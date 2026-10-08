@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>매일 점검 - 나무링크</title>
+<style>
+  :root{
+    --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+    --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E;
+    --sage:#5E9A6E; --coral:#D8684A; --coralL:#FCEFEA; --coralT:#993C1D;
+  }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line);
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+        padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; color:var(--tx); }
+  .hd .who { font-size:12px; color:var(--dim); }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:900px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 13px; font-size:13px;
+           background:var(--sf); color:var(--tx); border:1px solid var(--dim);
+           cursor:pointer; font-weight:500; }
+  button:hover { background:var(--camL); }
+  button.grey { border-color:var(--line); color:var(--cam); }
+  button.grey:hover { background:var(--camL); }
+  select { font:inherit; font-size:13px; padding:6px 9px; border-radius:8px;
+           border:1px solid var(--line); background:var(--sf); color:var(--tx); }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px;
+          padding:18px 20px; margin-bottom:14px; }
+  .ok { background:var(--sf); border-left:3px solid var(--sage);
+        padding:22px; text-align:center; font-size:16px; font-weight:600;
+        color:var(--tx); }
+  .ok .sub { font-size:13px; font-weight:400; color:var(--dim); margin-top:7px; }
+  .grp { margin-bottom:22px; border-left:3px solid var(--coral); padding-left:13px; }
+  .grp:last-child { margin-bottom:0; }
+  .grp-t { font-size:14px; font-weight:600; color:var(--tx); margin-bottom:3px; }
+  .grp-n { display:inline-block; background:var(--coralL); color:var(--coralT);
+           border-radius:10px; padding:1px 9px; font-size:12px;
+           margin-left:6px; vertical-align:1px; font-weight:500; }
+  /* 기록지 좌우 — 왼쪽 지난달 미작성 · 오른쪽 이번 달 진행 (2026-09-22) */
+  .lgcols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .lgR { border-left:1px solid #ECE8E3; padding-left:16px; }
+  .lgband { margin:0 0 12px; padding:8px 12px; font-size:13px; }
+  .lgrow { display:flex; justify-content:space-between; padding:6px 0;
+           border-bottom:1px solid #ECE8E3; font-size:13.5px; }
+  @media (max-width:700px) {
+    .lgcols { grid-template-columns:1fr; }
+    .lgR { border-left:none; padding-left:0; border-top:1px solid #ECE8E3; padding-top:12px; }
+  }
+  .grp-why { font-size:12.5px; color:var(--dim); margin-bottom:9px;
+             line-height:1.6; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--camL); color:#4A1B0C; text-align:left; font-weight:500;
+       padding:6px 10px; border-bottom:1px solid var(--camB); white-space:nowrap; }
+  td { padding:7px 10px; border-bottom:1px solid #F0EEEA; }
+  tr:last-child td { border-bottom:none; }
+  .cid { font-weight:500; color:var(--cam); white-space:nowrap; }
+  .sum { font-size:13px; color:var(--dim); margin-bottom:14px; }
+  .err { background:var(--sf); border-left:3px solid var(--coral);
+         padding:14px 16px; color:var(--coralT); font-size:13.5px;
+         white-space:pre-wrap; line-height:1.7; }
+  .load { text-align:center; padding:34px; color:var(--dim); font-size:14px; }
+  .note { font-size:12px; color:var(--dim); line-height:1.8; margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span>
+  <h1>매일 점검</h1>
+  <span class="who" id="who"></span>
+  <span class="sp"></span>
+  <select id="mon"></select>
+  <button id="run">점검하기</button>
+  <button id="home" class="grey">처음으로</button>
+</div>
+
+<div class="wrap">
+  <div id="body">
+    <div class="load">불러오는 중…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true,
+          autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+
+// 이 화면을 볼 수 있는 직원 — 관리자·행정·데스크
+const CAN_SEE = [8, 19, 11];
+
+// 항목마다 「무슨 뜻인지」와 「어떻게 하면 되는지」
+// 항목 이름을 화면에서만 쉽게 바꿔 보인다 (서버 글은 그대로 · 2026-10-07)
+const TFIX = { '11': '등록 안 함인데 「예정」으로 남음' };
+// 11번 줄 — 「○월 ○일(요일) ○:○○ 수업 있나요? 없나요?」 로 풀어 적는다 (2026-10-07 은정님)
+//   서버 글 「2026-10-15 14:20:00 · 예정 · 사유 없음」 에서 날짜 · 시각만 꺼냄. 못 꺼내면 서버 글 그대로
+function row11(txt){
+  const m = String(txt || '').match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})/);
+  if (!m) return esc(txt);
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const wd = '일월화수목금토'.charAt(dt.getDay());
+  const hh = Number(m[4]); const h12 = hh > 12 ? hh - 12 : hh;
+  return '<b>' + Number(m[2]) + '월 ' + Number(m[3]) + '일(' + wd + ') ' + h12 + ':' + m[5] + ' 수업 있나요? 없나요?</b>'
+    + '<div style="margin-top:4px;line-height:1.7;">'
+    + '· 납부 계산 — 수업 없음(등록 안 함)<br>'
+    + '· 시간표 — 안 보임<br>'
+    + '· 서버 자료만 「예정」으로 남아 있음<br>'
+    + '→ 수업 있음: 납부 계산에서 그 날 단추 켜기<br>'
+    + '→ 수업 없음: 납부 계산에서 그 날 단추를 켰다가 다시 끄기</div>';
+}
+const WHY = {
+  '1': '센터 운영시간(9:00~20:20) 밖에 회기가 있습니다. 시험용으로 만든 줄이거나 시각을 잘못 넣은 것입니다.',
+  '2': '같은 아동이 같은 날 같은 시각에 두 줄입니다. 시각이나 지원유형을 고칠 때 옛 줄이 안 지워지면 이렇게 됩니다.',
+  '3': '발달재활은 한 달 4회입니다. 회차가 5 이상이면 줄이 하나 더 있는 것입니다.',
+  '4': '회차가 중간에 비었습니다(1·3·4 처럼). 줄을 지운 뒤 번호를 다시 안 매긴 것입니다.',
+  '5': '수업줄에 적힌 시각과 회기 시각이 다릅니다. 그대로 두면 저장할 때마다 회기가 두 벌이 될 수 있습니다.',
+  '6': '회기는 「휴무」인데 그 날 휴무 기록이 없습니다. 휴무를 지우신 뒤 회기가 그대로 남은 것입니다. 「예정」으로 되돌리면 됩니다.',
+  '7': '이미 끝난 수업줄에 회기가 남아 있습니다.',
+  '8': '한 수업줄 안에서 같은 회차가 두 번 나옵니다.',
+  '9': '회기방식이 정한 횟수보다 회기가 많습니다.',
+  '10': '아직 오지 않은 날인데 「완료」로 되어 있습니다. 자료를 정리하다 섞였거나 잘못 눌린 것입니다. 「예정」으로 되돌리면 됩니다.',
+  '11': '납부 계산에서 「등록 안 함」으로 뺀 날인데 상태가 「예정」으로 바뀌어 있습니다. 이대로 두면 시간표에서 이 수업이 안 보입니다. → 그 날 수업을 하면: 납부 계산에서 그 날 단추를 켭니다. → 수업이 없으면: 납부 계산에서 그 날 단추를 한 번 켰다가 다시 끕니다.',
+  '12': '결석·보강 신청인데 어느 수업인지가 안 붙어 있습니다. 학부모 화면에서 낸 신청은 수업이 반드시 붙으므로, 다른 길로 들어온 것입니다. 확인 후 지우시면 됩니다.',
+  '13': '회차 번호가 0입니다. 번호 0은 발달재활에만 붙습니다. 센터비용·치료지원·방과후는 공휴일에도 번호를 붙여야 합니다. 번호가 0이면 보강 상자에 안 떠서 한 회가 조용히 빠집니다.',
+  '14': '「보강 없음」으로 정한 날인데 보강이 잡혀 있습니다. 둘 중 하나가 잘못된 것입니다. → 보강을 하기로 하셨으면 납부 계산에서 그 날 단추를 다시 켜고, 안 하기로 하셨으면 시간표에서 보강 줄을 지우세요.',
+  '15': '쪼개서 보강한 조각이 40분을 못 채웠습니다. → 시간표 찾기 창에서 그 결석 줄의 ＋ 를 눌러 남은 분을 다른 날에 더 얹으세요. 더 못 채우시면 「포기 (보강 안 함)」로 두시면 됩니다.',
+  '16': '납부 계산에 저장된 회기 수와 시간표 단추 수가 다릅니다. → 납부 계산 화면에서 그 아동을 열면 회기 칸 옆에 빨간 「단추 ○회」가 보입니다. 누르면 맞춰집니다.',
+  '17': '보강 줄이 다른 아동의 결석을 메우고 있습니다. 보강은 「어느 결석을 메우는지」를 가리키는데, 그 손가락이 남의 아이를 가리키고 있습니다. 그대로 두면 그 아이는 보강을 받은 것으로, 이 아이는 못 받은 것으로 셈됩니다. → 시간표 찾기 창에서 이 보강 줄을 지우고, 맞는 아동의 결석에서 ＋ 로 다시 잡아 주세요.',
+  '18': '보강 줄이 다른 지원유형의 결석을 메우고 있습니다. 센터비용 조각이 발달재활 결석 자리에 붙는 식입니다. 그대로 두면 엉뚱한 수업의 단추가 켜지고, 정작 메워야 할 결석은 안 메워진 채 남습니다. → 시간표 찾기 창에서 이 보강 줄을 지우고, 맞는 수업의 결석에서 ＋ 로 다시 잡아 주세요.',
+  '19': '평가를 보고 일주일이 지났는데 센터 평가보고서가 올라오지 않았습니다. → 담당 선생님께 말씀해 주세요. 올리면 저절로 사라집니다.',
+  '20': '쪼갠 조각이 붙을 수업이 그 날에 없습니다. 조각은 같은 선생님·같은 사업 수업 앞뒤에만 붙습니다. → 시간표 찾기 창에서 이 조각을 지우고 다시 잡아 주세요.',
+  '21': '매주 오는 수업인데 오는 주차가 꺼져 있습니다. 꺼진 주는 회기가 안 깔립니다. 월 2~3회 오시는 아동이면 회기방식을 「주차선택」으로 두어야 합니다.',
+  '22': '지난달 치료기록지가 덜 적혔습니다. 치료지원 계열(누가기록서)은 한 달 세 회, 발달재활·센터는 수업한 회수만큼 적으면 됩니다. → 담당 선생님께 말씀해 주세요. 매달 1일부터 지난달 것이 뜨고, 기한은 다음 달 10일입니다. 다 적으시면 저절로 사라집니다.',
+  '23': '치료와 요일줄의 시작·끝이 서로 안 맞거나, 아동 상태와 수업이 어긋납니다. 화면마다 보는 칸이 달라 어떤 곳은 남기고 어떤 곳은 빼게 됩니다. → 시간표에서 그 수업을 열어 시작일·종결일을 다시 넣어 주세요.',
+  '24': '요일줄이 지워졌는데 그 줄을 가리키는 회기가 남아 있습니다. 시간표에는 그려지지만 어느 셈에도 안 잡혀 회기 수·급여·교육비가 조용히 어긋납니다. → 그 달용 요일줄을 새로 만들어 회기를 그리로 이어 주세요.',
+  '25': '보강이 원래 결석이 아니라 다른 보강 줄에 붙어 있습니다(보강의 보강). 표 장치가 새로 들어오는 것은 저절로 바로잡으므로, 이 항목이 뜨면 장치 밖에서 고친 것입니다. → Claude 에게 줄 번호를 알려 주세요.',
+  '26': '보강이 원래 결석과 다른 달 몫으로 적혀 있습니다. 납부·급여가 엉뚱한 달로 셈됩니다. → Claude 에게 줄 번호를 알려 주세요.',
+  '27': '원래 줄은 예정·쉼(수업하는 날)인데 살아 있는 보강이 딸려 있습니다. 한 회가 두 번 셈됩니다. → 원래 줄이 실제로 결석이면 결석으로 바꾸고, 수업하셨으면 보강 줄을 지우세요.',
+  '28': '한 결석에 40분 보강이 둘 살아 있습니다. 한 회를 두 번 채운 것으로 셈됩니다. → 시간표 찾기 창에서 둘 중 하나를 지우세요.',
+  '29': '앞으로 올 수업의 담당 선생님이 요일줄 담당과 다릅니다. 담당 변경이 일부만 적용된 것입니다. → 시간표에서 그 수업을 열어 담당과 변경 시작일을 다시 저장하세요.',
+  '30': '같은 요일줄 · 같은 날 · 같은 시각에 사업만 다른 원래 줄이 두 벌 있습니다. 수업의 지원유형(사업)을 바꿀 때 옛 사업 줄이 남은 것입니다. 그대로 두면 한 수업이 두 번 그려지고, 납부·급여에서 두 번 셈됩니다. → 옛 사업 쪽 줄이 예정·휴무이면 시간표 찾기 창에서 지우세요. 결석이거나 보강이 딸려 있으면 Claude 에게 줄 번호를 알려 주세요.',
+  '31': '요일줄이 끝난 날짜 뒤에 결석 줄이 남아 있습니다. 요일·시각을 바꾸기 전에 미리 결석으로 표시해 둔 앞날 수업입니다. 옛 요일 자리는 이제 없으므로 그대로 두면 청구·보강 대상으로 잘못 잡힙니다. → 보강이 딸려 있으면 시간표 찾기 창에서 그 보강을 새 요일로 옮기거나 지우세요. 학부모 결석 요청이 있으면 결석 확인 화면에서 정리하세요. 그 뒤에도 남으면 Claude 에게 회기줄 번호를 알려 주세요.',
+  '32': '수업(예정·완료·보강) 시각이 같은 선생님이나 같은 아동의 평가 · 체험 · 추가 수업과 겹칩니다. 평가 · 체험을 넣을 때와 보강을 잡을 때는 서버가 막지만, 달마다 회기를 새로 깔 때는 그 달 깔기가 멈추지 않도록 막지 않아 여기서 잡습니다. → 실제로 둘 다 하는지 확인한 뒤, 평가 · 체험은 신규 상담 · 아동 목록에서, 추가 수업은 납부 계산에서 시각을 옮기거나, 시간표에서 그 날 수업을 옮기세요.',
+  '33': '같은 선생님(또는 같은 아동)의 수업 두 개가 같은 시간에 걸쳐 있습니다. 보강이 먼저 잡혀 있던 자리에 새 수업을 넣었거나, 수업 시각을 옮겼을 때 생깁니다. 회기를 깔 때는 그 달 깔기가 멈추지 않도록 막지 않아 여기서 잡습니다. → 시간표 찾기 창에 아동 번호를 넣으면 빨간 테두리 단추가 겹친 날입니다. 보강이면 ✎ 로 날짜·시각을 옮기고, 정규 수업이면 그 날을 결석으로 바꾼 뒤 보강을 다른 자리에 잡으세요. 두 아동 중 한쪽만 옮기면 두 줄 모두 사라집니다.'
+};
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function monNo(k){ return Number(String(k).slice(5,7)); }
+
+// 아동 번호 → 이름 (점검 결과에 나온 아동만 가져온다)
+let KIDNM = {};
+async function loadNames(ids){
+  KIDNM = {};
+  if (!ids.length) return;
+  try {
+    const { data } = await sb.from('nl_children').select('id, name').in('id', ids);
+    (data || []).forEach(function(c){ KIDNM[c.id] = c.name || ''; });
+  } catch (e) {}
+}
+// 22번(지난달 기록지 미작성)은 선생님별로 묶는다 (2026-09-21 은정님)
+//   서버 글 「2026-08 · 센터 · ○○○ 선생님 · 4회 중 1회 미작성」을 나눠
+//   제목 「3번 ○○○ 선생님」 아래 「28번 ○○○ · 센터 · 4회 중 1회 미작성」
+let THNO = {};
+function logByTh(list){
+  const g = {}, ord = [];
+  // 기한 — 서버 글 뒤 「기한 지남」 또는 「작성 중 · 기한 ○월 10일」 (2026-09-22)
+  let pm = '', st = '';
+  list.forEach(function(r){
+    const p = String(r['내용'] || '').split(' · ');
+    if (!pm) pm = p[0] || '';
+    const tail = p.slice(4).join(' · ');
+    if (tail) st = /지남/.test(tail) ? '기한 지남' : '작성 중';
+    const th = (p[2] || '').replace(/\s*선생님$/, '');
+    const key = th || '?';
+    if (!g[key]) { g[key] = []; ord.push(key); }
+    g[key].push({ cid: r['아동'], sp: p[1] || '', cnt: p[3] || '' });
+  });
+  const noOf = function(nm){
+    const m = /^(\d+)번$/.exec(nm);
+    if (m) return Number(m[1]);
+    return THNO[nm] != null ? Number(THNO[nm]) : 999;
+  };
+  ord.sort(function(a, b){ return noOf(a) - noOf(b); });
+  let h = '';
+  if (/^\d{4}-\d{2}$/.test(pm)) {
+    const dl = monNo(pm) % 12 + 1;
+    h += '<div class="lgband" style="background:var(--coralL);color:var(--coralT);">'
+       + esc('기한 ' + dl + '월 10일' + (st ? ' · ' + st : ''))
+       + '</div>';
+  }
+  ord.forEach(function(nm){
+    const n = noOf(nm);
+    const head = /^\d+번$/.test(nm) ? nm : ((n < 999 ? n + '번 ' : '') + nm);
+    h += '<div style="margin:0 0 14px;">'
+       + '<div style="font-weight:bold;padding:6px 0;border-bottom:1px solid var(--line,#ECE8E3);">'
+       + esc(head) + ' 선생님 <span style="font-weight:normal;color:var(--dim);font-size:12px;">'
+       + g[nm].length + '명</span></div>';
+    g[nm].sort(function(a, b){ return Number(a.cid) - Number(b.cid); }).forEach(function(x){
+      h += '<div style="padding:5px 0 5px 12px;">' + esc(kidTxt(x.cid))
+         + ' · ' + esc(x.sp) + ' · ' + esc(x.cnt) + '</div>';
+    });
+    h += '</div>';
+  });
+  return h;
+}
+function kidTxt(no){
+  const nm = KIDNM[Number(no)];
+  return no + '번' + (nm ? ' ' + nm : '');
+}
+
+// 달 고르기 — 지난 6달부터 다음 3달까지
+function fillMon(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  let html = '';
+  for (let i = -6; i <= 3; i++) {
+    const d = new Date(y, m + i, 1);
+    const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    html += '<option value="' + k + '"' + (i === 0 ? ' selected' : '') + '>'
+          + d.getFullYear() + '년 ' + (d.getMonth()+1) + '월</option>';
+  }
+  $('mon').innerHTML = html;
+}
+
+async function run(){
+  const k = $('mon').value;
+  $('body').innerHTML = '<div class="load">' + monNo(k) + '월을 점검하고 있습니다…</div>';
+  const { data, error } = await sb.rpc('nl_daily_check', { p_month: k });
+  if (error) {
+    $('body').innerHTML = '<div class="err">점검하지 못했습니다.\n' + esc(error.message) + '</div>';
+    return;
+  }
+  const rows = data || [];
+  if (!rows.length) {
+    await loadProg(k);
+    $('body').innerHTML = '<div class="ok">' + monNo(k) + '월 — 어긋난 것이 없습니다'
+      + '<div class="sub">모든 항목을 살펴봤습니다. 가벼운 마음으로 시작하세요.</div></div>'
+      + '<div class="card" style="margin-top:14px;">' + logBox(k, null) + '</div>';
+    return;
+  }
+
+  // 22번을 선생님별로 묶을 때 쓸 선생님 번호 (2026-09-21)
+  THNO = {};
+  try {
+    const { data: th } = await sb.from('nl_therapists').select('id, name');
+    (th || []).forEach(function(t){ if (t.name) THNO[t.name] = t.id; });
+  } catch (e) {}
+
+  await loadProg(k);
+
+  // 아동 이름을 함께 보여 준다 (2026-09-13)
+  await loadNames(Array.from(new Set(rows.map(function(r){ return Number(r['아동']); })
+                                         .filter(function(v){ return v; }))));
+
+  // 항목별로 묶는다
+  const grp = {}, ord = [];
+  rows.forEach(function(r){
+    const t = String(r['항목'] || '');
+    if (!grp[t]) { grp[t] = []; ord.push(t); }
+    grp[t].push(r);
+  });
+
+  let h = '<div class="card">';
+  h += '<div class="sum"><b>' + monNo(k) + '월</b> — 살펴볼 것이 '
+     + rows.length + '건 있습니다.</div>';
+  let lgDone = false;
+  ord.forEach(function(t){
+    const list = grp[t];
+    const no = String(t).split(' ')[0];
+    if (no === '22') { h += logBox(k, list); lgDone = true; return; }
+    h += '<div class="grp">'
+      + '<div class="grp-t">' + esc(TFIX[no] || t.replace(/^\d+\s*/, ''))
+      + '<span class="grp-n">' + list.length + '건</span></div>'
+      + (no === '11' ? '' : '<div class="grp-why">' + esc(WHY[no] || '') + '</div>')
+      ;
+
+    h += '<table><tr><th style="width:150px;">아동</th><th>내용</th></tr>';
+    list.forEach(function(r){
+      h += '<tr><td class="cid">' + esc(kidTxt(r['아동'])) + '</td>'
+         + '<td>' + (no === '11' ? row11(r['내용']) : esc(r['내용'])) + '</td></tr>';
+    });
+    h += '</table></div>';
+  });
+  if (!lgDone) h += logBox(k, null);
+  h += '<div class="note">※ 아동 이름이 나오므로 캡처해서 올리실 때는 이름을 가려 주세요.<br>'
+     + '※ 고치는 방법을 모르시겠으면 이 화면을 캡처해 물어보세요.</div>';
+  h += '</div>';
+  $('body').innerHTML = h;
+
+  // 「선생님께 알림 보내기」 — 22번(지난달 기록지 미작성) 상자에만 있다 (2026-09-19)
+  const sbtn = $('sendLog');
+  if (sbtn) sbtn.onclick = async function(){
+    const pm = prevMk(k);
+    if (!confirm('담당 선생님께 ' + pm + ' 기록지 알림을 보낼까요?\n\n'
+      + '· 선생님 화면 🔔 에 뜹니다\n'
+      + '· 같은 달 알림은 두 번 가지 않습니다')) return;
+    sbtn.disabled = true; sbtn.textContent = '보내는 중…';
+    try {
+      const { data, error } = await sb.rpc('nl_send_log_alerts', { p_month: pm });
+      if (error) throw error;
+      sbtn.textContent = '✓ 보냈습니다';
+      $('sendLogMsg').textContent = String(data || '');
+    } catch (e) {
+      sbtn.disabled = false; sbtn.textContent = '선생님께 알림 보내기';
+      alert('보내지 못했습니다.\n' + e.message);
+    }
+  };
+}
+
+// 기록지 좌우 상자 (2026-09-22 은정님)
+//   왼쪽 — 지난달 기록지 미작성 (22번, 아동별)
+//   오른쪽 — 보는 달 기록지 진행 (nl_log_progress, 선생님별 숫자)
+let PROG = null;
+async function loadProg(k){
+  PROG = null;
+  try {
+    const { data, error } = await sb.rpc('nl_log_progress', { p_month: k });
+    if (!error) PROG = data || [];
+  } catch (e) {}
+}
+function logBox(k, list){
+  const pm = prevMk(k);
+  let L = '';
+  if (list && list.length) {
+    L += '<div class="grp-t">' + monNo(pm) + '월 기록지 미작성'
+       + '<span class="grp-n">' + list.length + '건</span></div>'
+       + '<div class="grp-why">' + esc(WHY['22'] || '') + '</div>'
+       + '<div style="margin:0 0 12px;">'
+       + '<button id="sendLog" style="width:auto;margin:0;">선생님께 알림 보내기</button>'
+       + '<span id="sendLogMsg" style="font-size:12px;color:var(--dim);margin-left:8px;">'
+       + '같은 달은 한 번만 갑니다</span></div>'
+       + logByTh(list);
+  } else {
+    L += '<div class="grp-t">' + monNo(pm) + '월 기록지</div>'
+       + '<div class="grp-why">기한이 지난 것 가운데 덜 적힌 기록지가 없습니다.</div>';
+  }
+  // 오른쪽 — 기한은 다음 달 10일
+  const y = Number(String(k).slice(0,4)), m = monNo(k);
+  const due = new Date(y, m, 10);
+  const st = (new Date() < due) ? '작성 중' : '기한 지남';
+  let R = '<div class="grp-t">' + m + '월 기록지 진행</div>'
+        + '<div class="lgband" style="background:#F1F7F2;color:#3E6B4B;">'
+        + esc('기한 ' + (due.getMonth() + 1) + '월 10일 · ' + st) + '</div>';
+  if (PROG === null) {
+    R += '<div class="grp-why">진행 숫자를 가져오지 못했습니다.</div>';
+  } else {
+    const pr = PROG.filter(function(r){ return Number(r.need_cnt) > 0; });
+    if (!pr.length) R += '<div class="grp-why">이 달에 끝난 수업이 아직 없습니다.</div>';
+    pr.forEach(function(r){
+      R += '<div class="lgrow"><span>' + esc(r.therapist_id + '번 ' + (r.th_name || '') + ' 선생님')
+         + ' <span style="color:var(--dim);font-size:12px;">' + r.kids + '명</span></span>'
+         + '<span>적힌 <b>' + r.put_cnt + '</b> / ' + r.need_cnt + '회</span></div>';
+    });
+    R += '<div style="font-size:12px;color:var(--dim);margin-top:8px;">'
+       + '오늘까지 끝난 수업 가운데 기록지가 적힌 회수입니다.</div>';
+  }
+  return '<div class="grp"><div class="lgcols"><div class="lgL">' + L + '</div>'
+       + '<div class="lgR">' + R + '</div></div></div>';
+}
+
+// 고른 달의 지난달 ('2026-09' → '2026-08')
+function prevMk(k){
+  const y = Number(String(k).slice(0,4)), m = Number(String(k).slice(5,7));
+  const d = new Date(y, m - 2, 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+$('run').onclick = run;
+$('mon').onchange = run;
+$('home').onclick = () => { location.href = 'index.html'; };
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const user = data.session.user;
+  const { data: me, error } = await sb.from('nl_therapists')
+    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (error || !me) {
+    $('body').innerHTML = '<div class="err">직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.</div>';
+    return;
+  }
+  nlKeep(me.id);
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) {
+    $('body').innerHTML = '<div class="err">이 화면을 볼 권한이 없습니다.</div>';
+    return;
+  }
+  $('who').textContent = me.name + ' 님으로 로그인됨';
+  fillMon();
+  run();
+})();
+</script>
+</body>
+</html>

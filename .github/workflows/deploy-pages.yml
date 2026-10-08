@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+# 2026-10-09 — 저장소를 jet73kyj.github.io 로 옮김
+#   파일을 사이트의 namu-link/ 폴더 안에 넣어, 주소는 전과 같이
+#   https://jet73kyj.github.io/namu-link/ 로 열린다
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build site folder
+        run: |
+          mkdir -p _site/namu-link
+          tar --exclude='./.git' --exclude='./.github' --exclude='./_site' -cf - . | tar -xf - -C _site/namu-link
+          touch _site/.nojekyll
+          printf '%s\n' '<!DOCTYPE html><meta charset="UTF-8"><meta http-equiv="refresh" content="0; url=/namu-link/"><a href="/namu-link/">나무링크</a>' > _site/index.html
+          sed 's#href="index.html"#href="/namu-link/index.html"#' 404.html > _site/404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

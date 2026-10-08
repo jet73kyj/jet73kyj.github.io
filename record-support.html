@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>치료지원 누가기록서 - 나무링크</title>
+<style>
+  body { font-family: 'Malgun Gothic','맑은 고딕',sans-serif; background:#f5f7fa; margin:0; }
+  header { background:#2e7d32; color:white; padding:12px 24px; display:flex; align-items:center; gap:12px; }
+  .container { max-width:1000px; margin:16px auto; padding:0 16px; }
+  .page-title { font-size:18px; font-weight:bold; color:#2e7d32; margin:10px 0; }
+  .form-actions { display:flex; gap:8px; margin:12px 0; }
+  .form-actions button { padding:8px 18px; border:none; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; }
+  /* 저장 단추 — 저장 전(연한 초록) / 저장 중(회색) / 저장됨(진한 초록) (2026-09-16) */
+  .btn-save { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3 !important; }
+  .btn-save.done { background:#2e7d32; color:white; border-color:#2e7d32 !important; }
+  .btn-save:disabled { background:#bbb; color:white; border-color:#bbb !important; cursor:default; }
+  .btn-print { background:#1565c0; color:white; }
+  .sheet { background:white; padding:26px 32px; border:1px solid #ddd;
+           box-shadow:0 1px 4px rgba(0,0,0,0.05); margin-bottom:22px; }
+  .sheetlogo { text-align:center; margin-top:12px; }
+  .sheetlogo img { height:40px; }
+  .sheet h2.title { text-align:center; font-size:16px; margin:0 0 14px; letter-spacing:2px; }
+  .rec-tbl { border-collapse:collapse; width:100%; font-size:12px; table-layout:fixed; }
+  .rec-tbl td, .rec-tbl th { border:1px solid #333; padding:5px 8px; vertical-align:top; }
+  .rec-tbl td.lbl { background:#f5f5f5; font-weight:bold; text-align:center; vertical-align:middle; }
+  .rec-tbl th { background:#f0f4c3; font-weight:bold; text-align:center; }
+  .side { background:#f5f5f5; font-weight:bold; text-align:center; vertical-align:middle;
+          width:56px; letter-spacing:2px; }
+  input[type=text], input[type=date], textarea, select {
+    border:1px solid #ccc; padding:3px 6px; font-size:12px;
+    font-family:inherit; box-sizing:border-box; width:100%; }
+  textarea { resize:vertical; min-height:46px; }
+  textarea.opin { min-height:46px; }
+  .sign { text-align:center; font-size:12.5px; line-height:2.4; margin-top:22px; }
+  .sign .line { margin-top:6px; }
+  /* 두 서명을 한 줄에 담는다 (2026-09-10) */
+  /* 담당치료사 아래에 치료지원담당이 오도록 세로로 (2026-09-10) */
+  .sign .signrow { display:flex; flex-direction:column; align-items:center;
+                   gap:8px; }
+  .sign .signone { white-space:nowrap; }
+  /* 직인 — 「(인)」 글자 위에 겹쳐 찍는다 */
+  .ins { position:relative; display:inline-block; }
+  .ins img { position:absolute; left:50%; top:50%;
+             transform:translate(-50%, -50%);
+             width:44px; height:auto; opacity:0.92; display:none; }
+  .radio { font-size:12px; }
+  .radio span { cursor:pointer; padding:2px 8px; border-radius:4px; }
+  .radio span.on { color:#c62828; background:#ffebee; font-weight:bold; }
+
+  .loginbox { max-width:400px; margin:56px auto; background:#fff; border-radius:12px;
+              padding:32px; border:1px solid #e0e0e0; }
+  .loginbox input { border:1px solid #ddd; padding:11px; border-radius:7px; font-size:15px; }
+  .out { margin-top:16px; padding:12px 14px; border-radius:8px; font-size:13.5px;
+         line-height:1.6; display:none; white-space:pre-wrap; }
+  .ok  { background:#e8f5e9; color:#1b5e20; display:block; }
+  .err { background:#ffebee; color:#b71c1c; display:block; }
+  .picker { max-width:1000px; margin:14px auto 0; padding:0 16px; display:flex;
+            gap:8px; align-items:center; flex-wrap:wrap; }
+  .picker select, .picker input { width:auto; font-size:13px; padding:7px 9px; }
+  .picker button { background:#2e7d32; color:#fff; border:none; border-radius:6px;
+                   padding:8px 16px; font-size:13px; font-weight:bold; cursor:pointer; }
+  .picker #pInfo { font-size:12.5px; color:#777; margin-left:4px; }
+
+  @media print {
+    /* 발달재활 기록지와 같은 여백 (2026-09-10)
+       위를 넓게 두어 철하실 자리를 만든다 */
+    @page { size: A4 portrait; margin: 22mm 14mm 10mm; }
+    header, .form-actions, .page-title, .picker, .no-print { display:none !important; }
+    body { background:white; }
+    .ins img { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .container { max-width:none; margin:0; padding:0; }
+    .sheet { border:none; box-shadow:none; padding:0; margin:0; }
+    .rec-tbl { font-size:10.5px; }
+    .rec-tbl td, .rec-tbl th { padding:4px 6px; }
+    input, textarea { border:none; padding:1px 3px; font-size:10.5px; background:transparent; }
+    textarea { min-height:38px; }
+    textarea.opin { min-height:38px; }   /* 두 줄이면 충분 (2026-09-10) */
+    /* 긴 내용이 잘리지 않게 (2026-09-10) */
+    textarea { overflow:hidden !important; height:auto; resize:none; }
+    .rec-tbl { page-break-inside:auto; }
+    .rec-tbl tr { page-break-inside:avoid; page-break-after:auto; }
+    .rec-tbl thead { display:table-header-group; }
+    .sheet { overflow:visible !important; }
+    .sign { margin-top:10px; line-height:1.9; }
+    .sign .signrow { gap:7px; }
+    /* 로고 — 다음 장으로 넘어가지 않게 자리를 줄인다 (2026-09-10) */
+    .sheetlogo { margin-top:8mm; page-break-inside:avoid; }
+    .sheetlogo img { height:40px; }
+  }
+
+  /* ===== 꾸밈 B (2026-09-17) — 화면에서만 보이는 곳. 인쇄 서식(표·선·칸 색)은 그대로 =====
+     되돌리려면 이 묶음(꾸밈 B ~ 꾸밈 B 끝)만 지우면 된다 */
+  body { background:#F5F4F2; color:#2F2926; }
+  header { background:#fff !important; color:#2F2926 !important; border-bottom:1px solid #ECE8E3;
+           padding:10px 24px !important; }
+  header .toplogo { height:40px; width:auto; display:block; }
+  header h1 { color:#2F2926; font-size:17px !important; border-left:1px solid #ECE8E3; padding-left:12px; }
+  header #who { color:#A39C95; opacity:1 !important; }
+  header .hdout { background:#fff !important; color:#4A433F !important; border:1px solid #E4E0DA !important; }
+  .page-title { color:#2F2926 !important; }
+  .picker select, .picker input { border:1px solid #E4E0DA; border-radius:6px; background:#fff; color:#2F2926; }
+  .picker button, .picker #pIntake {
+    background:#fff !important; color:#4A433F !important; border:1px solid #E4E0DA !important;
+    border-radius:6px !important; font-weight:500 !important; }
+  .picker button:hover { background:#F7F6F4 !important; }
+  .form-actions { align-items:center; }
+  .form-actions button, .form-actions a {
+    background:#fff !important; color:#4A433F !important; border:1px solid #E4E0DA !important;
+    font-weight:500 !important; }
+  .form-actions button:hover, .form-actions a:hover { background:#F7F6F4 !important; }
+  .form-actions a[href="index.html"] { color:#7E5530 !important; border-color:#D9C3A7 !important;
+    font-weight:600 !important; }
+  .form-actions a[href="index.html"]:hover { background:#FBF5EE !important; }
+  /* 저장 — 저장 전 흰 테두리 / 저장됨만 초록 (납부 계산과 같게) */
+  .form-actions .btn-save { font-weight:600 !important; }
+  .form-actions .btn-save.done { background:#2e7d32 !important; color:#fff !important;
+    border-color:#2e7d32 !important; }
+  .form-actions .btn-save:disabled { background:#bbb !important; color:#fff !important;
+    border-color:#bbb !important; }
+  .sheet { border-color:#ECE8E3; }
+  .loginbox { border-color:#ECE8E3; }
+  .loginbox .loginlogo { display:block; height:52px; width:auto; margin:0 0 12px; }
+  .loginbox h1 { color:#2F2926 !important; }
+  .loginbox #btn { background:#B07A4A !important; }
+  .ok { background:#F8F1E8; color:#7E5530; }
+  /* ===== 꾸밈 B 끝 ===== */
+</style>
+</head>
+<body>
+
+<!-- 로그인 전 -->
+<div class="loginbox" id="loginBox">
+  <img src="img/nl-logo.png" alt="자라는나무" class="loginlogo" onerror="this.style.display='none'">
+  <h1 style="font-size:19px;margin:0 0 4px;color:#2e7d32;">치료지원 누가기록서</h1>
+  <div style="font-size:13px;color:#888;margin-bottom:20px;">나무링크</div>
+  <label style="display:block;font-size:12px;color:#666;margin:12px 0 5px;">이메일</label>
+  <input id="em" type="email" autocomplete="username" placeholder="you@example.com" style="width:100%;">
+  <label style="display:block;font-size:12px;color:#666;margin:12px 0 5px;">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password" style="width:100%;">
+  <button id="btn" style="width:100%;padding:12px;margin-top:20px;background:#2e7d32;color:#fff;border:none;border-radius:7px;font-size:15px;font-weight:bold;cursor:pointer;">로그인</button>
+  <div id="msg" class="out"></div>
+</div>
+
+<div id="mainBox" style="display:none;">
+<header>
+  <img src="img/nl-logo.png" alt="자라는나무" class="toplogo" onerror="this.style.display='none'">
+  <h1 style="margin:0;font-size:20px;">치료지원 누가기록서</h1>
+  <span style="margin-left:auto;font-size:13px;opacity:.9;" id="who"></span>
+  <button onclick="logout()" class="no-print hdout" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;">로그아웃</button>
+</header>
+
+<div class="picker no-print">
+  <select id="pChild" style="min-width:280px;"></select>
+  <input id="pMonth" type="month">
+  <button id="pLoad">불러오기</button>
+  <button type="button" id="pIntake" style="background:#e3f0fb;color:#0c447c;border:1px solid #85b7eb;border-radius:7px;font-weight:600;">상담 · 보고서</button>
+  <span id="pCount" style="font-size:14px;color:#5F5E5A;white-space:nowrap;"></span>
+  <span id="pInfo"></span>
+</div>
+
+<div class="container">
+  <div class="page-title" id="pageTitle">치료지원 누가기록서</div>
+
+  <div class="form-actions no-print">
+    <button class="btn-save" id="btnSave" onclick="saveRecord()">저장 전</button>
+    <button class="btn-print" onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="index.html" style="margin-left:auto;background:#eee;color:#555;text-decoration:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:bold;">처음으로</a>
+  </div>
+
+  <div class="sheet" id="sheet1">
+    <h2 class="title" id="sheetTitle">치료 [ ]월 치료지원 누가기록서</h2>
+
+    <table class="rec-tbl">
+      <colgroup>
+        <col style="width:56px;"><col style="width:15%;"><col style="width:26%;">
+        <col style="width:15%;"><col>
+      </colgroup>
+      <tr>
+        <td class="side" rowspan="4">학생<br>정보</td>
+        <td class="lbl">이름(성별)</td>
+        <td><input type="text" id="f_name"></td>
+        <td class="lbl">생년월일</td>
+        <td><input type="text" id="f_birth"></td>
+      </tr>
+      <tr>
+        <td class="lbl">장애유형</td>
+        <td><input type="text" id="f_disab"></td>
+        <td class="lbl">소속</td>
+        <td>
+          <div style="display:flex;gap:5px;">
+            <input type="text" id="f_school" placeholder="○○초등학교" style="flex:2;">
+            <input type="text" id="f_grade" placeholder="3학년" style="flex:1;">
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl" rowspan="2" style="vertical-align:middle;">현재<br>수행 수준</td>
+        <td class="lbl" style="background:#fafafa;">소근육 및<br>일상생활동작</td>
+        <td colspan="2"><textarea id="f_fine"></textarea></td>
+      </tr>
+      <tr>
+        <td class="lbl" style="background:#fafafa;">인지 및<br>언어/학습</td>
+        <td colspan="2"><textarea id="f_cog"></textarea></td>
+      </tr>
+      <tr>
+        <td class="side" rowspan="2">치료<br>지원<br>내용</td>
+        <td class="lbl">장기목표</td>
+        <td colspan="3"><textarea id="f_goalL"></textarea></td>
+      </tr>
+      <tr>
+        <td class="lbl">단기목표</td>
+        <td colspan="3"><textarea id="f_goalS"></textarea></td>
+      </tr>
+    </table>
+
+    <table class="rec-tbl" style="margin-top:-1px;">
+      <colgroup>
+        <col style="width:15%;"><col style="width:26%;"><col style="width:59%;">
+      </colgroup>
+      <tr>
+        <th>회 기</th>
+        <th>치 료 내 용</th>
+        <th>학생 반응 및 평가내용</th>
+      </tr>
+      <tbody id="seqBody"></tbody>
+    </table>
+
+    <table class="rec-tbl" style="margin-top:-1px;">
+      <colgroup><col style="width:15%;"><col></colgroup>
+      <tr>
+        <td class="lbl">치료결과<br>지속 여부</td>
+        <td>
+          <div class="radio" id="contBox">
+            <span data-val="지속" onclick="_pickCont(this)">지속</span> /
+            <span data-val="중단" onclick="_pickCont(this)">중단</span>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td class="lbl">치료 경과<br>및 의견</td>
+        <td><textarea id="f_opinion" class="opin"
+              placeholder="이 달의 치료 경과와 의견을 적어 주세요."></textarea></td>
+      </tr>
+    </table>
+
+    <div class="sign">
+      상기 내용이 이상 없음을 확인합니다.
+      <div class="line" id="signDate">20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;일</div>
+      <div class="line signrow">
+        <span class="signone">담당치료사 <span id="signThr" style="display:inline-block;min-width:110px;border-bottom:1px solid #999;">&nbsp;</span> (인)</span>
+        <span class="signone">치료지원담당(기관장) <span style="display:inline-block;min-width:110px;border-bottom:1px solid #999;">자라는나무</span> <span class="ins">(인)<img id="stampImg" alt=""></span></span>
+      </div>
+    </div>
+    <div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script src="nl-live-alert.js"></script>
+<script src="nl-evaldocs.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+// 로그인을 창(탭) 안에서만 유지한다. 창을 닫으면 자동으로 끊긴다.
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $  = id => document.getElementById(id);
+
+const SESSIONS = 3;                     // 치료지원 = 월 3회
+const SUPPORTS = [3, 4, 6, 7];          // 치료지원(언어/작업) · 방과후치료지원(언어/작업)
+const TTYPE = { 1:'언어', 2:'작업', 3:'전산화인지', 4:'감각통합', 5:'음악', 6:'일상자립' };
+
+let ME = null, PAIRS = [], THERAPISTS = {}, SUPNAME = {};
+let TPRAW = [];   // 수업 원본 (서버를 못 부를 때 쓰는 옛 셈)
+let KIDS  = {};   // 아동번호 → 아동 정보
+let cur = null;                          // 고른 아동+지원유형
+let SCHED = [], LOGID = null, ITEMS = [], CONT = '', PREV = null, WRITTEN = null;
+let year = new Date().getFullYear();
+let month = new Date().getMonth() + 1;
+let LOADED = false;
+
+function show(el, t, ok) { el.textContent = t; el.className = 'out ' + (ok ? 'ok' : 'err'); }
+function esc(s) { return String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function mkNow() { return year + '-' + String(month).padStart(2,'0'); }
+async function logout() {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+}
+function fmtBirth(b) {
+  if (!b) return '';
+  const s = String(b).replace(/\D/g,'');
+  if (s.length < 8) return b;
+  return s.slice(0,4) + '.' + s.slice(4,6) + '.' + s.slice(6,8);
+}
+function _hm(v) { const m = String(v||'').match(/(\d{1,2}):(\d{2})/);
+  return m ? m[1].padStart(2,'0') + ':' + m[2] : null; }
+function d2iso(s) { const m = String(s||'').replace(/[^0-9]/g,'');
+  return m.length === 8 ? m.slice(0,4)+'-'+m.slice(4,6)+'-'+m.slice(6,8) : null; }
+
+function _pickCont(el) {
+  markDirty();
+  const on = el.classList.contains('on');
+  $('contBox').querySelectorAll('span').forEach(s => s.classList.remove('on'));
+  if (!on) { el.classList.add('on'); CONT = el.dataset.val; } else { CONT = ''; }
+}
+
+
+// ─────────────────────────────────────────────
+// 권한 — 관리자·행정은 전체, 치료사는 담당 아동만, 홍보는 못 들어옴
+// ─────────────────────────────────────────────
+function _roleOf(r) { return String(r || '').trim(); }
+function _isAllView(r) { const x = _roleOf(r); return x === '관리자' || x === '행정'; }
+function _isBlocked(r) { return _roleOf(r) === '홍보'; }
+function _blockScreen(role) {
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('mainBox').style.display = 'none';
+  const b = document.createElement('div');
+  b.style.cssText = 'max-width:420px;margin:80px auto;background:#fff;border-radius:12px;'
+    + 'padding:34px;border:1px solid #e0e0e0;text-align:center;font-family:inherit;';
+  b.innerHTML = '<div style="font-size:34px;margin-bottom:10px;">\uD83D\uDD12</div>'
+    + '<div style="font-size:16px;font-weight:bold;color:#2e7d32;margin-bottom:8px;">'
+    + '이 화면은 볼 수 없습니다</div>'
+    + '<div style="font-size:13px;color:#666;line-height:1.8;">'
+    + '치료 기록지는 관리자 · 행정 · 담당 치료사만 볼 수 있습니다.<br>'
+    + '현재 역할: <b>' + _roleOf(role) + '</b></div>'
+    + '<button onclick="logout()" style="margin-top:20px;background:#2e7d32;color:#fff;'
+    + 'border:none;border-radius:7px;padding:10px 20px;font-size:14px;cursor:pointer;">로그아웃</button>';
+  document.body.appendChild(b);
+}
+
+// ── 로그인 ──
+// 직인 — Supabase 비공개 자리에서 받아온다.
+// 로그인하지 않은 사람은 받을 수 없다.
+async function loadStamp() {
+  try {
+    const { data, error } = await sb.storage.from('nl-private').download('stamp.png');
+    if (error || !data) return;
+    const img = $('stampImg');
+    if (!img) return;
+    img.src = URL.createObjectURL(data);
+    img.style.display = 'inline';
+  } catch (e) {}
+}
+
+// 끝난 수업도 두 달까지는 목록에 남긴다 (치료사가 기록지를 쓸 시간을 준다)
+//   보기: 8월 말 종결 → 10월까지 보임
+function _keepMk(mk) {
+  const y = Number(String(mk).slice(0,4));
+  const m = Number(String(mk).slice(5,7)) - 2;
+  const y2 = y + Math.floor((m - 1) / 12);
+  const m2 = ((m - 1) % 12 + 12) % 12 + 1;
+  return y2 + '-' + String(m2).padStart(2,'0');
+}
+
+async function afterLogin(user) {
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists').select('id, name, role')
+    .eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (e1)  { show($('msg'), '❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) { show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.', false); return; }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+  // 학부모 결석 요청을 실시간으로 띄운다 (2026-09-22)
+  if (window.NLLive) NLLive.start(sb, me.id, {});
+  if (window.NLDocs) NLDocs.init(sb, me.id);   // 상담·보고서 보기 창 (보기 전용)
+  loadStamp();     // 직인 받아오기 (로그인한 직원만 받을 수 있다)
+  ME = me;
+  if (_isBlocked(me.role)) { _blockScreen(me.role); return; }
+
+  const [th, st, tp] = await Promise.all([
+    sb.from('nl_therapists').select('id, name'),
+    sb.from('nl_support_types').select('id, name'),
+    sb.from('nl_therapies')
+      .select('id, child_id, therapy_type_id, support_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status, disability, school, grade_year), nl_therapy_schedules(therapist_id, to_month)')
+      .in('support_type_id', SUPPORTS)
+  ]);
+  (th.data || []).forEach(t => THERAPISTS[t.id] = t.name);
+  (st.data || []).forEach(s => SUPNAME[s.id] = s.name);
+
+  TPRAW = tp.data || [];
+  KIDS = {};
+  TPRAW.forEach(r => { if (r.nl_children) KIDS[r.nl_children.id] = r.nl_children; });
+
+  $('pMonth').value = mkNow();
+  $('pMonth').onchange = () => buildPairs().then(drawPairSelect);
+  await buildPairs();
+  drawPairSelect();
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+}
+
+// 셈은 서버 한 곳 — nl_live_rows(달, 유예개월) 가 「그 달에 살아 있던 수업」을 돌려준다 (2026-09-19)
+//   유예 2 = 끝난 수업도 두 달까지 남긴다 (기록지를 쓸 시간을 준다)
+//   서버를 못 부르면 아래 옛 셈으로 그린다
+async function buildPairs() {
+  const mv = ($('pMonth') && $('pMonth').value) ? $('pMonth').value : mkNow();
+  const allView = _isAllView(ME.role);
+  const seen = {};
+  PAIRS = [];
+  try {
+    const { data, error } = await sb.rpc('nl_live_rows', { p_month: mv, p_grace: 2 });
+    if (error) throw error;
+    (data || []).forEach(r => {
+      if (SUPPORTS.indexOf(Number(r.support_type_id)) < 0) return;
+      if (!allView && String(r.therapist_id) !== String(ME.id)) return;
+      const c = KIDS[r.child_id];
+      if (!c) return;
+      const k = c.id + '-' + r.support_type_id;
+      if (seen[k]) return;
+      seen[k] = true;
+      PAIRS.push({ child: c, support_type_id: Number(r.support_type_id),
+                   therapy_id: r.therapy_id, therapy_type_id: r.therapy_type_id });
+    });
+    PAIRS.sort((a,b) => (a.child.name||'').localeCompare(b.child.name||'')
+                     || a.support_type_id - b.support_type_id);
+    return;
+  } catch (e) { /* 서버를 못 부르면 아래 옛 셈으로 */ }
+  const _keep0 = _keepMk(mv);
+  TPRAW.forEach(r => {
+    const c = r.nl_children;
+    if (!c) return;
+    if (r.ended_on && String(r.ended_on).slice(0,7) < _keep0) return;
+    const sc = (r.nl_therapy_schedules || [])
+      .filter(s => !s.to_month || s.to_month >= _keep0);
+    if (!sc.length) return;
+    if (!allView && !sc.some(s => String(s.therapist_id) === String(ME.id))) return;
+    const k = c.id + '-' + r.support_type_id;
+    if (seen[k]) return;
+    seen[k] = true;
+    PAIRS.push({ child: c, support_type_id: r.support_type_id,
+                 therapy_id: r.id, therapy_type_id: r.therapy_type_id });
+  });
+  PAIRS.sort((a,b) => (a.child.name||'').localeCompare(b.child.name||'')
+                   || a.support_type_id - b.support_type_id);
+}
+
+function drawPairSelect() {
+  const keep = $('pChild').selectedOptions && $('pChild').selectedOptions[0]
+             ? $('pChild').selectedOptions[0].getAttribute('data-key') : '';
+  $('pChild').innerHTML = '<option value="">— 아동을 고르세요 —</option>'
+    + PAIRS.map((p,i) => '<option value="' + i + '" data-cid="' + p.child.id + '"'
+        + ' data-key="' + p.child.id + '-' + p.support_type_id + '">' + esc(p.child.name)
+        + ' · ' + esc(SUPNAME[p.support_type_id] || '') + '</option>').join('');
+  if (keep) {
+    const i = PAIRS.findIndex(p => (p.child.id + '-' + p.support_type_id) === keep);
+    if (i >= 0) $('pChild').value = String(i);
+  }
+  $('who').textContent = ME.name + ' (' + ME.role + ') 님 · 치료지원 ' + PAIRS.length + '건'
+    + (_isAllView(ME.role) ? '' : ' (담당)');
+  // 단추 줄 아동 수 — 종결·타기관이용은 빼고 센다 (2026-09-19)
+  const ids = {};
+  PAIRS.forEach(p => { if (p.child.status !== '종결' && p.child.status !== '타기관이용') ids[p.child.id] = 1; });
+  if ($('pCount')) $('pCount').textContent = '아동 ' + Object.keys(ids).length + '명';
+}
+
+// ── 그 달에 살아 있던 요일줄만 쓴다 (2026-09-17) ──
+//   달 중간에 담당·요일·시각을 바꾸면 요일줄이 둘이 된다.
+//   전에는 요일줄을 모두(지금 것까지) 읽어 지난 달 기록지의 담당·요일·시간이 바뀌어 보였다
+const _SWD = { 일:0, 월:1, 화:2, 수:3, 목:4, 금:5, 토:6 };
+function _ymd(d) { return year + '-' + String(month).padStart(2,'0') + '-' + String(d).padStart(2,'0'); }
+function schedActive(rows) {
+  const mk = year + '-' + String(month).padStart(2,'0');
+  const first = mk + '-01', last = _ymd(new Date(year, month, 0).getDate());
+  return (rows || []).filter(s => (s.from_month || '0000-00') <= mk && (s.to_month || '9999-12') >= mk
+    && (!s.from_date || String(s.from_date) <= last) && (!s.to_date || String(s.to_date) >= first));
+}
+function schedInMonth(rows) {
+  const act = schedActive(rows);
+  const st = s => String(s.from_date || ((s.from_month || '0000-00') + '-01'));
+  return (act.length ? act : (rows || [])).slice().sort((a, b) => st(a).localeCompare(st(b)));
+}
+// 그 날 수업을 맡은 요일줄 (요일·기간이 맞는 것)
+function schedOnDay(d) {
+  const iso = _ymd(d), wd = new Date(year, month - 1, d).getDay();
+  return SCHED.find(s => _SWD[s.weekday] === wd
+    && (!s.from_date || String(s.from_date) <= iso)
+    && (!s.to_date || String(s.to_date) >= iso)) || null;
+}
+function thOnIso(iso) {
+  const pre = year + '-' + String(month).padStart(2,'0') + '-';
+  const s = (iso && String(iso).startsWith(pre)) ? schedOnDay(parseInt(String(iso).slice(8, 10), 10)) : null;
+  return s ? s.therapist_id : (SCHED.length ? SCHED[SCHED.length - 1].therapist_id : null);
+}
+function schedThNames(nameOf) {
+  return [...new Set(SCHED.map(s => s.therapist_id).filter(v => v != null))]
+    .map(nameOf).filter(Boolean).join('·');
+}
+
+// ── 불러오기 ──
+async function loadOne() {
+  const idx = $('pChild').value;
+  const mv  = $('pMonth').value;
+  if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n그래도 다른 기록지를 불러올까요?\n(적어 둔 내용은 사라집니다)')) return;
+  if (idx === '') { alert('아동을 고르세요.'); return; }
+  if (!mv) { alert('달을 고르세요.'); return; }
+
+  cur = PAIRS[Number(idx)];
+  year  = parseInt(mv.split('-')[0], 10);
+  month = parseInt(mv.split('-')[1], 10);
+  const mk = mkNow();
+
+  $('pLoad').disabled = true; $('pLoad').textContent = '불러오는 중...';
+  try {
+    const [sc, lg, pr] = await Promise.all([
+      sb.from('nl_therapy_schedules')
+        .select('id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date')
+        .eq('therapy_id', cur.therapy_id),
+      sb.from('nl_session_logs').select('*')
+        .eq('child_id', cur.child.id)
+        .eq('support_type_id', cur.support_type_id)
+        .eq('month_key', mk).maybeSingle(),
+      // 지난 달들 중 가장 최근 기록 — 수행수준·목표를 이어받는다
+      sb.from('nl_session_logs').select('*')
+        .eq('child_id', cur.child.id)
+        .eq('support_type_id', cur.support_type_id)
+        .lt('month_key', mk)
+        .order('month_key', { ascending: false }).limit(1)
+    ]);
+    SCHED = schedInMonth(sc.data || []);
+    PREV = (pr.data || [])[0] || null;
+
+    LOGID = lg.data ? lg.data.id : null;
+    ITEMS = [];
+    if (LOGID) {
+      const it = await sb.from('nl_session_items').select('*')
+        .eq('log_id', LOGID).order('seq_no');
+      ITEMS = it.data || [];
+    }
+    LOADED = true;
+    $('pInfo').textContent = mk + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
+    drawAll(lg.data);
+    DIRTY = false;
+    setSaveBtn(LOGID ? 'done' : 'before');
+  } catch (e) {
+    alert('불러오지 못했습니다.\n' + e.message);
+  } finally {
+    $('pLoad').disabled = false; $('pLoad').textContent = '불러오기';
+  }
+}
+
+// 그 달 수업일 (최대 3회)
+function _classDays() {
+  const M = { 일:0, 월:1, 화:2, 수:3, 목:4, 금:5, 토:6 };
+  const dows = [...new Set(SCHED.map(s => M[s.weekday]).filter(v => v !== undefined))];
+  if (!dows.length) return [];
+  const last = new Date(year, month, 0).getDate();
+  const out = [];
+  for (let d = 1; d <= last; d++) {
+    if (dows.includes(new Date(year, month - 1, d).getDay()) && schedOnDay(d)) out.push(d);
+  }
+  return out.slice(0, SESSIONS);
+}
+function _timeText() {
+  if (!SCHED.length || !SCHED[0].start_time) return '';
+  const p = String(SCHED[0].start_time).split(':');
+  let h = parseInt(p[0],10), m = parseInt(p[1]||'0',10);
+  const s = h + ':' + String(m).padStart(2,'0');
+  const dur = SCHED[0].duration || 40;
+  m += dur; h += Math.floor(m/60); m %= 60;
+  return s + '-' + h + ':' + String(m).padStart(2,'0');
+}
+
+function drawAll(saved) {
+  const c = cur.child;
+  const areaName = TTYPE[cur.therapy_type_id] || '';
+  $('pageTitle').textContent = `치료지원 누가기록서 — ${c.name} · ${SUPNAME[cur.support_type_id]} · ${year}년 ${month}월`;
+  $('sheetTitle').textContent = `${areaName}치료 [ ${month} ]월 치료지원 누가기록서`;
+
+  $('f_name').value   = c.name || '';
+  $('f_birth').value  = fmtBirth(c.birth);
+  // 이번 달 저장분 → 없으면 지난 기록 → 없으면 아동 표
+  const pick = k => (saved && saved[k]) || (PREV && PREV[k]) || '';
+  $('f_disab').value  = pick('disability_text');
+  $('f_opinion').value = pick('month_summary') || '';
+  $('f_school').value = pick('school_text') || c.school || '';
+  $('f_grade').value  = pick('grade_text')  || c.grade_year || '';
+  $('f_fine').value   = pick('level_fine');
+  $('f_cog').value    = pick('level_cog');
+  $('f_goalL').value  = pick('goal_long');
+  $('f_goalS').value  = pick('goal_short');
+  const carried = !saved && PREV;
+
+  CONT = (saved && saved.continue_yn) || '';
+  $('contBox').querySelectorAll('span').forEach(s =>
+    s.classList.toggle('on', s.dataset.val === CONT));
+
+  const tname = schedThNames(id => THERAPISTS[id] || '');
+  $('signThr').textContent = tname || '\u00a0';
+  // 작성일 = 그 달 마지막 수업일. 저장된 값이 있으면 그것을 쓴다
+  let wd = saved && saved.written_on ? String(saved.written_on) : '';
+  if (!wd) {
+    const ds = _classDays();
+    if (ds.length) {
+      wd = year + '-' + String(month).padStart(2,'0')
+         + '-' + String(ds[ds.length - 1]).padStart(2,'0');
+    }
+  }
+  WRITTEN = wd || null;
+  $('signDate').innerHTML = wd
+    ? `${wd.slice(0,4)}년 ${parseInt(wd.slice(5,7),10)}월 ${parseInt(wd.slice(8,10),10)}일`
+    : '20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;일';
+
+  if (carried) {
+    $('pInfo').textContent += ' · 지난 기록(' + PREV.month_key + ')에서 목표를 이어받았습니다';
+  }
+  buildSeq();
+}
+
+function buildSeq() {
+  const tb = $('seqBody');
+  tb.innerHTML = '';
+  for (let i = 0; i < SESSIONS; i++) {
+    const it = ITEMS[i] || {};
+    // 수업일자·시간은 자동으로 채우지 않는다.
+    // 실제 수업한 날과 카드 결제일이 다를 수 있어,
+    // 치료사분이 직접 적으시도록 비워 둔다.
+    const d  = it.service_date ? parseInt(String(it.service_date).slice(8,10),10) : '';
+    const st = it.start_time ? String(it.start_time).slice(0,5) : '';
+    const en = it.end_time   ? String(it.end_time).slice(0,5)   : '';
+    const timeVal = (st && en) ? (st + '-' + en) : (st || en || '');
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+        '<td style="text-align:center;">'
+      + '<div style="font-weight:bold;margin-bottom:4px;">' + (i+1) + '회</div>'
+      + '<input type="text" class="q_date" value="' + (d ? month + '월 ' + d + '일' : '') + '" style="text-align:center;">'
+      + '<input type="text" class="q_time" value="' + esc(timeVal) + '" style="text-align:center;margin-top:3px;">'
+      + '</td>'
+      + '<td><textarea class="q_content" style="min-height:64px;">' + esc(it.content || '') + '</textarea></td>'
+      + '<td><textarea class="q_react" style="min-height:64px;">' + esc(it.reaction || '') + '</textarea></td>';
+    tb.appendChild(tr);
+  }
+}
+
+// ── 저장 ──
+async function saveRecord() {
+  if (!LOADED || !cur) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
+  const mk = mkNow();
+  SAVING = true;
+  setSaveBtn('saving');
+  try {
+    const logRow = {
+      child_id: cur.child.id, support_type_id: cur.support_type_id, month_key: mk,
+      therapist_id: SCHED.length ? SCHED[SCHED.length - 1].therapist_id : null,
+      goal_long:  $('f_goalL').value || null,
+      goal_short: $('f_goalS').value || null,
+      level_fine: $('f_fine').value  || null,
+      level_cog:  $('f_cog').value   || null,
+      school_text: $('f_school').value || null,
+      grade_text:  $('f_grade').value  || null,
+      disability_text: $('f_disab').value || null,
+      continue_yn: CONT || null,
+      month_summary: $('f_opinion').value || null,
+      written_on: WRITTEN || null,
+      updated_at: new Date().toISOString()
+    };
+    // 잠금 uq_session_log_th — 아동·지원유형·달·수업 (2026-09-11)
+    const { data: lg, error: e1 } = await sb.from('nl_session_logs')
+      .upsert(logRow, { onConflict: 'child_id,support_type_id,month_key,therapy_id' })
+      .select('id').single();
+    if (e1) throw e1;
+    LOGID = lg.id;
+
+
+    const trs = document.querySelectorAll('#seqBody tr');
+    const items = [];
+    trs.forEach((tr, i) => {
+      const dtxt = tr.querySelector('.q_date').value;
+      const dm = dtxt.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+      const iso = dm
+        ? year + '-' + String(dm[1]).padStart(2,'0') + '-' + String(dm[2]).padStart(2,'0')
+        : d2iso(dtxt);
+      const tv = tr.querySelector('.q_time').value.split(/[-~]/);
+      items.push({
+        log_id: LOGID, seq_no: i + 1,
+        service_date: iso,
+        start_time: _hm(tv[0] || ''),
+        end_time:   _hm(tv[1] || ''),
+        therapist_id: thOnIso(iso),
+        content:  tr.querySelector('.q_content').value || null,
+        reaction: tr.querySelector('.q_react').value || null,
+        status: '출석'
+      });
+    });
+    // 회차 줄은 다 만든 뒤에 바꾼다 (2026-09-21)
+    //   전에는 먼저 지우고 나서 만들어 넣었는데, 넣다가 실패하면(시간 글자 잘못 등)
+    //   적어 둔 내용이 모두 사라졌다 → 옛 줄을 들고 있다가 실패하면 되돌린다
+    const old = await sb.from('nl_session_items').select('*').eq('log_id', LOGID);
+    if (old.error) throw old.error;
+    const del = await sb.from('nl_session_items').delete().eq('log_id', LOGID);
+    if (del.error) throw del.error;
+    const ins = await sb.from('nl_session_items').insert(items);
+    if (ins.error) {
+      const back = (old.data || []).map(r => { const c = Object.assign({}, r); delete c.id; return c; });
+      if (back.length) await sb.from('nl_session_items').insert(back);
+      throw new Error('저장하지 못해 전에 적은 내용으로 되돌렸습니다.\n' + ins.error.message);
+    }
+
+    // 학교·학년을 아동 표에도 남긴다 (다음부터 자동으로 채워짐)
+    const sc = $('f_school').value.trim(), gy = $('f_grade').value.trim();
+    if (sc || gy) {
+      await sb.from('nl_children')
+        .update({ school: sc || null, grade_year: gy || null })
+        .eq('id', cur.child.id);
+      cur.child.school = sc; cur.child.grade_year = gy;
+    }
+
+    ITEMS = items;
+    // 저장 알림 창은 뺐다 — 단추 모양이 알려 준다 (2026-09-16)
+    $('pInfo').textContent = mk + ' · 저장됨';
+    DIRTY = false;
+    setSaveBtn('done');
+  } catch (e) {
+    alert('❌ 저장하지 못했습니다.\n' + e.message);
+    setSaveBtn('before');
+  } finally {
+    setTimeout(() => { SAVING = false; }, 300);
+  }
+}
+
+// ── 저장 단추 상태 (2026-09-16) ──
+//   before 저장 전 / saving 저장 중 / done 저장됨
+//   칸을 고치면 다시 「저장 전」. 저장 전인 채 나가면 묻는다
+let DIRTY  = false;
+let SAVING = false;
+function setSaveBtn(st) {
+  const b = $('btnSave');
+  if (!b) return;
+  b.classList.toggle('done', st === 'done');
+  b.disabled = (st === 'saving');
+  b.textContent = st === 'saving' ? '저장 중…'
+                : st === 'done'   ? '\u2713 저장됨'
+                : '저장 전';
+}
+function markDirty() {
+  if (!LOADED || SAVING) return;
+  DIRTY = true;
+  setSaveBtn('before');
+}
+document.querySelector('.container').addEventListener('input',  markDirty);
+document.querySelector('.container').addEventListener('change', markDirty);
+window.addEventListener('beforeunload', e => {
+  if (!DIRTY) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+$('pLoad').onclick = loadOne;
+// 초기 상담·평가보고서 보기 전용 창 (2026-09-15)
+$('pIntake').onclick = () => {
+  if ($('pChild').value === '') { alert('아동을 고르세요.'); return; }
+  const cid = (PAIRS[Number($('pChild').value)] || {child:{}}).child.id;
+  if (!cid) { alert('아동을 고르세요.'); return; }
+  if (!window.NLDocs) { alert('보기 창을 불러오지 못했습니다. 화면을 새로 열어 주세요.'); return; }
+  NLDocs.openIntake(cid);
+};
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false; $('btn').textContent = '로그인';
+  }
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+  else {
+    // 로그인이 없으면 첫 화면으로 보낸다 (빈 화면이 열리는 것을 막기 위함)
+    location.replace('index.html');
+  }
+})();
+</script>
+<script>
+// 인쇄할 때 글상자의 높이를 내용만큼 늘린다 (2026-09-10)
+//   그래야 긴 글이 잘리지 않고 다음 장으로 넘어간다
+(function(){
+  var saved = [];
+  function grow(){
+    saved = [];
+    var list = document.querySelectorAll('textarea');
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      saved.push([a, a.style.height]);
+      a.style.height = 'auto';
+      a.style.height = (a.scrollHeight + 4) + 'px';
+    }
+  }
+  function back(){
+    for (var i = 0; i < saved.length; i++) saved[i][0].style.height = saved[i][1];
+    saved = [];
+  }
+  window.addEventListener('beforeprint', grow);
+  window.addEventListener('afterprint', back);
+  if (window.matchMedia) {
+    var mq = window.matchMedia('print');
+    if (mq.addEventListener) {
+      mq.addEventListener('change', function(e){ if (e.matches) grow(); else back(); });
+    }
+  }
+})();
+</script>
+</div>
+<!-- 아동 이름 타자로 찾기 (2026-09-17) — 안쪽 고르기 칸(#pChild)은 숨겨 두고 그대로 쓴다 -->
+<style>
+  .kidpickwrap { position:relative; display:inline-block; vertical-align:middle; }
+  #pChildQ { min-width:260px; padding:6px 10px; font:inherit; font-size:14px;
+             border:1px solid #ccc; border-radius:6px; background:#fff; }
+  #pChildList { position:absolute; left:0; top:100%; z-index:50; min-width:100%; max-height:320px;
+                overflow-y:auto; background:#fff; border:1px solid #ccc; border-radius:6px;
+                box-shadow:0 4px 14px rgba(0,0,0,.12); display:none; margin-top:2px; }
+  #pChildList div { padding:6px 10px; font-size:13.5px; cursor:pointer; white-space:nowrap; }
+  #pChildList div.on, #pChildList div:hover { background:#F8F1E8; }
+  #pChildList .none { color:#999; cursor:default; }
+  @media print { .kidpickwrap { display:none !important; } }
+</style>
+<script>
+(function () {
+  const sel = document.getElementById('pChild');
+  if (!sel) return;
+  sel.style.display = 'none';
+  const wrap = document.createElement('span');
+  wrap.className = 'kidpickwrap';
+  wrap.innerHTML = '<input id="pChildQ" type="text" autocomplete="off" placeholder="아동 이름이나 번호를 치세요">'
+                 + '<div id="pChildList"></div>';
+  sel.parentNode.insertBefore(wrap, sel);
+  const q = document.getElementById('pChildQ'), box = document.getElementById('pChildList');
+  let hits = [], cur = -1;
+  const opts = () => Array.from(sel.options).filter(o => o.value !== '');
+  function show() {
+    const t = q.value.trim().toLowerCase();
+    hits = opts().filter(o => !t || o.text.toLowerCase().includes(t)
+      || (/^\d+$/.test(t) && String(o.dataset.cid || '') === t));
+    cur = hits.length ? 0 : -1;
+    box.innerHTML = hits.length
+      ? hits.map((o, i) => '<div data-i="' + i + '"' + (i === cur ? ' class="on"' : '') + '>'
+          + o.text.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</div>').join('')
+      : '<div class="none">찾는 아동이 없습니다</div>';
+    box.style.display = 'block';
+  }
+  function mark() {
+    box.querySelectorAll('div[data-i]').forEach(d => d.classList.toggle('on', Number(d.dataset.i) === cur));
+    const el = box.querySelector('div.on'); if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+  function pick(o) {
+    sel.value = o.value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    q.value = o.text;
+    q.dataset.picked = o.value;
+    box.style.display = 'none';
+  }
+  q.addEventListener('focus', () => { q.select(); show(); });
+  q.addEventListener('input', () => { q.dataset.picked = ''; show(); });
+  q.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { if (hits.length) { cur = (cur + 1) % hits.length; mark(); } e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { if (hits.length) { cur = (cur - 1 + hits.length) % hits.length; mark(); } e.preventDefault(); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (box.style.display === 'block' && hits[cur]) pick(hits[cur]);
+      else if (q.dataset.picked) { const b = document.getElementById('pLoad'); if (b) b.click(); }
+    }
+    else if (e.key === 'Escape') { box.style.display = 'none'; }
+  });
+  box.addEventListener('mousedown', e => {
+    const d = e.target.closest('div[data-i]'); if (!d) return;
+    e.preventDefault(); pick(hits[Number(d.dataset.i)]);
+  });
+  q.addEventListener('blur', () => setTimeout(() => {
+    box.style.display = 'none';
+    // 고르지 않고 나가면 지금 고른 아동 이름으로 되돌린다
+    const o = sel.options[sel.selectedIndex];
+    q.value = (o && o.value !== '') ? o.text : '';
+  }, 150));
+  // 목록이 다시 그려지면(달·전체 보기 바꿈) 칸 글자를 맞춘다
+  new MutationObserver(() => {
+    const o = sel.options[sel.selectedIndex];
+    if (document.activeElement !== q) q.value = (o && o.value !== '') ? o.text : '';
+  }).observe(sel, { childList: true });
+})();
+</script>
+
+</body>
+</html>

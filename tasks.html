@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>할 일 목록 - 나무링크</title>
+<!-- 할 일 목록 — 지금은 원장님(8번)만 (2026-10-07 은정님 · 신규 직원 채용 뒤 직원 화면을 엶)
+     표 nl_task_rules(늘 하는 일) · nl_tasks(날마다 할 일) · 새벽 5시 nl_make_tasks 가 그날 목록을 만듦
+     상태 — 할 일 · 하는 중 · 끝냄 · 미룸(다른 날로 · 그 날에 「미룬 일」이 저절로) · 못 함(사유 반드시) -->
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --sage:#5E9A6E; --coral:#D8684A; --coralL:#FCEFEA; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg); margin:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; } .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; } .hd .who { font-size:12px; color:var(--dim); } .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:1000px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 12px; font-size:13px; background:var(--sf); color:var(--tx); border:1px solid #CFC8C0; cursor:pointer; }
+  button:hover { background:var(--camL); } button.pri { background:var(--cam); color:#fff; border-color:var(--cam); }
+  button.grey { border-color:var(--line); color:var(--cam); }
+  input, select { font:inherit; font-size:13px; padding:6px 8px; border-radius:8px; border:1px solid #DDD6CE; background:#fff; }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .ct { font-size:14px; font-weight:600; margin:0 0 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .tk { border-top:1px solid #F0EEEA; padding:9px 0; display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; }
+  .tk:first-child { border-top:none; }
+  .tk .t { flex:1 1 260px; min-width:0; line-height:1.6; }
+  .tk .src { font-size:11.5px; color:var(--dim); margin-left:6px; }
+  .st { display:flex; gap:4px; flex-wrap:wrap; }
+  .st button { padding:4px 9px; font-size:12px; border-color:var(--line); color:var(--dim); }
+  .st button.on { color:#fff; border-color:transparent; }
+  .on.s1 { background:#C4BDB5; } .on.s2 { background:#EDBF5F; } .on.s3 { background:#5E9A6E; } .on.s4 { background:#8DB4DE; } .on.s5 { background:#D8684A; }
+  .late { background:var(--coralL); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+  .msg { font-size:13px; margin-top:8px; white-space:pre-wrap; } .ok { color:#2e7d32; } .err { color:#c62828; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th { background:var(--camL); color:#4A1B0C; font-weight:500; padding:6px 9px; border-bottom:1px solid var(--camB); text-align:left; white-space:nowrap; }
+  td { padding:6px 9px; border-bottom:1px solid #F0EEEA; }
+  .dim { color:var(--dim); } .note { font-size:12px; color:var(--dim); line-height:1.8; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span><h1>할 일 목록</h1><span class="who" id="whoami"></span><span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+<div class="wrap" id="body"><div class="dim">불러오는 중…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, { auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+const $ = id => document.getElementById(id);
+const CAN_SEE = [8];
+const STATES = ['할 일', '하는 중', '끝냄', '미룸', '못 함'];
+const SCL = { '할 일':'s1', '하는 중':'s2', '끝냄':'s3', '미룸':'s4', '못 함':'s5' };
+const WD = ['일','월','화','수','목','금','토'];
+let STAFF = [], TASKS = [], LATE = [], RULES = [], DAY = null, WHO = 'all';
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function today(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function dlab(d){ const x = new Date(d + 'T00:00:00'); return (x.getMonth()+1) + '/' + x.getDate() + '(' + WD[x.getDay()] + ')'; }
+function stName(id){ const s = STAFF.find(x => Number(x.id) === Number(id)); return s ? id + '번 ' + s.name : id + '번'; }
+function msg(t, ok){ const m = $('tmsg'); if (m) { m.className = 'msg ' + (ok ? 'ok' : 'err'); m.textContent = t; } }
+
+async function load(){
+  const qs = [
+    sb.from('nl_tasks').select('*').eq('task_date', DAY).order('staff_id').order('id'),
+    sb.from('nl_tasks').select('*').lt('task_date', DAY).in('state', ['할 일', '하는 중']).order('task_date').limit(500),
+    sb.from('nl_task_rules').select('*').order('active', { ascending: false }).order('staff_id').order('id')
+  ];
+  const [a, b, c] = await Promise.all(qs);
+  const er = a.error || b.error || c.error;
+  if (er) { $('body').innerHTML = '<div class="card err">불러오지 못했습니다.\n' + esc(er.message) + '</div>'; return; }
+  TASKS = a.data || []; LATE = b.data || []; RULES = c.data || [];
+  draw();
+}
+
+function taskRow(t, late){
+  return '<div class="tk">'
+    + '<div class="t">' + (late ? '<b style="color:var(--coral)">' + dlab(t.task_date) + '</b> · ' : '')
+    + (WHO === 'all' ? '<span class="dim">' + esc(stName(t.staff_id)) + '</span> · ' : '')
+    + esc(t.title) + '<span class="src">' + esc(t.source) + '</span>'
+    + (t.reason ? '<div class="dim" style="font-size:12.5px">사유 · ' + esc(t.reason) + '</div>' : '')
+    + (t.moved_to ? '<div class="dim" style="font-size:12.5px">→ ' + dlab(t.moved_to) + '로 미룸</div>' : '')
+    + '</div>'
+    + '<div class="st">' + STATES.map(s => '<button type="button" data-tk="' + t.id + '" data-s="' + s + '" class="' + (t.state === s ? 'on ' + SCL[s] : '') + '">' + s + '</button>').join('')
+    + ' <button type="button" data-del="' + t.id + '" title="지우기">✕</button></div>'
+    + '</div>';
+}
+
+function draw(){
+  const tl = TASKS.filter(t => WHO === 'all' || Number(t.staff_id) === Number(WHO));
+  const ll = LATE.filter(t => WHO === 'all' || Number(t.staff_id) === Number(WHO));
+  const done = tl.filter(t => t.state === '끝냄').length;
+  let h = '<div class="card"><div class="ct">'
+    + '<input type="date" id="day" value="' + DAY + '">'
+    + '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
+    + '<span class="dim" style="font-weight:400">' + dlab(DAY) + ' · ' + tl.length + '개 중 끝냄 ' + done + '</span>'
+    + '<span style="flex:1"></span><button type="button" id="remake">이 날 목록 다시 만들기</button></div>';
+  if (ll.length) h += '<div class="late"><b style="color:var(--coral)">지난 날 남은 일 ' + ll.length + '</b>' + ll.map(t => taskRow(t, true)).join('') + '</div>';
+  h += tl.length ? tl.map(t => taskRow(t, false)).join('') : '<div class="dim">이 날 할 일이 없습니다.</div>';
+  h += '<div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">'
+     + '<select id="nwho">' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
+     + '<input type="date" id="nday" value="' + DAY + '">'
+     + '<input id="ntitle" placeholder="맡길 일" style="flex:1 1 240px">'
+     + '<button type="button" class="pri" id="nadd">＋ 맡기기</button></div>'
+     + '<div id="tmsg" class="msg"></div></div>';
+
+  // 늘 하는 일
+  h += '<div class="card"><div class="ct">늘 하는 일 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></div><table>'
+     + '<tr><th>직원</th><th>할 일</th><th>주기</th><th>쉬는 날</th><th>기간</th><th></th></tr>'
+     + RULES.map(r => '<tr' + (r.active ? '' : ' class="dim"') + '><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + '</td>'
+         + '<td>' + esc(r.cycle === '매주' ? '매주 ' + WD[r.weekday] : r.cycle === '매달' ? '매달 ' + r.month_day + '일' : r.cycle === '매년' ? '매년 ' + r.year_month + '/' + r.month_day : '매일') + '</td>'
+         + '<td>' + (r.skip_off ? (r.cycle === '매일' ? '건너뜀' : '다음 출근 날') : '그대로') + '</td>'
+         + '<td>' + esc(r.from_date) + ' ~ ' + esc(r.to_date || '') + '</td>'
+         + '<td><button type="button" data-ra="' + r.id + '">' + (r.active ? '끄기' : '켜기') + '</button></td></tr>').join('')
+     + '</table>'
+     + '<div class="row" style="margin-top:12px;">'
+     + '<select id="rwho">' + STAFF.map(s => '<option value="' + s.id + '">' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
+     + '<input id="rtitle" placeholder="늘 하는 일" style="flex:1 1 220px">'
+     + '<select id="rcyc"><option>매일</option><option>매주</option><option>매달</option><option>매년</option></select>'
+     + '<select id="rwd" style="display:none">' + WD.map((w, i) => '<option value="' + i + '"' + (i === 1 ? ' selected' : '') + '>' + w + '요일</option>').join('') + '</select>'
+     + '<select id="rym" style="display:none">' + Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '월</option>').join('') + '</select>'
+     + '<select id="rmd" style="display:none">' + Array.from({ length: 31 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '일</option>').join('') + '</select>'
+     + '<label class="dim" style="font-size:12.5px"><input type="checkbox" id="rskip" checked> 쉬는 날 건너뜀</label>'
+     + '<button type="button" class="pri" id="radd">＋ 더하기</button></div>'
+     + '<div class="note">쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 매주 · 매달 · 매년은 다음 출근 날로 미뤄 만듭니다.<br>늘 하는 일은 지우지 않고 「끄기」로 멈춥니다 (지난 목록은 그대로).</div></div>';
+
+  // 확인 — 이 달 직원별
+  h += '<div class="card"><div class="ct">이 달 확인 <span class="dim" style="font-weight:400" id="mlab"></span></div><div id="mon" class="dim">불러오는 중…</div></div>';
+  $('body').innerHTML = h;
+  bind();
+  drawMonth();
+}
+
+async function drawMonth(){
+  const m = DAY.slice(0, 7), from = m + '-01';
+  const end = new Date(Number(m.slice(0,4)), Number(m.slice(5,7)), 0);
+  const to = m + '-' + String(end.getDate()).padStart(2, '0');
+  $('mlab').textContent = '— ' + Number(m.slice(5,7)) + '월';
+  const { data, error } = await sb.from('nl_tasks').select('staff_id, state, reason, title, task_date').gte('task_date', from).lte('task_date', to).limit(5000);
+  if (error) { $('mon').textContent = '불러오지 못했습니다. ' + error.message; return; }
+  const g = {};
+  const td = today();
+  (data || []).forEach(t => {
+    const o = g[t.staff_id] || (g[t.staff_id] = { n: 0, done: 0, moved: 0, cant: [], left: 0 });
+    if (t.state === '미룸') { o.moved++; return; }
+    o.n++;
+    if (t.state === '끝냄') o.done++;
+    if (t.state === '못 함') o.cant.push(dlab(t.task_date) + ' ' + t.title + ' — ' + (t.reason || ''));
+    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
+  });
+  const ks = Object.keys(g);
+  if (!ks.length) { $('mon').textContent = '이 달 할 일이 아직 없습니다.'; return; }
+  $('mon').innerHTML = '<table><tr><th>직원</th><th>할 일</th><th>끝냄</th><th>끝냄 비율</th><th>미룬 횟수</th><th>지난 날 남은 일</th><th>못 함</th></tr>'
+    + ks.map(k => { const o = g[k];
+        return '<tr><td>' + esc(stName(k)) + '</td><td>' + o.n + '</td><td>' + o.done + '</td><td><b>' + (o.n ? Math.round(o.done / o.n * 100) : 0) + '%</b></td>'
+          + '<td>' + o.moved + '</td><td' + (o.left ? ' style="color:var(--coral);font-weight:600"' : '') + '>' + o.left + '</td>'
+          + '<td style="white-space:normal">' + (o.cant.length ? o.cant.map(esc).join('<br>') : '<span class="dim">–</span>') + '</td></tr>'; }).join('')
+    + '</table><div class="note">미룬 일은 미룬 날에 「미룬 일」로 다시 세어지므로 할 일 수에서 뺐습니다.</div>';
+}
+
+function bind(){
+  $('day').onchange = () => { DAY = $('day').value || today(); load(); };
+  $('wsel').onchange = () => { WHO = $('wsel').value; draw(); };
+  const cyc = () => { const v = $('rcyc').value; $('rwd').style.display = v === '매주' ? '' : 'none'; $('rym').style.display = v === '매년' ? '' : 'none'; $('rmd').style.display = (v === '매달' || v === '매년') ? '' : 'none'; };
+  $('rcyc').onchange = cyc; cyc();
+  $('remake').onclick = async () => {
+    const { data, error } = await sb.rpc('nl_make_tasks', { p_date: DAY });
+    if (error) { msg('❌ ' + error.message, false); return; }
+    msg('늘 하는 일에서 ' + data + '개를 새로 넣었습니다.', true); load();
+  };
+  $('nadd').onclick = async () => {
+    const title = $('ntitle').value.trim();
+    if (!title) { msg('맡길 일을 적어 주세요.', false); return; }
+    const { data, error } = await sb.from('nl_tasks').insert({ task_date: $('nday').value || DAY, staff_id: Number($('nwho').value), title: title, source: '맡김' }).select('id');
+    if (error || !data || !data.length) { msg('❌ 맡기지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    msg('맡겼습니다.', true); load();
+  };
+  $('radd').onclick = async () => {
+    const title = $('rtitle').value.trim(), cy = $('rcyc').value;
+    if (!title) { msg('늘 하는 일을 적어 주세요.', false); return; }
+    const row = { staff_id: Number($('rwho').value), title: title, cycle: cy, skip_off: $('rskip').checked };
+    if (cy === '매주') row.weekday = Number($('rwd').value);
+    if (cy === '매달' || cy === '매년') row.month_day = Number($('rmd').value);
+    if (cy === '매년') row.year_month = Number($('rym').value);
+    const { data, error } = await sb.from('nl_task_rules').insert(row).select('id');
+    if (error || !data || !data.length) { msg('❌ 더하지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    msg('늘 하는 일을 더했습니다. 내일 새벽부터 목록에 들어갑니다 (오늘 것은 「이 날 목록 다시 만들기」).', true); load();
+  };
+  document.querySelectorAll('button[data-ra]').forEach(b => b.onclick = async () => {
+    const r = RULES.find(x => x.id === Number(b.dataset.ra)); if (!r) return;
+    const { data, error } = await sb.from('nl_task_rules').update({ active: !r.active }).eq('id', r.id).select('id');
+    if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    load();
+  });
+  document.querySelectorAll('button[data-tk]').forEach(b => b.onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.tk)); if (!t) return;
+    const s = b.dataset.s; if (t.state === s) return;
+    const up = { state: s };
+    if (s === '못 함') { const w = prompt('못 한 까닭을 적어 주세요. (반드시)', t.reason || ''); if (w === null || !w.trim()) return; up.reason = w.trim(); }
+    if (s === '미룸') {
+      const d = prompt('며칠로 미룰까요? (예: 2026-10-12)', ''); if (d === null) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.trim()) || d.trim() <= t.task_date) { msg('미룰 날은 그 날 뒤 날짜로 적어 주세요 (2026-10-12 모양).', false); return; }
+      up.moved_to = d.trim();
+    }
+    const { data, error } = await sb.from('nl_tasks').update(up).eq('id', t.id).select('id');
+    if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    load();
+  });
+  document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.del)); if (!t) return;
+    if (!confirm('이 할 일을 지울까요?\n' + t.title)) return;
+    const { data, error } = await sb.from('nl_tasks').delete().eq('id', t.id).select('id');
+    if (error || !data || !data.length) { msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    load();
+  });
+}
+
+$('home').onclick = () => { location.href = 'index.html'; };
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name').eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="card err">직원 표에 이 이메일이 없습니다.</div>'; return; }
+  nlKeep(me.id);
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="card err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+  $('whoami').textContent = me.name + ' 님으로 로그인됨';
+  const { data: st } = await sb.from('nl_therapists').select('id, name, role, left_on').order('id');
+  STAFF = (st || []).filter(s => !s.left_on && !/치료사/.test(s.role || ''));
+  DAY = today();
+  load();
+})();
+</script>
+</body>
+</html>

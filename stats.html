@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>통계 - 나무링크</title>
+<!-- 통계 — 대표(8번)만 (2026-10-07 은정님)
+     셈은 서버 한 곳: nl_stats_rev · nl_stats_th · nl_stats_pay · nl_stats_flow (모두 대표만 열림)
+     화면은 받은 줄을 더하고 그리기만 한다 -->
+<style>
+  :root{
+    --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+    --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E;
+    --sage:#5E9A6E; --coral:#D8684A; --coralL:#FCEFEA; --coralT:#993C1D;
+  }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line);
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .who { font-size:12px; color:var(--dim); }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:1180px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 13px; font-size:13px;
+           background:var(--sf); color:var(--tx); border:1px solid var(--dim);
+           cursor:pointer; font-weight:500; }
+  button:hover { background:var(--camL); }
+  button.grey { border-color:var(--line); color:var(--cam); }
+  select { font:inherit; font-size:13px; padding:6px 9px; border-radius:8px;
+           border:1px solid var(--line); background:var(--sf); color:var(--tx); }
+  .tabs { display:flex; gap:4px; align-items:center; flex-wrap:wrap; margin:0 0 14px; }
+  .tab { border:none; border-bottom:2px solid transparent; border-radius:0; background:none;
+         padding:7px 14px; color:var(--dim); font-size:14px; }
+  .tab:hover { background:none; color:var(--tx); }
+  .tab.on { color:var(--cam); border-bottom-color:var(--cam); font-weight:600; }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px;
+          padding:16px 18px; margin-bottom:14px; }
+  .ct { font-size:14px; font-weight:600; margin:0 0 10px; }
+  .tw { overflow-x:auto; }
+  table { border-collapse:collapse; font-size:13px; width:100%; }
+  th { background:var(--camL); color:#4A1B0C; font-weight:500; padding:6px 9px;
+       border-bottom:1px solid var(--camB); white-space:nowrap; text-align:right; }
+  th.l, td.l { text-align:left; }
+  td { padding:6px 9px; border-bottom:1px solid #F0EEEA; text-align:right; white-space:nowrap; }
+  tr.tot td { font-weight:600; border-top:1px solid var(--camB); background:#FBF8F4; }
+  tr.sub td { color:var(--dim); font-size:12px; }
+  tr.click { cursor:pointer; }
+  tr.click:hover td { background:#FBF5EE; }
+  tr.sel td { background:#F8F1E8; }
+  .nd { color:#C8C2BB; }
+  .up { color:var(--sage); font-size:12px; } .dn { color:var(--coral); font-size:12px; }
+  .note { font-size:12px; color:var(--dim); line-height:1.8; margin-top:10px; }
+  .bars { display:flex; align-items:flex-end; gap:6px; height:170px; padding:8px 4px 0;
+          border-bottom:1px solid var(--line); }
+  .bcol { flex:1 1 0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+          height:100%; min-width:26px; }
+  .bstk { width:70%; display:flex; flex-direction:column-reverse; }
+  .bseg { width:100%; }
+  .blab { font-size:11px; color:var(--dim); margin-top:4px; }
+  .bval { font-size:11px; color:var(--tx); margin-bottom:2px; }
+  .pair { display:flex; gap:3px; align-items:flex-end; width:80%; justify-content:center; height:100%; }
+  .pb { flex:1 1 0; }
+  .leg { display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:var(--dim); margin-top:8px; }
+  .leg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  .err { background:var(--sf); border-left:3px solid var(--coral); padding:14px 16px;
+         color:var(--coralT); font-size:13.5px; white-space:pre-wrap; line-height:1.7; }
+  .load { text-align:center; padding:34px; color:var(--dim); font-size:14px; }
+  .star { color:#D29A3C; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span>
+  <h1>통계</h1>
+  <span class="who" id="who"></span>
+  <span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <select id="yr"></select>
+    <span style="width:10px"></span>
+    <button class="tab on" data-t="biz">사업별</button>
+    <button class="tab" data-t="kid">아동별</button>
+    <button class="tab" data-t="th">선생님</button>
+    <button class="tab" data-t="flow">신규·종결</button>
+    <button class="tab" data-t="area">치료 영역</button>
+    <button class="tab" data-t="move">사업 이동</button>
+  </div>
+  <div id="body"><div class="load">불러오는 중…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true,
+          autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+const CAN_SEE = [8];   // 대표만 (서버도 대표만 열어 줌)
+
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function man(v){ return Math.round((Number(v) || 0) / 10000).toLocaleString('ko-KR'); }   // 만원
+function won(v){ return Math.round(Number(v) || 0).toLocaleString('ko-KR') + '원'; }
+function monNo(k){ return Number(String(k).slice(5,7)); }
+function mkOf(y, m){ return y + '-' + String(m).padStart(2,'0'); }
+function sumBy(arr, f){ return arr.reduce((a, r) => a + (Number(f(r)) || 0), 0); }
+
+// 사업 색 (시간표 · 납부와 비슷하게)
+// 밝으면서 선명하게 (2026-10-07 은정님 — 처음 색은 어둡고, 파스텔은 흐렸음)
+const SCOL = { 1:'#8DB4DE', 2:'#93CBA0', 3:'#EDBF5F', 4:'#F4D88A', 5:'#B4A4E2', 6:'#EBA287',
+               7:'#EDA9BE', 8:'#B4D985', 9:'#DC85AA', 10:'#74AEE0', 11:'#B9AAE8' };
+let STN = {}, THN = {}, KID = {};
+let TAB = 'biz', YEAR = null;
+let REV = [], REVP = [], TH = [], PAY = [], FLOW = [], FLOWP = [];
+let KSEL = null, KMON = null, TMON = null;
+let AREA = [], AMON = null, TTN = {};
+let MOVE = [], MMON = null;
+let ENDS = [], EMON = null;
+let NEWB = [], REVW = [], FSUB = 'flow', NBMON = null, EBMON = null;
+// 사업 묶음 — 발달 · 센터 · 치료지원 · 방과후 · 새 지원유형은 제 이름으로 저절로 (2026-10-07)
+function grpOf(st){ st = Number(st); if (st === 1) return '센터'; if (st === 2) return '발달'; if (st === 3 || st === 4) return '치료지원';
+  if (st >= 5 && st <= 7) return '방과후'; if (st >= 8 && st <= 11) return null; return STN[st] || (st + '번'); }
+const GCOL = { '센터':'#8DB4DE', '발달':'#93CBA0', '치료지원':'#EDBF5F', '방과후':'#B4A4E2' };
+const GEXTRA = ['#EBA287', '#EDA9BE', '#74AEE0', '#B4D985'];
+function gcol(g){ if (GCOL[g]) return GCOL[g]; const ks = Object.keys(GCOL); GCOL[g] = GEXTRA[(ks.length - 4) % GEXTRA.length]; return GCOL[g]; }
+// 둥근 원 한 개 그리기 (arr = [{k, n}])
+function pieHtml(arr, colf, mid, sub, size){
+  size = size || 210; const tot = sumBy(arr, o => o.n); let acc = 0;
+  const seg = arr.map(o => { const a = acc / tot * 360, b = (acc + o.n) / tot * 360; acc += o.n; return colf(o.k) + ' ' + a + 'deg ' + b + 'deg'; }).join(', ');
+  const ins = Math.round(size / 4);
+  return '<div style="position:relative;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + (tot ? 'conic-gradient(' + seg + ')' : '#F0EEEA') + ';flex:0 0 auto;">'
+    + '<div style="position:absolute;inset:' + ins + 'px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+    + '<div style="font-size:22px;font-weight:600;">' + mid + '</div><div style="font-size:11.5px;color:var(--dim);">' + sub + '</div></div></div>';
+}
+function monSel(id, ms, cur){
+  return '<select id="' + id + '"><option value="year"' + (cur === 'year' ? ' selected' : '') + '>' + YEAR + '년 한 해</option>'
+    + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('') + '</select>';
+}
+const ECOL = { '수업 종료':'#8FD19E', '이사':'#8DB4DE', '타기관 이동':'#B4A4E2', '보호자 사정':'#F4D88A',
+  '아동 적응 어려움':'#EDA9BE', '지원 사업 변동':'#93CBA0', '치료사 관련':'#EBA287', '결석 잦음':'#EDBF5F', '기타':'#C4BDB5' };
+const MCOL = { '더함':'#8FD19E', '바꿈':'#EDBF5F', '뺌':'#C4BDB5' };
+// 치료 영역 색 (1 언어 · 2 작업 · 3 전산화인지 · 4 감각통합 · 5 음악 · 6 일상자립 · 7 심리)
+const ACOL = { 1:'#A9C4E0', 2:'#F0D09A', 3:'#C4DDC8', 4:'#EDC1AE', 5:'#D4CBEA', 6:'#F2CFD9', 7:'#B6D8BD' };   // 밝게 (2026-10-07 은정님)
+
+function nowMk(){ const d = new Date(); return mkOf(d.getFullYear(), d.getMonth() + 1); }
+
+// 서버는 한 번에 1,000줄까지만 준다 — 1,000줄씩 끝까지 나눠 받는다 (2026-10-07)
+//   처음에는 한 번만 받아 한 해 자료의 뒷부분이 잘려 합계가 작게 나왔다
+async function rpc(name, a, b){
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.rpc(name, { p_from: a, p_to: b }).range(from, from + 999);
+    if (error) throw new Error(name + ' — ' + error.message);
+    (data || []).forEach(r => out.push(r));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+async function load(){
+  $('body').innerHTML = '<div class="load">불러오는 중…</div>';
+  const y = YEAR, f = mkOf(y, 1), pf = mkOf(y - 1, 1), pt = mkOf(y - 1, 12);
+  // 이번 달까지만 — 앞날 달은 깔아 둔 회기로 지원금이 미리 셈되어 매출처럼 보이므로 뺀다 (2026-10-07)
+  const t = mkOf(y, 12) < nowMk() ? mkOf(y, 12) : nowMk();
+  try {
+    const r = await Promise.all([
+      rpc('nl_stats_rev', f, t), rpc('nl_stats_th', f, t), rpc('nl_stats_pay', f, t),
+      rpc('nl_stats_flow', f, t),
+      rpc('nl_stats_area', f, t),
+      rpc('nl_stats_move', f, t),
+      rpc('nl_stats_end', f, t),
+      rpc('nl_stats_newbiz', f, t),
+      rpc('nl_stats_review', f, t),
+      y > 2026 ? rpc('nl_stats_rev', pf, pt) : Promise.resolve([]),
+      y > 2026 ? rpc('nl_stats_flow', pf, pt) : Promise.resolve([])
+    ]);
+    REV = r[0]; TH = r[1]; PAY = r[2]; FLOW = r[3]; AREA = r[4]; MOVE = r[5]; ENDS = r[6]; NEWB = r[7]; REVW = r[8]; REVP = r[9]; FLOWP = r[10];
+  } catch (e) {
+    $('body').innerHTML = '<div class="err">통계를 가져오지 못했습니다.\n' + esc(e.message) + '</div>';
+    return;
+  }
+  // 아동 이름 — 받은 줄에 나온 아동만
+  const ids = Array.from(new Set(REV.concat(MOVE, ENDS).map(r => r.child_id).filter(x => x != null)));
+  KID = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data } = await sb.from('nl_children').select('id, name').in('id', ids.slice(i, i + 200));
+    (data || []).forEach(c => { KID[c.id] = c.name || ''; });
+  }
+  draw();
+}
+
+function draw(){
+  document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b.dataset.t === TAB));
+  if (TAB === 'biz') drawBiz();
+  else if (TAB === 'kid') drawKid();
+  else if (TAB === 'th') drawTh();
+  else if (TAB === 'flow') drawFlowTab();
+  else if (TAB === 'move') drawMove();
+  else drawArea();
+}
+
+// 받은 줄이 있는 달 (1~12월 중)
+function monthsWithData(){
+  const s = new Set(REV.map(r => r.month_key));
+  const out = [];
+  for (let m = 1; m <= 12; m++) { const k = mkOf(YEAR, m); if (s.has(k)) out.push(k); }
+  return out;
+}
+
+// ① 사업별
+function drawBiz(){
+  const ms = monthsWithData();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">이 해에는 자료가 없습니다.</div>'; return; }
+  const sts = Array.from(new Set(REV.map(r => Number(r.support_type_id)))).sort((a, b) => a - b);
+  let h = '<div class="card"><div class="ct">' + YEAR + '년 사업별 매출 (만원)</div><div class="tw"><table>'
+        + '<tr><th class="l">사업</th>' + ms.map(k => '<th>' + monNo(k) + '월</th>').join('') + '<th>합계</th></tr>';
+  sts.forEach(st => {
+    let tot = 0;
+    h += '<tr><td class="l"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + (SCOL[st] || '#ccc') + ';margin-right:6px"></i>' + esc(STN[st] || (st + '번')) + '</td>';
+    ms.forEach(k => {
+      const rs = REV.filter(r => r.month_key === k && Number(r.support_type_id) === st);
+      const self = sumBy(rs, r => r.self_amt), gov = sumBy(rs, r => r.gov_amt);
+      const nd = rs.some(r => r.gov_state === '자료 없음');
+      tot += self + gov;
+      if (!rs.length) { h += '<td class="nd">·</td>'; return; }
+      h += '<td title="자부담 ' + won(self) + (nd ? ' · 정부지원 자료 없음' : (gov ? ' · 정부지원 ' + won(gov) : '')) + '">'
+         + man(self + gov) + (nd ? '<span class="nd">*</span>' : '') + '</td>';
+    });
+    h += '<td>' + man(tot) + '</td></tr>';
+  });
+  const monTot = k => sumBy(REV.filter(r => r.month_key === k), r => (Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0));
+  h += '<tr class="tot"><td class="l">합계</td>' + ms.map(k => '<td>' + man(monTot(k)) + '</td>').join('')
+     + '<td>' + man(sumBy(ms, monTot)) + '</td></tr>';
+  h += '<tr class="sub"><td class="l">· 자부담</td>' + ms.map(k => '<td>' + man(sumBy(REV.filter(r => r.month_key === k), r => r.self_amt)) + '</td>').join('') + '<td></td></tr>';
+  h += '<tr class="sub"><td class="l">· 정부지원</td>' + ms.map(k => '<td>' + man(sumBy(REV.filter(r => r.month_key === k), r => r.gov_amt)) + '</td>').join('') + '<td></td></tr>';
+  h += '<tr class="sub"><td class="l">아동 수</td>' + ms.map(k => '<td>' + new Set(REV.filter(r => r.month_key === k && ((Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0)) > 0).map(r => r.child_id)).size + '</td>').join('') + '<td></td></tr>';
+  // 리뷰 할인 — 납부 메모의 [리뷰N] × 5,000원 (자부담에 이미 빠져 있음 · 2026-10-07)
+  const rvw = k => REVW.filter(r => r.month_key === k);
+  h += '<tr class="sub"><td class="l">리뷰 할인</td>' + ms.map(k => {
+    const n = sumBy(rvw(k), r => r.cnt), a = sumBy(rvw(k), r => r.amt);
+    return '<td title="' + n + '건 · ' + won(a) + '">' + (a ? '−' + won(a) + ' (' + n + '건)' : '·') + '</td>';
+  }).join('') + '<td title="' + won(sumBy(REVW, r => r.amt)) + '">' + (sumBy(REVW, r => r.amt) ? '−' + won(sumBy(REVW, r => r.amt)) + ' (' + sumBy(REVW, r => r.cnt) + '건)' : '') + '</td></tr>';
+  if (REVP.length) {
+    h += '<tr class="sub"><td class="l">지난해 합계</td>' + ms.map(k => {
+      const pk = mkOf(YEAR - 1, monNo(k));
+      return '<td>' + man(sumBy(REVP.filter(r => r.month_key === pk), r => (Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0))) + '</td>';
+    }).join('') + '<td></td></tr>';
+  }
+  h += '</table></div>'
+     + '<div class="note"><span class="nd">*</span> 정부지원 자료가 없는 달 — 발달재활 정부 금액은 2026년 7월부터, 치료지원 · 방과후 지원금은 8월부터 셉니다. 그 전 달은 자부담만입니다.<br>'
+     + '숫자에 마우스를 올리면 자부담 · 정부지원이 원 단위로 보입니다. 아동 수는 그 달 매출이 있는 아동입니다.<br>'
+     + '리뷰 할인 — 납부 계산에서 적은 리뷰 건수 × 5,000원 (원 단위 그대로). 자부담에서 이미 빠진 금액입니다.</div></div>';
+  // 막대 — 달마다 사업 쌓기
+  const mx = Math.max(1, ...ms.map(monTot));
+  h += '<div class="card"><div class="ct">달별 매출</div><div class="bars">';
+  ms.forEach(k => {
+    h += '<div class="bcol"><div class="bval">' + man(monTot(k)) + '</div><div class="bstk">';
+    sts.forEach(st => {
+      const v = sumBy(REV.filter(r => r.month_key === k && Number(r.support_type_id) === st), r => (Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0));
+      if (v > 0) h += '<div class="bseg" title="' + esc(STN[st] || st) + ' ' + won(v) + '" style="height:' + (v / mx * 140) + 'px;background:' + (SCOL[st] || '#ccc') + '"></div>';
+    });
+    h += '</div><div class="blab">' + monNo(k) + '월</div></div>';
+  });
+  h += '</div><div class="leg">' + sts.map(st => '<span><i style="background:' + (SCOL[st] || '#ccc') + '"></i>' + esc(STN[st] || st) + '</span>').join('') + '</div></div>';
+  $('body').innerHTML = h;
+}
+
+// ② 아동별
+function kidSums(mk){
+  const g = {};
+  REV.forEach(r => {
+    if (r.child_id == null) return;
+    if (mk && r.month_key !== mk) return;
+    const o = g[r.child_id] || (g[r.child_id] = { c: r.child_id, self: 0, gov: 0, st: new Set() });
+    o.self += Number(r.self_amt) || 0; o.gov += Number(r.gov_amt) || 0;
+    if ((Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0) > 0) o.st.add(Number(r.support_type_id));
+  });
+  const arr = Object.values(g).filter(o => o.self + o.gov > 0);
+  arr.sort((a, b) => (b.self + b.gov) - (a.self + a.gov));
+  arr.forEach((o, i) => { o.rank = i + 1; });
+  return arr;
+}
+function prevMkOf(k){ const y = Number(k.slice(0,4)), m = monNo(k); return m === 1 ? mkOf(y - 1, 12) : mkOf(y, m - 1); }
+
+function drawKid(){
+  const ms = monthsWithData();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">이 해에는 자료가 없습니다.</div>'; return; }
+  if (KMON !== 'year' && ms.indexOf(KMON) < 0) KMON = ms.indexOf(nowMk()) >= 0 ? prevMkOf(nowMk()) : ms[ms.length - 1];
+  if (KMON !== 'year' && ms.indexOf(KMON) < 0) KMON = ms[ms.length - 1];
+  const mk = KMON === 'year' ? null : KMON;
+  const arr = kidSums(mk);
+  const prevRank = {};
+  if (mk) kidSums(prevMkOf(mk)).forEach(o => { prevRank[o.c] = o.rank; });
+  let h = '<div class="card"><div class="ct">아동별 매출 순위 &nbsp; '
+        + '<select id="kmon"><option value="year"' + (KMON === 'year' ? ' selected' : '') + '>' + YEAR + '년 한 해</option>'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === KMON ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div><div class="tw"><table>'
+        + '<tr><th>순위</th><th class="l">아동</th><th class="l">사업</th><th>자부담</th><th>정부지원</th><th>합계</th>' + (mk ? '<th>지난달 대비</th>' : '') + '</tr>';
+  arr.forEach(o => {
+    let ch = '';
+    if (mk) {
+      const p = prevRank[o.c];
+      ch = p == null ? '<span class="up">새로</span>' : (p > o.rank ? '<span class="up">▲' + (p - o.rank) + '</span>' : (p < o.rank ? '<span class="dn">▼' + (o.rank - p) + '</span>' : '<span class="nd">–</span>'));
+    }
+    h += '<tr class="click' + (KSEL === o.c ? ' sel' : '') + '" data-c="' + o.c + '"><td>' + o.rank + '</td>'
+       + '<td class="l">' + o.c + '번 ' + esc(KID[o.c] || '') + '</td>'
+       + '<td class="l">' + Array.from(o.st).sort((a,b)=>a-b).map(st => esc(STN[st] || st)).join(' · ') + '</td>'
+       + '<td>' + won(o.self) + '</td><td>' + won(o.gov) + '</td><td><b>' + won(o.self + o.gov) + '</b></td>'
+       + (mk ? '<td>' + ch + '</td>' : '') + '</tr>';
+  });
+  h += '</table></div><div class="note">줄을 누르면 그 아동의 달별 매출이 아래에 나옵니다. 정부지원은 2026년 7~8월부터 셉니다.</div></div>';
+  if (KSEL != null) {
+    const rows = REV.filter(r => Number(r.child_id) === Number(KSEL));
+    const vals = ms.map(k => sumBy(rows.filter(r => r.month_key === k), r => (Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0)));
+    const pv = ms.map(k => sumBy(REVP.filter(r => Number(r.child_id) === Number(KSEL) && r.month_key === mkOf(YEAR - 1, monNo(k))), r => (Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0)));
+    const mx = Math.max(1, ...vals, ...pv);
+    h += '<div class="card"><div class="ct">' + KSEL + '번 ' + esc(KID[KSEL] || '') + ' — 달별 매출</div><div class="bars">';
+    ms.forEach((k, i) => {
+      h += '<div class="bcol"><div class="bval">' + man(vals[i]) + '</div><div class="pair">'
+         + (REVP.length ? '<div class="pb" title="지난해 ' + won(pv[i]) + '" style="height:' + (pv[i] / mx * 140) + 'px;background:#DCD6CF"></div>' : '')
+         + '<div class="pb" title="' + won(vals[i]) + '" style="height:' + (vals[i] / mx * 140) + 'px;background:var(--cam)"></div>'
+         + '</div><div class="blab">' + monNo(k) + '월</div></div>';
+    });
+    h += '</div>' + (REVP.length ? '<div class="leg"><span><i style="background:#DCD6CF"></i>지난해</span><span><i style="background:var(--cam)"></i>올해</span></div>' : '') + '</div>';
+  }
+  $('body').innerHTML = h;
+  $('kmon').onchange = () => { KMON = $('kmon').value; drawKid(); };
+  document.querySelectorAll('tr.click[data-c]').forEach(tr => tr.onclick = () => {
+    KSEL = Number(tr.dataset.c) === Number(KSEL) ? null : Number(tr.dataset.c); drawKid();
+  });
+}
+
+// ③ 선생님 (9월부터)
+function drawTh(){
+  const ms = Array.from(new Set(TH.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">선생님 매출은 2026년 9월부터 셉니다. 이 해에는 자료가 없습니다.</div>'; return; }
+  if (TMON !== 'year' && ms.indexOf(TMON) < 0) TMON = ms.indexOf(prevMkOf(nowMk())) >= 0 ? prevMkOf(nowMk()) : ms[ms.length - 1];
+  const inM = r => TMON === 'year' ? true : r.month_key === TMON;
+  const g = {};
+  TH.filter(inM).forEach(r => {
+    const k = r.therapist_id == null ? 'none' : String(r.therapist_id);
+    const o = g[k] || (g[k] = { t: r.therapist_id, rev: 0, pay: 0, kids: new Set() });
+    o.rev += Number(r.amt) || 0;
+    if (r.child_id != null && (Number(r.amt) || 0) > 0) o.kids.add(r.child_id);
+  });
+  PAY.filter(inM).forEach(p => {
+    const k = String(p.therapist_id);
+    const o = g[k] || (g[k] = { t: p.therapist_id, rev: 0, pay: 0, kids: new Set() });
+    o.pay += Number(p.total) || 0;
+  });
+  const arr = Object.values(g).filter(o => o.t != null);
+  arr.forEach(o => { o.net = o.rev - o.pay; });
+  arr.sort((a, b) => b.net - a.net);
+  const pos = sumBy(arr.filter(o => o.net > 0), o => o.net);
+  let h = '<div class="card"><div class="ct">선생님별 매출 · 순이익 &nbsp; '
+        + '<select id="tmon"><option value="year"' + (TMON === 'year' ? ' selected' : '') + '>' + YEAR + '년 (9월부터)</option>'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === TMON ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div><div class="tw"><table>'
+        + '<tr><th>순위</th><th class="l">선생님</th><th>아동</th><th>매출</th><th>지급</th><th>순이익</th><th>기여도</th></tr>';
+  arr.forEach((o, i) => {
+    h += '<tr><td>' + (i + 1) + '</td><td class="l">' + o.t + '번 ' + esc(THN[o.t] || '') + '</td>'
+       + '<td>' + o.kids.size + '명</td><td>' + won(o.rev) + '</td>'
+       + '<td>' + (o.pay ? won(o.pay) : '<span class="nd">공개 전</span>') + '</td>'
+       + '<td><b' + (o.net < 0 ? ' style="color:var(--coral)"' : '') + '>' + won(o.net) + '</b></td>'
+       + '<td>' + (o.net > 0 && pos ? Math.round(o.net / pos * 100) + '%' : '<span class="nd">–</span>') + '</td></tr>';
+  });
+  const none = g.none;
+  if (none && Math.round(none.rev) !== 0) h += '<tr class="sub"><td></td><td class="l">선생님 없음</td><td></td><td>' + won(none.rev) + '</td><td></td><td></td><td></td></tr>';
+  const tr = sumBy(Object.values(g), o => o.rev), tp = sumBy(arr, o => o.pay);
+  h += '<tr class="tot"><td></td><td class="l">합계</td><td></td><td>' + won(tr) + '</td><td>' + won(tp) + '</td><td>' + won(tr - tp) + '</td><td></td></tr>';
+  h += '</table></div><div class="note">매출 — 아동이 낸 돈(자부담 + 정부지원)을 그 달 그 사업 수업을 한 선생님께 수업한 분만큼 나눈 금액입니다.<br>'
+     + '지급 — 수수료 정산에서 선생님께 공개한 마지막 판의 총액입니다. 공개 전이면 「공개 전」.<br>'
+     + '기여도 — 순이익이 0원보다 큰 선생님들의 순이익 합 가운데 차지하는 몫입니다. 4대보험 · 주유비 등 센터 다른 비용은 빼지 않았습니다.</div></div>';
+  $('body').innerHTML = h;
+  $('tmon').onchange = () => { TMON = $('tmon').value; drawTh(); };
+}
+
+// ④ 신규 · 종결
+function drawFlow(){
+  const cnt = (arr, kind, k) => sumBy(arr.filter(r => r.kind === kind && r.month_key === k), r => r.cnt);
+  const ms = []; for (let m = 1; m <= 12; m++) ms.push(mkOf(YEAR, m));
+  const nw = ms.map(k => cnt(FLOW, '신규', k)), en = ms.map(k => cnt(FLOW, '종결', k)), iq = ms.map(k => cnt(FLOW, '문의', k));
+  const pnw = ms.map(k => cnt(FLOWP, '신규', mkOf(YEAR - 1, monNo(k))));
+  const best = Math.max(...nw);
+  const mx = Math.max(1, ...nw, ...en, ...pnw);
+  let h = '<div class="card"><div class="ct">' + YEAR + '년 신규 · 종결</div><div class="bars">';
+  ms.forEach((k, i) => {
+    h += '<div class="bcol"><div class="bval">' + (nw[i] ? nw[i] : '') + (nw[i] && nw[i] === best ? '<span class="star">★</span>' : '') + '</div><div class="pair">'
+       + (FLOWP.length ? '<div class="pb" title="지난해 신규 ' + pnw[i] + '명" style="height:' + (pnw[i] / mx * 140) + 'px;background:#DCD6CF"></div>' : '')
+       + '<div class="pb" title="신규 ' + nw[i] + '명" style="height:' + (nw[i] / mx * 140) + 'px;background:#8FD19E"></div>'
+       + '<div class="pb" title="종결 ' + en[i] + '명" style="height:' + (en[i] / mx * 140) + 'px;background:#C4BDB5"></div>'
+       + '</div><div class="blab">' + monNo(k) + '월</div></div>';
+  });
+  h += '</div><div class="leg">' + (FLOWP.length ? '<span><i style="background:#DCD6CF"></i>지난해 신규</span>' : '')
+     + '<span><i style="background:#8FD19E"></i>신규</span><span><i style="background:#C4BDB5"></i>종결</span><span class="star">★ 신규가 가장 많은 달</span></div>';
+  h += '<div class="tw" style="margin-top:12px"><table><tr><th class="l"></th>' + ms.map(k => '<th>' + monNo(k) + '월</th>').join('') + '<th>합계</th></tr>'
+     + '<tr><td class="l">신규</td>' + nw.map(v => '<td>' + v + '</td>').join('') + '<td><b>' + sumBy(nw, v => v) + '</b></td></tr>'
+     + '<tr><td class="l">종결</td>' + en.map(v => '<td>' + v + '</td>').join('') + '<td><b>' + sumBy(en, v => v) + '</b></td></tr>'
+     + '<tr class="sub"><td class="l">문의</td>' + iq.map(v => '<td>' + v + '</td>').join('') + '<td>' + sumBy(iq, v => v) + '</td></tr>'
+     + (FLOWP.length ? '<tr class="sub"><td class="l">지난해 신규</td>' + pnw.map(v => '<td>' + v + '</td>').join('') + '<td>' + sumBy(pnw, v => v) + '</td></tr>' : '')
+     + '</table></div>'
+     + '<div class="note">신규 — 그 아동이 처음 수업을 시작한 달 (수업 시작일 · 첫 납부 달 · 첫 회기 중 가장 이른 날). 2026년 1월에 이미 다니던 아동은 셈하지 않습니다.<br>'
+     + '종결 — 종결 · 타기관이용 아동의 마지막 수업이 끝난 달. 문의 — 신규 문의 화면에 적은 문의일 (2026년 7월부터 적기 시작).</div></div>';
+  $('body').innerHTML = subBar() + h;
+  bindSub();
+}
+
+// 신규·종결 안에서 고르기 — 흐름 · 신규 사업 · 종결 사유 · 사업별 종결 (2026-10-07 은정님)
+function subBar(){
+  const it = [['flow', '흐름'], ['newbiz', '신규 사업'], ['end', '종결 사유'], ['endbiz', '사업별 종결']];
+  return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;">'
+    + it.map(x => '<button type="button" class="fsub" data-f="' + x[0] + '" style="border-radius:16px;padding:5px 14px;'
+        + (FSUB === x[0] ? 'background:var(--cam);color:#fff;border-color:var(--cam);' : 'border-color:var(--line);color:var(--dim);') + '">' + x[1] + '</button>').join('')
+    + '</div>';
+}
+function bindSub(){
+  document.querySelectorAll('.fsub').forEach(b => b.onclick = () => { FSUB = b.dataset.f; drawFlowTab(); });
+}
+function drawFlowTab(){
+  if (FSUB === 'newbiz') drawNewBiz();
+  else if (FSUB === 'end') drawEnd();
+  else if (FSUB === 'endbiz') drawEndBiz();
+  else drawFlow();
+}
+// 신규 사업 — 신규 아동이 처음 시작한 사업 비율
+function drawNewBiz(){
+  const ms = Array.from(new Set(FLOW.filter(r => r.kind === '신규').map(r => r.month_key).concat(NEWB.map(r => r.month_key)))).sort();
+  if (!ms.length) { $('body').innerHTML = subBar() + '<div class="card">이 해에는 신규 아동이 없습니다.</div>'; bindSub(); return; }
+  if (NBMON !== 'year' && ms.indexOf(NBMON) < 0) NBMON = 'year';
+  const inP = r => NBMON === 'year' || r.month_key === NBMON;
+  const rows = NEWB.filter(inP);
+  const g = {}, kids = new Set();
+  const seen = new Set();
+  rows.forEach(r => {
+    const gg = grpOf(r.support_type_id); if (!gg) return;
+    const key = r.month_key + '|' + r.child_id + '|' + gg;
+    if (seen.has(key)) return; seen.add(key);
+    g[gg] = (g[gg] || 0) + 1; kids.add(r.month_key + '|' + r.child_id);
+  });
+  const arr = Object.keys(g).map(k => ({ k: k, n: g[k] })).sort((a, b) => b.n - a.n);
+  const tot = sumBy(arr, o => o.n);
+  const flowN = sumBy(FLOW.filter(r => r.kind === '신규' && inP(r)), r => r.cnt);
+  const etc = Math.max(0, flowN - kids.size);
+  let h = '<div class="card"><div class="ct">신규 아동 사업 &nbsp; ' + monSel('nbmon', ms, NBMON) + '</div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + pieHtml(arr, gcol, kids.size, '신규 아동')
+        + '<table style="width:auto;min-width:280px;"><tr><th class="l">사업</th><th>아동</th><th>비율</th></tr>'
+        + arr.map(o => '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + gcol(o.k) + ';margin-right:6px"></i>' + esc(o.k) + '</td>'
+            + '<td>' + o.n + '명</td><td><b>' + Math.round(o.n / tot * 1000) / 10 + '%</b></td></tr>').join('')
+        + '<tr class="tot"><td class="l">합계</td><td>' + tot + '</td><td>100%</td></tr>'
+        + (etc ? '<tr class="sub"><td class="l">평가 · 체험만</td><td>' + etc + '명</td><td>원에 안 넣음</td></tr>' : '')
+        + '</table></div>'
+        + '<div class="note">처음 시작한 달에 시작한 수업의 사업입니다. 한 아동이 두 사업을 함께 시작하면 두 사업에 하나씩 셉니다.<br>'
+        + '사업 — 발달 · 센터 · 치료지원(언어·작업) · 방과후(활동비 · 치료지원). 새 지원유형이 생기면 제 이름으로 저절로 들어갑니다.<br>'
+        + '평가 · 체험만 — 흐름의 신규에는 들어 있으나 아직 수업을 시작하지 않은 아동입니다.</div></div>';
+  // 달별 표
+  const allG = Array.from(new Set(NEWB.map(r => grpOf(r.support_type_id)).filter(Boolean)));
+  const mAll = []; for (let m = 1; m <= 12; m++) mAll.push(mkOf(YEAR, m));
+  h += '<div class="card"><div class="ct">달별 신규 아동 사업</div><div class="tw"><table><tr><th class="l">사업</th>'
+     + mAll.map(k => '<th>' + monNo(k) + '월</th>').join('') + '<th>합계</th></tr>';
+  allG.forEach(gg => {
+    const cnt = k => new Set(NEWB.filter(r => r.month_key === k && grpOf(r.support_type_id) === gg).map(r => r.child_id)).size;
+    h += '<tr><td class="l">' + esc(gg) + '</td>' + mAll.map(k => '<td>' + (cnt(k) || '·') + '</td>').join('') + '<td><b>' + sumBy(mAll, cnt) + '</b></td></tr>';
+  });
+  h += '</table></div></div>';
+  $('body').innerHTML = subBar() + h;
+  bindSub();
+  $('nbmon').onchange = () => { NBMON = $('nbmon').value; drawNewBiz(); };
+}
+// 사업별 종결 — 종결 아동의 사업 비율 · 사업별 종결률 (종결 ÷ 그 사업 이용 아동)
+function drawEndBiz(){
+  const ms = Array.from(new Set(ENDS.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = subBar() + '<div class="card">이 해에는 종결한 수업이 없습니다.</div>'; bindSub(); return; }
+  if (EBMON !== 'year' && ms.indexOf(EBMON) < 0) EBMON = 'year';
+  const inP = r => EBMON === 'year' || r.month_key === EBMON;
+  const seen = new Set(), g = {};
+  ENDS.filter(inP).forEach(r => {
+    if (r.support_type_id == null) return;   // 수업 기록 없이 끝난 아동은 사업이 없어 뺌 (2026-10-08)
+    const gg = grpOf(r.support_type_id); if (!gg) return;
+    const key = r.month_key + '|' + r.child_id + '|' + gg;
+    if (seen.has(key)) return; seen.add(key);
+    g[gg] = (g[gg] || 0) + 1;
+  });
+  // 이용 아동 — 그 기간 그 사업에 매출이 있는 아동 (사업별 갈래와 같은 자료)
+  const use = {};
+  REV.filter(r => (EBMON === 'year' || r.month_key === EBMON) && ((Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0)) > 0)
+     .forEach(r => { const gg = grpOf(r.support_type_id); if (!gg) return; (use[gg] = use[gg] || new Set()).add(r.child_id); });
+  const arr = Object.keys(g).map(k => ({ k: k, n: g[k] })).sort((a, b) => b.n - a.n);
+  const tot = sumBy(arr, o => o.n);
+  let h = '<div class="card"><div class="ct">사업별 종결 &nbsp; ' + monSel('ebmon', ms, EBMON) + '</div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + pieHtml(arr, gcol, tot, '종결')
+        + '<table style="width:auto;min-width:360px;"><tr><th class="l">사업</th><th>종결</th><th>비율</th><th>이용 아동</th><th>종결률</th></tr>'
+        + arr.map(o => {
+            const u = use[o.k] ? use[o.k].size : 0;
+            return '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + gcol(o.k) + ';margin-right:6px"></i>' + esc(o.k) + '</td>'
+              + '<td>' + o.n + '명</td><td>' + Math.round(o.n / tot * 1000) / 10 + '%</td>'
+              + '<td>' + (u || '–') + '</td><td><b>' + (u ? Math.round(o.n / u * 1000) / 10 + '%' : '–') + '</b></td></tr>';
+          }).join('')
+        + '<tr class="tot"><td class="l">합계</td><td>' + tot + '</td><td>100%</td><td></td><td></td></tr></table></div>'
+        + '<div class="note">종결 — 그 사업 수업을 끝낸 아동 (같은 달 · 같은 사업은 한 명). 다른 사업은 계속 다닐 수 있습니다. 「자료 정리」는 뺐습니다.<br>'
+        + '종결률 — 종결 ÷ 그 ' + (EBMON === 'year' ? '해' : '달') + ' 그 사업에 매출이 있던 아동 수.</div></div>';
+  $('body').innerHTML = subBar() + h;
+  bindSub();
+  $('ebmon').onchange = () => { EBMON = $('ebmon').value; drawEndBiz(); };
+}
+
+// ⑦ 종결 사유 — 수업마다 한 줄 · 자료 정리 뺌 · 묶음 없음은 원에서 뺌 (2026-10-07)
+function drawEnd(){
+  const ms = Array.from(new Set(ENDS.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = subBar() + '<div class="card">이 해에는 종결한 수업이 없습니다.</div>'; bindSub(); return; }
+  if (EMON !== 'year' && ms.indexOf(EMON) < 0) EMON = 'year';
+  const raw = ENDS.filter(r => EMON === 'year' || r.month_key === EMON);
+  // 아동 기준 (2026-10-07 은정님) — 같은 달 · 같은 아동은 한 줄 · 사업 · 사유 · 세부를 모음
+  const gk = {};
+  raw.forEach(r => {
+    const k = r.month_key + '|' + r.child_id;
+    const o = gk[k] || (gk[k] = { month_key: r.month_key, child_id: r.child_id, sts: new Set(), cats: new Set(), why: new Set() });
+    if (r.support_type_id != null) o.sts.add(Number(r.support_type_id));
+    o.cats.add(r.end_cat);
+    if (r.end_reason && r.end_reason !== r.end_cat) o.why.add(r.end_reason);
+  });
+  const rows = Object.values(gk);
+  // 한 수업만 사유를 적었으면 「묶음 없음」은 뺌
+  rows.forEach(o => { if (o.cats.size > 1) o.cats.delete('묶음 없음'); });
+  const none = rows.filter(o => o.cats.has('묶음 없음'));
+  const has = rows.filter(o => !o.cats.has('묶음 없음'));
+  const g = {}; has.forEach(o => o.cats.forEach(c => { g[c] = (g[c] || 0) + 1; }));
+  const arr = Object.keys(g).map(k => ({ k: k, n: g[k] })).sort((a, b) => b.n - a.n);
+  const tot = sumBy(arr, o => o.n);
+  let acc = 0;
+  const seg = arr.map(o => {
+    const a = acc / tot * 360, b = (acc + o.n) / tot * 360; acc += o.n;
+    return (ECOL[o.k] || '#ccc') + ' ' + a + 'deg ' + b + 'deg';
+  }).join(', ');
+  let h = '<div class="card"><div class="ct">종결 사유 &nbsp; '
+        + '<select id="emon"><option value="year"' + (EMON === 'year' ? ' selected' : '') + '>' + YEAR + '년 한 해</option>'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === EMON ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div style="position:relative;width:220px;height:220px;border-radius:50%;background:' + (tot ? 'conic-gradient(' + seg + ')' : '#F0EEEA') + ';flex:0 0 auto;">'
+        + '<div style="position:absolute;inset:55px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+        + '<div style="font-size:22px;font-weight:600;">' + tot + '</div><div style="font-size:11.5px;color:var(--dim);">종결 아동</div></div></div>'
+        + '<table style="width:auto;min-width:300px;"><tr><th class="l">사유</th><th>아동</th><th>비율</th></tr>';
+  arr.forEach(o => {
+    h += '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + (ECOL[o.k] || '#ccc') + ';margin-right:6px"></i>' + esc(o.k) + '</td>'
+       + '<td>' + o.n + '</td><td><b>' + Math.round(o.n / tot * 1000) / 10 + '%</b></td></tr>';
+  });
+  h += '<tr class="tot"><td class="l">합계</td><td>' + tot + '</td><td>100%</td></tr>'
+     + (none.length ? '<tr class="sub"><td class="l">사유 없는 종결</td><td>' + none.length + '</td><td>원에 안 넣음</td></tr>' : '')
+     + '</table></div>'
+     + '<div class="note">아동 기준입니다 — 같은 달에 한 아동이 여러 수업을 끝내도 한 명으로 셉니다 (사유가 서로 다르면 사유마다 하나). 「자료 정리」로 끝낸 것은 실제 종결이 아니라 뺐습니다.<br>'
+     + '사유 없는 종결 — 사유 칸이 생기기 전(2026-09-10)에 끝냈거나 사유 없이 종결일만 넣은 수업입니다.<br>'
+     + '수업 기록 없음 — 시스템을 쓰기 전에 끝나 아동 목록 「아동 종결 사유」에 적은 아동입니다 (종결일을 적은 아동만 셈 · 사업별 종결에는 안 넣음).</div></div>';
+  h += '<div class="card"><div class="ct">명부</div><div class="tw"><table>'
+     + '<tr><th class="l">달</th><th class="l">아동</th><th class="l">사업</th><th class="l">사유</th><th class="l">세부</th></tr>';
+  rows.slice().sort((a, b) => a.month_key < b.month_key ? 1 : a.month_key > b.month_key ? -1 : a.child_id - b.child_id).forEach(o => {
+    h += '<tr><td class="l">' + monNo(o.month_key) + '월</td><td class="l">' + o.child_id + '번 ' + esc(KID[o.child_id] || '') + '</td>'
+       + '<td class="l">' + (o.sts.size ? Array.from(o.sts).sort((a, b) => a - b).map(st => esc(STN[st] || st)).join(' · ')
+           : '<span class="nd">수업 기록 없음</span>') + '</td>'
+       + '<td class="l">' + Array.from(o.cats).map(c => c === '묶음 없음' ? '<span class="nd">사유 없음</span>'
+           : '<span style="background:' + (ECOL[c] || '#eee') + ';border-radius:8px;padding:1px 8px;font-size:12px;margin-right:3px">' + esc(c) + '</span>').join('') + '</td>'
+       + '<td class="l" style="white-space:normal;color:var(--dim);font-size:12.5px">' + esc(Array.from(o.why).join(' / ')) + '</td></tr>';
+  });
+  h += '</table></div><div class="note">세부 글은 원장님 화면에만 보입니다.</div></div>';
+  $('body').innerHTML = subBar() + h;
+  bindSub();
+  $('emon').onchange = () => { EMON = $('emon').value; drawEnd(); };
+}
+
+// ⑥ 사업 이동 — 발달 · 방과후 · 치료지원 셋 (센터 뺌 · 납부 기준 · 2026-10-07)
+function drawMove(){
+  const ms = Array.from(new Set(MOVE.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">이 해에는 사업을 옮긴 아동이 없습니다.</div>'; return; }
+  if (MMON !== 'year' && ms.indexOf(MMON) < 0) MMON = 'year';
+  const rows = MOVE.filter(r => MMON === 'year' || r.month_key === MMON);
+  const kinds = ['바꿈', '더함', '뺌'];
+  const cnt = {}; kinds.forEach(k => { cnt[k] = rows.filter(r => r.kind === k).length; });
+  const tot = rows.length;
+  let acc = 0;
+  const seg = kinds.filter(k => cnt[k]).map(k => {
+    const a = acc / tot * 360, b = (acc + cnt[k]) / tot * 360; acc += cnt[k];
+    return MCOL[k] + ' ' + a + 'deg ' + b + 'deg';
+  }).join(', ');
+  const path = {};
+  rows.forEach(r => { const k = r.prev_grps + ' → ' + r.grps; path[k] = (path[k] || 0) + 1; });
+  const pa = Object.keys(path).map(k => ({ k: k, n: path[k] })).sort((a, b) => b.n - a.n);
+  let h = '<div class="card"><div class="ct">사업 이동 (발달 · 방과후 · 치료지원) &nbsp; '
+        + '<select id="mmon"><option value="year"' + (MMON === 'year' ? ' selected' : '') + '>' + YEAR + '년 한 해</option>'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === MMON ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div style="position:relative;width:200px;height:200px;border-radius:50%;background:' + (tot ? 'conic-gradient(' + seg + ')' : '#F0EEEA') + ';flex:0 0 auto;">'
+        + '<div style="position:absolute;inset:50px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+        + '<div style="font-size:22px;font-weight:600;">' + tot + '</div><div style="font-size:11.5px;color:var(--dim);">이동</div></div></div>'
+        + '<table style="width:auto;min-width:240px;"><tr><th class="l">종류</th><th>건</th><th>비율</th></tr>';
+  kinds.forEach(k => {
+    h += '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + MCOL[k] + ';margin-right:6px"></i>' + k + '</td>'
+       + '<td>' + cnt[k] + '</td><td><b>' + (tot ? Math.round(cnt[k] / tot * 1000) / 10 : 0) + '%</b></td></tr>';
+  });
+  h += '</table><table style="width:auto;min-width:280px;"><tr><th class="l">이동 길</th><th>건</th></tr>'
+     + pa.map(o => '<tr><td class="l">' + esc(o.k) + '</td><td>' + o.n + '</td></tr>').join('') + '</table></div>'
+     + '<div class="note">바꿈 — 하나가 빠지고 다른 것이 들어옴 · 더함 — 그대로 두고 하나 더 · 뺌 — 하나만 빠짐.<br>'
+     + '납부 표 기준으로 지난달과 이달을 견줍니다. 센터비용은 5주 있는 달의 센터 1회 등으로 오르내려 뺐습니다.</div></div>';
+  h += '<div class="card"><div class="ct">명부</div><div class="tw"><table>'
+     + '<tr><th class="l">달</th><th class="l">아동</th><th class="l">지난달</th><th class="l"></th><th class="l">이달</th><th class="l">종류</th></tr>';
+  rows.slice().sort((a, b) => a.month_key < b.month_key ? 1 : a.month_key > b.month_key ? -1 : a.child_id - b.child_id).forEach(r => {
+    h += '<tr><td class="l">' + monNo(r.month_key) + '월</td><td class="l">' + r.child_id + '번 ' + esc(KID[r.child_id] || '') + '</td>'
+       + '<td class="l">' + esc(r.prev_grps) + '</td><td class="l">→</td><td class="l">' + esc(r.grps) + '</td>'
+       + '<td class="l"><span style="background:' + MCOL[r.kind] + ';border-radius:8px;padding:1px 8px;font-size:12px">' + esc(r.kind) + '</span></td></tr>';
+  });
+  h += '</table></div></div>';
+  $('body').innerHTML = h;
+  $('mmon').onchange = () => { MMON = $('mmon').value; drawMove(); };
+}
+
+// ⑤ 치료 영역 — 그 달 그 영역 수업을 받은 아동 수 · 원 그림 (2026-10-07)
+function drawArea(){
+  const ms = Array.from(new Set(AREA.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">치료 영역은 회기 자료가 있는 2026년 8월부터 셉니다. 이 해에는 자료가 없습니다.</div>'; return; }
+  if (AMON !== 'year' && ms.indexOf(AMON) < 0) AMON = ms.indexOf(prevMkOf(nowMk())) >= 0 ? prevMkOf(nowMk()) : ms[ms.length - 1];
+  const rows = AREA.filter(r => AMON === 'year' || r.month_key === AMON);
+  const g = {};
+  rows.forEach(r => { const k = Number(r.therapy_type_id); g[k] = (g[k] || 0) + 1; });
+  const arr = Object.keys(g).map(k => ({ t: Number(k), n: g[k] })).sort((a, b) => b.n - a.n);
+  const tot = sumBy(arr, o => o.n);
+  const kids = new Set(rows.map(r => AMON === 'year' ? r.month_key + '|' + r.child_id : r.child_id)).size;
+  // 원 — conic-gradient
+  let acc = 0;
+  const seg = arr.map(o => {
+    const a = acc / tot * 360, b = (acc + o.n) / tot * 360; acc += o.n;
+    return (ACOL[o.t] || '#ccc') + ' ' + a + 'deg ' + b + 'deg';
+  }).join(', ');
+  let h = '<div class="card"><div class="ct">치료 영역 이용 &nbsp; '
+        + '<select id="amon"><option value="year"' + (AMON === 'year' ? ' selected' : '') + '>' + YEAR + '년 한 해</option>'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === AMON ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + '<div style="position:relative;width:220px;height:220px;border-radius:50%;background:conic-gradient(' + seg + ');flex:0 0 auto;">'
+        + '<div style="position:absolute;inset:55px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+        + '<div style="font-size:22px;font-weight:600;">' + kids + '</div>'
+        + '<div style="font-size:11.5px;color:var(--dim);">' + (AMON === 'year' ? '연인원' : '아동') + '</div></div></div>'
+        + '<table style="width:auto;min-width:320px;"><tr><th class="l">영역</th><th>아동</th><th>비율</th></tr>';
+  arr.forEach(o => {
+    h += '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + (ACOL[o.t] || '#ccc') + ';margin-right:6px"></i>'
+       + esc(TTN[o.t] || (o.t + '번')) + '</td><td>' + o.n + '명</td><td><b>' + Math.round(o.n / tot * 1000) / 10 + '%</b></td></tr>';
+  });
+  h += '<tr class="tot"><td class="l">합계</td><td>' + tot + '</td><td>100%</td></tr></table></div>'
+     + '<div class="note">그 ' + (AMON === 'year' ? '해 달마다' : '달') + ' 그 영역 수업을 받은 아동 수입니다. 한 아동이 두 영역을 받으면 두 영역에 하나씩 셉니다'
+     + (AMON === 'year' ? ' (한 해는 달마다 더한 연인원)' : '') + '.<br>회기 자료가 2026년 8월부터라 그 전 달은 없습니다.</div></div>';
+  // 달별 흐름
+  const ts = Array.from(new Set(AREA.map(r => Number(r.therapy_type_id)))).sort((a, b) => a - b);
+  h += '<div class="card"><div class="ct">달별 영역 아동 수</div><div class="tw"><table><tr><th class="l">영역</th>'
+     + ms.map(k => '<th>' + monNo(k) + '월</th>').join('') + '</tr>';
+  ts.forEach(t => {
+    h += '<tr><td class="l">' + esc(TTN[t] || t) + '</td>'
+       + ms.map(k => '<td>' + AREA.filter(r => r.month_key === k && Number(r.therapy_type_id) === t).length + '</td>').join('') + '</tr>';
+  });
+  h += '</table></div></div>';
+  $('body').innerHTML = h;
+  $('amon').onchange = () => { AMON = $('amon').value; drawArea(); };
+}
+
+document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => { TAB = b.dataset.t; draw(); });
+$('home').onclick = () => { location.href = 'index.html'; };
+$('yr').onchange = () => { YEAR = Number($('yr').value); KSEL = null; KMON = null; TMON = null; AMON = null; MMON = null; EMON = null; NBMON = null; EBMON = null; load(); };
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const user = data.session.user;
+  const { data: me, error } = await sb.from('nl_therapists')
+    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="err">직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.</div>'; return; }
+  nlKeep(me.id);
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+  $('who').textContent = me.name + ' 님으로 로그인됨';
+  const [s, t, tt] = await Promise.all([
+    sb.from('nl_support_types').select('id, name, short_name'),
+    sb.from('nl_therapists').select('id, name'),
+    sb.from('nl_therapy_types').select('id, name')
+  ]);
+  (tt.data || []).forEach(x => { TTN[x.id] = x.name; });
+  (s.data || []).forEach(x => { STN[x.id] = x.name; });
+  (t.data || []).forEach(x => { THN[x.id] = x.name; });
+  const cy = new Date().getFullYear();
+  let o = '';
+  for (let y = cy; y >= 2026; y--) o += '<option value="' + y + '">' + y + '년</option>';
+  $('yr').innerHTML = o;
+  YEAR = cy;
+  load();
+})();
+</script>
+</body>
+</html>

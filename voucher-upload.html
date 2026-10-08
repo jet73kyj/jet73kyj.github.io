@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>발달 결제내역 올리기 - 나무링크</title>
+<style>
+  :root {
+    --ink:#1c1f1a; --ink2:#5a6156; --ink3:#9aa294;
+    --line:#e8ebe4; --bg:#f7f8f5; --acc:#3c7a4a; --acc-bg:#eef3ec;
+  }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, "Malgun Gothic", sans-serif; background:var(--bg);
+         margin:0; padding:28px 20px; color:var(--ink);
+         font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased; }
+
+  .box  { max-width:400px; margin:56px auto; background:#fff; border-radius:14px;
+          padding:32px; border:1px solid var(--line); }
+  .wide { max-width:820px; margin:0 auto; }
+
+  h1 { font-size:19px; font-weight:600; letter-spacing:-.01em; margin:0; color:var(--ink); }
+  .sub { font-size:13px; color:var(--ink3); margin:6px 0 24px; }
+  label { display:block; font-size:12px; color:var(--ink2); margin:16px 0 6px; }
+
+  input, select { font:inherit; font-size:14px; padding:9px 11px; color:var(--ink);
+                  border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input:focus, select:focus { outline:2px solid var(--acc); outline-offset:-1px;
+                              border-color:transparent; }
+  .box input { width:100%; }
+
+  button { font:inherit; font-size:14px; font-weight:500; padding:10px 16px;
+           background:var(--acc); color:#fff; border:none; border-radius:8px; cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  button:disabled { background:#c3c8c0; cursor:default; }
+  .box button { width:100%; padding:12px; margin-top:24px; }
+  .ghost { background:none; color:var(--ink2); border:1px solid var(--line); }
+
+  .out { margin-top:16px; padding:12px 14px; border-radius:8px; font-size:13.5px;
+         line-height:1.6; display:none; white-space:pre-wrap; }
+  .ok  { background:var(--acc-bg); color:#2c5c37; display:block; }
+  .err { background:#fdeeee; color:#9c2b2b; display:block; }
+
+  .top { display:flex; justify-content:space-between; align-items:flex-start;
+         gap:12px; margin-bottom:24px; }
+  .who { font-size:13px; color:var(--ink3); margin-top:4px; }
+
+  .note { font-size:12.5px; color:var(--ink3); line-height:1.9; margin:14px 0 22px; }
+  .note b { color:var(--ink2); font-weight:600; }
+
+  .card { background:#fff; border:1px solid var(--line); border-radius:14px;
+          padding:22px 24px; margin-bottom:14px; }
+  .card h2 { font-size:14px; font-weight:600; margin:0 0 14px; }
+
+  .drop { border:2px dashed var(--line); border-radius:12px; padding:34px 20px;
+          text-align:center; color:var(--ink3); font-size:14px; cursor:pointer;
+          background:#fcfdfb; }
+  .drop:hover { border-color:var(--acc); color:var(--ink2); }
+  .drop b { color:var(--acc); font-weight:600; }
+  .drop2 { padding:24px 16px; font-size:13px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .lbl { font-size:13px; font-weight:600; color:var(--ink2); margin:0 0 6px; }
+  .prevstat { font-size:12px; color:var(--ink3); margin:8px 0 0; }
+
+  .asum { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
+  .apill { border:1px solid var(--line); border-radius:8px; padding:6px 10px;
+           font-size:12.5px; background:#fafafa; }
+  .apill b { font-size:14px; }
+  .apill.hit { background:#fff4f2; border-color:#f0b3a6; color:#b03a20; }
+  .asec { margin:0 0 20px; }
+  .asec h3 { font-size:14px; margin:0 0 8px; color:var(--ink1);
+             border-left:3px solid var(--acc); padding-left:8px; }
+  .anone { font-size:13px; color:var(--ink3); padding:6px 0 0; }
+  /* 점검 메모 — 어긋난 아동 옆에 처리 결과를 적는다 (2026-09-03) */
+  .amemoh { width:200px; }
+  .amemo { white-space:nowrap; }
+  .amemoin { width:150px; font:inherit; font-size:12.5px; padding:4px 7px;
+    border:1px solid #dfe4e1; border-radius:6px; }
+  .amemobtn { font:inherit; font-size:12px; padding:4px 9px; margin-left:4px;
+    border:1px solid #c8d4c4; border-radius:6px; background:#fff;
+    color:#2e7d32; cursor:pointer; }
+  .amemo-no { font-size:12px; color:#9aa294; }
+  @media print { .amemobtn { display:none; }
+    .amemoin { border:none; padding:0; width:auto; background:transparent; } }
+  .atab { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .atab th { background:#f4f6f2; text-align:left; padding:6px 8px;
+             border-bottom:1px solid var(--line); white-space:nowrap; }
+  .atab td { padding:6px 8px; border-bottom:1px solid #eee; }
+  .atab tr.bad td { background:#fff4f2; }
+  .atab tr.warn td { background:#fffaf0; }
+
+  /* 담당 치료사별 묶음 */
+  .thrgrp { margin-bottom:16px; }
+  .thrhead { font-size:13.5px; font-weight:700; color:var(--ink1);
+             padding:7px 10px; background:var(--acc-bg); border-radius:8px;
+             margin-bottom:5px; }
+  .thrsum { font-weight:500; font-size:12px; color:var(--ink2); }
+
+  @media print {
+    .noprint, .top, #loginBox, .drop, .drop2, .two, #empty,
+    #unmatchCard, .foot, .out { display:none !important; }
+    body { background:#fff; }
+    .card { border:none; box-shadow:none; padding:0 0 10px; page-break-inside:avoid; }
+    .asec { page-break-inside:avoid; }
+    .thrgrp { page-break-inside:avoid; margin-bottom:12px; }
+    .thrhead { background:#f0f2ee; font-size:12px; padding:5px 8px; }
+    /* PDF에는 아홉 항목만 넣는다 (2-2 · 10 · 11 은 화면에서만 봄) */
+    .pdfskip { display:none !important; }
+    /* 전체 보관용일 때는 다 넣는다 */
+    body.printall .pdfskip { display:block !important; }
+  }
+
+  .stat { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0 4px; }
+  .st { flex:1; min-width:120px; background:var(--acc-bg); border-radius:10px;
+        padding:12px 14px; }
+  .st .k { font-size:11.5px; color:var(--ink2); }
+  .st .v { font-size:19px; font-weight:600; margin-top:3px; }
+  .st.warnbox { background:#fdf3e6; }
+  .st.warnbox .v { color:#a9701c; }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  th { text-align:left; font-weight:600; color:var(--ink2); font-size:12px;
+       padding:8px 6px; border-bottom:1px solid var(--line); }
+  td { padding:7px 6px; border-bottom:1px solid var(--line); color:var(--ink2); }
+  td.num { text-align:right; }
+  tr.bad td { background:#fdf3e6; }
+  .tag { font-size:11px; padding:2px 7px; border-radius:20px; font-weight:600; }
+  .tag.ok2 { background:var(--acc-bg); color:#2c5c37; }
+  .tag.no  { background:#fdf3e6; color:#a9701c; }
+  .tag.cx  { background:#fdeeee; color:#9c2b2b; }
+  .scroll { max-height:420px; overflow-y:auto; }
+  select.pick { max-width:230px; font-size:12.5px; padding:5px 7px; }
+  .foot { display:flex; gap:10px; align-items:center; margin-top:20px; }
+  .foot .grow { margin-left:auto; font-size:13px; color:var(--ink3); }
+  .empty { padding:50px 20px; text-align:center; color:var(--ink3); font-size:14px; }
+
+  .btn-home { display:inline-block; padding:8px 16px; background:#2e7d32; color:#fff;
+              font-size:13px; border-radius:8px; text-decoration:none;
+              white-space:nowrap; margin-right:8px; }
+  .btn-home:hover { filter:brightness(1.08); }
+  /* 저장 단추 — 저장 전(연한 초록) / 저장 중(회색) / 저장됨(진한 초록) (2026-09-16) */
+  button#save { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
+  button#save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  button#save:disabled { background:#bbb; color:#fff; border-color:#bbb; }
+
+  /* ── 꾸밈 B (2026-09-18) — 화면에서 보이는 곳만. 인쇄 모양은 손대지 않음 ── */
+  :root { --ink:#2F2926; --ink2:#5F5E5A; --ink3:#A39C95;
+          --line:#ECE8E3; --bg:#F5F4F2; --acc:#B07A4A; --acc-bg:#F8F1E8;
+          --camBg:#FBF5EE; --camB:#C9A27E; }
+  body { padding:0; }
+  .hd { background:#fff; border-bottom:1px solid var(--line); display:flex;
+        align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar0 { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .sp { flex:1 1 auto; }
+  .box { max-width:420px; margin:60px auto; border-radius:12px; padding:28px; }
+  .box img.lg { height:26px; display:block; margin:0 auto 14px; }
+  .wide { max-width:820px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; font-weight:600; }
+  .who { font-size:12px; color:var(--ink3); }
+  button { background:#fff; color:var(--ink); border:1px solid var(--ink3);
+           border-radius:8px; font-weight:500; padding:7px 16px; }
+  button:hover { background:var(--acc-bg); filter:none; }
+  button:disabled { background:#f2f1ee; color:var(--ink3); border-color:var(--line); }
+  .ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .btn-home { background:#fff; color:var(--acc); border:1px solid var(--line);
+              padding:5px 12px; border-radius:8px; margin-right:0; }
+  .btn-home:hover { background:var(--acc-bg); filter:none; }
+  input, select { border:1px solid var(--line); border-radius:8px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+          margin-bottom:12px; }
+  .card h2 { font-size:14px; font-weight:600; }
+  .drop { border:2px dashed var(--line); border-radius:12px; background:var(--camBg);
+          color:var(--ink3); }
+  .drop:hover { border-color:var(--acc); color:var(--ink2); }
+  .drop b { color:var(--acc); font-weight:500; }
+  .lbl { font-weight:500; color:var(--ink2); }
+  .st { background:var(--camBg); border-radius:10px; }
+  .st .v { font-weight:500; }
+  .st.warnbox { background:#FAEEDA; }
+  .st.warnbox .v { color:#854F0B; }
+  .out.ok  { background:#fff; border-left:3px solid #5E9A6E; color:var(--ink);
+             border-radius:0; }
+  .out.err { background:#fff; border-left:3px solid #D8684A; color:#993C1D;
+             border-radius:0; }
+  th { background:var(--acc-bg); color:#4A1B0C; font-weight:500;
+       border-bottom:1px solid var(--camB); }
+  td { border-bottom:1px solid #F0EEEA; }
+  tr.bad td { background:#FCEFEA; }
+  .atab th { background:var(--acc-bg); color:#4A1B0C; font-weight:500;
+             border-bottom:1px solid var(--camB); }
+  .atab td { border-bottom:1px solid #F0EEEA; }
+  .atab tr.bad td { background:#FCEFEA; }
+  .atab tr.warn td { background:#FAEEDA; }
+  .apill { border:1px solid var(--line); border-radius:8px; background:#fff; }
+  .apill.hit { background:#FCEFEA; border-color:#F2D3C8; color:#993C1D; }
+  .asec h3 { border-left:3px solid var(--acc); color:var(--ink); font-weight:600; }
+  .thrhead { background:var(--acc-bg); color:#4A1B0C; font-weight:600; }
+  .tag.ok2 { background:#EAF3DE; color:#3B6D11; font-weight:500; }
+  .tag.no  { background:#FAEEDA; color:#854F0B; font-weight:500; }
+  .tag.cx  { background:#FCEFEA; color:#993C1D; font-weight:500; }
+  .amemoin { border:1px solid var(--line); border-radius:8px; }
+  .amemobtn { border:1px solid var(--line); border-radius:8px; background:#fff;
+              color:var(--ink); }
+  button#save { background:#fff; color:var(--ink); border:1px solid var(--ink3); }
+  button#save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  button#save:disabled { background:#f2f1ee; color:var(--ink3); border-color:var(--line); }
+  @media print { .hd { display:none !important; } }
+</style>
+</head>
+<body>
+
+<!-- 로그인 전 -->
+<div class="box" id="loginBox">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <h1 style="text-align:center">발달 결제내역 올리기</h1>
+  <div class="sub" style="text-align:center">나무링크</div>
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username" placeholder="you@example.com">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn">로그인</button>
+  <div id="msg" class="out"></div>
+</div>
+
+<!-- 로그인 후 -->
+<div id="mainBox" style="display:none;">
+  <div class="hd noprint">
+    <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+    <span class="bar0"></span>
+    <h1>발달 결제내역 올리기</h1>
+    <span class="who" id="who"></span>
+    <span class="sp"></span>
+    <button id="out" class="ghost">로그아웃</button>
+    <a href="index.html" class="btn-home">처음으로</a>
+  </div>
+  <div class="wide">
+
+  <div class="note">
+    사회서비스 전자바우처에서 내려받은 <b>결제내역 엑셀</b>을 그대로 올리세요.<br>
+    승인일자와 승인번호가 기록지에 자동으로 들어갑니다.<br>
+    아동 이름 칸을 지우고 올려도 됩니다. <b>대상자ID</b>만 있으면 됩니다.<br>
+    같은 파일을 두 번 올려도 중복으로 쌓이지 않습니다.
+  </div>
+
+  <div class="card">
+    <h2>1. 엑셀 고르기</h2>
+    <div class="two">
+      <div>
+        <div class="lbl">당월 (점검할 달)</div>
+        <div class="drop" id="drop">
+          엑셀 파일을 여기에 <b>끌어다 놓거나</b> 눌러서 고르세요<br>
+          <b>.xlsx</b> 파일
+        </div>
+        <input id="file" type="file" accept=".xlsx,.xls" style="display:none;">
+      </div>
+      <div>
+        <div class="lbl">전월 (비교용 · 안 올려도 됨)</div>
+        <div class="drop drop2" id="drop0">
+          전월 엑셀을 여기에 <b>끌어다 놓거나</b> 눌러서 고르세요<br>
+          <span style="font-size:12px;">한 번 올리면 계속 보관됩니다</span>
+        </div>
+        <input id="file0" type="file" accept=".xlsx,.xls" style="display:none;">
+        <div class="prevstat" id="prevstat">전월 자료를 확인하는 중...</div>
+      </div>
+    </div>
+    <div id="msg2" class="out"></div>
+  </div>
+
+  <div id="result" style="display:none;">
+    <div class="card">
+      <h2>2. 확인</h2>
+      <div class="stat" id="stat"></div>
+      <div class="note" id="mkline" style="margin:14px 0 0;"></div>
+    </div>
+
+    <div class="card" id="unmatchCard" style="display:none;">
+      <h2>3. 짝이 안 맞는 아동</h2>
+      <div class="note" style="margin:0 0 10px;">
+        엑셀에는 있지만 나무링크에서 못 찾은 아동입니다.
+        오른쪽에서 골라주면 다음부터는 자동으로 이어집니다.
+        모르면 비워두세요. 나중에 이어도 됩니다.
+      </div>
+      <div class="scroll"><table id="unmatch"></table></div>
+    </div>
+
+    <div class="card">
+      <h2 id="prevTitle">4. 아동별 내역</h2>
+      <div class="scroll"><table id="prev"></table></div>
+      <div class="foot">
+        <button id="save">저장 전</button>
+        <span class="grow" id="savehint"></span>
+      </div>
+      <div id="msg3" class="out"></div>
+    </div>
+
+    <div class="card" id="auditCard">
+      <h2>5. 결제 오류 점검</h2>
+      <div class="note" style="margin:0 0 12px;">
+        전자바우처 결제 규칙에 어긋나는 줄을 찾아 모았습니다.
+        오류가 없는 항목은 「해당 없음」으로 둡니다.
+      </div>
+      <div id="auditSum"></div>
+      <div id="auditBody"></div>
+      <div class="foot noprint">
+        <button id="pdfBtn" class="ghost">치료사 공유용 PDF</button>
+        <button id="pdfAllBtn" class="ghost" style="display:none;">전체 보관용 PDF</button>
+        <span class="grow" style="font-size:12px;color:#777;">
+          인쇄 창에서 「대상」을 <b>PDF로 저장</b> 으로 고르세요
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty" id="empty">엑셀을 고르면 내용이 여기에 나옵니다.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+
+// 로그인을 창(탭) 안에서만 유지한다. 창을 닫으면 자동으로 끊긴다.
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $  = id => document.getElementById(id);
+
+let CHILDREN = [];      // 나무링크 아동
+let MAPPED   = {};      // 대상자ID -> 아동번호 (지난번에 이어둔 것)
+let ROWS     = [];      // 엑셀에서 읽은 줄
+let GROUPS   = [];      // 대상자ID별로 묶은 것
+let PREV     = [];      // 전월 줄 (파일이나 시스템에서)
+let PREVMK   = '';      // 전월 달
+let THBYKID  = {};      // 아동번호 -> 발달재활 담당 치료사
+
+function show(el, text, ok) {
+  el.textContent = text;
+  el.className = 'out ' + (ok ? 'ok' : 'err');
+}
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function won(n) { return (n || 0).toLocaleString(); }
+
+// 2019-03-14 -> 190314
+function ymd6(b) {
+  const s = String(b || '').replace(/[^0-9]/g, '');
+  return s.length >= 8 ? s.slice(2, 8) : (s.length === 6 ? s : '');
+}
+// 숫자·글자 어느 쪽이든 6자리로
+function birth6(v) {
+  const s = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+  if (s.length === 6) return s;
+  if (s.length === 8) return s.slice(2);
+  return s.padStart(6, '0').slice(-6);
+}
+// 202607 -> 2026-07
+function mkOf(v) {
+  const s = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+  return s.length >= 6 ? s.slice(0,4) + '-' + s.slice(4,6) : '';
+}
+// 엑셀 날짜칸 -> 2026-07-01
+function dOnly(v) {
+  if (v instanceof Date) {
+    return v.getFullYear() + '-' + String(v.getMonth()+1).padStart(2,'0')
+         + '-' + String(v.getDate()).padStart(2,'0');
+  }
+  const s = String(v == null ? '' : v);
+  const m = s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+  if (m) return m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0');
+  return null;
+}
+// 엑셀 날짜칸 -> 시각
+function tOnly(v) {
+  if (v instanceof Date) {
+    return String(v.getHours()).padStart(2,'0') + ':' + String(v.getMinutes()).padStart(2,'0');
+  }
+  const m = String(v == null ? '' : v).match(/(\d{1,2}):(\d{2})/);
+  return m ? m[1].padStart(2,'0') + ':' + m[2] : null;
+}
+function isoOf(v) {
+  if (v instanceof Date) return v.toISOString();
+  const d = dOnly(v), t = tOnly(v);
+  return d ? (t ? d + 'T' + t + ':00' : d + 'T00:00:00') : null;
+}
+function numOf(v) {
+  if (typeof v === 'number') return Math.round(v);
+  const s = String(v == null ? '' : v).replace(/[^0-9-]/g, '');
+  return s === '' || s === '-' ? 0 : parseInt(s, 10);
+}
+
+async function afterLogin(user) {
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists').select('id, name, role')
+    .eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (e1)  { show($('msg'), '❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) { show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.', false); return; }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+  ME_ID = Number(me.id);
+  // 전체 보관용 PDF 단추는 8번만 볼 수 있다
+  if (ME_ID === 8) { const b = $('pdfAllBtn'); if (b) b.style.display = ''; }
+
+  const [c, v, tp, sc, th] = await Promise.all([
+    sb.from('nl_children').select('id, name, birth, manager_no, status').order('name'),
+    sb.from('nl_voucher_rows').select('target_id, child_id').not('child_id', 'is', null),
+    sb.from('nl_therapies').select('id, child_id, support_type_id, ended_on').eq('support_type_id', 2),
+    sb.from('nl_therapy_schedules').select('therapy_id, therapist_id'),
+    sb.from('nl_therapists').select('id, name').lte('id', 7)
+  ]);
+  if (c.error) { show($('msg'), '❌ 아동 조회 실패\n' + c.error.message, false); return; }
+
+  CHILDREN = c.data || [];
+  MAPPED = {};
+  (v.data || []).forEach(r => { if (r.child_id) MAPPED[r.target_id] = r.child_id; });
+
+  // 아동번호 -> 발달재활 담당 치료사 이름 (엑셀에 치료사 칸이 없어서 시스템에서 가져온다)
+  const thNm = {}; (th.data || []).forEach(t => thNm[t.id] = t.name);
+  const tpOf = {}; (tp.data || []).forEach(t => { if (!t.ended_on) tpOf[t.id] = t.child_id; });
+  THBYKID = {};
+  (sc.data || []).forEach(s => {
+    const cid = tpOf[s.therapy_id];
+    if (!cid || !thNm[s.therapist_id]) return;
+    (THBYKID[cid] = THBYKID[cid] || {})[thNm[s.therapist_id]] = 1;
+  });
+
+  $('who').textContent = me.name + ' (' + me.role + ') 님 · 아동 ' + CHILDREN.length + '명'
+    + ' · 이어둔 대상자ID ' + Object.keys(MAPPED).length + '개';
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+}
+
+// 아동 고르는 칸
+function childOptions(sel) {
+  let o = '<option value="">— 고르지 않음 —</option>';
+  CHILDREN.forEach(c => {
+    o += '<option value="' + c.id + '"' + (String(sel) === String(c.id) ? ' selected' : '') + '>'
+       + esc(c.name) + ' · ' + ymd6(c.birth) + ' (' + c.id + ')</option>';
+  });
+  return o;
+}
+
+// 엑셀 읽기
+function readExcel(file, which) {
+  const fr = new FileReader();
+  fr.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, cellDates:true });
+      if (which === 'prev') parsePrev(aoa); else parseRows(aoa);
+    } catch (err) {
+      show($('msg2'), '❌ 엑셀을 읽지 못했습니다.\n' + err.message, false);
+    }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+// 엑셀 한 장을 줄 목록으로 (당월·전월 공통)
+function toRows(aoa) {
+  let hr = -1;
+  for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+    if ((aoa[i] || []).some(x => String(x || '').replace(/\s/g,'') === '대상자ID')) { hr = i; break; }
+  }
+  if (hr < 0) return null;
+  const H = {};
+  (aoa[hr] || []).forEach((h, i) => {
+    const k = String(h || '').replace(/\s/g,'');
+    if (k && H[k] === undefined) H[k] = i;
+  });
+  const pick = (row, ...names) => {
+    for (const n of names) if (H[n] !== undefined) return row[H[n]];
+    return null;
+  };
+  const out = [];
+  for (let i = hr + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [];
+    const tid = String(pick(r, '대상자ID') || '').trim();
+    if (!tid) continue;
+    const paid = pick(r, '결제일시');
+    out.push({
+      target_id: tid,
+      name:  String(pick(r, '대상자명') || '').trim(),
+      birth: birth6(pick(r, '생년월일')),
+      grade: String(pick(r, '대상자등급') || '').trim(),
+      therapist_name: String(pick(r, '제공인력명') || '').trim(),
+      month_key: mkOf(pick(r, '대상년월')),
+      paid_at:      isoOf(paid),
+      service_date: dOnly(paid),
+      start_time: tOnly(pick(r, '시작시간(월/일/분)', '시작시간')),
+      end_time:   tOnly(pick(r, '종료시간(월/일/분)', '종료시간')),
+      appr_no: String(pick(r, '승인번호') || '').trim(),
+      amount:     numOf(pick(r, '승인금액(C=A+B)', '승인금액')),
+      gov_amount: numOf(pick(r, '정부지원금합계(A=D+F)', '정부지원금합계', '정부지원금')),
+      self_amount:numOf(pick(r, '본인부담금합계(B=E+G)', '본인부담금합계', '본인부담금')),
+      pay_kind: String(pick(r, '결제구분') || '').trim(),
+      back_kind: String(pick(r, '반납구분') || '').trim(),
+      hold_txt:  String(pick(r, '지급보류내역') || '').trim()
+    });
+  }
+  return out;
+}
+
+// 전월 파일 읽기
+async function parsePrev(aoa) {
+  const rows = toRows(aoa);
+  if (!rows) { show($('msg2'), '❌ 전월 파일에 「대상자ID」 칸이 없습니다.', false); return; }
+  if (!rows.length) { show($('msg2'), '전월 파일에 읽을 줄이 없습니다.', false); return; }
+  PREV = rows;
+  PREVMK = rows[0].month_key || '';
+  $('prevstat').textContent = '✅ 전월 ' + (PREVMK || '') + ' · ' + rows.length + '줄 읽었습니다.';
+  if (ROWS.length) await drawAudit();
+}
+
+function parseRows(aoa) {
+  if (!aoa.length) { show($('msg2'), '내용이 없는 파일입니다.', false); return; }
+  const rows = toRows(aoa);
+  if (!rows) {
+    show($('msg2'), '❌ 이 파일에는 「대상자ID」 칸이 없습니다.\n'
+      + '사회서비스 전자바우처에서 내려받은 결제내역 엑셀이 맞는지 확인해 주세요.', false);
+    return;
+  }
+  ROWS = rows;
+  if (!ROWS.length) { show($('msg2'), '읽을 줄이 없습니다.', false); return; }
+  matchAndDraw();
+  loadPrevIfNeeded();
+}
+
+// ===== 결제 오류 점검 =====
+const GAP_MIN   = 40;   // 최소 결제 간격 (분)
+const WEEK_MAX  = 2;    // 주간 최대 결제 횟수
+const MONTH_NEED= 4;    // 아동별 월 기준 결제 횟수
+
+function thOf(tid) {
+  const g = GROUPS.find(x => x.target_id === tid);
+  if (g && g.child_id && THBYKID[g.child_id])
+    return Object.keys(THBYKID[g.child_id]).join(', ');
+  return '';
+}
+let ME_ID = null;        // 지금 로그인한 직원 번호
+let MEMOS = {};   // 아동번호 -> 그 달 점검 메모
+// 결제 줄의 아동 번호 (이어두지 않았으면 null)
+function cidOf(tid) {
+  const g = GROUPS.find(x => x.target_id === tid);
+  return (g && g.child_id) ? g.child_id : null;
+}
+// 점검 메모 칸 — 아동·달 단위로 남긴다
+let MEMO_MK = '';   // 지금 보고 있는 달
+function memoCell(cid) {
+  if (!cid) return '<td class="amemo"><span class="amemo-no">이어두지 않음</span></td>';
+  const v = MEMOS[cid] || '';
+  return '<td class="amemo">'
+    + '<input class="amemoin" data-cid="' + cid + '" value="' + esc(v) + '"'
+    + ' placeholder="처리 결과를 적어 두세요">'
+    + '<button class="amemobtn" data-cid="' + cid + '" data-mk="'
+    + esc(MEMO_MK) + '">저장</button></td>';
+}
+// 그 달 점검 메모를 미리 읽어 둔다
+async function loadMemos(mk) {
+  MEMO_MK = mk; MEMOS = {};
+  try {
+    const { data } = await sb.from('nl_voucher_memos')
+      .select('child_id, memo').eq('month_key', mk);
+    (data || []).forEach(x => { if (x.memo) MEMOS[x.child_id] = x.memo; });
+  } catch (e) {}
+}
+function nameOf(tid) {
+  const g = GROUPS.find(x => x.target_id === tid);
+  if (g && g.child_id) {
+    const c = CHILDREN.find(k => k.id === g.child_id);
+    // 아동 이름 앞에 번호를 붙인다
+    if (c) return '[' + g.child_id + '] ' + c.name;
+    return '[' + g.child_id + ']';
+  }
+  if (g && g.name) return g.name;
+  return tid;
+}
+function minOf(hm) {
+  const p = String(hm || '').split(':');
+  if (p.length < 2) return null;
+  return Number(p[0]) * 60 + Number(p[1]);
+}
+function timeOf(r) {
+  if (r.start_time) return minOf(r.start_time);
+  const t = String(r.paid_at || '').slice(11, 16);
+  return minOf(t);
+}
+function weekKey(ymd) {
+  const dt = new Date(ymd + 'T00:00:00');
+  const dow = (dt.getDay() + 6) % 7;          // 월=0
+  const mon = new Date(dt); mon.setDate(dt.getDate() - dow);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const f = x => (x.getMonth()+1) + '/' + x.getDate();
+  // 열쇠도 한국 날짜로 (2026-09-21) — toISOString 은 하루 앞(일요일)이 나왔다
+  const k = mon.getFullYear() + '-' + String(mon.getMonth()+1).padStart(2,'0') + '-' + String(mon.getDate()).padStart(2,'0');
+  return { key: k, txt: f(mon) + '~' + f(sun) };
+}
+
+// 전월 자료를 시스템에서 꺼내 온다 (파일을 안 올렸을 때)
+async function loadPrevIfNeeded() {
+  if (PREV.length) { await drawAudit(); return; }
+  const mk = (ROWS[0] && ROWS[0].month_key) || '';
+  if (!mk) { await drawAudit(); return; }
+  const y = Number(mk.slice(0,4)), m = Number(mk.slice(5,7));
+  const dt = new Date(y, m - 2, 1);
+  const pk = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0');
+  try {
+    const { data } = await sb.from('nl_voucher_rows')
+      .select('target_id, grade, therapist_name, month_key, service_date, start_time, appr_no, amount, pay_kind')
+      .eq('month_key', pk);
+    if (data && data.length) {
+      PREV = data; PREVMK = pk;
+      $('prevstat').textContent = '✅ 전월 ' + pk + ' 자료 ' + data.length + '줄이 시스템에 있습니다.';
+    } else {
+      $('prevstat').textContent = 'ℹ 전월(' + pk + ') 자료가 없습니다. 비교 항목은 건너뜁니다.';
+    }
+  } catch (e) {
+    $('prevstat').textContent = 'ℹ 전월 자료를 불러오지 못했습니다.';
+  }
+  await drawAudit();
+}
+
+// 담당 치료사별로 묶어서 그린다 (줄마다 thr 칸이 있어야 한다)
+function tabByThr(head, rows, memo) {
+  if (!rows.length) return '<div class="anone">해당 없음</div>';
+  const by = {};
+  rows.forEach(r => { (by[r.thr || '담당 치료사 없음'] = by[r.thr || '담당 치료사 없음'] || []).push(r); });
+  const keys = Object.keys(by).sort((a, b) => {
+    if (a === '담당 치료사 없음') return 1;
+    if (b === '담당 치료사 없음') return -1;
+    return b.length - a.length || a.localeCompare(b, 'ko');
+  });
+  return keys.map(k =>
+    '<div class="thrgrp"><div class="thrhead">' + esc(k)
+    + (k === '담당 치료사 없음' ? '' : ' 선생님')
+    + ' <span class="thrsum">— 아동 ' + by[k].length + '명</span></div>'
+    + tab(head, by[k], memo) + '</div>').join('');
+}
+
+// memo 가 true 면 「처리 결과」 칸을 붙인다 (1 · 2-2 · 4 항목)
+// 메모 칸을 붙일 항목 — 1(승인번호) · 2-2(중복·아동) · 4(회수 미달)
+function memoOn(title) {
+  const s = String(title);
+  return s.indexOf('1.') === 0 || s.indexOf('2-2.') === 0 || s.indexOf('4.') === 0;
+}
+// 메모 칸에 저장 단추를 붙인다
+function bindMemo() {
+  document.querySelectorAll('.amemobtn').forEach(b => {
+    b.onclick = async () => {
+      const cid = Number(b.dataset.cid);
+      const mk  = b.dataset.mk;
+      const box = b.parentElement.querySelector('.amemoin');
+      const v = box.value.trim();
+      b.disabled = true; b.textContent = '...';
+      try {
+        const { error } = await sb.from('nl_voucher_memos')
+          .upsert({ child_id: cid, month_key: mk, memo: v || null,
+                    updated_by: ME_ID || null,
+                    updated_at: new Date().toISOString() },
+                  { onConflict: 'child_id,month_key' });
+        if (error) throw error;
+        MEMOS[cid] = v;
+        // 같은 아동이 다른 항목에도 있으면 함께 맞춘다
+        document.querySelectorAll('.amemoin[data-cid="' + cid + '"]')
+          .forEach(x => { x.value = v; });
+        b.textContent = '✓';
+        setTimeout(() => { b.textContent = '저장'; b.disabled = false; }, 1200);
+      } catch (e) {
+        alert('저장하지 못했습니다.\n' + e.message);
+        b.textContent = '저장'; b.disabled = false;
+      }
+    };
+  });
+}
+
+function tab(head, rows, memo) {
+  if (!rows.length) return '<div class="anone">해당 없음</div>';
+  return '<table class="atab"><tr>'
+    + head.map(h => '<th>' + esc(h) + '</th>').join('')
+    + (memo ? '<th class="amemoh">처리 결과</th>' : '') + '</tr>'
+    + rows.map(r => '<tr class="' + (r.cls || 'bad') + '">'
+        + r.v.map(c => '<td>' + (c == null ? '' : esc(String(c))) + '</td>').join('')
+        + (memo ? memoCell(r.cid) : '')
+      + '</tr>').join('')
+    + '</table>';
+}
+
+async function drawAudit() {
+  if (!ROWS.length) return;
+  const MK = ROWS[0].month_key || '';
+  await loadMemos(MK);
+  // --- 0. 승인번호 없음·이상 (가장 급한 오류) ---
+  // 결제취소나 미결제라 다시 결제해야 하는 줄
+  const lens = {};
+  ROWS.forEach(r => { const n = String(r.appr_no||'').trim();
+    if (n) lens[n.length] = (lens[n.length]||0) + 1; });
+  let normLen = 0, best = 0;
+  Object.keys(lens).forEach(L => { if (lens[L] > best) { best = lens[L]; normLen = Number(L); } });
+
+  const dup = {};
+  ROWS.forEach(r => { const n = String(r.appr_no||'').trim();
+    if (n) dup[n] = (dup[n]||0) + 1; });
+
+  const e0 = [];
+  ROWS.forEach(r => {
+    const n = String(r.appr_no || '').trim();
+    let why = '';
+    if (!n)                          why = '승인번호 없음 — 결제취소·미결제. 다시 결제해야 함';
+    else if (!/^[0-9]+$/.test(n))    why = '숫자가 아닌 글자가 섞임';
+    else if (normLen && n.length !== normLen)
+                                     why = '자릿수 이상 (' + n.length + '자리 · 보통 ' + normLen + '자리)';
+    else if (dup[n] > 1)             why = '같은 승인번호가 ' + dup[n] + '번 나옴';
+    if (!r.service_date)             why = (why ? why + ' / ' : '') + '결제일시 없음';
+    if (why) e0.push({ cid: cidOf(r.target_id),
+                       v:[ nameOf(r.target_id), r.service_date || '-',
+                           r.start_time || '', n || '(비어 있음)', why ] });
+  });
+
+  // 예외결제는 전월분이라 당월 셈에서 뺀다.
+  // 일괄결제는 카드를 안 가져오셔서 다음 수업 때 몰아 낸 것이라 당월에 넣는다.
+  const EXCEPT = ROWS.filter(r => r.service_date && r.appr_no
+                    && String(r.pay_kind || '').indexOf('예외') >= 0);
+  const live = ROWS.filter(r => r.service_date && r.appr_no
+                    && String(r.pay_kind || '').indexOf('예외') < 0);
+  // 엑셀에 치료사 칸이 없으면 시스템에서 가져와 채운다
+  live.forEach(r => { if (!r.therapist_name) r.therapist_name = thOf(r.target_id); });
+
+  // --- 1. 치료사 기준 40분 미만 ---
+  const e1 = [];
+  const byTh = {};
+  live.forEach(r => {
+    if (!r.therapist_name) return;
+    const k = r.therapist_name + '|' + r.service_date;
+    (byTh[k] = byTh[k] || []).push(r);
+  });
+  Object.keys(byTh).forEach(k => {
+    const a = byTh[k].slice().sort((x,y) => (timeOf(x)||0) - (timeOf(y)||0));
+    for (let i = 1; i < a.length; i++) {
+      const t1 = timeOf(a[i-1]), t2 = timeOf(a[i]);
+      if (t1 == null || t2 == null) continue;
+      if (a[i-1].target_id === a[i].target_id) continue;
+      const gap = t2 - t1;
+      if (gap < GAP_MIN) e1.push({ v:[ a[i].therapist_name, a[i].service_date,
+        nameOf(a[i-1].target_id) + ' ' + (a[i-1].start_time || ''),
+        nameOf(a[i].target_id)   + ' ' + (a[i].start_time   || ''),
+        gap + '분' ] });
+    }
+  });
+
+  // --- 2. 아동 기준 40분 미만 ---
+  const e2 = [];
+  const byKid = {};
+  live.forEach(r => {
+    const k = r.target_id + '|' + r.service_date;
+    (byKid[k] = byKid[k] || []).push(r);
+  });
+  Object.keys(byKid).forEach(k => {
+    const a = byKid[k].slice().sort((x,y) => (timeOf(x)||0) - (timeOf(y)||0));
+    for (let i = 1; i < a.length; i++) {
+      const t1 = timeOf(a[i-1]), t2 = timeOf(a[i]);
+      if (t1 == null || t2 == null) continue;
+      if (a[i-1].therapist_name === a[i].therapist_name) continue;
+      const gap = t2 - t1;
+      if (gap < GAP_MIN) e2.push({ cid: cidOf(a[i].target_id),
+        v:[ nameOf(a[i].target_id), a[i].service_date,
+        (a[i-1].therapist_name || '?') + ' ' + (a[i-1].start_time || ''),
+        (a[i].therapist_name   || '?') + ' ' + (a[i].start_time   || ''),
+        gap + '분' ] });
+    }
+  });
+
+  // --- 3. 주 3회 이상 ---
+  const e3 = [];
+  const byWk = {};
+  live.forEach(r => {
+    const w = weekKey(r.service_date);
+    const k = r.target_id + '|' + w.key;
+    (byWk[k] = byWk[k] || { txt:w.txt, tid:r.target_id, ds:[] }).ds.push(r.service_date);
+  });
+  Object.values(byWk).forEach(g => {
+    if (g.ds.length > WEEK_MAX)
+      e3.push({ v:[ nameOf(g.tid), g.txt, g.ds.sort().join(', '), g.ds.length + '회' ] });
+  });
+
+  // --- 4. 월 4회 미달 ---
+  const e4 = [];
+  const cnt = {};
+  live.forEach(r => {
+    (cnt[r.target_id] = cnt[r.target_id] || { ds:[], th:{} }).ds.push(r.service_date);
+    if (r.therapist_name) cnt[r.target_id].th[r.therapist_name] = 1;
+  });
+  Object.keys(cnt).forEach(tid => {
+    const g = cnt[tid];
+    if (g.ds.length < MONTH_NEED)
+      e4.push({ cls:'warn', cid: cidOf(tid),
+        thr: Object.keys(g.th).join(', ') || thOf(tid) || '담당 치료사 없음',
+        v:[ nameOf(tid),
+        g.ds.length + '회', g.ds.sort().join(', '),
+        (MONTH_NEED - g.ds.length) + '회 부족' ] });
+  });
+  e4.sort((a,b) => Number(b.v[3].replace(/\D/g,'')) - Number(a.v[3].replace(/\D/g,'')));
+
+  // --- 5·7·8. 전월 대비 ---
+  const e5 = [], e7 = [], e8 = [];
+  if (PREV.length) {
+    const pv = {};
+    PREV.forEach(r => {
+      const g = pv[r.target_id] = pv[r.target_id] || { th:{}, grade:r.grade, amt:{} };
+      if (r.therapist_name) g.th[r.therapist_name] = (g.th[r.therapist_name]||0) + 1;
+      if (r.grade) g.grade = r.grade;
+      if (r.amount) g.amt[r.amount] = (g.amt[r.amount]||0) + 1;
+    });
+    const top = o => Object.keys(o).sort((a,b) => o[b]-o[a])[0] || '';
+    const cu = {};
+    live.forEach(r => {
+      const g = cu[r.target_id] = cu[r.target_id] || { th:{}, grade:r.grade, amt:{} };
+      if (r.therapist_name) g.th[r.therapist_name] = (g.th[r.therapist_name]||0) + 1;
+      if (r.grade) g.grade = r.grade;
+      if (r.amount) g.amt[r.amount] = (g.amt[r.amount]||0) + 1;
+    });
+    Object.keys(cu).forEach(tid => {
+      const P = pv[tid]; if (!P) return;
+      const C = cu[tid];
+      const pt = top(P.th), ct = top(C.th);
+      if (pt && ct && pt !== ct) e5.push({ v:[ nameOf(tid), pt, ct ] });
+      if (P.grade && C.grade && P.grade !== C.grade)
+        e7.push({ v:[ nameOf(tid), P.grade, C.grade ] });
+      const pa = Number(top(P.amt)), ca = Number(top(C.amt));
+      if (pa && ca && pa !== ca && P.grade === C.grade)
+        e8.push({ v:[ nameOf(tid), C.grade, '발달재활',
+          won(pa) + '원', won(ca) + '원', won(ca - pa) + '원' ] });
+    });
+  }
+
+  // --- 6. 당월 내 치료사 변경 ---
+  const e6 = [];
+  Object.keys(byKid).length;
+  const perKid = {};
+  live.forEach(r => (perKid[r.target_id] = perKid[r.target_id] || []).push(r));
+  Object.keys(perKid).forEach(tid => {
+    const a = perKid[tid].slice()
+      .sort((x,y) => String(x.service_date).localeCompare(String(y.service_date)));
+    const seq = a.map((r,i) => (i+1) + '회 ' + r.service_date + ' ' + (r.therapist_name || '?'));
+    let at = '';
+    for (let i = 1; i < a.length; i++) {
+      if (a[i].therapist_name && a[i-1].therapist_name
+          && a[i].therapist_name !== a[i-1].therapist_name) {
+        at = (i+1) + '회차 (' + a[i].service_date + ') 부터 ' + a[i].therapist_name;
+        break;
+      }
+    }
+    if (at) e6.push({ v:[ nameOf(tid), seq.join(' / '), at ] });
+  });
+
+  // --- 9. 치료사별 월 실적 ---
+  const st = {};
+  live.forEach(r => {
+    const n = r.therapist_name || '(없음)';
+    const g = st[n] = st[n] || { c:0, d:{} };
+    g.c++; g.d[r.service_date] = 1;
+  });
+  const e9 = Object.keys(st).sort().map(n =>
+    ({ cls:'', v:[ n, st[n].c + '건', Object.keys(st[n].d).length + '일' ] }));
+
+  // --- 10. 월별 총괄 ---
+  const e10 = Object.keys(cnt)
+    .map(tid => ({ nm: nameOf(tid), c: cnt[tid].ds.length,
+                   thr: Object.keys(cnt[tid].th).join(', ') || thOf(tid) || '담당 치료사 없음' }))
+    .sort((a,b) => a.nm.localeCompare(b.nm, 'ko'))
+    .map(x => ({ cls: (x.c < MONTH_NEED ? 'warn' : ''),
+                 thr: x.thr, v:[ x.nm, x.c + '회' ] }));
+
+  // --- 11. 예외지급(전월분) · 일괄결제 ---
+  const e13 = EXCEPT.map(r => ({ cls:'warn', v:[ nameOf(r.target_id), r.service_date,
+      r.start_time || '', r.pay_kind, r.appr_no ] }));
+  const e11 = live.filter(r => r.pay_kind && r.pay_kind !== '정상결제')
+    .map(r => ({ cls:'warn', v:[ nameOf(r.target_id), r.service_date,
+      r.start_time || '', r.pay_kind, r.appr_no ] }));
+
+  // --- 12. 반납·지급보류 ---
+  const e12 = live.filter(r => r.back_kind || r.hold_txt)
+    .map(r => ({ v:[ nameOf(r.target_id), r.service_date,
+      r.back_kind || '', r.hold_txt || '', r.appr_no ] }));
+
+  // ===== 그리기 =====
+  const S = [
+    ['1. 승인번호 없음·이상 — 다시 결제 필요',
+      ['아동','날짜','시간','승인번호','무엇이 문제인가'], e0, true],
+    ['2-1. 중복 결제 — 치료사 기준 (40분 미만)',
+      ['치료사','날짜','아동A · 시간','아동B · 시간','간격'], e1, true],
+    ['2-2. 중복 결제 — 아동 기준 (40분 미만)',
+      ['아동','날짜','치료사A · 시간','치료사B · 시간','간격'], e2, true],
+    ['3. 주 3회 이상 초과 결제',
+      ['아동','주차','결제일','횟수'], e3, true],
+    ['4. 월 ' + MONTH_NEED + '회 미달 아동 — 담당 치료사별',
+      ['아동','현재','결제일','부족'], e4, true, true],
+    ['5-1. 담당 치료사 변경 (전월 → 당월)',
+      ['아동','전월','당월'], e5, true],
+    ['5-2. 당월 내 담당 치료사 변경',
+      ['아동','회차별','변경 시점'], e6, true],
+    ['6. 등급 변경 (전월 → 당월)',
+      ['아동','전월 등급','당월 등급'], e7, true],
+    ['7. 결제금액 불일치',
+      ['아동','등급','서비스','전월','당월','차액'], e8, true],
+    ['8. 일괄결제 (당월에 넣어 셈)',
+      ['아동','날짜','시간','결제구분','승인번호'], e11, true],
+    ['8-2. 예외지급 — 전월분 (당월 셈에서 뺌)',
+      ['아동','날짜','시간','결제구분','승인번호'], e13, true],
+    ['9. 반납·지급보류',
+      ['아동','날짜','반납구분','지급보류','승인번호'], e12, true],
+    ['10. 치료사별 월 실적',
+      ['치료사','수업 건수','근무일수'], e9, false],
+    ['11. 월별 결제 총괄 — 담당 치료사별',
+      ['아동','결제 건수'], e10, false, true]
+  ];
+
+  const errN = e0.length + e1.length + e2.length + e3.length + e4.length + e5.length
+             + e6.length + e7.length + e8.length + e11.length + e12.length;
+
+  let sum = '<div class="asum">'
+    + '<span class="apill"><b>' + MK + '</b> 점검</span>'
+    + '<span class="apill">결제 <b>' + live.length + '</b>건</span>'
+    + '<span class="apill">아동 <b>' + Object.keys(cnt).length + '</b>명</span>'
+    + '<span class="apill' + (errN ? ' hit' : '') + '">조치 필요 <b>' + errN + '</b>건</span>'
+    + (PREV.length ? '<span class="apill">전월 ' + PREVMK + ' 비교</span>'
+                   : '<span class="apill">전월 자료 없음</span>')
+    + '</div>';
+
+  sum += '<table class="atab" style="margin:0 0 18px;"><tr><th>항목</th><th>건수</th></tr>'
+    + S.filter(x => x[3]).map(x =>
+        '<tr class="' + (x[2].length ? 'bad' : '') + '"><td>' + esc(x[0])
+        + '</td><td>' + x[2].length + '건</td></tr>').join('')
+    + '</table>';
+
+  $('auditSum').innerHTML = sum;
+  // PDF에 안 넣을 항목 — 화면에는 보이고 인쇄에서만 빠진다
+  const PDF_SKIP = ['2-2.', '10.', '11.'];
+  $('auditBody').innerHTML = S.map(x =>
+    '<div class="asec'
+    + (PDF_SKIP.some(k => String(x[0]).indexOf(k) === 0) ? ' pdfskip' : '')
+    + '"><h3>' + esc(x[0]) + '</h3>'
+    + (x[4] ? tabByThr(x[1], x[2], memoOn(x[0])) : tab(x[1], x[2], memoOn(x[0])))
+    + '</div>').join('');
+  bindMemo();
+}
+
+// 아동 짝맞추기
+function matchAndDraw() {
+  const byId = {};
+  ROWS.forEach(r => {
+    if (!byId[r.target_id]) {
+      byId[r.target_id] = { target_id:r.target_id, name:r.name, birth:r.birth,
+                            grade:r.grade, rows:[], child_id:null, how:'' };
+    }
+    const g = byId[r.target_id];
+    g.rows.push(r);
+    if (!g.name && r.name) g.name = r.name;
+    if (!g.birth && r.birth) g.birth = r.birth;
+    if (!g.grade && r.grade) g.grade = r.grade;
+  });
+
+  GROUPS = Object.keys(byId).map(k => byId[k]);
+
+  GROUPS.forEach(g => {
+    // 1) 지난번에 이어둔 것이 있으면 그대로
+    if (MAPPED[g.target_id]) { g.child_id = MAPPED[g.target_id]; g.how = '이어둠'; return; }
+    // 2) 이름 + 생년월일
+    if (g.name) {
+      const hit = CHILDREN.filter(c =>
+        (c.name || '').trim() === g.name && (!g.birth || ymd6(c.birth) === g.birth));
+      if (hit.length === 1) { g.child_id = hit[0].id; g.how = '이름+생일'; return; }
+      if (hit.length > 1)   { g.how = '이름 겹침'; return; }
+      const only = CHILDREN.filter(c => (c.name || '').trim() === g.name);
+      if (only.length === 1) { g.child_id = only[0].id; g.how = '이름만'; return; }
+    }
+    g.how = '못 찾음';
+  });
+
+  drawResult();
+}
+
+function drawResult() {
+  const okN   = GROUPS.filter(g => g.child_id).length;
+  const badN  = GROUPS.length - okN;
+  const cancN = ROWS.filter(r => r.amount < 0).length;
+  const mks   = Array.from(new Set(ROWS.map(r => r.month_key).filter(Boolean))).sort();
+
+  $('stat').innerHTML =
+      '<div class="st"><div class="k">줄 수</div><div class="v">' + ROWS.length + '</div></div>'
+    + '<div class="st"><div class="k">아동 수</div><div class="v">' + GROUPS.length + '</div></div>'
+    + '<div class="st"><div class="k">짝 맞음</div><div class="v">' + okN + '</div></div>'
+    + '<div class="st' + (badN ? ' warnbox' : '') + '"><div class="k">짝 안 맞음</div><div class="v">' + badN + '</div></div>'
+    + (cancN ? '<div class="st warnbox"><div class="k">취소(마이너스)</div><div class="v">' + cancN + '</div></div>' : '');
+
+  $('mkline').innerHTML = '대상 월 <b>' + (mks.join(', ') || '알 수 없음') + '</b>'
+    + (mks.length > 1 ? ' — 여러 달이 섞여 있습니다. 확인해 주세요.' : '');
+
+  // 짝 안 맞는 아동
+  const bad = GROUPS.filter(g => !g.child_id);
+  if (bad.length) {
+    let h = '<tr><th>대상자ID</th><th>이름</th><th>생년월일</th><th>줄</th><th>상태</th><th>나무링크 아동</th></tr>';
+    bad.forEach(g => {
+      h += '<tr class="bad" data-tid="' + esc(g.target_id) + '">'
+        + '<td>' + esc(g.target_id.slice(-8)) + '</td>'
+        + '<td>' + (g.name ? esc(g.name) : '<span style="color:#9aa294">(없음)</span>') + '</td>'
+        + '<td>' + esc(g.birth || '') + '</td>'
+        + '<td class="num">' + g.rows.length + '</td>'
+        + '<td><span class="tag no">' + esc(g.how) + '</span></td>'
+        + '<td><select class="pick">' + childOptions('') + '</select></td>'
+        + '</tr>';
+    });
+    $('unmatch').innerHTML = h;
+    $('unmatchCard').style.display = 'block';
+  } else {
+    $('unmatchCard').style.display = 'none';
+  }
+
+  // 아동별 내역
+  let h = '<tr><th>아동</th><th>등급</th><th>회차</th><th class="num">합계</th><th>짝</th></tr>';
+  GROUPS.sort((a,b) => (b.child_id?1:0) - (a.child_id?1:0)).forEach(g => {
+    const c = CHILDREN.find(x => String(x.id) === String(g.child_id));
+    const sum = g.rows.reduce((s,r) => s + (r.amount||0), 0);
+    const nCancel = g.rows.filter(r => r.amount < 0).length;
+    h += '<tr>'
+      + '<td>' + (c ? esc(c.name) + ' <span style="color:#9aa294">(' + c.id + ')</span>'
+                    : (g.name ? esc(g.name) : esc(g.target_id.slice(-8)))) + '</td>'
+      + '<td>' + esc(g.grade) + '</td>'
+      + '<td class="num">' + g.rows.length
+        + (nCancel ? ' <span class="tag cx">취소' + nCancel + '</span>' : '') + '</td>'
+      + '<td class="num">' + won(sum) + '</td>'
+      + '<td>' + (g.child_id ? '<span class="tag ok2">' + esc(g.how) + '</span>'
+                             : '<span class="tag no">안 맞음</span>') + '</td>'
+      + '</tr>';
+  });
+  $('prev').innerHTML = h;
+
+  $('result').style.display = 'block';
+  $('empty').style.display = 'none';
+  show($('msg2'), '읽었습니다. 내용을 확인하고 아래 [저장]을 누르세요.', true);
+  $('savehint').textContent = ROWS.length + '줄이 저장됩니다.';
+  UP_DIRTY = true;
+  setUpBtn('before');
+}
+
+// ── 저장 단추 상태 · 나갈 때 묻기 (2026-09-16) ──
+//   엑셀을 읽거나 짝을 고르면 「저장 전」, 저장하면 「✓ 저장됨」(계속 남김)
+//   처리 결과 메모 칸은 단추를 그대로 두고, 적고 안 누른 칸만 나갈 때 함께 묻는다
+let UP_DIRTY = false;
+let UP_LEAVING = false;
+function setUpBtn(st) {
+  const b = $('save');
+  if (!b) return;
+  b.classList.toggle('done', st === 'done');
+  b.disabled = (st === 'saving');
+  b.textContent = st === 'saving' ? '저장 중…'
+                : st === 'done'   ? '\u2713 저장됨'
+                : '저장 전';
+}
+// 적고 「저장」을 안 누른 메모 칸 수 (같은 아동 칸은 하나로 센다)
+function memoPendingN() {
+  const seen = {};
+  document.querySelectorAll('.amemoin').forEach(el => {
+    const cid = el.dataset.cid;
+    if (el.value.trim() !== String(MEMOS[cid] || '').trim()) seen[cid] = 1;
+  });
+  return Object.keys(seen).length;
+}
+function upPending(withRows) {
+  const out = [];
+  if (withRows && UP_DIRTY) out.push('엑셀 내역 (아래 「저장」)');
+  const n = memoPendingN();
+  if (n) out.push('처리 결과 메모 ' + n + '칸 (칸 옆 「저장」)');
+  return out;
+}
+function upLeaveOk(withRows) {
+  const p = upPending(withRows);
+  if (!p.length) return true;
+  return confirm('저장하지 않은 것이 있습니다.\n\n· ' + p.join('\n· ')
+    + '\n\n그래도 계속할까요? (저장하지 않은 것은 사라집니다)');
+}
+document.querySelector('.btn-home').addEventListener('click', e => {
+  if (!upLeaveOk(true)) { e.preventDefault(); return; }
+  UP_LEAVING = true;
+});
+window.addEventListener('beforeunload', e => {
+  if (UP_LEAVING || !upPending(true).length) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// 짝 고르면 바로 반영
+$('unmatch') && $('unmatch').addEventListener('change', e => {
+  if (!e.target.classList.contains('pick')) return;
+  const tid = e.target.closest('tr').dataset.tid;
+  const g = GROUPS.find(x => x.target_id === tid);
+  if (!g) return;
+  g.child_id = e.target.value ? Number(e.target.value) : null;
+  g.how = g.child_id ? '손으로 이음' : '못 찾음';
+  UP_DIRTY = true;
+  setUpBtn('before');
+  const okN = GROUPS.filter(x => x.child_id).length;
+  $('stat').querySelectorAll('.st')[2].querySelector('.v').textContent = okN;
+  $('stat').querySelectorAll('.st')[3].querySelector('.v').textContent = GROUPS.length - okN;
+});
+
+$('save').onclick = async () => {
+  const btn = $('save');
+  setUpBtn('saving');
+  try {
+    const idOf = {};
+    GROUPS.forEach(g => { idOf[g.target_id] = g.child_id || null; });
+
+    const rows = ROWS.map(r => ({
+      target_id: r.target_id,
+      child_id:  idOf[r.target_id],
+      grade: r.grade || null,
+      therapist_name: r.therapist_name || null,
+      month_key: r.month_key,
+      paid_at: r.paid_at,
+      service_date: r.service_date,
+      start_time: r.start_time,
+      end_time: r.end_time,
+      appr_no: r.appr_no || null,
+      amount: r.amount,
+      gov_amount: r.gov_amount,
+      self_amount: r.self_amount,
+      pay_kind: r.pay_kind || null
+    })).filter(r => r.appr_no && r.service_date);
+
+    if (!rows.length) throw new Error('저장할 줄이 없습니다. 승인번호나 결제일시가 비어 있습니다.');
+
+    // 한 번에 많이 보내면 실패할 수 있어 나눠서 보낸다
+    let done = 0;
+    for (let i = 0; i < rows.length; i += 200) {
+      const part = rows.slice(i, i + 200);
+      const { error } = await sb.from('nl_voucher_rows')
+        .upsert(part, { onConflict: 'target_id,appr_no,service_date' });
+      if (error) throw error;
+      done += part.length;
+      $('savehint').textContent = done + ' / ' + rows.length + '줄';
+    }
+
+    const skipped = ROWS.length - rows.length;
+    show($('msg3'), '✅ ' + done + '줄 저장했습니다.'
+      + (skipped ? '\n(' + skipped + '줄은 승인번호나 날짜가 없어 건너뜀)' : '')
+      + '\n같은 내용을 다시 올려도 중복으로 쌓이지 않습니다.', true);
+
+    GROUPS.forEach(g => { if (g.child_id) MAPPED[g.target_id] = g.child_id; });
+    // 「저장됨」을 계속 남긴다 (전에는 1.5초 뒤 「저장」으로 돌아가 저장했는지 알 수 없었음)
+    UP_DIRTY = false;
+    setUpBtn('done');
+  } catch (e) {
+    show($('msg3'), '❌ 저장하지 못했습니다.\n' + e.message, false);
+    setUpBtn('before');
+  }
+};
+
+$('drop').onclick = () => $('file').click();
+$('drop0').onclick = () => $('file0').click();
+
+function takeCur(f) {
+  if (!f) return;
+  if (!upLeaveOk(true)) { $('file').value = ''; return; }
+  UP_DIRTY = false;
+  $('drop').innerHTML = '고른 파일<br><b>' + esc(f.name) + '</b><br>'
+    + '<span style="font-size:12px;">다시 고르려면 여기를 누르거나 새 파일을 끌어다 놓으세요</span>';
+  readExcel(f, 'cur');
+}
+function takePrev(f) {
+  if (!f) return;
+  // 전월은 올리는 즉시 보관된다. 다시 그리면 적어 둔 메모 칸이 지워지므로 메모만 묻는다
+  if (!upLeaveOk(false)) { $('file0').value = ''; return; }
+  $('drop0').innerHTML = '고른 전월 파일<br><b>' + esc(f.name) + '</b>';
+  readExcel(f, 'prev');
+}
+
+$('file').onchange  = e => takeCur(e.target.files[0]);
+$('file0').onchange = e => takePrev(e.target.files[0]);
+
+// 엑셀 파일을 끌어다 놓아도 되게 한다
+[['drop', takeCur], ['drop0', takePrev]].forEach(([id, fn]) => {
+  const el = $(id);
+  el.addEventListener('dragover', ev => {
+    ev.preventDefault();
+    el.style.borderColor = 'var(--acc)';
+  });
+  el.addEventListener('dragleave', () => { el.style.borderColor = ''; });
+  el.addEventListener('drop', ev => {
+    ev.preventDefault();
+    el.style.borderColor = '';
+    if (ev.dataTransfer.files && ev.dataTransfer.files[0]) fn(ev.dataTransfer.files[0]);
+  });
+});
+
+// 화면 아무 데나 떨어뜨렸을 때 브라우저가 파일을 열어버리지 않게 막는다
+document.addEventListener('dragover', ev => ev.preventDefault());
+document.addEventListener('drop', ev => ev.preventDefault());
+
+// 치료사 공유용 — 아홉 항목만
+$('pdfBtn').onclick = () => { document.body.classList.remove('printall'); window.print(); };
+// 전체 보관용 — 모든 항목 (8번만 보임)
+$('pdfAllBtn').onclick = () => {
+  document.body.classList.add('printall');
+  window.print();
+  setTimeout(() => document.body.classList.remove('printall'), 500);
+};
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false; $('btn').textContent = '로그인';
+  }
+};
+$('out').onclick = async () => {
+  if (!upLeaveOk(true)) return;
+  UP_LEAVING = true;
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+  else {
+    // 로그인이 없으면 첫 화면으로 보낸다 (빈 화면이 열리는 것을 막기 위함)
+    location.replace('index.html');
+  }
+})();
+</script>
+</body>
+</html>

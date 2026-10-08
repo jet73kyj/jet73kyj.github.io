@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>결석·보강 신청 - 나무링크</title>
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camBg:#FBF5EE; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex;
+        align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar0 { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; color:var(--tx); }
+  .hd .sp { flex:1 1 auto; }
+  .box { max-width:420px; margin:60px auto; background:var(--sf);
+         border:1px solid var(--line); border-radius:12px; padding:28px; }
+  .box img.lg { height:26px; display:block; margin:0 auto 14px; }
+  .wide { max-width:900px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; color:var(--tx); margin:0 0 4px; font-weight:600; }
+  .sub { font-size:13px; color:var(--dim); margin-bottom:20px; text-align:center; }
+  label { display:block; font-size:12.5px; font-weight:500; margin:12px 0 5px;
+          color:#5F5E5A; }
+  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px;
+          font-size:14px; box-sizing:border-box; background:var(--sf); color:var(--tx); }
+  button { width:100%; padding:11px; margin-top:18px; background:var(--sf); color:var(--tx);
+           border:1px solid var(--dim); border-radius:8px; font-size:14px;
+           font-weight:500; cursor:pointer; }
+  button:hover { background:var(--camL); }
+  button:disabled { background:#f2f1ee; color:var(--dim); border-color:var(--line);
+                    cursor:default; }
+  .out { margin-top:16px; padding:13px; border-radius:8px; font-size:14px;
+         line-height:1.7; display:none; white-space:pre-wrap; }
+  .ok  { background:var(--sf); border-left:3px solid #5E9A6E; color:var(--tx); display:block; }
+  .err { background:var(--sf); border-left:3px solid #D8684A; color:#993C1D; display:block; }
+
+  .who { font-size:12px; color:var(--dim); }
+  .btn-out { width:auto; margin:0; padding:5px 12px; font-size:13px;
+             border-color:var(--line); }
+  .btn-home { display:inline-block; padding:5px 12px; background:var(--sf); color:var(--cam);
+              font-size:13px; border:1px solid var(--line); border-radius:8px;
+              text-decoration:none; margin-right:8px; }
+  .btn-home:hover { background:var(--camL); }
+
+  .tabs { display:flex; gap:16px; margin-bottom:14px;
+          border-bottom:1px solid var(--line); }
+  .tabs button { width:auto; margin:0; padding:2px 0 7px; background:none; color:var(--dim);
+                 font-size:13.5px; font-weight:400; border:none;
+                 border-bottom:2px solid transparent; border-radius:0; }
+  .tabs button:hover { background:none; color:var(--tx); }
+  .tabs button.on { background:none; color:var(--tx); font-weight:500;
+                    border-bottom-color:var(--cam); }
+
+  .rq { background:var(--sf); border:1px solid var(--line); border-radius:12px;
+        padding:15px 16px; margin-bottom:10px; }
+  .rq.wait { border-radius:0; border-left:3px solid #D29A3C; }
+  .rqhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .rqkid { font-size:14.5px; font-weight:500; color:var(--tx); }
+  .tag { font-size:11.5px; padding:1px 9px; border-radius:11px; }
+  .t-wait { background:#FAEEDA; color:#854F0B; }
+  .t-ok   { background:#EAF3DE; color:#3B6D11; }
+  .t-no   { background:#F1EFE8; color:#5F5E5A; }
+  .t-cx   { background:#EEF1F4; color:#5A6B7B; }   /* 학부모 취소 (2026-09-21) */
+  .t-th   { background:#EAF2EC; color:#3E7A50; }   /* 선생님 요청 (2026-10-03) */
+  .t-mk   { background:#E6F0FA; color:#2E5E8C; }   /* 결석 뒤 보강 요청 (2026-09-30) */
+  .t-x8   { background:#F1ECFA; color:#5B3E96; }   /* 발추 일정 요청 (2026-10-02) */
+  .t-pair { background:#EEEDFE; color:#3C3489; margin-left:6px; }   /* 두 수업 묶음 (2026-09-22) */
+  .pairsep { border-top:1px dashed #E3DDD5; margin:6px 0; }
+  .rqline { font-size:13.5px; color:#5F5E5A; line-height:1.8; margin-top:9px; }
+  .rqline b { color:var(--tx); font-weight:500; }
+  .why { background:var(--camBg); border-radius:8px; padding:9px 12px;
+         font-size:13.5px; color:#5F5E5A; margin-top:9px; }
+  .none2 { color:#993C1D; font-weight:500; }
+  .rqbtns { display:flex; gap:8px; margin-top:14px; }
+  .rqbtns button { width:auto; margin:0; padding:6px 18px; font-size:13px; }
+  .btn-no { background:var(--sf); color:#993C1D; border-color:var(--line); font-weight:400; }
+  .btn-no:hover { background:#FCEFEA; }
+  .empty { padding:40px; text-align:center; color:var(--dim); font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="box" id="loginBox">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <h1 style="text-align:center">결석 · 보강 신청</h1>
+  <div class="sub">나무링크 · 학부모 · 선생님이 낸 신청을 확인합니다</div>
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn">로그인</button>
+  <div class="out" id="msg"></div>
+</div>
+
+<div id="mainBox" style="display:none">
+  <div class="hd">
+    <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+    <span class="bar0"></span>
+    <h1>결석 · 보강 신청</h1>
+    <span class="who" id="who"></span>
+    <span class="sp"></span>
+    <button class="btn-out" id="out" style="display:inline-block">로그아웃</button>
+    <a class="btn-home" href="index.html" style="margin-right:0">처음으로</a>
+  </div>
+  <div class="wide">
+
+  <div class="tabs">
+    <button id="tabWait" class="on">확인할 것</button>
+    <button id="tabAll">전체</button>
+  </div>
+
+  <div class="out" id="msg2"></div>
+  <div id="list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script src="nl-live-alert.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $ = id => document.getElementById(id);
+
+let ME = null;
+let REQS = [];        // 신청 목록
+let KIDS = {};        // 아동 번호 -> 이름
+let THRS = {};        // 치료사 번호 -> 이름
+let SESS = {};        // 수업 번호 -> 수업
+let TAB = 'wait';
+let X8REQS = [];      // 발추 일정 요청 (nl_x8_requests · 2026-10-02)
+
+function show(el, t, ok) { el.textContent = t; el.className = 'out ' + (ok ? 'ok' : 'err'); }
+function hide(el) { el.className = 'out'; el.textContent = ''; }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+const DAYS = ['일','월','화','수','목','금','토'];
+function dm(d) {
+  if (!d) return '';
+  const dd = new Date(d + 'T00:00:00');
+  return (+String(d).slice(5,7)) + '월 ' + (+String(d).slice(8,10)) + '일('
+       + DAYS[dd.getDay()] + ')';
+}
+function hm(t) { return t ? String(t).slice(0,5) : ''; }
+// 「○번 이름」 (2026-09-21)
+function kidName(cid) { return cid + '번' + (KIDS[cid] ? ' ' + KIDS[cid] : ''); }
+
+// ── 목록 그리기 ─────────────────────────────────────
+function draw() {
+  // 방금 확정한 것(10분 안 · 되돌릴 수 있음)도 「확인 필요」 갈래에 남긴다 (2026-10-07)
+  const list = (TAB === 'wait') ? REQS.filter(r => r.state === '신청' || r.state === '보강신청' || canUndo(r)) : REQS;
+  const x8l  = (TAB === 'wait') ? X8REQS.filter(r => r.state === '신청') : X8REQS;
+  if (!list.length && !x8l.length) {
+    $('list').innerHTML = '<div class="empty">'
+      + (TAB === 'wait' ? '확인할 신청이 없습니다.' : '아직 들어온 신청이 없습니다.')
+      + '</div>';
+    return;
+  }
+  let h = x8l.map(drawX8).join('');
+  const drawn = {};   // 이미 그린 묶음 (2026-09-22)
+  list.forEach(r => {
+    // 두 수업 묶음(pair_key)은 한 칸에 함께 그린다 (원칙 11 · 2026-09-22)
+    if (r.pair_key) {
+      if (drawn[r.pair_key]) return;
+      drawn[r.pair_key] = 1;
+      h += drawPair(REQS.filter(x => x.pair_key === r.pair_key));
+      return;
+    }
+    const s   = SESS[r.session_id] || {};
+    // 「보강신청」 = 결석은 이미 확정 · 학부모가 나중에 보강 자리를 요청한 것 (2026-09-30)
+    const mkAsk = r.state === '보강신청';
+    const wait = r.state === '신청' || mkAsk;
+    // 학부모가 「결석 취소」한 것은 상태가 「취소」 — 반려와 가른다 (2026-09-21)
+    const tag = mkAsk ? '<span class="tag t-mk">보강 요청 · 확인 필요</span>'
+              : wait ? '<span class="tag t-wait">확인 필요</span>'
+              : r.state === '확정' ? '<span class="tag t-ok">확정됨</span>'
+              : r.state === '취소' ? '<span class="tag t-cx">' + (r.staff_id && !r.account_id ? '선생님 취소' : '학부모 취소') + '</span>'
+              : '<span class="tag t-no">반려</span>';
+    // 선생님이 넣은 보강 요청 (2026-10-03)
+    const thTag = r.staff_id ? '<span class="tag t-th">' + esc(THRS[r.staff_id] || '') + ' 선생님 요청</span>' : '';
+
+    h += '<div class="rq' + (wait ? ' wait' : '') + '">'
+      + '<div class="rqhead"><span class="rqkid">' + esc(kidName(r.child_id))
+      + '</span>' + tag + thTag + '</div>'
+      + '<div class="rqline">못 오는 수업 · <b>' + dm(s.plan_date) + ' ' + hm(s.start_time) + '</b>'
+      + (s.therapist_id ? ' · ' + esc(THRS[s.therapist_id] || '') + ' 선생님' : '') + '</div>'
+      + '<div class="rqline">보강 · '
+      + (r.makeup_date
+          ? '<b>' + dm(r.makeup_date) + ' ' + hm(r.makeup_time) + '</b>'
+          : '<span class="none2">아직 안 정함</span>')
+      + '</div>'
+      + '<div class="why">' + esc(r.reason || '') + '</div>';
+
+    if (canUndo(r)) {
+      h += undoBtn(r);
+    } else if (wait) {
+      h += '<div class="rqbtns">'
+        + '<button data-ok="' + r.id + '">' + (mkAsk ? '보강 확정' : '확정하기') + '</button>'
+        + '<button class="btn-no" data-no="' + r.id + '">' + (mkAsk ? '보강 반려' : '반려') + '</button>'
+        + '</div>';
+    } else if (r.staff_memo) {
+      h += '<div class="rqline" style="color:#888;font-size:13px;">센터 메모 · '
+         + esc(r.staff_memo) + '</div>';
+    }
+    h += '</div>';
+  });
+  $('list').innerHTML = h;
+
+  document.querySelectorAll('button[data-ok]').forEach(b => {
+    b.onclick = () => doConfirm(Number(b.dataset.ok));
+  });
+  document.querySelectorAll('button[data-no]').forEach(b => {
+    b.onclick = () => doReject(Number(b.dataset.no));
+  });
+  document.querySelectorAll('button[data-undo]').forEach(b => {
+    b.onclick = () => doUndo(Number(b.dataset.undo));
+  });
+  document.querySelectorAll('button[data-x8ok]').forEach(b => {
+    b.onclick = () => doX8(Number(b.dataset.x8ok), true);
+  });
+  document.querySelectorAll('button[data-x8no]').forEach(b => {
+    b.onclick = () => doX8(Number(b.dataset.x8no), false);
+  });
+}
+
+// ── 발추 일정 요청 한 칸 (2026-10-02) ──────────────────
+//   발추 자리가 없는 달 — 학부모가 빈 자리를 골라 요청 → 센터가 확정 · 반려
+//   확정하면 서버(nl_x8_confirm)가 그 날 발추 수업 줄을 만든다
+function x8Mon(mk) { return mk ? Number(String(mk).slice(5, 7)) + '월분' : ''; }
+function drawX8(r) {
+  const wait = r.state === '신청';
+  const tag = wait ? '<span class="tag t-x8">발추 일정 요청 · 확인 필요</span>'
+            : r.state === '확정' ? '<span class="tag t-ok">확정됨</span>'
+            : r.state === '취소' ? '<span class="tag t-cx">' + (r.staff_id ? '선생님 취소' : '학부모 취소') + '</span>'
+            : '<span class="tag t-no">반려</span>';
+  const thTag = r.staff_id ? '<span class="tag t-th">' + esc(THRS[r.staff_id] || '') + ' 선생님 요청</span>' : '';
+  let h = '<div class="rq' + (wait ? ' wait' : '') + '">'
+    + '<div class="rqhead"><span class="rqkid">' + esc(kidName(r.child_id)) + '</span>' + tag + thTag + '</div>'
+    + '<div class="rqline">발달추가 수업 · <b>' + esc(x8Mon(r.x8_month)) + '</b></div>'
+    + '<div class="rqline">요청 일정 · <b>' + dm(r.want_date) + ' ' + hm(r.want_time) + '</b>'
+    + (r.therapist_id ? ' · ' + esc(THRS[r.therapist_id] || '') + ' 선생님' : '') + '</div>';
+  if (wait) {
+    h += '<div class="rqbtns">'
+      + '<button data-x8ok="' + r.id + '">확정</button>'
+      + '<button class="btn-no" data-x8no="' + r.id + '">반려</button>'
+      + '</div>';
+  } else if (r.staff_memo) {
+    h += '<div class="rqline" style="color:#888;font-size:13px;">센터 메모 · ' + esc(r.staff_memo) + '</div>';
+  }
+  return h + '</div>';
+}
+// ── 확인 창 — 핸드폰 실수 막기 (2026-10-07 은정님) ──────────────
+//   크게 보여 주고, 확정 · 반려 단추는 3초 지나야 눌린다
+//   ask 가 있으면 까닭 칸 — 비워도 됨 · 취소면 null
+function sure(o) {
+  return new Promise(resolve => {
+    const bg = document.createElement('div');
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(40,30,25,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    bg.innerHTML =
+        '<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px 20px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);">'
+      +   '<div style="font-size:18px;font-weight:700;margin-bottom:12px;color:' + (o.danger ? '#B4482E' : '#2F2926') + ';">' + esc(o.title) + '</div>'
+      +   '<div style="font-size:16px;line-height:1.7;white-space:pre-wrap;background:#F8F1E8;border-radius:10px;padding:12px 14px;">' + esc(o.body) + '</div>'
+      +   (o.ask ? '<textarea id="sureWhy" rows="3" placeholder="' + esc(o.ask) + '" style="width:100%;box-sizing:border-box;margin-top:12px;font:inherit;font-size:15px;padding:10px;border:1px solid #DDD6CE;border-radius:10px;"></textarea>' : '')
+      +   '<div style="display:flex;gap:10px;margin-top:16px;">'
+      +     '<button type="button" id="sureNo" style="flex:1;padding:14px;font-size:16px;border-radius:10px;border:1px solid #CFC8C0;background:#fff;color:#2F2926;margin:0;">취소</button>'
+      +     '<button type="button" id="sureOk" disabled style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:none;color:#fff;margin:0;background:' + (o.danger ? '#D8684A' : '#B07A4A') + ';opacity:.45;">' + esc(o.ok) + ' (3)</button>'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(bg);
+    const ok = bg.querySelector('#sureOk'), no = bg.querySelector('#sureNo');
+    let n = 3;
+    const tick = setInterval(() => {
+      n--;
+      if (n > 0) { ok.textContent = o.ok + ' (' + n + ')'; return; }
+      clearInterval(tick);
+      ok.textContent = o.ok; ok.disabled = false; ok.style.opacity = '1';
+    }, 1000);
+    const done = v => { clearInterval(tick); bg.remove(); resolve(v); };
+    no.onclick = () => done(null);
+    ok.onclick = () => {
+      if (ok.disabled) return;
+      const w = bg.querySelector('#sureWhy');
+      done(w ? w.value.trim() : true);
+    };
+  });
+}
+
+async function doX8(id, ok) {
+  const r = X8REQS.find(x => x.id === id);
+  if (!r) return;
+  let memo = null;
+  if (ok) {
+    if (!(await sure({ title: '발달추가 수업을 확정할까요?', ok: '확정',
+        body: kidName(r.child_id) + '\n발달추가 수업 · ' + x8Mon(r.x8_month)
+        + '\n' + dm(r.want_date) + ' ' + hm(r.want_time)
+        + (r.therapist_id ? '\n' + (THRS[r.therapist_id] || '') + ' 선생님' : '')
+        + '\n\n시간표에 들어갑니다.' }))) return;
+  } else {
+    memo = await sure({ title: '발추 일정 요청을 반려할까요?', ok: '반려', danger: true,
+        body: kidName(r.child_id) + '\n' + dm(r.want_date) + ' ' + hm(r.want_time)
+        + '\n\n학부모 화면에 다시 [일정 잡기]가 나옵니다.',
+        ask: '반려 까닭 (비워도 됩니다)' });
+    if (memo === null) return;
+  }
+  const btn = document.querySelector('button[' + (ok ? 'data-x8ok' : 'data-x8no') + '="' + id + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = ok ? '확정 중…' : '반려 중…'; }
+  try {
+    const { data, error } = await sb.rpc('nl_x8_confirm', { p_req: id, p_ok: ok, p_memo: memo || null });
+    if (error) throw error;
+    const res = String(data || '');
+    const good = ok ? res.indexOf('확정했습니다') === 0 : res.indexOf('반려했습니다') === 0;
+    if (!good) {
+      show($('msg2'), '❌ ' + (res || '처리하지 못했습니다.'), false);
+      alert(res || '처리하지 못했습니다.');
+    } else {
+      show($('msg2'), res, true);
+    }
+    await loadAll();
+  } catch (e) {
+    show($('msg2'), '❌ 처리하지 못했습니다.\n' + (e.message || e), false);
+    if (btn) { btn.disabled = false; btn.textContent = ok ? '확정' : '반려'; }
+  }
+}
+
+// 두 수업 묶음 한 칸 (원칙 11 · 2026-09-22)
+//   확정·반려는 묶음 전체에 한 번. 서버가 둘 다 되거나 둘 다 안 되게 한다
+function pairItems(rs) {
+  return rs.slice().sort((a, b) => {
+    const sa = SESS[a.session_id] || {}, sb2 = SESS[b.session_id] || {};
+    return String(sa.plan_date || '').localeCompare(String(sb2.plan_date || ''))
+        || String(sa.start_time || '').localeCompare(String(sb2.start_time || ''))
+        || a.id - b.id;
+  });
+}
+function reqTag(st) {
+  return st === '보강신청' ? '<span class="tag t-mk">보강 요청 · 확인 필요</span>'
+       : st === '신청' ? '<span class="tag t-wait">확인 필요</span>'
+       : st === '확정' ? '<span class="tag t-ok">확정됨</span>'
+       : st === '취소' ? '<span class="tag t-cx">학부모 취소</span>'
+       : '<span class="tag t-no">반려</span>';
+}
+function drawPair(rs) {
+  rs = pairItems(rs);
+  const wait = rs.some(r => r.state === '신청');
+  const states = [...new Set(rs.map(r => r.state))];
+  let h = '<div class="rq' + (wait ? ' wait' : '') + '">'
+    + '<div class="rqhead"><span class="rqkid">' + esc(kidName(rs[0].child_id)) + '</span>'
+    + states.map(reqTag).join(' ')
+    + '<span class="tag t-pair">두 수업 묶음</span></div>';
+  rs.forEach((r, i) => {
+    const s = SESS[r.session_id] || {};
+    if (i) h += '<div class="pairsep"></div>';
+    h += '<div class="rqline">못 오는 수업 · <b>' + dm(s.plan_date) + ' ' + hm(s.start_time) + '</b>'
+      + (s.therapist_id ? ' · ' + esc(THRS[s.therapist_id] || '') + ' 선생님' : '')
+      + (states.length > 1 ? ' ' + reqTag(r.state) : '') + '</div>'
+      + '<div class="rqline">보강 · '
+      + (r.makeup_date
+          ? '<b>' + dm(r.makeup_date) + ' ' + hm(r.makeup_time) + '</b>'
+            + (r.makeup_therapist_id ? ' · ' + esc(THRS[r.makeup_therapist_id] || '') + ' 선생님' : '')
+          : '<span class="none2">아직 안 정함</span>')
+      + '</div>';
+  });
+  h += '<div class="why">' + esc(rs[0].reason || '') + '</div>';
+  const w1 = rs.find(r => r.state === '신청');
+  const u1 = rs.every(r => canUndo(r)) ? rs[0] : null;
+  if (u1) {
+    h += undoBtn(u1, true);
+  } else if (w1) {
+    h += '<div class="rqbtns">'
+      + '<button data-ok="' + w1.id + '">두 건 함께 확정</button>'
+      + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
+      + '</div>';
+  } else {
+    const memo = rs.map(r => r.staff_memo).filter(Boolean)[0];
+    if (memo) h += '<div class="rqline" style="color:#888;font-size:13px;">센터 메모 · ' + esc(memo) + '</div>';
+  }
+  return h + '</div>';
+}
+
+// ── 불러오기 ────────────────────────────────────────
+let TEACHER = false;   // 담당 선생님 계정 (2026-10-05)
+async function loadAll() {
+  hide($('msg2'));
+  const { data, error } = await sb
+    .from('nl_absence_requests')
+    .select('id, child_id, session_id, reason, makeup_date, makeup_time,'
+          + ' makeup_therapist_id, state, staff_memo, pair_key, staff_id, account_id,'
+          + ' decided_by, decided_at, undo_prev_state')
+    .order('id', { ascending: false });
+  if (error) { show($('msg2'), '❌ 신청을 불러오지 못했습니다.\n' + error.message, false); return; }
+  REQS = data || [];
+
+  // 발추 일정 요청 (2026-10-02) — 못 불러와도 결석 목록은 그린다
+  X8REQS = [];
+  {
+    const { data: xd, error: xe } = await sb.from('nl_x8_requests')
+      .select('id, child_id, x8_month, want_date, want_time, therapist_id, state, staff_memo, staff_id')
+      .order('id', { ascending: false });
+    if (xe) show($('msg2'), '⚠️ 발추 일정 요청을 불러오지 못했습니다.\n' + xe.message, false);
+    else X8REQS = xd || [];
+  }
+
+  // 딸린 수업을 가져온다
+  SESS = {};
+  const sids = [...new Set(REQS.map(r => r.session_id).filter(Boolean))];
+  // 200개씩 나눠 묻는다 — 한 번에 묻으면 주소가 길어져 실패한다 (2026-09-21)
+  for (let i = 0; i < sids.length; i += 200) {
+    const { data: ss, error: se } = await sb.from('nl_sessions')
+      .select('id, plan_date, start_time, therapist_id, status').in('id', sids.slice(i, i + 200));
+    if (se) { show($('msg2'), '❌ 딸린 수업을 불러오지 못했습니다.\n' + se.message, false); break; }
+    (ss || []).forEach(s => { SESS[s.id] = s; });
+  }
+  // 선생님 계정 — 내 수업(또는 내 보강 자리) 요청 · 내 발추 요청만 (2026-10-05)
+  if (TEACHER && ME) {
+    const mine = r => Number((SESS[r.session_id] || {}).therapist_id) === Number(ME.id) || Number(r.makeup_therapist_id) === Number(ME.id);
+    REQS = REQS.filter(mine);
+    X8REQS = X8REQS.filter(x => Number(x.therapist_id) === Number(ME.id));
+  }
+  draw();
+}
+
+// ── 확정 ───────────────────────────────────────────
+async function doConfirm(id) {
+  const r = REQS.find(x => x.id === id);
+  if (!r) return;
+  const s = SESS[r.session_id] || {};
+  let m = kidName(r.child_id) + '\n\n';
+  if (r.pair_key) {
+    // 두 수업 묶음 — 둘 다 보여 주고 함께 확정 (2026-09-22)
+    const rs = pairItems(REQS.filter(x => x.pair_key === r.pair_key && x.state === '신청'));
+    m += '두 수업 묶음 · 둘 다 되거나 둘 다 안 됩니다\n\n';
+    rs.forEach(x => {
+      const sx = SESS[x.session_id] || {};
+      m += '결석 · ' + dm(sx.plan_date) + ' ' + hm(sx.start_time)
+         + '  →  보강 · ' + (x.makeup_date ? dm(x.makeup_date) + ' ' + hm(x.makeup_time) : '아직 안 정함') + '\n';
+    });
+    m += '\n시간표에 반영할까요?';
+  } else {
+    m += '결석 · ' + dm(s.plan_date) + ' ' + hm(s.start_time) + (r.state === '보강신청' ? ' (결석은 이미 확정)' : '') + '\n';
+    m += r.makeup_date
+       ? '보강 · ' + dm(r.makeup_date) + ' ' + hm(r.makeup_time) + '\n\n시간표에 반영할까요?'
+       : '보강 · 아직 안 정함\n\n결석만 반영할까요?';
+  }
+  if (!(await sure({ title: '이 요청을 확정할까요?', ok: '확정', body: m.replace(/\n\n시간표에 반영할까요\?$|\n\n결석만 반영할까요\?$/, '') }))) return;
+
+  // 누르는 동안 단추를 잠가 두 번 눌러지지 않게 한다 (2026-09-16)
+  const btn = document.querySelector('button[data-ok="' + id + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = '확정 중…'; }
+  try {
+    const { data, error } = await sb.rpc('nl_absence_confirm', { p_req_id: id });
+    if (error) throw error;
+    // 창구가 「확정했습니다.」가 아닌 글을 돌려주면 확정이 안 된 것이다 (2026-09-11)
+    //   보기: 「확정하지 못했습니다 — 09/21(월) 09:50 : 월요일은 선생님 출근 요일이 아닙니다 …」
+    //   전에는 무슨 글이 오든 초록 칸에 띄워, 막힌 것을 알아보기 어려웠다
+    //   「확정했습니다. (이미 잡아 두신 보강을 그대로 씁니다)」도 성공이다 (2026-09-16)
+    //   전에는 글자가 「확정했습니다.」와 똑같을 때만 성공으로 봐서, 확정됐는데 빨간 칸이 떴다
+    const res = String(data || '');
+    if (res.indexOf('확정했습니다') !== 0) {
+      show($('msg2'), '❌ ' + (res || '확정하지 못했습니다.'), false);
+      alert(res || '확정하지 못했습니다.');
+      await loadAll();
+      return;
+    }
+    show($('msg2'), res, true);
+    await loadAll();
+  } catch (e) {
+    show($('msg2'), '❌ 확정하지 못했습니다.\n' + (e.message || e), false);
+    if (btn) { btn.disabled = false; btn.textContent = r.pair_key ? '두 건 함께 확정' : '확정하기'; }
+  }
+}
+
+// ── 확정 10분 되돌리기 (2026-10-07 은정님) ──────────────
+//   확정한 분 본인(관리자는 누구 것이든) · 확정 뒤 10분 · 서버 nl_absence_undo 가 다시 따짐
+//   되돌리면 담당 선생님 🔔 · 학부모 알림함에 「결석 확정 취소」가 저절로 감
+function canUndo(r) {
+  if (!r || r.state !== '확정' || !r.undo_prev_state || !r.decided_at || !ME) return false;
+  const left = 10 * 60 * 1000 - (Date.now() - Date.parse(r.decided_at));
+  if (left <= 0) return false;
+  return Number(r.decided_by) === Number(ME.id) || !TEACHER;
+}
+function undoBtn(r, pair) {
+  const left = Math.max(1, Math.ceil((10 * 60 * 1000 - (Date.now() - Date.parse(r.decided_at))) / 60000));
+  return '<div class="rqbtns">'
+    + '<button class="btn-no" data-undo="' + r.id + '">' + (pair ? '두 건 함께 ' : '') + '확정 되돌리기</button>'
+    + '<span style="font-size:12.5px;color:#888;align-self:center;">' + left + '분 안에 되돌릴 수 있습니다</span>'
+    + '</div>';
+}
+async function doUndo(id) {
+  const r = REQS.find(x => x.id === id);
+  if (!r) return;
+  const s = SESS[r.session_id] || {};
+  const v = await sure({ title: '확정을 되돌릴까요?', ok: '되돌리기', danger: true,
+    body: kidName(r.child_id) + '\n결석 · ' + dm(s.plan_date) + ' ' + hm(s.start_time)
+        + (r.makeup_date ? '\n보강 · ' + dm(r.makeup_date) + ' ' + hm(r.makeup_time) : '')
+        + '\n\n요청이 다시 「확인 필요」로 돌아가고,\n선생님 · 학부모께 「결석 확정 취소」 알림이 갑니다.' });
+  if (!v) return;
+  const btn = document.querySelector('button[data-undo="' + id + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = '되돌리는 중…'; }
+  try {
+    const { data, error } = await sb.rpc('nl_absence_undo', { p_req_id: id });
+    if (error) throw error;
+    const res = String(data || '');
+    if (res.indexOf('되돌렸습니다') !== 0) {
+      show($('msg2'), '❌ ' + (res || '되돌리지 못했습니다.'), false);
+      alert(res || '되돌리지 못했습니다.');
+    } else {
+      show($('msg2'), res, true);
+    }
+    await loadAll();
+  } catch (e) {
+    show($('msg2'), '❌ 되돌리지 못했습니다.\n' + (e.message || e), false);
+    if (btn) { btn.disabled = false; btn.textContent = '확정 되돌리기'; }
+  }
+}
+// 남은 분 · 10분 지나면 단추 거두기 — 30초마다 다시 그림 (되돌릴 것이 있을 때만)
+setInterval(() => { try { if (REQS.some(canUndo) || document.querySelector('button[data-undo]')) draw(); } catch (e) {} }, 30000);
+
+// ── 반려 ───────────────────────────────────────────
+async function doReject(id) {
+  const rr = REQS.find(x => x.id === id) || {};
+  if (rr.state === '보강신청') return doRejectMk(rr);
+  const pk = rr.pair_key || null;   // 두 수업 묶음이면 함께 반려 (2026-09-22)
+  const sx0 = SESS[rr.session_id] || {};
+  const why = await sure({ title: (pk ? '두 수업 묶음을 함께 ' : '이 요청을 ') + '반려할까요?', ok: '반려', danger: true,
+    body: kidName(rr.child_id) + '\n결석 · ' + dm(sx0.plan_date) + ' ' + hm(sx0.start_time)
+        + (rr.makeup_date ? '\n보강 · ' + dm(rr.makeup_date) + ' ' + hm(rr.makeup_time) : '')
+        + '\n\n학부모께는 따로 연락해 주셔야 합니다.',
+    ask: '반려 까닭 (비워도 됩니다)' });
+  if (why === null) return;
+  const btn = document.querySelector('button[data-no="' + id + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = '반려 중…'; }
+  try {
+    // 「신청」 상태일 때만 반려한다 — 이미 확정·취소된 것을 덮지 않게 (2026-09-21)
+    // 누른 사람도 남긴다
+    const { data: upd, error } = await sb.from('nl_absence_requests')
+      .update({ state: '반려', staff_memo: why || null,
+                decided_by: ME ? ME.id : null,
+                decided_at: new Date().toISOString() })
+      .eq(pk ? 'pair_key' : 'id', pk || id).eq('state', '신청')
+      .select('id');
+    if (error) throw error;
+    if (!upd || !upd.length) {
+      show($('msg2'), '⚠️ 이미 처리된 신청입니다. 목록을 새로 불러왔습니다.', false);
+      alert('이미 처리된 신청입니다.\n(학부모 취소 또는 다른 분이 확정·반려)');
+      await loadAll();
+      return;
+    }
+    show($('msg2'), '반려했습니다.', true);
+    await loadAll();
+  } catch (e) {
+    show($('msg2'), '❌ 반려하지 못했습니다.\n' + (e.message || e), false);
+    if (btn) { btn.disabled = false; btn.textContent = pk ? '두 건 함께 반려' : '반려'; }
+  }
+}
+
+// 보강 요청만 반려 — 결석은 그대로 두고 보강 자리만 비운다 (2026-09-30)
+//   상태를 「확정」으로 되돌리므로 학부모가 다른 시간으로 다시 요청할 수 있다
+async function doRejectMk(rr) {
+  const why = await sure({ title: '보강 요청을 반려할까요?', ok: '반려', danger: true,
+    body: kidName(rr.child_id) + '\n보강 · ' + dm(rr.makeup_date) + ' ' + hm(rr.makeup_time)
+        + '\n\n결석은 그대로 남고, ' + (rr.staff_id ? '선생님' : '학부모') + '이 다른 시간으로 다시 요청하실 수 있습니다.',
+    ask: '반려 까닭 (비워도 됩니다)' });
+  if (why === null) return;
+  const btn = document.querySelector('button[data-no="' + rr.id + '"]');
+  if (btn) { btn.disabled = true; btn.textContent = '반려 중…'; }
+  try {
+    const { data: upd, error } = await sb.from('nl_absence_requests')
+      // 선생님이 새로 넣은 줄(학부모 계정 없음)은 「반려」로 닫는다 · 결석 줄에 얹은 것은 보강만 비운다 (2026-10-03)
+      .update(!rr.account_id
+        ? { state: '반려', staff_memo: (rr.staff_memo ? rr.staff_memo + ' / ' : '') + '보강 반려: ' + (why || ''),
+            decided_by: ME ? ME.id : null, decided_at: new Date().toISOString() }
+        : { state: '확정', makeup_date: null, makeup_time: null, makeup_therapist_id: null, staff_id: null,
+                staff_memo: (rr.staff_memo ? rr.staff_memo + ' / ' : '') + '보강 반려: ' + (why || ''),
+                decided_by: ME ? ME.id : null, decided_at: new Date().toISOString() })
+      .eq('id', rr.id).eq('state', '보강신청')
+      .select('id');
+    if (error) throw error;
+    if (!upd || !upd.length) {
+      show($('msg2'), '⚠️ 이미 처리된 요청입니다. 목록을 새로 불러왔습니다.', false);
+      alert('이미 처리된 요청입니다.\n(학부모가 거두었거나 다른 분이 처리)');
+      await loadAll();
+      return;
+    }
+    show($('msg2'), '보강 요청을 반려했습니다. 결석은 그대로입니다.', true);
+    await loadAll();
+  } catch (e) {
+    show($('msg2'), '❌ 반려하지 못했습니다.\n' + (e.message || e), false);
+    if (btn) { btn.disabled = false; btn.textContent = '보강 반려'; }
+  }
+}
+
+// ── 로그인 뒤 ──────────────────────────────────────
+async function afterLogin(user) {
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists')
+    .select('id, name, role, active')
+    .eq('login_email', user.email.toLowerCase())
+    .maybeSingle();
+
+  if (e1)  { show($('msg'), '❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) {
+    // 직원이 아닌 계정은 로그인을 남기지 않는다 (2026-09-21)
+    try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+    show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.', false); return;
+  }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+
+  const can = [8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || '') || me.role === '치료사';
+  // 담당 선생님도 자기 수업 요청을 확정 · 반려 (2026-10-05 은정님 · 서버 nl_abs_can · nl_x8_can 이 다시 따짐)
+  TEACHER = !([8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || ''));
+  if (!can) {
+    show($('msg'), '⚠️ 관리자·행정 · 담당 선생님만 볼 수 있습니다.', false);
+    nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+    return;
+  }
+  ME = me;
+  // 학부모 결석 요청을 실시간으로 띄우고, 들어오면 목록을 다시 부른다 (2026-09-22)
+  if (window.NLLive) NLLive.start(sb, me.id, { onNew: () => loadAll() });
+
+  try {
+    const [kd, th] = await Promise.all([
+      sb.from('nl_children').select('id, name'),
+      sb.from('nl_therapists').select('id, name')
+    ]);
+    (kd.data || []).forEach(k => { KIDS[k.id] = k.name; });
+    (th.data || []).forEach(t => { THRS[t.id] = t.name; });
+  } catch (e) {}
+
+  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨';
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+  await loadAll();
+}
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false; $('btn').textContent = '로그인';
+  }
+};
+
+$('out').onclick = async () => {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+
+$('tabWait').onclick = () => {
+  TAB = 'wait';
+  $('tabWait').className = 'on'; $('tabAll').className = '';
+  draw();
+};
+$('tabAll').onclick = () => {
+  TAB = 'all';
+  $('tabAll').className = 'on'; $('tabWait').className = '';
+  draw();
+};
+
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+$('em').addEventListener('keydown', e => { if (e.key === 'Enter') $('pw').focus(); });
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session && data.session.user) {
+    await afterLogin(data.session.user);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업무위탁 수수료 정산 - 나무링크</title>
+<style>
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:#f5f9f0;
+         margin:0; padding:20px; color:#333; }
+  .box { max-width:460px; margin:40px auto; background:#fff; border-radius:12px;
+         padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .wide { max-width:1000px; margin:16px auto; background:#fff; border-radius:12px;
+          padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  h1 { font-size:20px; color:#2e7d32; margin:0 0 4px; }
+  #monBig { font-size:28px; font-weight:800; color:#1b5e20; vertical-align:-2px;
+            margin-left:6px; }
+  .sub { font-size:13px; color:#888; margin-bottom:22px; }
+  label { display:block; font-size:13px; font-weight:bold; margin:14px 0 5px; }
+  input { width:100%; padding:11px; border:1px solid #ddd; border-radius:7px;
+          font-size:15px; box-sizing:border-box; }
+  button { width:100%; padding:13px; margin-top:20px; background:#2e7d32; color:#fff;
+           border:none; border-radius:7px; font-size:15px; font-weight:bold; cursor:pointer; }
+  button:disabled { background:#bbb; cursor:default; }
+  .out { margin-top:16px; padding:13px; border-radius:8px; font-size:14px;
+         line-height:1.7; display:none; white-space:pre-wrap; }
+  .ok  { background:#e8f5e9; color:#1b5e20; display:block; }
+  .err { background:#ffebee; color:#b71c1c; display:block; }
+
+  .top { display:flex; justify-content:space-between; align-items:center;
+         flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .who { font-size:13px; color:#666; }
+  .btn-out { width:auto; margin:0; padding:8px 16px; background:#757575; font-size:13px; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .sel { width:auto; padding:9px 12px; font-size:14px; border:1px solid #ddd;
+         border-radius:7px; font-family:inherit; }
+  .prtbtn { width:auto; margin:0; padding:9px 16px; background:#546e7a; font-size:13.5px; }
+
+  .sec { margin-top:26px; }
+  .sec-t { font-size:15px; font-weight:bold; color:#33691e; margin-bottom:10px;
+           padding-bottom:6px; border-bottom:2px solid #c5e1a5; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th { background:#f1f8e9; color:#33691e; padding:9px 8px; text-align:left;
+       border-bottom:2px solid #c5e1a5; font-size:12.5px; white-space:nowrap; }
+  td { padding:8px; border-bottom:1px solid #eee; }
+  td.n, th.n { text-align:right; }
+  tr:hover td { background:#fafdf7; }
+  tfoot td { font-weight:bold; background:#f7faf4; border-top:2px solid #c5e1a5; }
+
+  /* 지급 내역 */
+  .pay { max-width:520px; }
+  .pay td { padding:9px 8px; }
+  .pay .lab { color:#5a6156; }
+  .pay .amt { text-align:right; font-variant-numeric:tabular-nums; }
+  .pay .sum td { font-weight:bold; background:#f7faf4; }
+  .pay .minus .amt { color:#c62828; }
+  .pay .plus  .amt { color:#00695c; }
+  .pay .final td { font-size:16px; font-weight:800; background:#e8f5e9;
+                   color:#1b5e20; border-top:2px solid #a5d6a7; }
+  .note { font-size:12.5px; color:#888; margin-top:8px; line-height:1.8; }
+  .warn { background:#fff3e0; border:1px solid #ffcc80; color:#e65100;
+          border-radius:8px; padding:12px 14px; font-size:13.5px; margin-bottom:14px; }
+  .evalbox { background:#f1f8e9; border:1px solid #c5e1a5; border-radius:10px;
+             padding:14px 16px; margin-bottom:14px; }
+  .evalrow { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+  .evalrow > div { display:flex; flex-direction:column; }
+  .evalrow label { margin:0 0 4px; font-size:12.5px; font-weight:normal; color:#555; }
+  .evalrow input, .evalrow select { padding:8px 10px; font-size:14px;
+       border:1px solid #ddd; border-radius:6px; font-family:inherit; }
+  .evalrow .addb { width:auto; margin:0; padding:8px 16px; font-size:13.5px;
+       background:#8bc34a; }
+  .delx { color:#c62828; cursor:pointer; font-weight:bold; }
+  /* 출근 요일 · 수업 시각 (2026-09-11) */
+  .wdt { border-collapse:collapse; font-size:13.5px; margin-top:8px; }
+  .wdt th, .wdt td { padding:5px 10px; border-bottom:1px solid #dcedc8; text-align:left; }
+  .wdt th { font-weight:normal; color:#555; font-size:12.5px; }
+  .wdt input[type=time] { padding:4px 6px; font-size:13.5px; border:1px solid #ddd;
+       border-radius:6px; font-family:inherit; }
+  .wdt tr.offday td { color:#9e9e9e; }
+  .wdsave { margin-top:10px; padding:7px 16px; font-size:13.5px; border-radius:7px; cursor:pointer;
+       background:#EAF3DE; color:#27500A; border:1px solid #97C459; font-family:inherit; }
+  .wdsave.busy { background:#eee; color:#777; border-color:#ccc; }
+  .wdsave.done { background:#3B6D11; color:#fff; border-color:#3B6D11; }
+  .small { font-size:12px; color:#8d6e63; }
+
+  @media print {
+    body { background:#fff; padding:0; }
+    .wide { box-shadow:none; max-width:none; margin:0; padding:10px; }
+    .tools, .btn-out, .evalbox, .noprint { display:none !important; }
+  }
+
+  .sheetlogo { text-align:center; margin-top:20px; }
+  .sheetlogo img { height:40px; }
+  .btn-home { display:inline-block; padding:8px 16px; background:#2e7d32; color:#fff;
+              font-size:13px; border-radius:8px; text-decoration:none;
+              white-space:nowrap; margin-right:8px; }
+  .btn-home:hover { filter:brightness(1.08); }
+
+  /* ── 꾸밈 B (2026-09-18) — 화면에서 보이는 곳만. 인쇄 모양은 손대지 않음 ── */
+  body { background:#F5F4F2; padding:0; color:#2F2926; }
+  .hd { background:#fff; border-bottom:1px solid #ECE8E3; display:flex;
+        align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar0 { width:1px; height:16px; background:#ECE8E3; }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; color:#2F2926; }
+  .hd .sp { flex:1 1 auto; }
+  #monBig { font-size:20px; font-weight:500; color:#B07A4A; vertical-align:-1px; }
+  .box { max-width:420px; margin:60px auto; border:1px solid #ECE8E3; box-shadow:none; }
+  .box img.lg { height:26px; display:block; margin:0 auto 14px; }
+  .wide { max-width:1000px; margin:0 auto; padding:16px; background:none;
+          border-radius:0; box-shadow:none; }
+  .panel { background:#fff; border:1px solid #ECE8E3; border-radius:12px;
+           padding:14px 16px; }
+  h1 { color:#2F2926; font-size:18px; font-weight:600; }
+  .who { font-size:12px; color:#A39C95; }
+  button { background:#fff; color:#2F2926; border:1px solid #A39C95;
+           border-radius:8px; font-weight:500; }
+  button:hover { background:#F8F1E8; }
+  button:disabled { background:#f2f1ee; color:#A39C95; border-color:#ECE8E3; }
+  .btn-out, .prtbtn, .addb { background:#fff; color:#2F2926; border-color:#ECE8E3; }
+  .btn-home { background:#fff; color:#B07A4A; border:1px solid #ECE8E3;
+              padding:5px 12px; border-radius:8px; }
+  .btn-home:hover { background:#F8F1E8; filter:none; }
+  .sel { border:1px solid #ECE8E3; background:#fff; color:#2F2926; }
+  input { border:1px solid #ECE8E3; border-radius:8px; color:#2F2926; }
+  .sec-t { color:#2F2926; font-size:14px; font-weight:600; border-bottom:2px solid #C9A27E; }
+  th { background:#F8F1E8; color:#4A1B0C; font-weight:500;
+       border-bottom:1px solid #C9A27E; }
+  td { border-bottom:1px solid #F0EEEA; }
+  tr:hover td { background:#FBF5EE; }
+  tfoot td { background:#FBF5EE; border-top:2px solid #C9A27E; font-weight:500; }
+  .evalbox { background:#FBF5EE; border:1px solid #ECE8E3; border-radius:12px; }
+  .evalrow label { color:#5F5E5A; }
+  .evalrow input, .evalrow select { border:1px solid #ECE8E3; border-radius:8px; }
+  .wdt th, .wdt td { border-bottom:1px solid #F0EEEA; }
+  .wdt th { background:none; color:#5F5E5A; border-bottom:1px solid #F0EEEA; }
+  .wdt input[type=time] { border:1px solid #ECE8E3; border-radius:8px; }
+  .wdsave { background:#fff; color:#2F2926; border:1px solid #A39C95; border-radius:8px; }
+  .wdsave.busy { background:#f2f1ee; color:#A39C95; border-color:#ECE8E3; }
+  .wdsave.done { background:#3B6D11; color:#fff; border-color:#3B6D11; }
+  .out.ok  { background:#fff; border-left:3px solid #5E9A6E; color:#2F2926; }
+  .out.err { background:#fff; border-left:3px solid #D8684A; color:#993C1D; }
+  .note, .small { color:#A39C95; }
+  @media print { body { background:#fff; } .wide { padding:10px; }
+                 .hd { display:none; } .panel { border:none; padding:0; } }
+
+/* 정산 공개 (2026-10-02) */
+.pubbtn.busy{background:#f2f1ee;color:#A39C95;border-color:#ECE8E3}
+.pubbtn.done{background:#3B6D11;color:#fff;border-color:#3B6D11}
+.pubbtn.ask{background:#C2553A;color:#fff;border-color:#C2553A}
+.pubsum{font-size:12.5px;color:#6E6660;margin:-6px 0 12px}
+.pubsum b{color:#2F2926;font-weight:600}
+/* 미확인 (2026-10-01) */
+.unconf{background:#FBEDE6;border:1px solid #E7B9A6;border-left:4px solid #C2553A;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:13.5px;color:#6E6660;line-height:1.7}
+.unconf b{color:#C2553A}
+.gtag{display:inline-block;background:#EDE7F6;color:#5E35B1;border-radius:4px;padding:0 4px;margin-right:4px;font-size:10.5px;font-weight:600}
+
+  .xbox { margin-top:10px; padding:10px 12px; background:#FFF8E1; border:1px solid #F0DFA8; border-radius:8px; }
+  .xhd { font-weight:600; margin-bottom:6px; }
+  .xrow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .xrow input, .xrow select { margin:0; }
+  .xrow button { width:auto; margin:0; padding:5px 14px; }
+  #x_list .xli { font-size:13px; padding:3px 0; }
+  #x_list .xdel { width:auto; margin:0 0 0 6px; padding:0 8px; font-size:12px; background:#fff; color:#c62828; border:1px solid #e0b4b4; }
+
+  /* 위탁계약 카드 (2026-10-03) */
+  .ctcard { margin:10px 0 14px; padding:14px 16px; background:#fff; border:1px solid #ECE8E3; border-left:4px solid #B07A4A; border-radius:10px; }
+  .cthd { font-weight:700; font-size:15px; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .cthd .ctsm { margin-left:auto; }
+  .ctl { font-size:13.5px; line-height:1.7; color:#3a332f; }
+  .ctrate { font-size:12.5px; padding-left:10px; }
+  .ctrate.old { color:#a39c95; }
+  .ctwarn { color:#c62828; }
+  .ctsm { width:auto; margin:0 0 0 4px; padding:2px 10px; font-size:12px; border:1px solid #E4E0DA; border-radius:8px; background:#fff; color:#4A433F; cursor:pointer; }
+  .ctedit { margin:10px 0 14px; padding:14px 16px; background:#FBF5EE; border:1px solid #F0E4D6; border-radius:10px; }
+  .cthd2 { font-weight:700; margin-bottom:10px; }
+  .ctgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px 12px; }
+  .ctgrid label { font-size:12.5px; color:#6b625b; display:flex; flex-direction:column; gap:3px; }
+  /* 칸 높이 · 모양을 모두 같게 (2026-10-03 — 칸마다 위아래가 어긋나던 것) */
+  .ctgrid input, .ctgrid select { width:100%; height:38px; box-sizing:border-box; margin:0; padding:6px 10px;
+            border:1px solid #E4E0DA; border-radius:8px; background:#fff; font-size:14px; }
+  .ctgrid input:disabled { background:#F5F4F2; color:#8a817a; }
+  .ctsub { margin:12px 0 4px; font-weight:600; font-size:13px; }
+  .ctareas { display:flex; flex-wrap:wrap; gap:10px; }
+  .ctchk { font-size:13px; font-weight:normal; }
+  .ctlic { display:flex; gap:6px; margin-bottom:4px; }
+  .ctlic .lnm { flex:0 1 300px; min-width:160px; } .ctlic .lno { width:150px; flex:0 0 150px; }
+  .ctlic input { height:34px !important; padding:4px 8px !important; font-size:13.5px !important; margin:0 !important; box-sizing:border-box; }
+  .ctlic .lx { height:34px; padding:0 10px; margin:0 !important; }   /* 면허 칸 줄임 (2026-10-08) */
+  .ctfoot { display:flex; gap:6px; justify-content:flex-end; align-items:center; margin-top:12px; }
+  .ctfoot #ctMsg { flex:1; color:#c62828; }
+  .ctgo { width:auto; margin:0; padding:6px 18px; background:#B07A4A; color:#fff; border:1px solid #B07A4A; border-radius:8px; cursor:pointer; }
+  .ctleft { color:#C2553A; }
+
+  /* 지급내역 문서 차림 (2026-10-03 · 급여명세서 · 세무와 같은 인쇄 문서 차림) */
+  .paydoc { margin-top:20px; padding:30px; background:#fff; border:3px double #5a7a5e; }
+  .pdhead { text-align:center; margin-bottom:18px; }
+  .pdtitle { font-size:20px; font-weight:700; letter-spacing:2px; color:#2F2926; }
+  .pdsub { font-size:13px; color:#555; margin-top:6px; }
+  .paydoc .sec-t { color:#2F2926; border-bottom:none; padding-bottom:0; font-size:14.5px; }
+  .paydoc table { border:0.8px solid #4a4a4a; }
+  .paydoc th { background:#f2f6f0; color:#2F2926; border:0.8px solid #4a4a4a; font-weight:600; }
+  .paydoc td { border:0.8px solid #4a4a4a; }
+  .paydoc tr:hover td { background:transparent; }
+  .paydoc tfoot td { background:#f2f6f0; border-top:0.8px solid #4a4a4a; }
+  .paydoc .pay { max-width:none; }
+  .paydoc .pay .lab { color:#2F2926; }
+  .paydoc .pay .minus .amt, .paydoc .pay .plus .amt { color:#2F2926; }
+  .paydoc .pay .sum td { background:#f7f9f5; }
+  .paydoc .pay .info td { border-top:none; color:#777; }
+  .paydoc .pay .final td { font-size:16px; font-weight:800; background:#f2f6f0; color:#2F2926; border-top:3px double #4a4a4a; }
+  @media print { .paydoc { border:3px double #5a7a5e; padding:20px; } }
+
+  .sumbox { margin:10px 0 14px; padding:14px 16px; background:#fff; border:1px solid #ECE8E3; border-left:4px solid #5a7a5e; border-radius:10px; overflow-x:auto; }
+  .sumbox .cthd .ctsm:first-of-type, .sumbox .cthd .ctgo { margin-left:auto; }
+  .sumt { border:0.8px solid #4a4a4a; }
+  .sumt th { background:#f2f6f0; color:#2F2926; border:0.8px solid #4a4a4a; }
+  .sumt td { border:0.8px solid #4a4a4a; }
+  .sumt tfoot td { background:#f2f6f0; font-weight:700; }
+
+  .edubox { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:8px 10px; background:#FBF5EE; border:1px solid #F0E4D6; border-radius:8px; }
+  .edubox input { margin:0; padding:5px 8px; border:1px solid #E4E0DA; border-radius:6px; font-size:13.5px; }
+  .edubox #eduAmt { width:130px; text-align:right; } .edubox #eduMemo { flex:1; min-width:220px; }
+
+  /* 지급 모음 보는 동안 — 선생님 한 분 화면 숨김 */
+  body.summode #ctCard, body.summode #ctEdit, body.summode #payDoc, body.summode #pubSum,
+  body.summode #warnBox, body.summode #unconfBox, body.summode .evalbox, body.summode #pubBtn,
+  body.summode #prt { display:none !important; }
+
+  .backbtn { width:auto; margin:0 0 10px; padding:7px 16px; background:#fff; color:#B07A4A; border:1px solid #E4E0DA;
+            border-radius:8px; font-size:13.5px; cursor:pointer; }
+  .backbtn:hover { background:#F8F1E8; }
+
+  .vtabp { background:#fff !important; color:#4A433F !important; border:1px solid #E4E0DA !important; }
+  .vtabp.on { background:#B07A4A !important; color:#fff !important; border-color:#B07A4A !important; }
+
+  /* 화면 오가기 ‹ › (2026-10-03) — 위탁수수료 화면에는 「지급 모음 ›」만, 지급 모음에는 「‹ 위탁수수료」만 · 선생님 고르는 칸 숨김 */
+  .navbtn { background:#fff !important; color:#B07A4A !important; border:1px solid #E4E0DA !important; }
+  #sheetBtn { display:none; }
+  body.summode #sheetBtn { display:inline-block; }
+  body.summode #sumBtn, body.summode #th { display:none !important; }
+  /* 지급 모음은 홈 카드로 따로 연다 — 위탁수수료 화면의 단추는 숨김 (2026-10-07) */
+  #sumBtn { display:none !important; }
+.sumt .pmrow input{width:100%;box-sizing:border-box;font-size:12px;padding:3px 5px;}
+.sumt .pmrow td{vertical-align:top;}
+.sumt .rtrow{background:#FBF8F4;}
+.sumt .rtrow input{width:100%;box-sizing:border-box;font-size:12px;padding:0 6px !important;height:28px !important;line-height:28px;margin:0 !important;}
+.sumt .rtrow td{vertical-align:bottom;}
+.sumt .rtrow input.n{text-align:right;}
+/* 이름 옆 딱지 · 입금일 메모 (2026-10-05) */
+.sumt .stb{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;margin-left:4px;white-space:nowrap;}
+.sumt .stb.ok{background:#EAF3DE;color:#3B6D11;} .sumt .stb.no{background:#FCEFEA;color:#C2553A;} .sumt .stb.gr{background:#F1EFE8;color:#5F5E5A;}
+.sumt input.dmi{display:block;width:100%;box-sizing:border-box;margin-top:3px !important;font-size:11px;padding:1px 5px !important;height:22px !important;
+  border:1px dashed #D3D1C7;border-radius:5px;text-align:right;color:#5F5E5A;background:#fff;}
+.sumt input.dmi:focus{border-style:solid;border-color:#B07A4A;outline:none;}
+.sumt input.dmi.saved{border-style:solid;border-color:#ECE8E3;}
+.sumt .rtrow .rtlab{font-size:11px;color:#8a6a48;margin-bottom:3px;}
+</style>
+</head>
+<body>
+
+<!-- 로그인 전 -->
+<div class="box" id="loginBox">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <h1 style="text-align:center">나무링크</h1>
+  <div class="sub" style="text-align:center">업무위탁 수수료 정산 — 관리자 전용</div>
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username" placeholder="you@example.com">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn">로그인</button>
+  <div id="msg" class="out"></div>
+</div>
+
+<!-- 로그인 후 -->
+<div id="mainBox" style="display:none;">
+  <div class="hd noprint">
+    <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+    <span class="bar0"></span>
+    <h1>업무위탁 수수료</h1>
+    <span id="monBig"></span>
+    <span class="who" id="who"></span>
+    <span class="sp"></span>
+    <button id="out" class="btn-out">로그아웃</button>
+    <a href="index.html" class="btn-home">처음으로</a>
+  </div>
+  <div class="wide">
+
+  <div class="tools">
+    <select id="mon" class="sel"></select>
+    <select id="th" class="sel"></select>
+    <button id="prt" class="prtbtn">인쇄 / PDF 저장</button>
+    <button id="pubBtn" class="prtbtn pubbtn noprint">선생님께 공개 전</button>
+    <button id="sheetBtn" type="button" class="prtbtn noprint navbtn" style="display:none !important;">위탁수수료</button>
+    <button id="sumBtn" type="button" class="prtbtn noprint navbtn" title="이 달 모든 선생님 지급 모음으로">이 달 지급 모음</button>
+    <a href="staff.html" class="prtbtn noprint" style="text-decoration:none;" title="직원 계정 화면에서 임시 아이디로 새 선생님을 만든 뒤 여기서 계약 카드를 채웁니다">＋ 신규 채용</a>
+  </div>
+  <!-- 이 달 지급 모음 · 세무사 전달 (2026-10-03) — 8번만 -->
+  <div id="sumBox" class="sumbox noprint" style="display:none;"></div>
+  <!-- 위탁계약 카드 (2026-10-03) — 8번만 · 공개본 · 인쇄에 안 들어감 -->
+  <div id="ctCard" class="ctcard noprint"></div>
+  <div id="ctEdit" class="ctedit noprint" style="display:none;">
+    <div class="cthd2">위탁계약 고치기 <span class="small">— 아래 「저장」 하나로 모두 저장됩니다</span></div>
+    <div class="ctgrid">
+      <label>입사일<input id="ct_hired" type="date"></label>
+      <label title="퇴사일 다음 날부터 14일은 기록지만 쓸 수 있고, 그 뒤로는 계정이 막힙니다">퇴사일<input id="ct_left" type="date"></label>
+      <label>연락처<input id="ct_phone" type="tel" data-tel inputmode="numeric" maxlength="13" autocomplete="off" placeholder="010-0000-0000"></label>
+      <label>계정 아이디<input id="ct_login" type="text" disabled></label>
+      <label>계약 형태<select id="ct_type"><option value="">— 고르기 —</option>
+        <option>프리랜서</option><option>근로+프리랜서</option><option>근로기본회기+수당</option></select></label>
+      <label>발달 제공인력번호<input id="ct_prov" type="text" maxlength="40"></label>
+      <label>주민번호<input id="ct_rrn" type="text" placeholder="000000-0000000" maxlength="14" autocomplete="off"></label>
+      <label>은행<input id="ct_bank" type="text" maxlength="30"></label>
+      <label>계좌번호<input id="ct_acc" type="text" placeholder="숫자와 - 만" maxlength="30" autocomplete="off"></label>
+    </div>
+    <!-- 치료 영역 체크는 숨김 — 지급 단가 표의 영역 줄이 곧 치료 영역 (2026-10-08) -->
+    <div class="ctsub" style="display:none;">치료 영역</div>
+    <div id="ct_areas" class="ctareas" style="display:none;"></div>
+    <div class="ctsub">면허 <button id="ct_licAdd" type="button" class="ctsm">＋ 면허</button></div>
+    <div id="ct_lics"></div>
+    <div class="ctsub">메모 <button id="ct_memoClr" type="button" class="ctsm">지우기</button></div>
+    <textarea id="ct_memo" maxlength="500" rows="2" style="width:100%;box-sizing:border-box;"></textarea>
+    <div id="ctMove"></div>
+    <div class="ctfoot"><span id="ctMsg" class="small"></span>
+      <button id="ctCancel" type="button" class="ctsm">닫기</button>
+      <button id="ctSave" type="button" class="ctgo">저장</button></div>
+  </div>
+  <div id="pubSum" class="pubsum noprint"></div>
+
+  <div id="warnBox" class="warn" style="display:none;"></div>
+  <div id="unconfBox" class="unconf noprint" style="display:none;"></div>
+
+  <!-- 지급 단가 넣기 -->
+  <div class="evalbox noprint">
+    <div class="sec-t" style="border:none;padding:0;margin-bottom:8px;">
+      지급 단가 넣기 <span style="font-weight:normal;font-size:12px;color:#888;">
+      — 넣은 달부터 계속 적용됩니다. 바뀌면 그 달에 새로 넣으세요.</span>
+    </div>
+    <!-- 지급 단가 — 사람마다 값은 위 한 줄 · 영역 × 1:1 · 그룹 표 · 평가는 아래 (2026-10-08 은정님) -->
+    <style>
+      .rttab { border-collapse:collapse; margin:10px 0 6px; font-size:13.5px; }
+      .rttab th { background:#F8F1E8; border:1px solid #E6DED4; padding:6px 10px; font-weight:600; color:#5F5E5A; text-align:center; }
+      .rttab td { border:1px solid #ECE8E3; padding:4px 8px; }
+      .rttab td:first-child { min-width:110px; }
+      .rttab input { width:120px !important; margin:0 !important; padding:6px 8px; font-size:14px; border:1px solid #ECE8E3; border-radius:6px; text-align:right; }
+      .rttab tr.rtbase td { background:#FBF8F4; }
+    </style>
+    <div class="evalrow">
+      <div>
+        <label for="rt_from">적용 시작 달</label>
+        <input id="rt_from" type="month">
+      </div>
+      <div>
+        <label for="rt_ins">4대보험</label>
+        <select id="rt_ins" class="sel">
+          <option value="no">미가입</option>
+          <option value="yes">가입</option>
+        </select>
+      </div>
+      <div>
+        <label for="rt_dec">4대보험 신고 금액</label>
+        <input id="rt_dec" data-won type="text" inputmode="numeric" placeholder="가입일 때만">
+      </div>
+      <div>
+        <label for="rt_fuel">주유비 · 교통비 (하루) <select id="rt_fname" style="padding:1px 4px;font-size:12px;"><option>주유비</option><option>교통비</option></select></label>
+        <input id="rt_fuel" data-won type="text" inputmode="numeric" placeholder="없으면 비움">
+      </div>
+    </div>
+    <table class="rttab">
+      <thead><tr><th>영역 <select id="rt_addArea" style="width:auto !important;margin:0 0 0 6px !important;padding:3px 6px;font-size:12.5px;border:1px solid #DDD6CE;border-radius:6px;font-weight:normal;"></select></th><th>1:1 (40분)</th><th>그룹 1인당</th></tr></thead>
+      <tbody style="display:none;">
+        <tr class="rtbase"><td>기본</td>
+          <td><input id="rt_fee" data-won type="text" inputmode="numeric"></td>
+          <td><input id="rt_grp" data-won type="text" inputmode="numeric"></td></tr>
+      </tbody>
+      <tbody id="rt_areas"></tbody>
+    </table>
+    <div style="color:#888;font-size:12px;">영역마다 1:1 칸은 꼭 적습니다 · 그룹 칸은 그룹 수업이 있을 때만 · 60분은 1:1 칸의 1.5배</div>
+    <div class="evalrow" style="margin-top:10px;">
+      <div>
+        <label for="rt_ev1">평가 1 · 2 · 3개 단가 <span style="color:#888;">(비우면 공통 단가)</span></label>
+        <span style="display:flex;gap:4px;"><input id="rt_ev1" data-won type="text" inputmode="numeric" placeholder="1개" style="width:80px;">
+        <input id="rt_ev2" data-won type="text" inputmode="numeric" placeholder="2개" style="width:80px;">
+        <input id="rt_ev3" data-won type="text" inputmode="numeric" placeholder="3개" style="width:80px;"></span>
+      </div>
+      <button id="rtSave" class="addb">저장</button>
+    </div>
+    <div id="rtNow" style="font-size:12.5px;color:#666;margin-top:8px;"></div>
+    <div id="rtMsg" class="out" style="display:none;"></div>
+  </div>
+
+  <!-- 평가 안내 -->
+  <div class="evalbox noprint">
+    <div class="sec-t" style="border:none;padding:0;margin-bottom:8px;">평가 수수료</div>
+    <div class="note">평가는 <b>문의·상담 화면의 「📋 평가 관리」</b>에서 넣습니다.
+      여기서는 넣지 않습니다.<br>
+      그 달에 <b>평가한 날</b>이 들어 있고 <b>상태가 「완료」</b>인 평가만 아래 표에 잡힙니다.<br>
+      평가는 회기수에 넣지 않고 따로 수수료를 드립니다.
+      1개 27,000 / 2개 53,000 / 3개 80,000원</div>
+    <div id="evMsg" class="out"></div>
+  </div>
+
+  <!-- 출근 요일 · 수업 시각 (2026-09-11) — nl_therapist_days -->
+  <div class="evalbox noprint">
+    <div class="sec-t" style="border:none;padding:0;margin-bottom:8px;" id="wdTitle">출근 요일 · 수업 시각</div>
+    <div class="note">여기 적은 대로 <b>학부모 보강 요청 · 보강 확정 · 시간표 보강 잡기</b>가 자리를 가립니다.
+      출근 안 하는 날은 휴무 관리의 <b>「나오는 날」</b>로만 열립니다.
+      시각을 비우면 그 요일은 시각으로 막지 않습니다.
+      <b>첫 수업 · 마지막 수업</b>은 그 교시가 <b>시작하는 시각</b>입니다 (보기: 마지막 수업 6:30 → 6:30 수업까지).</div>
+    <table class="wdt">
+      <thead><tr><th>요일</th><th>출근</th><th>첫 수업</th><th>마지막 수업</th></tr></thead>
+      <tbody id="wdRows"></tbody>
+    </table>
+    <button id="wdSave" class="wdsave">저장 전</button>
+    <div id="wdMsg" class="out" style="display:none;"></div>
+  </div>
+
+  <div id="payDoc" class="paydoc">
+  <div class="pdhead"><div class="pdtitle" id="pdTitle">업무위탁 수수료 내역서</div><div class="pdsub" id="pdSub"></div></div>
+  <div class="sec">
+    <div class="sec-t">1. 세션 진행 내역</div>
+    <table id="t1">
+      <thead>
+        <tr>
+          <th>아동명 · 사업</th>
+          <th class="n">40분</th>
+          <th class="n">60분</th>
+          <th class="n" title="합계에 들어 있음 · 지난달 몫을 이 달에 한 보강">전월보강</th>
+          <th class="n" title="합계에 들어 있음 · 이 달 몫을 지난달에 미리 한 보강">선보강</th>
+          <th class="n">합계</th>
+          <th class="n" title="그 줄에 쓰인 1회 금액 (60분은 1.5배)">단가</th>
+          <th class="n">수수료</th>
+          <th>진행 날짜</th>
+        </tr>
+      </thead>
+      <tbody id="rows1"></tbody>
+      <tfoot id="foot1"></tfoot>
+    </table>
+    <!-- 번외 회기 (2026-10-03) — 시간표에 없는 회기를 급여에만 더한다 -->
+    <div class="xbox noprint">
+      <div class="xhd">＋ 번외 회기 <span class="small">시간표에 없는 회기를 이 선생님 · 이 달 급여에만 더합니다 (시간표 · 납부는 그대로)</span></div>
+      <div class="xrow">
+        <select id="x_mode"><option value="cnt">회기로</option><option value="amt">미지급분 (금액)</option></select>
+        <input id="x_kid" type="text" inputmode="numeric" placeholder="아동 번호" style="width:90px;">
+        <select id="x_dur"><option value="40">40분</option><option value="50">50분</option><option value="60">60분</option></select>
+        <input id="x_cnt" type="text" inputmode="decimal" placeholder="회수" value="1" style="width:60px;">
+        <input id="x_amt" data-won type="text" inputmode="numeric" placeholder="금액" style="width:110px;display:none;">
+        <input id="x_why" type="text" maxlength="200" placeholder="사유 (예: 시스템 사용 전 8월분 보강)" style="flex:1;min-width:200px;">
+        <button id="x_add" type="button">넣기</button>
+      </div>
+      <div id="x_list"></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-t">2. 평가 진행 내역</div>
+    <table id="t2">
+      <thead>
+        <tr><th>날짜</th><th>아동명</th><th>종류</th>
+            <th class="n">개수</th><th class="n">수수료</th><th class="noprint"></th></tr>
+      </thead>
+      <tbody id="rows2"></tbody>
+      <tfoot id="foot2"></tfoot>
+    </table>
+  </div>
+
+  <div class="sec" id="fuelSec" style="display:none;">
+    <div class="sec-t" id="fuelTitle">3. 주유 · 교통비 지원 내역</div>
+    <table>
+      <thead><tr><th class="n">근무일수</th><th>근무일 목록</th><th class="n">1일 지원금</th><th class="n">지원금 합계</th></tr></thead>
+      <tbody id="rows4"></tbody>
+    </table>
+    <div class="note">실비 성격의 비과세 지원금으로 업무위탁 수수료와 따로 이체합니다. 원천징수 대상이 아닙니다.</div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-t" id="payTitle">3. 지급 내역</div>
+    <table class="pay"><tbody id="rows3"></tbody></table>
+    <div class="note nopub" id="payNote"></div>
+  </div>
+  <div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
+  </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+
+// ===== 연락처 칸 (2026-10-08) — 숫자만 · 자리 수만큼 · 줄표 저절로 =====
+//   data-tel 이 붙은 칸 모두 (나중에 그려지는 칸도) · 신규 아동 관리와 같은 규칙
+//   010 휴대폰 11자리 · 02 서울 9~10자리 · 그 밖 지역번호 10~11자리 · 1588 같은 대표번호 8자리
+function telDigits(v){ return String(v || '').replace(/\D/g, ''); }
+function telMax(d){ return d.startsWith('02') ? 10 : /^1[5-9]\d{2}/.test(d) ? 8 : 11; }
+function telFmt(v){
+  let d = telDigits(v);
+  d = d.slice(0, telMax(d));
+  if (/^1[5-9]\d{2}/.test(d)) return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d;
+  const a = d.startsWith('02') ? 2 : 3;
+  if (d.length <= a) return d;
+  const rest = d.length - a;
+  const mid = rest <= 7 ? Math.min(3, rest) : 4;
+  if (rest <= 3) return d.slice(0, a) + '-' + d.slice(a);
+  if (rest <= 7 && d.length < (a === 2 ? 10 : 11) && rest - 3 <= 4)
+    return d.slice(0, a) + '-' + d.slice(a, a + 3) + '-' + d.slice(a + 3);
+  return d.slice(0, a) + '-' + d.slice(a, a + mid) + '-' + d.slice(a + mid);
+}
+function telOk(v){
+  const d = telDigits(v);
+  if (/^1[5-9]\d{2}/.test(d)) return d.length === 8;
+  if (d.startsWith('010')) return d.length === 11;
+  if (d.startsWith('02')) return d.length === 9 || d.length === 10;
+  return d.startsWith('0') && (d.length === 10 || d.length === 11);   // 지역번호는 0으로 시작 (2026-10-08)
+}
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (!el || !el.matches || !el.matches('input[data-tel]')) return;
+  const f = telFmt(el.value); if (f !== el.value) el.value = f;
+}, true);   // 먼저 고쳐 둔 뒤 칸의 다른 일이 돌게 (capture)
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+// 로그인을 창(탭) 안에서만 유지한다. 창을 닫으면 자동으로 끊긴다.
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $  = id => document.getElementById(id);
+
+// 이 화면을 볼 수 있는 사람 — 관리자(8)만
+const CAN_SEE = [8];
+
+// 4대보험 요율 (2026년)
+const INS = {
+  pension:  { emp:0.0475,  own:0.0475 },
+  health:   { emp:0.03595, own:0.03595 },
+  care:     0.1314,                       // 건강보험료에 곱함
+  employ:   { emp:0.009,   own:0.0115 },
+  accident: { emp:0,       own:0.0153 }
+};
+const TAX = 0.033;
+const STYPE = {1:'센',2:'발',3:'치',4:'치',5:'방',6:'방치',7:'방치',8:'발추',9:'평가',10:'체험',11:'추가'};
+
+let RATES_ALL = [];   // 단가 기록 전부 (여러 시점)
+// 영역별 단가 (2026-10-04) — nl_pay_area_rates · 단가 줄(pay_rate_id)에 묶여 함께 쌓임
+let AREA_RATES = [];  // { pay_rate_id, therapy_type_id, fee, group_fee } — group_fee 영역별 그룹 1인당 (2026-10-08)
+let TH_AREAS = {};    // 치료사 번호 -> [치료 종류] (위탁계약 「치료 영역」)
+let TPTT = {};        // 수업 번호 -> 치료 종류 (요일줄 없는 보강도 찾게)
+let AREAMISS = [];    // 담당 영역 밖 치료 종류
+function areaFeeOf(r, tt){
+  if (!r || !tt) return 0;
+  const a = AREA_RATES.find(x => x.pay_rate_id === r.id && Number(x.therapy_type_id) === Number(tt));
+  return a ? Number(a.fee) || 0 : 0;
+}
+function areaGrpOf(r, tt){
+  if (!r || !tt) return 0;
+  const a = AREA_RATES.find(x => x.pay_rate_id === r.id && Number(x.therapy_type_id) === Number(tt));
+  return a ? Number(a.group_fee) || 0 : 0;
+}
+function ttName(id){ const t = (typeof TTYPES !== 'undefined' ? TTYPES : []).find(x => Number(x.id) === Number(id)); return t ? t.name : ('종류' + id); }
+function areaTxt(r){
+  if (!r) return '';
+  const rows = AREA_RATES.filter(x => x.pay_rate_id === r.id).sort((a, b) => a.therapy_type_id - b.therapy_type_id);
+  if (rows.length) return rows.map(x => ' · ' + ttName(x.therapy_type_id) + ' ' + (x.fee ? won(x.fee) : '기본')
+    + (x.group_fee ? ' / 그룹 ' + won(x.group_fee) : '')).join('');
+  return r.special_fee ? ' · 심리(메모) ' + won(r.special_fee) : '';
+}
+async function loadAreaRates(){
+  const [a, b] = await Promise.all([
+    sb.from('nl_pay_area_rates').select('pay_rate_id, therapy_type_id, fee, group_fee'),
+    sb.from('nl_th_areas').select('therapist_id, therapy_type_id')
+  ]);
+  if (a.error) alert('영역별 단가를 읽지 못했습니다. 새로고침 해 주세요.\n' + a.error.message);
+  AREA_RATES = a.data || [];
+  TH_AREAS = {};
+  (b.data || []).forEach(x => { (TH_AREAS[x.therapist_id] = TH_AREAS[x.therapist_id] || []).push(Number(x.therapy_type_id)); });
+}
+let RATES = {};   // 치료사 번호 -> 단가
+
+// 그 달에 적용되는 단가를 고른다.
+// 시작일이 그 달 말일보다 앞선 것 중 가장 최근 것.
+function pickRates(mk) {
+  const end = monEnd(mk);
+  const out = {};
+  RATES_ALL.forEach(r => {
+    const from = r.started_on || '1900-01-01';
+    if (from > end) return;                       // 아직 시작 안 한 단가
+    if (r.ended_on && r.ended_on < mk + '-01') return;  // 이미 끝난 단가
+    const cur = out[r.therapist_id];
+    if (!cur || from > (cur.started_on || '1900-01-01')) out[r.therapist_id] = r;
+  });
+  return out;
+}
+let EVFEE = {};   // 평가 개수 -> 수수료
+const ETYPE = {1:'심리평가', 2:'발달평가', 3:'언어평가'};
+let THS   = [];
+let SESS  = [], ROWS = [], KIDS = {};
+let EXTRA = [];    // 번외 회기 (nl_pay_extra · 2026-10-03)
+let DEADMK = [];   // 보강이 두 번 결석해 소멸한 회 — 급여 인정 (교육비 미입금 뺌 · 2026-10-03)
+let WORKWD = {};   // 선생님 -> 정규 출근 요일 Set (주유비)
+let XWORK  = {};   // '선생님|날짜' -> 나오는 날 (공휴일 대신 출근 · 주유비 인정)
+let FUTPRE = [];   // 다음 달 몫을 이 달에 미리 한 줄 (선보강 · 주유비 날짜용 · 2026-10-03)
+let HASPART = {};   // 쪼갠 조각이 딸린 원래 줄 { 줄번호: 조각 분의 합 }
+let EVALS = [];   // 그 달 평가
+let TRIALS = [];  // 그 달 체험 수업 — 완료만. 정규 1회처럼 센다 (2026-09-16)
+let mon = '', thId = 0;
+let PAYSUM = null;
+let GRPMISS = false;   // 그룹 수업이 있는데 그룹 1인당 단가가 비었음 (2026-10-02)  // 지금 그린 정산의 총 수수료·실 지급액 (2026-10-02)
+let PUB = {};       // 선생님 번호 → 그 달 가장 늦은 공개본 (2026-10-02)
+
+function show(t, ok){ $('msg').textContent=t; $('msg').className='out '+(ok?'ok':'err'); }
+function evmsg(t, ok){ $('evMsg').textContent=t; $('evMsg').className='out '+(ok?'ok':'err'); }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function won(n){ return Number(n||0).toLocaleString('ko-KR'); }
+function monNo(k){ return Number(String(k).split('-')[1]); }
+function dayNo(d){ return Number(String(d).split('-')[2]); }
+function monEnd(k){
+  const p=String(k).split('-');
+  const d=new Date(Number(p[0]), Number(p[1]), 0);
+  return k+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// ===== 계산 =====
+// 선생님이 「확인 완료」를 안 누른 날 (2026-10-01) — 그 날 예정 줄은 완료로 안 바뀌어 수수료에 안 잡힘
+let UNCONF = {};
+async function loadUnconf(){
+  UNCONF = {};
+  try {
+    const { data, error } = await sb.rpc('nl_unconfirmed', { p_month: mon });
+    if (!error) (data || []).forEach(r => { UNCONF[r.therapist_id] = r.days || []; });
+  } catch (e) {}
+  // 고르는 칸에 미확인 날 수
+  Array.from($('th').options).forEach(o => {
+    const base = o.dataset.base || o.textContent;
+    o.dataset.base = base;
+    const n = (UNCONF[Number(o.value)] || []).length;
+    o.textContent = base + (n ? ' · 미확인 ' + n + '일' : '');
+  });
+}
+function drawUnconf(){
+  const b = $('unconfBox');
+  const days = UNCONF[thId] || [];
+  if (!days.length) { b.style.display = 'none'; return; }
+  const WDN = ['일','월','화','수','목','금','토'];
+  b.style.display = 'block';
+  b.innerHTML = '<b>미확인 ' + days.length + '일</b> — 선생님이 하루 보기 「확인 완료」를 안 누른 날입니다. '
+    + '그 날 예정 줄은 완료로 안 바뀌어 아래 수수료에 잡히지 않았습니다.<br>'
+    + days.map(d => Number(String(d).slice(5, 7)) + '/' + Number(String(d).slice(8, 10))
+                   + '(' + WDN[new Date(d + 'T00:00:00').getDay()] + ')').join(' · ');
+}
+function calc(){
+  try { drawExtra(); } catch (e) {}
+  drawUnconf();
+  RATES = pickRates(mon);          // 그 달에 맞는 단가를 고른다
+  const r = RATES[thId];
+  $('monBig').textContent = monNo(mon) + '월';
+  drawRateBox();
+
+  if (!r) {
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = '<b>이 치료사의 단가가 없습니다.</b> '
+      + '단가를 넣어야 계산됩니다.';
+    $('rows1').innerHTML = ''; $('foot1').innerHTML = '';
+    $('rows2').innerHTML = ''; $('foot2').innerHTML = '';
+    $('rows3').innerHTML = '';
+    PAYSUM = null; drawPub();
+    return;
+  }
+
+  // 완료·보강만 센다
+  //   쪼갠 조각이 딸린 원래 줄 (2026-09-11)
+  //   · 조각이 40분을 채웠으면 → 원래 줄은 세지 않는다 (조각이 한 회를 이룬다)
+  //     조각이 40분 차면 원래 줄이 저절로 완료가 되는데, 조각도 세므로 한 회가 두 번 잡혔다
+  //   · 40분이 안 됐어도 원래 줄은 세지 않는다 (2026-09-13 은정님 정함)
+  //     종결로 완료 처리한 경우, 실제로 한 조각만큼만 비율로 지급한다 (조각 20분 → 0.5회)
+  // 「보강」(아직 표시 안 된 보강)은 오늘까지 지난 날짜만 센다 (2026-09-21)
+  //   달 중간에 열면 앞날 보강까지 지급으로 잡혔다. 달이 끝난 뒤 결과는 같다
+  const _t0 = new Date();
+  const _today = _t0.getFullYear() + '-' + String(_t0.getMonth() + 1).padStart(2, '0')
+               + '-' + String(_t0.getDate()).padStart(2, '0');
+  const done = SESS.filter(s => s.therapist_id === thId
+                 && (s.status === '완료'
+                     || (s.status === '보강' && String(s.plan_date) <= _today))
+                 && !(HASPART[s.id] > 0));
+  // 번외 회기 — 시간표에 없는 회기를 급여에만 (2026-10-03)
+  EXTRA.filter(x => x.therapist_id === thId && x.cnt).forEach(x => {
+    done.push({ id: 'E' + x.id, child_id: x.child_id, plan_date: mon + '-01', status: '완료', therapist_id: thId,
+                support_type_id: null, schedule_id: null, memo: '', minutes: 40 * Number(x.cnt), dur_min: x.dur,
+                _extra: true, _why: x.reason });
+  });
+  // 소멸한 회 — 원래 담당 선생님께 지급 (미입금이면 줄은 보이되 지급 안 함 · 2026-10-03)
+  DEADMK.filter(o => o.therapist_id === thId).forEach(o => {
+    done.push(Object.assign({}, o, { id: 'D' + o.id, plan_date: o._deadOn, status: '완료', makeup_for: null }));
+  });
+  // 완료된 체험 수업도 정규 1회처럼 센다 (2026-09-16) — 수업 시간은 _trialDur 로
+  TRIALS.filter(t => t.therapist_id === thId).forEach(t => {
+    // 추가 수업(갈래 「추가」 · 2026-09-30)도 같은 규칙 — 표기만 「(추가)」
+    const isX = t.kind === '추가';
+    done.push({ id: (isX ? 'X' : 'T') + t.id, child_id: t.child_id, plan_date: t.lesson_date,
+                status: '완료', therapist_id: t.therapist_id, support_type_id: isX ? 11 : 10,
+                schedule_id: null, memo: '', _trialDur: Number(t.duration_min) || 40, _isX: isX });
+  });
+
+  if (!SESS.length) {
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = '<b>' + monNo(mon) + '월은 회차 자료가 없습니다.</b> '
+      + '매달 초에 회차를 깔아야 이 화면이 계산됩니다.';
+  } else if (!done.length) {
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = '<b>완료·보강으로 표시된 회차가 없습니다.</b> '
+      + '시간표에서 진행한 수업을 완료로 표시하면 여기에 잡힙니다.';
+  } else {
+    $('warnBox').style.display = 'none';
+  }
+
+  // 아동별로 모으기
+  const byKid = {};
+  GRPMISS = false;
+  AREAMISS = [];
+  done.forEach(s => {
+    const sc = ROWS.find(x => x.id === s.schedule_id);
+    // 그 날만 분을 바꾼 회기는 그 분으로 (납부 계산 「분 변경」 · 2026-10-03)
+    const dur = s._trialDur || Number(s.dur_min || 0) || Number(s._origDur || 0) || (sc ? Number(sc.duration || 40) : 40);
+    const tt  = sc ? sc._tt : null;
+    const stid = s.support_type_id || (sc ? sc.support_type_id : null);
+    // 그룹 수업 원래 줄 — 출석 아동 1명마다 그룹 1인당 단가 (1:1 보강은 보통 단가 · 2026-10-02)
+    const isGrp = !!(sc && sc._grp && !s.makeup_for);
+    // 아동 번호를 이름 앞에 (2026-10-03 은정님)
+    const nm  = (isGrp ? '[그룹] ' : '') + s.child_id + '번 ' + (KIDS[s.child_id] || '')
+              + (stid ? ' · ' + (STYPE[stid] || ('유형'+stid)) : '');
+    const k = byKid[nm] = byKid[nm] || { m40:0, m60:0, sp:0, pv:0, pre:0, days:[], fee:0, rates:{} };
+    // 심리치료(특수 단가)는 치료종류가 아니라 메모로 구분해야 하므로
+    // 지금은 특수 단가가 있는 치료사의 60분 아닌 수업 중
+    // 메모에 '심리'가 있는 것만 특수로 본다
+    // 영역별 단가 (2026-10-04) — 그 회기 수업의 치료 종류로 찾음. 없으면 회기 단가
+    //   옛 방식(메모에 「심리」 + 특별 단가)은 영역별 단가가 없을 때만 (지난 자료 보호)
+    const tt2 = tt || (s.therapy_id ? TPTT[s.therapy_id] : null) || null;
+    const aFee = isGrp ? 0 : areaFeeOf(r, tt2);
+    const myA = TH_AREAS[thId] || [];
+    if (tt2 && myA.length && myA.indexOf(Number(tt2)) < 0 && AREAMISS.indexOf(Number(tt2)) < 0) AREAMISS.push(Number(tt2));
+    const isSp = !aFee && r.special_fee && String(s.memo||'').includes('심리');
+    // 쪼개서 보강한 줄은 분만큼만 센다. 10분이면 0.25회 (2026-09-08)
+    const rest = (HASPART[s.id] > 0 && HASPART[s.id] < 40) ? (40 - HASPART[s.id]) : 0;
+    const part = s._unpaid ? 0 : (rest ? rest / 40 : Number(s.minutes || 40) / 40);
+    let fee, unit = 0, ulab = '';
+    const gFee = isGrp ? (areaGrpOf(r, tt2) || Number(r.group_fee) || 0) : 0;
+    if (isGrp)         { k.m40 += part; fee = gFee * part; if (!gFee) GRPMISS = true; unit = gFee; ulab = areaGrpOf(r, tt2) ? '그룹 ' + ttName(tt2) : '그룹'; }
+    else if (aFee)     { if (dur >= 60) { k.m60 += part; fee = aFee * 1.5 * part; unit = aFee * 1.5; } else { k.m40 += part; fee = aFee * part; unit = aFee; } ulab = ttName(tt2); }
+    else if (isSp)     { k.m40 += part; fee = r.special_fee * part; unit = r.special_fee; ulab = '심리'; }   // 특수(심리)도 40분 칸에 · 단가는 특수 (2026-10-03)
+    else if (dur >= 60){ k.m60 += part; fee = r.session_fee * 1.5 * part; unit = r.session_fee * 1.5; }
+    else               { k.m40 += part; fee = r.session_fee * part; unit = r.session_fee; }
+    k.fee += Math.round(fee);
+    // 적용 단가 칸 (2026-10-04) — 그 줄에 쓰인 1회 금액
+    if (unit) k.rates[Math.round(unit)] = k.rates[Math.round(unit)] || ulab;
+    // 전월보강 · 선보강 회수 (합계에 들어 있음 · 따로 보이기만 · 2026-10-03)
+    if (s._pre) k.pre += part;
+    else if (s.makeup_for && s.month_key && String(s.month_key) < mon) k.pv += part;
+    k.days.push((s._extra ? '번외<span class="nopub">(' + esc(s._why || '') + ')</span>' : dayNo(s.plan_date))
+      + (s._trialDur ? (s._isX ? '(추가)' : '(체험)') : '')
+      + (s.dur_min ? '(' + s.dur_min + '분)' : (s._origDur ? '(' + s._origDur + '분)' : ''))
+      + (s._dead ? (s._unpaid ? '(소멸 · 교육비 미입금 · 지급 안 함)' : '(소멸 인정)') : '')
+      + (s._pre ? '(선보강 ' + Number(String(s.plan_date).slice(5, 7)) + '/' + Number(String(s.plan_date).slice(8, 10)) + ')' : '')
+      + (rest ? '(완료 처리 ' + rest + '분)'
+              : (part !== 1 ? '(+' + Number(s.minutes) + '분)' : ''))
+      + (s.status==='보강'
+          ? ((s.month_key && s.month_key !== mon)
+              ? '(' + monNo(s.month_key) + '월분 보강)' : '(보강)')
+          : ''));
+  });
+
+  // 아동 번호 차례로 (숫자로 견줌)
+  // 금액 번외 (미지급분 등) — 회기 수 없이 수수료에만 · 총 수수료에 들어가 원천징수까지 (2026-10-03)
+  EXTRA.filter(x => x.therapist_id === thId && x.fee_amt).forEach(x => {
+    const nm = (x.child_id ? x.child_id + '번 ' + (KIDS[x.child_id] || '') + ' · ' : '') + '미지급분';
+    const k = byKid[nm] = byKid[nm] || { m40:0, m60:0, sp:0, pv:0, pre:0, days:[], fee:0, rates:{} };
+    k.fee += Number(x.fee_amt);
+    k.days.push('미지급분<span class="nopub">(' + esc(x.reason || '') + ')</span>');
+  });
+  const names = Object.keys(byKid).sort((a,b)=>a.localeCompare(b,'ko',{ numeric:true }));
+  let t40=0, t60=0, tsp=0, tcnt=0, tfee=0, tpv=0, tpre=0, tev=0;
+  $('rows1').innerHTML = names.map(nm => {
+    const k = byKid[nm];
+    const rd = v => Math.round(Number(v) * 100) / 100;
+    const cnt = rd(k.m40 + k.m60 + k.sp);
+    t40+=k.m40; t60+=k.m60; tsp+=k.sp; tcnt+=cnt; tfee+=k.fee; tpv+=k.pv; tpre+=k.pre; tev+=(k.ev || 0);
+    k.days.sort((a,b)=>parseInt(a)-parseInt(b));
+    return '<tr><td>' + esc(nm).replace('[그룹] ', '<span class="gtag">그룹</span>') + '</td>'
+      + '<td class="n">' + (k.m40 ? rd(k.m40) : '–') + '</td>'
+      + '<td class="n">' + (k.m60 ? rd(k.m60) : '–') + '</td>'
+      + '<td class="n">' + (k.pv  ? rd(k.pv)  : '–') + '</td>'
+      + '<td class="n">' + (k.pre ? rd(k.pre) : '–') + '</td>'
+      + '<td class="n">' + cnt + '</td>'
+      + '<td class="n">' + Object.keys(k.rates).map(Number).sort((a, b) => a - b)
+          .map(u => won(u) + (k.rates[u] ? '<br><span class="small" style="color:#888;">' + esc(k.rates[u]) + '</span>' : '')).join('<br>') + '</td>'
+      + '<td class="n">' + won(k.fee) + '</td>'
+      + '<td class="small">' + k.days.join(', ') + '</td></tr>';
+  }).join('');
+  const nKid = new Set(done.map(x => x.child_id)).size;
+  $('foot1').innerHTML = '<tr><td>세션 소계 아동 ' + nKid + '명 · ' + names.length + '줄</td>'
+    + '<td class="n">' + (Math.round(t40*100)/100) + '</td>'
+    + '<td class="n">' + (Math.round(t60*100)/100) + '</td>'
+    + '<td class="n">' + (Math.round(tpv*100)/100) + '</td>'
+    + '<td class="n">' + (Math.round(tpre*100)/100) + '</td>'
+    + '<td class="n">' + (Math.round(tcnt*100)/100) + '</td>'
+    + '<td></td><td class="n">' + won(tfee) + '</td><td></td></tr>';
+
+  // 평가
+  const evs = EVALS.filter(e => e.therapist_id === thId);
+  let efee = 0;
+  $('rows2').innerHTML = evs.length ? evs.map(e => {
+    const cnt = Number(e.item_cnt) || 1;
+    const own = cnt === 1 ? r.eval1 : cnt === 2 ? r.eval2 : cnt === 3 ? r.eval3 : null;
+    const f = (own != null && own !== '' ? Number(own) : (EVFEE[cnt] || 0)); efee += f;
+    const nm = KIDS[e.child_id] || ('아동 ' + e.child_id + '번');
+    return '<tr><td>' + esc(e.eval_date) + '</td><td>' + esc(nm) + '</td>'
+      + '<td>' + esc(ETYPE[e.eval_type_id] || '') + '</td>'
+      + '<td class="n">' + cnt + '개</td>'
+      + '<td class="n">' + won(f) + '</td>'
+      + '<td class="noprint"></td></tr>';
+  }).join('')
+    : '<tr><td colspan="6" style="color:#999;">완료로 표시된 평가가 없습니다.</td></tr>';
+  $('foot2').innerHTML = evs.length
+    ? '<tr><td colspan="4">평가 소계 ' + evs.length + '건</td>'
+      + '<td class="n">' + won(efee) + '</td><td class="noprint"></td></tr>' : '';
+
+  // 주유비 — 완료 회차가 있는 날만 (보강만 있는 날은 뺀다)
+  const fuelDays = new Set();
+  // 정규 출근 요일에 나온 날만 · 공휴일 대신 나온 날(나오는 날)은 인정 (2026-10-03 은정님)
+  const wdOf = d => '일월화수목금토'[new Date(d + 'T00:00:00').getDay()];
+  const fuelOk = d => (WORKWD[thId] ? WORKWD[thId].has(wdOf(d)) : true) || !!XWORK[thId + '|' + d];
+  SESS.concat(FUTPRE || []).filter(s => s.therapist_id === thId && s.status === '완료' && !(HASPART[s.id] > 0) && !s._pre)
+      .forEach(s => { if (fuelOk(String(s.plan_date))) fuelDays.add(s.plan_date); });
+  // 체험한 날도 나오신 날이다 (2026-09-16)
+  TRIALS.filter(t => t.therapist_id === thId).forEach(t => { if (fuelOk(String(t.lesson_date))) fuelDays.add(t.lesson_date); });
+  const fuel = (r.daily_fuel || 0) * fuelDays.size;
+
+  // 4대보험 — 엑셀 「치료사별 업무위탁 수수료」 셈과 같게 (2026-10-03 은정님)
+  //   신고금액은 근로 급여로 따로 지급하므로 수수료에서 빼고,
+  //   사업주 부담분(연금 · 건강 · 장기요양 · 고용 · 산재 사업주 몫, 항목마다 10원 아래 버림)도 뺀다
+  //   과세대상액 = 총 수수료 − 신고금액 − 사업주 부담분 · 원천징수 3.3%는 원 단위 반올림
+  const f10 = v => Math.floor(v / 10) * 10;
+  let wage = 0, empShare = 0, wkShare = 0, insTxt = '가입 안 함';
+  if (r.insured && r.declared_amt > 0) {
+    const d = r.declared_amt;
+    const pen = f10(d * INS.pension.own);
+    const hea = f10(d * INS.health.own);
+    const car = f10(hea * INS.care);
+    const emp = f10(d * INS.employ.own);
+    const acc = f10(d * INS.accident.own);
+    wage = d;
+    empShare = pen + hea + car + emp + acc;
+    // 근로자 부담분 (연금 · 건강 · 장기요양 · 고용 근로자 몫) → 급여 실수령액 (2026-10-03)
+    const wHea = f10(d * INS.health.emp);
+    wkShare = f10(d * INS.pension.emp) + wHea + f10(wHea * INS.care) + f10(d * INS.employ.emp);
+    insTxt = '신고금액 ' + won(d) + '원(근로 급여로 따로 지급) · 사업주 부담분 ' + won(empShare)
+           + '원 = 국민연금 ' + won(pen) + ' / 건강 ' + won(hea) + ' / 장기요양 ' + won(car)
+           + ' / 고용 ' + won(emp) + ' / 산재 ' + won(acc);
+  }
+  const ins = wage + empShare;
+
+  const total  = tfee + efee;
+  const taxBase= Math.max(0, total - wage - empShare);
+  const tax    = Math.round(taxBase * TAX);   // 엑셀과 같게 반올림 (16,747.5 → 16,748)
+  const netFee = taxBase - tax;
+  const net    = netFee + fuel;
+
+  const line = (lab, amt, cls) =>
+    '<tr class="' + (cls||'') + '"><td class="lab">' + lab + '</td>'
+    + '<td class="amt">' + amt + '</td></tr>';
+
+  $('rows3').innerHTML =
+      line('회기 수수료 <span class="small">(' + tcnt + '회기)</span>', won(tfee))
+    + line('평가 수수료 <span class="small">(' + evs.length + '건)</span>', won(efee))
+    + line('총 수수료', won(total), 'sum')
+    + (wage ? line('4대보험 신고금액 <span class="small">(근로 급여로 따로 지급)</span>', '(' + won(wage) + ')', 'minus')
+            + line('<span class="small">　└ 근로자 부담분 (연금 · 건강 · 장기요양 · 고용)</span>', '<span class="small">' + won(wkShare) + '</span>', 'info')
+            + line('<span class="small">　└ 급여 실수령액 (신고금액 − 근로자 부담분)</span>', '<span class="small"><b>' + won(wage - wkShare) + '</b></span>', 'info')
+            + line('사업주 부담분', '(' + won(empShare) + ')', 'minus')
+            : line('4대보험', '미가입', 'minus'))
+    + line('과세대상액', won(taxBase), 'sum')
+    + line('원천징수 3.3%', '(' + won(tax) + ')', 'minus')
+    + line('실 지급액 <span class="small">(수수료)</span>', won(netFee) + ' 원', 'final');
+
+  // 주유 · 교통비 — 평가처럼 따로 한 묶음 (비과세 · 별도 이체 · 2026-10-03 은정님)
+  if (r.daily_fuel) {
+    const fl = Array.from(fuelDays).sort().map(d => Number(String(d).slice(5, 7)) + '/' + Number(String(d).slice(8, 10))
+      + '(' + '일월화수목금토'[new Date(d + 'T00:00:00').getDay()] + ')');
+    $('fuelTitle').textContent = '3. ' + (r.fuel_name || '주유비') + ' 지원 내역';
+    $('rows4').innerHTML = '<tr><td class="n">' + fuelDays.size + '일</td><td class="small">' + fl.join(' · ') + '</td>'
+      + '<td class="n">' + won(r.daily_fuel) + '</td><td class="n"><b>' + won(fuel) + '</b></td></tr>';
+    $('fuelSec').style.display = '';
+    $('payTitle').textContent = '4. 지급 내역';
+  } else {
+    $('rows4').innerHTML = ''; $('fuelSec').style.display = 'none';
+    $('payTitle').textContent = '3. 지급 내역';
+  }
+
+  $('payNote').innerHTML =
+      '회기는 <b>완료·보강</b>만 셉니다. 결석·휴무·예정은 빠집니다.<br>'
+    + '60분 수업은 회기 단가의 1.5배입니다. 회기 단가 ' + won(r.session_fee) + '원'
+    + esc(areaTxt(r)) + '<br>'
+    + '4대보험 — ' + insTxt + '<br>'
+    + (r.daily_fuel ? '주유비 · 교통비는 <b>정규 출근 요일에 완료 회차가 있는 날</b>만 셉니다. 공휴일 대신 나온 날(나오는 날)은 셉니다. 비과세라 원천징수 뒤에 더합니다.<br>' : '')
+    + '<b>아동별 진행 날짜</b>가 위 표에 있으니 숫자가 안 맞으면 그 표에서 찾으세요.';
+  if (GRPMISS) {
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = '<b>그룹 수업이 있는데 이 선생님의 「그룹 1인당」 단가가 비어 있습니다.</b> '
+      + '위 「지급 단가 넣기」에서 넣어 주세요. (지금은 그룹 수업이 0원으로 셈됨)';
+  }
+  if (AREAMISS.length) {
+    const was = $('warnBox').style.display === 'block' ? $('warnBox').innerHTML + '<br>' : '';
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = was + '<b>담당 치료 영역에 없는 수업이 있습니다 — ' + AREAMISS.map(id => esc(ttName(id))).join(' · ') + '</b> '
+      + '위탁계약 「치료 영역」을 확인하거나 시간표 담당을 확인해 주세요.';
+  }
+  PAYSUM = { total: total, net: net, wage: wage, wkShare: wkShare, empShare: empShare, taxBase: taxBase,
+             tax: tax, netFee: netFee, fuel: fuel, fuelName: r.fuel_name || '주유비', insured: !!wage };
+  try {
+    const _t = THS.find(x => x.id === thId);
+    $('pdTitle').textContent = mon.slice(0, 4) + '년 ' + monNo(mon) + '월 업무위탁 수수료 내역서';
+    $('pdSub').textContent = '수탁자 ' + (_t ? _t.name : '') + ' 선생님 · 산정기간 ' + monNo(mon) + '. 1. ~ ' + monNo(mon) + '. ' + Number(monEnd(mon).slice(8)) + '.';
+  } catch (e) {}
+  drawPub();
+}
+
+// ── 선생님께 공개 (2026-10-02) ─────────────────────────────
+//   공개한 순간의 세 표를 그대로 저장한다 (nl_pay_publish)
+//   뒤에 회기를 고쳐도 선생님 화면은 안 바뀐다 → 다시 공개하면 새 판
+async function loadPub(){
+  PUB = {};
+  const { data, error } = await sb.from('nl_pay_share')
+    .select('id, therapist_id, ver, published_at, seen_at, ask_text, ask_at')
+    .eq('month_key', mon).order('ver');
+  if (error) return;
+  (data || []).forEach(x => { PUB[x.therapist_id] = x; });
+}
+function mdhm(t){
+  const d = new Date(t);
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+function drawPub(){
+  // 단추 하나가 상태를 보여 준다 (2026-10-02 은정님)
+  //   공개 전(흰) → 공개 중…(회색) → ✓ 공개 완료(초록) · 확인함 / ⚠ 문의 있음(코랄)
+  const p = PUB[thId];
+  const b = $('pubBtn');
+  b.classList.remove('busy', 'done', 'ask');
+  b.disabled = !PAYSUM;
+  b.title = '';
+  if (!p) {
+    b.textContent = '선생님께 공개 전';
+  } else if (p.ask_text) {
+    b.classList.add('ask');
+    b.textContent = '⚠ 공개 완료 · 문의 있음';
+    b.title = mdhm(p.ask_at) + ' 문의 — ' + p.ask_text;
+  } else {
+    b.classList.add('done');
+    b.textContent = '✓ 공개 완료' + (p.seen_at ? ' · 확인함' : '');
+    b.title = mdhm(p.published_at) + ' 공개' + (p.ver > 1 ? ' (' + p.ver + '판)' : '')
+            + (p.seen_at ? ' · ' + mdhm(p.seen_at) + ' 확인' : ' · 선생님 확인 전')
+            + '\n다시 누르면 새 판으로 공개합니다';
+  }
+  let ok = 0, no = 0, ask = 0, pre = 0;
+  THS.forEach(t => {
+    const q = PUB[t.id];
+    if (!q) pre++;
+    else if (q.ask_text) ask++;
+    else if (q.seen_at) ok++;
+    else no++;
+  });
+  $('pubSum').innerHTML = monNo(mon) + '월 공개 현황 &nbsp; 확인 <b>' + ok + '</b> · 안 함 <b>' + no
+    + '</b> · 문의 <b>' + ask + '</b> · 공개 전 <b>' + pre + '</b>';
+}
+$('pubBtn').onclick = async () => {
+  if (!PAYSUM || !thId) return;
+  const t = THS.find(x => x.id === thId);
+  const nm = thId + '번 ' + (t ? t.name : '') + ' 선생님';
+  const unc = (UNCONF[thId] || []).length;
+  const p = PUB[thId];
+  if (!confirm(nm + ' ' + monNo(mon) + '월 정산을 공개할까요?\n\n'
+      + '실 지급액 ' + won(PAYSUM.net) + '원\n'
+      + (unc ? '⚠ 선생님이 확인 안 한 날이 ' + unc + '일 있습니다.\n' : '')
+      + (p ? '이미 공개한 판이 있습니다. 다시 공개하면 새 판이 되고, 확인은 다시 받습니다.\n' : '')
+      + '\n공개한 순간의 내역이 그대로 선생님께 보입니다.')) return;
+
+  // 세 표만 떠서 담는다 (화면용 칸 · 단추는 뺀다)
+  const wrap = document.createElement('div');
+  // 문서 제목 · 수탁자 줄을 그대로 담는다 (2026-10-03 문서 차림)
+  const _hd = document.querySelector('#payDoc .pdhead');
+  wrap.innerHTML = _hd ? _hd.outerHTML : '<div class="pshead">' + monNo(mon) + '월 업무위탁 수수료 · ' + esc(nm) + '</div>';
+  document.querySelectorAll('#mainBox .sec').forEach(sec => wrap.appendChild(sec.cloneNode(true)));
+  wrap.querySelectorAll('.noprint, .nopub, button, input, select, script').forEach(el => el.remove());
+  wrap.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+
+  $('pubBtn').disabled = true; $('pubBtn').textContent = '공개 중…';
+  $('pubBtn').classList.remove('done', 'ask'); $('pubBtn').classList.add('busy');
+  const { data, error } = await sb.rpc('nl_pay_publish', {
+    p_th: thId, p_month: mon, p_html: wrap.innerHTML,
+    p_total: Math.round(PAYSUM.total), p_net: Math.round(PAYSUM.net) });
+  if (error) { alert('❌ 공개하지 못했습니다.\n' + error.message); }
+  else       { alert('✅ ' + data); }
+  await loadPub();
+  drawPub();
+};
+
+// ===== 평가 넣기 =====
+// ===== 지급 단가 =====
+// 지금 고른 달·치료사의 단가를 칸에 채워 보여준다
+function drawRateBox(){
+  const r = RATES[thId];
+  if (r) {
+    $('rtNow').innerHTML = '지금 적용 중: <b>' + won(r.session_fee) + '원</b>'
+      + ' · ' + (r.started_on ? r.started_on.slice(0,7) + '부터' : '시작일 없음')
+      + esc(areaTxt(r))
+      + (r.group_fee ? ' · 그룹 1인당 ' + won(r.group_fee) + '원' : '')
+      + (r.daily_fuel ? ' · ' + (r.fuel_name || '주유비') + ' ' + won(r.daily_fuel) + '원' : '')
+      + ' · 4대보험 ' + (r.insured ? '가입' : '미가입');
+    $('rt_fee').value  = r.session_fee || '';
+    $('rt_grp').value  = r.group_fee || '';
+    $('rt_fuel').value = r.daily_fuel  || '';
+    $('rt_ins').value  = r.insured ? 'yes' : 'no';
+    $('rt_dec').value  = r.declared_amt || '';
+    $('rt_ev1').value = r.eval1 || ''; $('rt_ev2').value = r.eval2 || ''; $('rt_ev3').value = r.eval3 || '';
+    $('rt_fname').value = r.fuel_name || '주유비';
+  } else {
+    $('rtNow').innerHTML = '<b style="color:#c62828;">이 달에 적용되는 단가가 없습니다.</b>'
+      + ' 아래에 넣어주세요.';
+    $('rt_fee').value = ''; $('rt_grp').value = '';
+    $('rt_fuel').value = ''; $('rt_dec').value = ''; $('rt_ins').value = 'no';
+    $('rt_ev1').value = ''; $('rt_ev2').value = ''; $('rt_ev3').value = ''; $('rt_fname').value = '주유비';
+  }
+  $('rt_from').value = mon;
+  drawAreaInputs();
+}
+// 영역별 단가 칸 — 체크한 치료 영역(고치기 창이 열려 있으면 그 체크) + 단가가 들어 있는 영역
+let RT_EXTRA = [];   // 「＋ 영역」으로 더한 치료 종류 (창을 열 때 비움)
+function drawAreaInputs(){
+  const r = RATES[thId];
+  const box = $('ct_areas');
+  const chk = box ? Array.from(box.querySelectorAll('input[type=checkbox]')) : [];
+  const keep = {};
+  const key = thId + '|' + (r ? r.id : '');
+  if ($('rt_areas').dataset.key === key) Array.from($('rt_areas').querySelectorAll('input')).forEach(i => { keep[i.dataset.tt + '|' + i.dataset.k] = i.value; });
+  $('rt_areas').dataset.key = key;
+  const editing = chk.length && $('ctEdit').style.display !== 'none';
+  let ids = editing ? chk.filter(c => c.checked).map(c => Number(c.value)) : (TH_AREAS[thId] || []).slice();
+  RT_EXTRA.forEach(id => { if (ids.indexOf(id) < 0) ids.push(id); });
+  if (r && !editing) AREA_RATES.filter(x => x.pay_rate_id === r.id).forEach(x => { if (ids.indexOf(Number(x.therapy_type_id)) < 0) ids.push(Number(x.therapy_type_id)); });
+  ids = ids.sort((a, b) => a - b);
+  const ph1 = '꼭 적기', ph2 = '';
+  // 원래 맡던 영역만 지금 단가로 채움 — 새로 더한 영역은 빈칸 (2026-10-08)
+  const had = id => (TH_AREAS[thId] || []).indexOf(Number(id)) >= 0;
+  const cell = (id, k, v, ph) => '<td><input data-won data-tt="' + id + '" data-k="' + k + '" type="text" inputmode="numeric" placeholder="' + ph + '" value="' + esc(String(v)) + '"></td>';
+  $('rt_areas').innerHTML = ids.length ? ids.map(id => {
+    const v1 = (id + '|fee' in keep) ? keep[id + '|fee'] : (areaFeeOf(r, id) || (r && had(id) && r.session_fee) || '');
+    const v2 = (id + '|grp' in keep) ? keep[id + '|grp'] : (areaGrpOf(r, id) || (r && had(id) && r.group_fee) || '');
+    return '<tr><td>' + esc(ttName(id)) + ' <button type="button" class="rtx" data-x="' + id + '" title="이 영역 빼기" style="width:auto !important;margin:0 0 0 4px !important;padding:0 6px !important;font-size:12px;border:1px solid #ECE8E3;border-radius:6px;background:#fff;color:#C2553A;cursor:pointer;">✕</button></td>' + cell(id, 'fee', v1, ph1) + cell(id, 'grp', v2, ph2) + '</tr>';
+  }).join('') : '<tr><td colspan="3" class="small" style="color:#888;">영역이 없습니다 — 「영역」 옆에서 골라 넣어 주세요</td></tr>';
+  // ＋ 영역 — 아직 줄이 없는 치료 종류
+  const left = (typeof TTYPES !== 'undefined' ? TTYPES : []).filter(x => ids.indexOf(Number(x.id)) < 0);
+  $('rt_addArea').innerHTML = '<option value="">＋ 영역</option>' + left.map(x => '<option value="' + x.id + '">' + esc(x.name) + '</option>').join('');
+  $('rt_addArea').style.display = left.length ? '' : 'none';
+}
+$('rt_areas').addEventListener('click', e => {
+  const b = e.target.closest('button[data-x]'); if (!b) return;
+  const id = Number(b.dataset.x);
+  const c = $('ct_areas') && $('ct_areas').querySelector('input[type=checkbox][value="' + id + '"]');
+  if (c) c.checked = false;
+  RT_EXTRA = RT_EXTRA.filter(x => x !== id);
+  drawAreaInputs();
+});
+// 저장 직전 — 숨긴 기본 칸 채우기 (회기 단가 = 첫 영역 1:1 · 기본 그룹 = 비움) · 1:1 빈 영역 막기
+function rtSyncBase(){
+  const rows = Array.from($('rt_areas').querySelectorAll('tr')).filter(tr => tr.querySelector('input[data-k="fee"]'));
+  if (!rows.length) return '영역을 하나 이상 넣어 주세요 (「영역」 옆에서 고르기).';
+  const miss = rows.filter(tr => !numOf(tr.querySelector('input[data-k="fee"]').value));
+  if (miss.length) return miss.map(tr => String(tr.firstChild.firstChild.nodeValue || '').trim()).join(', ') + ' — 1:1 단가를 적어 주세요.';
+  $('rt_fee').value = String(numOf(rows[0].querySelector('input[data-k="fee"]').value));
+  $('rt_grp').value = '';
+  return '';
+}
+$('rt_addArea').onchange = () => {
+  const id = Number($('rt_addArea').value); if (!id) return;
+  const c = $('ct_areas') && $('ct_areas').querySelector('input[type=checkbox][value="' + id + '"]');
+  if (c && $('ctEdit').style.display !== 'none') c.checked = true;   // 치료 영역에도 체크 (저장 때 함께)
+  else if (RT_EXTRA.indexOf(id) < 0) RT_EXTRA.push(id);
+  drawAreaInputs();
+};
+function areaVals(){
+  const m = {};
+  Array.from($('rt_areas').querySelectorAll('input')).forEach(i => {
+    const tt = Number(i.dataset.tt), o = m[tt] = m[tt] || { therapy_type_id: tt, fee: null, group_fee: null };
+    if (i.dataset.k === 'grp') o.group_fee = numOf(i.value); else o.fee = numOf(i.value);
+  });
+  return Object.values(m).filter(x => x.fee || x.group_fee);
+}
+
+function rtMsg(t, ok){
+  const e = $('rtMsg');
+  e.textContent = t;
+  e.className = 'out ' + (ok ? 'ok' : 'err');
+  e.style.display = t ? 'block' : 'none';
+}
+
+const numOf = v => {
+  const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
+  return isNaN(n) ? null : n;
+};
+
+$('rtSave').onclick = async () => {
+  const bad = rtSyncBase();
+  if (bad) { rtMsg(bad, false); return; }
+  const from = $('rt_from').value;
+  const fee  = numOf($('rt_fee').value);
+  if (!from) { rtMsg('적용 시작 달을 고르세요.', false); return; }
+  if (!fee)  { rtMsg('회기 단가를 넣으세요.', false); return; }
+
+  const ins = ($('rt_ins').value === 'yes');
+  const dec = numOf($('rt_dec').value);
+  if (ins && !dec) { rtMsg('4대보험 가입이면 신고 금액도 함께 넣으세요.', false); return; }
+
+  const row = {
+    therapist_id: thId,
+    started_on:   from + '-01',
+    session_fee:  fee,
+    group_fee:    numOf($('rt_grp').value),
+    daily_fuel:   numOf($('rt_fuel').value),
+    insured:      ins,
+    declared_amt: dec,
+    eval1: numOf($('rt_ev1').value), eval2: numOf($('rt_ev2').value), eval3: numOf($('rt_ev3').value),
+    fuel_name: $('rt_fname').value || '주유비'
+  };
+
+  $('rtSave').disabled = true;
+  try {
+    // 같은 치료사·같은 시작달 기록이 있으면 고치고, 없으면 새로 넣는다
+    const old = RATES_ALL.find(x => x.therapist_id === thId
+                                 && x.started_on === row.started_on);
+    const areas = areaVals();
+    let res;
+    if (old) res = await sb.from('nl_pay_rates').update(row).eq('id', old.id).select('id');
+    else     res = await sb.from('nl_pay_rates').insert(row).select('id');
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) throw new Error('단가 줄이 저장되지 않았습니다 (권한).');
+    const rid = res.data[0].id;
+    // 영역별 단가 — 그 단가 줄 것을 지우고 넣기 (실패하면 옛 줄을 되살림 · 2026-10-04)
+    const oldAr = AREA_RATES.filter(x => x.pay_rate_id === rid).map(x => ({ pay_rate_id: rid, therapy_type_id: x.therapy_type_id, fee: x.fee, group_fee: x.group_fee }));
+    const dAr = await sb.from('nl_pay_area_rates').delete().eq('pay_rate_id', rid);
+    if (dAr.error) throw dAr.error;
+    if (areas.length) {
+      const ins = areas.map(a => ({ pay_rate_id: rid, therapy_type_id: a.therapy_type_id, fee: a.fee, group_fee: a.group_fee }));
+      const iAr = await sb.from('nl_pay_area_rates').insert(ins).select('id');
+      if (iAr.error || !iAr.data || iAr.data.length !== ins.length) {
+        if (oldAr.length) await sb.from('nl_pay_area_rates').insert(oldAr);
+        throw (iAr.error || new Error('영역별 단가가 저장되지 않았습니다.'));
+      }
+    }
+
+    const { data: rates } = await sb.from('nl_pay_rates').select('*');
+    RATES_ALL = rates || [];
+    await loadAreaRates();
+    calc();
+    rtMsg('✅ 저장했습니다. ' + from + '부터 적용됩니다.', true);
+  } catch (e) {
+    rtMsg('❌ 저장하지 못했습니다.\n' + e.message, false);
+  } finally { $('rtSave').disabled = false; }
+};
+
+async function loadEvals(){
+  // 평가 관리 화면(nl_evaluations)에서 읽는다.
+  // 그 달에 평가한 날 · 상태가 「완료」인 것만 급여에 넣는다.
+  const { data } = await sb.from('nl_evaluations')
+    .select('id, child_id, eval_type_id, eval_date, therapist_id, item_cnt, status, memo')
+    .gte('eval_date', mon + '-01').lte('eval_date', monEnd(mon))
+    .order('eval_date');
+  EVALS = (data || []).filter(e => e.status === '완료');
+
+  // 체험 수업 — 그 달에 체험한 날 · 「완료」만 (2026-09-16)
+  TRIALS = [];
+  try {
+    const { data: tl } = await sb.from('nl_trial_lessons')
+      .select('id, child_id, lesson_date, therapist_id, duration_min, status, kind')
+      .gte('lesson_date', mon + '-01').lte('lesson_date', monEnd(mon))
+      .order('lesson_date');
+    TRIALS = (tl || []).filter(t => t.status === '완료');
+  } catch (e) { TRIALS = []; }
+}
+
+async function loadMonth(){
+  // 급여는 「실제로 수업한 날」 기준으로 센다.
+  // 전월 결석분을 이번 달에 보강한 줄도 이번 달 급여에 들어온다.
+  // (납부는 billing 화면에서 month_key = 원래 달 기준으로 그대로 센다)
+  // 1,000줄씩 나눠 끝까지 가져온다 (2026-09-21) — 한 번에는 1,000줄까지만 오고 뒤는 조용히 잘린다
+  SESS = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('nl_sessions')
+      .select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
+      .gte('plan_date', mon + '-01').lte('plan_date', monEnd(mon))
+      .order('id').range(from, from + 999);
+    if (error || !data) break;
+    SESS = SESS.concat(data);
+    if (data.length < 1000) break;
+  }
+  // 선보강 — 몫인 달의 급여로 (2026-10-03 은정님)
+  //   다음 달 몫을 이 달 날짜에 미리 한 줄은 이 달에서 빼고,
+  //   이 달 몫을 지난달 날짜에 미리 한 줄은 이 달에 더한다
+  //   (후보강 · 다음달 보강처럼 날짜가 몫인 달보다 뒤인 것은 지금처럼 날짜 달에 셈)
+  // 주유비는 실제 나온 날이므로 빼낸 줄도 날짜로는 남겨 둔다
+  FUTPRE = SESS.filter(x => x.month_key && String(x.month_key) > mon);
+  SESS = SESS.filter(x => !(x.month_key && String(x.month_key) > mon));
+  {
+    const { data: pre, error: ePre } = await sb.from('nl_sessions')
+      .select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
+      .eq('month_key', mon).lt('plan_date', mon + '-01');
+    if (ePre) { alert('선보강 회기를 읽지 못했습니다. 새로고침 해 주세요.\n' + ePre.message); }
+    else (pre || []).forEach(x => { x._pre = true; SESS.push(x); });
+  }
+  // 40분 보강 줄에 분이 비어 있으면 메우는 원래 줄의 「분 변경」을 따른다 (2026-10-04 은정님)
+  //   납부 계산에서 바꾼 분은 원래 줄에 적히고, 수업은 보강 줄로 완료되는 경우 (34번 9/30)
+  {
+    const mk = SESS.filter(x => x.makeup_for && !x.dur_min && Number(x.minutes || 40) === 40);
+    const oid = [...new Set(mk.map(x => x.makeup_for))];
+    const OD = {};
+    SESS.forEach(x => { if (x.dur_min) OD[x.id] = Number(x.dur_min); });
+    const need = oid.filter(id => !(id in OD));
+    for (let i = 0; i < need.length; i += 200) {
+      const { data: od, error: eOd } = await sb.from('nl_sessions').select('id, dur_min').in('id', need.slice(i, i + 200)).not('dur_min', 'is', null);
+      if (eOd) { alert('보강 줄의 원래 분을 읽지 못했습니다. 새로고침 해 주세요.\n' + eOd.message); break; }
+      (od || []).forEach(x => { OD[x.id] = Number(x.dur_min); });
+    }
+    mk.forEach(x => { if (OD[x.makeup_for]) x._origDur = OD[x.makeup_for]; });
+  }
+  // 쪼갠 조각(10·20·30분)이 딸린 원래 줄을 찾아 둔다 (2026-09-11)
+  HASPART = {};
+  const _ids = SESS.filter(x => !x.makeup_for && x.status === '완료').map(x => x.id);
+  for (let i = 0; i < _ids.length; i += 200) {
+    const { data: pp } = await sb.from('nl_sessions')
+      .select('makeup_for, minutes, status').in('makeup_for', _ids.slice(i, i + 200)).neq('minutes', 40);
+    (pp || []).forEach(x => {
+      // 결석·취소한 조각은 안 센다 (2026-09-21 — 서버·시간표와 같은 규칙)
+      if (x.status === '취소' || x.status === '결석') return;
+      HASPART[x.makeup_for] = (HASPART[x.makeup_for] || 0) + Number(x.minutes || 0);
+    });
+  }
+  await loadDeadAndFuel();
+  await loadExtra();
+  await loadEvals();
+}
+
+// ── 번외 회기 (2026-10-03) ─────────────────────────────
+async function loadExtra(){
+  EXTRA = [];
+  const { data, error } = await sb.from('nl_pay_extra')
+    .select('id, therapist_id, month_key, child_id, dur, cnt, fee_amt, reason').eq('month_key', mon).order('id');
+  if (error) { console.error('번외 회기 읽기 실패', error); return; }
+  EXTRA = data || [];
+}
+function drawExtra(){
+  const box = $('x_list'); if (!box) return;
+  const mine = EXTRA.filter(x => x.therapist_id === thId);
+  box.innerHTML = mine.length ? mine.map(x => '<div class="xli">' + (x.child_id ? x.child_id + '번 ' + esc(KIDS[x.child_id] || '') : '아동 없음')
+      + ' · ' + (x.fee_amt ? '미지급분 ' + won(x.fee_amt) + '원' : x.dur + '분 ' + Number(x.cnt) + '회') + ' · ' + esc(x.reason)
+      + '<button class="xdel" type="button" data-id="' + x.id + '">✕ 지우기</button></div>').join('')
+    : '<div class="xli small">이 선생님 · 이 달 번외 회기 없음</div>';
+}
+// 회기로 / 금액으로 — 금액은 총 수수료에 더해 원천징수까지 (미지급분 등 · 2026-10-03)
+if ($('x_mode')) $('x_mode').onchange = () => {
+  const amt = $('x_mode').value === 'amt';
+  $('x_dur').style.display = amt ? 'none' : ''; $('x_cnt').style.display = amt ? 'none' : '';
+  $('x_amt').style.display = amt ? '' : 'none';
+  $('x_kid').placeholder = amt ? '아동 번호 (없으면 비움)' : '아동 번호';
+};
+if ($('x_add')) $('x_add').onclick = async () => {
+  const amtMode = $('x_mode').value === 'amt';
+  const kid = Number(String($('x_kid').value).replace(/[^0-9]/g, '')) || null;
+  const cnt = Number(String($('x_cnt').value).trim());
+  const amt = Number(String($('x_amt').value).replace(/[^0-9]/g, '')) || 0;
+  const why = $('x_why').value.trim();
+  if (!amtMode && !kid) { alert('아동 번호를 넣어 주세요.'); return; }
+  if (!amtMode && !(cnt > 0 && cnt <= 20)) { alert('회수를 확인해 주세요 (0.25 · 0.5 · 1 …).'); return; }
+  if (amtMode && !(amt > 0)) { alert('금액을 넣어 주세요.'); return; }
+  if (!why) { alert('사유를 적어 주세요.'); return; }
+  if (!confirm(mon + ' · ' + thId + '번 선생님 · ' + (kid ? kid + '번 · ' : '')
+      + (amtMode ? won(amt) + '원 (총 수수료에 더해 원천징수 3.3%)' : $('x_dur').value + '분 ' + cnt + '회') + '를 급여에 더할까요?')) return;
+  $('x_add').disabled = true;
+  const { data, error } = await sb.from('nl_pay_extra').insert(amtMode
+    ? { therapist_id: thId, month_key: mon, child_id: kid, dur: 40, cnt: null, fee_amt: amt, reason: why }
+    : { therapist_id: thId, month_key: mon, child_id: kid, dur: Number($('x_dur').value), cnt: cnt, reason: why }).select('id');
+  $('x_add').disabled = false;
+  if (error) { alert('넣지 못했습니다.\n' + error.message); return; }
+  if (!data || !data.length) { alert('넣지 못했습니다.'); return; }
+  $('x_kid').value = ''; $('x_cnt').value = '1'; $('x_amt').value = ''; $('x_why').value = '';
+  await loadExtra(); calc();
+};
+if ($('x_list')) $('x_list').onclick = async ev => {
+  const b = ev.target.closest('.xdel'); if (!b) return;
+  if (!confirm('이 번외 회기를 지울까요?')) return;
+  const { data, error } = await sb.from('nl_pay_extra').delete().eq('id', Number(b.dataset.id)).select('id');
+  if (error || !data || !data.length) { alert('지우지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+  await loadExtra(); calc();
+};
+
+// ── 소멸 회 인정 · 주유비 날짜 (2026-10-03 은정님) ─────────────
+//   소멸 — 원래 줄(결석)에 딸린 40분 보강이 두 번 결석하면 그 회는 소멸.
+//          선생님께는 지급한다. 두 번째 결석한 보강 날짜의 달에 원래 담당 선생님께.
+//          단 그 달 몫 교육비가 미입금(금액 있고 낸 날 없음)이면 지급하지 않는다
+//   주유비 — 정규 출근 요일에 나온 날만. 공휴일 대신 나온 날(휴무 관리 「나오는 날」)도 인정
+async function loadDeadAndFuel(){
+  DEADMK = []; WORKWD = {}; XWORK = {};
+  try {
+    const { data: ab } = await sb.from('nl_sessions')
+      .select('makeup_for').eq('status', '결석').not('makeup_for', 'is', null)
+      .gte('plan_date', mon + '-01').lte('plan_date', monEnd(mon));
+    const oids = [...new Set((ab || []).map(x => x.makeup_for))];
+    for (let i = 0; i < oids.length; i += 200) {
+      const part = oids.slice(i, i + 200);
+      const [{ data: mks }, { data: ors }] = await Promise.all([
+        sb.from('nl_sessions').select('makeup_for, plan_date, status, minutes').in('makeup_for', part),
+        sb.from('nl_sessions').select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id').in('id', part)
+      ]);
+      const byO = {};
+      (mks || []).forEach(m => {
+        if (Number(m.minutes || 40) !== 40) return;               // 쪼개기 조각은 소멸 셈에서 뺌
+        (byO[m.makeup_for] = byO[m.makeup_for] || []).push(m);
+      });
+      for (const o of (ors || [])) {
+        if (o.status !== '결석' || o.makeup_for) continue;
+        const ms = (byO[o.id] || []).sort((a, b) => String(a.plan_date).localeCompare(String(b.plan_date)));
+        if (ms.some(m => m.status !== '결석' && m.status !== '취소')) continue;   // 한 번이라도 한 보강이 있으면 아님
+        const abs = ms.filter(m => m.status === '결석');
+        if (abs.length < 2) continue;
+        const d2 = abs[1].plan_date;                              // 두 번째 결석 날 = 소멸한 날
+        if (String(d2).slice(0, 7) !== mon) continue;
+        DEADMK.push(Object.assign({}, o, { _dead: true, _deadOn: d2 }));
+      }
+    }
+    // 그 달 몫 교육비 미입금이면 뺀다
+    if (DEADMK.length) {
+      const kids = [...new Set(DEADMK.map(x => x.child_id))];
+      const { data: pays } = await sb.from('nl_payments')
+        .select('child_id, month_key, support_type_id, amount, paid_on').in('child_id', kids);
+      DEADMK = DEADMK.filter(o => {
+        const p = (pays || []).find(x => x.child_id === o.child_id && x.month_key === o.month_key
+                                      && Number(x.support_type_id) === Number(o.support_type_id));
+        o._unpaid = !!(p && Number(p.amount) > 0 && !p.paid_on);
+        return true;
+      });
+    }
+  } catch (e) { console.error('소멸 회 읽기 실패', e); DEADMK = []; }
+  try {
+    const { data: wd } = await sb.from('nl_therapist_days').select('therapist_id, weekday, works');
+    (wd || []).forEach(r => { if (r.works) (WORKWD[r.therapist_id] = WORKWD[r.therapist_id] || new Set()).add(r.weekday); });
+    const { data: xw } = await sb.from('nl_offdays').select('therapist_id, off_date')
+      .eq('kind', '추가근무').gte('off_date', mon + '-01').lte('off_date', monEnd(mon));
+    (xw || []).forEach(r => { XWORK[r.therapist_id + '|' + r.off_date] = 1; });
+  } catch (e) { console.error('출근 요일 읽기 실패', e); }
+}
+
+$('prt').onclick = () => window.print();
+
+async function afterLogin(user){
+  const { data: me, error: e1 } = await sb.from('nl_therapists')
+    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (e1)  { show('❌ 직원 조회 실패\n'+e1.message, false); return; }
+  if (!me) { show('⚠️ 직원 표에 이 이메일이 없습니다.', false); return; }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+  if (CAN_SEE.indexOf(me.id) < 0) {
+    show('이 화면은 관리자만 볼 수 있습니다.', false); return;
+  }
+
+  const { data: ths } = await sb.from('nl_therapists')
+    .select('id, name').lte('id', 7).order('id');
+  THS = ths || [];
+  $('th').innerHTML = THS.map(t =>
+    '<option value="'+t.id+'">'+t.id+'번 '+esc(t.name)+' 치료사</option>').join('');
+  thId = THS.length ? THS[0].id : 0;
+
+  const { data: rates } = await sb.from('nl_pay_rates').select('*');
+  RATES_ALL = rates || [];
+  if (!TTYPES.length) { const { data: tt0 } = await sb.from('nl_therapy_types').select('id, name').order('id'); TTYPES = tt0 || []; }
+  await loadAreaRates();
+
+  const { data: ef } = await sb.from('nl_eval_pay').select('cnt, fee').order('cnt');
+  (ef || []).forEach(x => EVFEE[x.cnt] = x.fee);
+
+  // 수업 · 아동
+  const { data: sc } = await sb.from('nl_therapy_schedules')
+    .select('id, therapy_id, duration, therapist_id');
+  const { data: tp } = await sb.from('nl_therapies')
+    .select('id, child_id, therapy_type_id, support_type_id, group_id');
+  const { data: kids } = await sb.from('nl_children').select('id, name');
+  const tpMap = {}; (tp||[]).forEach(x => { tpMap[x.id] = x; TPTT[x.id] = x.therapy_type_id; });
+  (kids||[]).forEach(k => KIDS[k.id] = k.name);
+  ROWS = (sc||[]).map(r => {
+    const t = tpMap[r.therapy_id];
+    r._tt = t ? t.therapy_type_id : null;
+    r._grp = t ? (t.group_id || null) : null;   // 그룹 수업 (2026-10-02)
+    r.support_type_id = t ? t.support_type_id : null;
+    return r;
+  });
+
+  // 달 목록
+  const now = new Date();
+  let opts = '';
+  for (let k = 6; k >= -1; k--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    opts += '<option value="'+key+'">'+key+'</option>';
+  }
+  $('mon').innerHTML = opts;
+  mon = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  // 지난번에 보던 달이 있으면 그 달로 연다
+  let _keepM = '';
+  try { _keepM = localStorage.getItem('nl_payroll_mon') || ''; } catch(e) {}
+  if (_keepM && Array.from($('mon').options).some(o => o.value === _keepM)) mon = _keepM;
+  $('mon').value = mon;
+
+  await loadMonth();
+  if (!SESS.length && !_keepM) {
+    const d2 = new Date(now.getFullYear(), now.getMonth()+1, 1);
+    const nk = d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0');
+    const save = mon; mon = nk; await loadMonth();
+    if (SESS.length) $('mon').value = nk;
+    else { mon = save; $('mon').value = save; await loadMonth(); }
+  }
+
+  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨';
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+  await loadUnconf();
+  await loadPub();
+  calc();
+  drawWorkDays();
+  initCard();
+  loadCard();
+  // 홈 「이 달 지급 모음」 카드(payroll.html#sum)로 들어오면 지급 모음을 바로 연다 (2026-10-07)
+  if (location.hash === '#sum') buildSum();
+}
+
+$('mon').onchange = async () => { mon = $('mon').value;
+  document.body.classList.remove('summode'); $('sumBox').style.display = 'none';
+  try { localStorage.setItem('nl_payroll_mon', mon); } catch(e) {}
+  await loadMonth(); await loadUnconf(); await loadPub(); calc(); };
+$('th').onchange  = () => { document.body.classList.remove('summode'); $('sumBox').style.display = 'none';
+  thId = Number($('th').value); calc(); drawWorkDays(); loadCard(); };
+
+
+
+// ── 이 달 지급 모음 · 세무사 전달 (2026-10-03 은정님) ─────────────
+//   선생님마다 지금 화면 셈(calc)을 차례로 돌려 금액을 모은다 → 고른 선생님으로 되돌림
+//   세무사 전달 — 비영리: 근로+프리랜서는 4대보험 신고금액 · 프리랜서(3.3%만)는 과세대상액 ·
+//                 급여명세서 근로자는 기본급 · 추가 줄(nl_tax_extra)은 적어 둔 금액
+//               면세: 근로+프리랜서의 과세대상액 · 추가 줄의 면세 금액
+let SUMROWS = [], TAXROWS = [], EDU = { amount: null, memo: '' };
+let PSH = {}, SSH = {}, DM = {};   // 위탁 공개 · 급여명세서 발송 가장 늦은 판 / 입금일 메모 (2026-10-05)
+function sumBadge(r){
+  if (r.emp) {
+    if (Number(r.id) === 8) return '<span class="stb gr" title="대표 본인 명세서는 보내지 않습니다">대표 · 발송 안 함</span>';
+    const x = SSH[r.id];
+    return !x ? '<span class="stb no" title="급여명세서를 아직 보내지 않았습니다">미발송</span>'
+         : x.seen_at ? '<span class="stb ok">발송 · 확인</span>' : '<span class="stb ok" title="보냈지만 아직 확인 안 함">발송</span>';
+  }
+  const x = PSH[r.id];
+  return !x ? '<span class="stb gr" title="위탁수수료 내역을 아직 공개하지 않았습니다">공개 안 함</span>'
+       : x.seen_at ? '<span class="stb ok">확인</span>' : '<span class="stb no" title="공개했지만 선생님이 아직 확인 안 함">미확인</span>';
+}
+function dmIn(who, col){
+  const v = DM[who + '|' + col] || '';
+  return '<input type="text" class="dmi' + (v ? ' saved' : '') + '" maxlength="100" placeholder="입금일" data-who="' + who + '" data-col="' + col + '" value="' + esc(v) + '">';
+}
+async function dmSave(el){
+  const who = Number(el.dataset.who), col = el.dataset.col, v = el.value.trim();
+  if ((DM[who + '|' + col] || '') === v) return;
+  el.disabled = true;
+  const { data, error } = await sb.from('nl_pay_daymemo').upsert({ month_key: mon, who, col, memo: v || null, updated_at: new Date().toISOString() },
+    { onConflict: 'month_key,who,col' }).select('id');
+  el.disabled = false;
+  if (error || !data || !data.length) { el.classList.remove('saved'); alert('입금일 메모를 저장하지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+  DM[who + '|' + col] = v; el.classList.toggle('saved', !!v);
+}
+let PAYMEMO = { wage: '', fee: '', fuel: '' };
+// 퇴직금 줄 (nl_pay_retire · 2026-10-04) — 그 달 이전 가장 늦은 줄을 이어받음 · 저장하면 그 달부터
+let RET = { from: '', names: '', acc: '', w: 0, f: 0 };   // 이체 기록 메모 (nl_tax_month · 2026-10-04)
+async function buildSum(){
+  const box = $('sumBox');
+  // 지급 모음을 보는 동안 선생님 한 분 화면은 숨긴다 (2026-10-03)
+  document.body.classList.add('summode');
+
+  box.style.display = ''; box.innerHTML = '<div class="small">모으는 중…</div>';
+  const keep = thId; const rows = [];
+  for (const t of THS) {
+    thId = t.id;
+    try { calc(); } catch (e) { console.error('셈 실패', t.id, e); }
+    const p = PAYSUM;
+    if (!p || !(p.total || p.wage || p.fuel)) continue;
+    rows.push(Object.assign({ id: t.id, name: t.name }, p));
+  }
+  thId = keep; $('th').value = String(keep); try { calc(); } catch (e) {}
+  const ids = rows.map(r => r.id);
+  const [pv, sal, ex, psh, ssh, dmm] = await Promise.all([
+    sb.from('nl_th_private').select('therapist_id, bank, account_no'),   // 근로자 계좌도 함께 (2026-10-04)
+    sb.from('nl_salary').select('staff_id, base_pay, pension, health, care, employ, income_tax, local_tax').eq('month_key', mon),
+    sb.from('nl_tax_extra').select('name, nonprofit, taxfree, from_month, to_month, memo').lte('from_month', mon),
+    // 이름 옆 딱지 (2026-10-05) — 위탁: 공개 · 확인 / 근로자: 급여명세서 발송 · 확인
+    sb.from('nl_pay_share').select('therapist_id, ver, seen_at').eq('month_key', mon),
+    sb.from('nl_salary_share').select('staff_id, ver, seen_at').eq('month_key', mon),
+    // 입금일 메모 (2026-10-05)
+    sb.from('nl_pay_daymemo').select('who, col, memo').eq('month_key', mon)
+  ]);
+  const err = [pv, sal, ex, psh, ssh, dmm].find(x => x && x.error);
+  if (err) { box.innerHTML = '<div class="ctwarn">불러오지 못했습니다. ' + esc(err.error.message) + '</div>'; return; }
+  const PV = {}; (pv.data || []).forEach(x => { PV[x.therapist_id] = x; });
+  const lastOf = (rows, k) => { const o = {}; (rows || []).forEach(x => { if (!o[x[k]] || x.ver > o[x[k]].ver) o[x[k]] = x; }); return o; };
+  PSH = lastOf(psh.data, 'therapist_id'); SSH = lastOf(ssh.data, 'staff_id');
+  DM = {}; (dmm.data || []).forEach(x => { DM[x.who + '|' + x.col] = x.memo || ''; });
+  const sids = (sal.data || []).map(x => x.staff_id);
+  let SNM = {};
+  if (sids.length) { const { data: nm } = await sb.from('nl_therapists').select('id, name').in('id', sids); (nm || []).forEach(x => { SNM[x.id] = x.name; }); }
+  const exs = (ex.data || []).filter(x => !x.to_month || x.to_month >= mon);
+  // 교육청 지원금액 — 달마다 직접 적음 (nl_tax_month · 2026-10-03)
+  EDU = { amount: null, memo: '' }; PAYMEMO = { wage: '', fee: '', fuel: '' }; RET = { from: '', names: '', acc: '', w: 0, f: 0 };
+  { const { data: rt, error: rte } = await sb.from('nl_pay_retire').select('from_month, names, account_memo, amt_wage, amt_fee')
+      .lte('from_month', mon).order('from_month', { ascending: false }).limit(1);
+    if (rte) alert('퇴직금 줄을 읽지 못했습니다.\n' + rte.message);
+    const x = (rt || [])[0];
+    if (x) RET = { from: x.from_month, names: x.names || '', acc: x.account_memo || '', w: x.amt_wage || 0, f: x.amt_fee || 0 }; }
+  { const { data: em } = await sb.from('nl_tax_month').select('edu_amount, edu_memo, memo_wage, memo_fee, memo_fuel').eq('month_key', mon).maybeSingle();
+    if (em) { EDU = { amount: em.edu_amount, memo: em.edu_memo || '' };
+              PAYMEMO = { wage: em.memo_wage || '', fee: em.memo_fee || '', fuel: em.memo_fuel || '' }; } }
+
+  // 프리랜서(4대보험 미가입)는 실 지급액을 「급여 실수령액」 칸에 · 「실지급액 (면세)」 칸은 근로 + 프리랜서만 (2026-10-03 은정님)
+  SUMROWS = rows.map(r => ({ id: r.id, who: r.id + '번 ' + r.name, bank: (PV[r.id] || {}).bank || '', acc: (PV[r.id] || {}).account_no || '',
+    wageNet: r.wage ? r.wage - r.wkShare : r.netFee, netFee: r.wage ? r.netFee : 0, fuel: r.fuel, fuelName: r.fuelName }));
+  (sal.data || []).forEach(x => {
+    const net = (x.base_pay || 0) - (x.pension || 0) - (x.health || 0) - (x.care || 0) - (x.employ || 0) - (x.income_tax || 0) - (x.local_tax || 0);
+    SUMROWS.push({ id: x.staff_id, who: x.staff_id + '번 ' + (SNM[x.staff_id] || ''), bank: (PV[x.staff_id] || {}).bank || '', acc: (PV[x.staff_id] || {}).account_no || '', wageNet: net, netFee: 0, fuel: 0, emp: true });
+  });
+  TAXROWS = rows.map(r => r.insured
+      ? { name: r.name, np: r.wage, tf: r.taxBase, note: '근로 + 프리랜서 (비영리 = 4대보험 신고금액 · 면세 = 과세대상액)' }
+      : { name: r.name, np: r.taxBase, tf: 0, note: '프리랜서 3.3% (비영리 = 과세대상액)' });
+  (sal.data || []).forEach(x => TAXROWS.push({ name: SNM[x.staff_id] || (x.staff_id + '번'), np: x.base_pay || 0, tf: 0, note: '급여명세서 근로자 (비영리 = 기본급)' }));
+  exs.forEach(x => TAXROWS.push({ name: x.name, np: x.nonprofit || 0, tf: x.taxfree || 0, note: '추가 줄' + (x.to_month ? ' · ' + x.to_month + '까지' : '') + (x.memo ? ' · ' + x.memo : '') }));
+  drawSum();
+}
+function drawSum(){
+  const box = $('sumBox');
+  const sum = k => SUMROWS.reduce((t, r) => t + (r[k] || 0), 0);
+  const tsum = k => TAXROWS.reduce((t, r) => t + (r[k] || 0), 0);
+  // 계좌는 전체 번호로 (이체용 · 대표만 여는 화면 · 2026-10-04 은정님)
+  box.innerHTML = '<div class="cthd">' + mon.slice(0, 4) + '년 ' + monNo(mon) + '월 지급 모음</div>'
+    + '<table class="sumt"><thead><tr><th>이름</th><th>은행 · 계좌</th><th class="n">급여 실수령액</th><th class="n">실지급액 (면세)</th>'
+    + '<th class="n">주유 · 교통비</th><th class="n">이체 합계</th></tr></thead><tbody>'
+    + SUMROWS.map(r => '<tr><td>' + esc(r.who) + ' ' + sumBadge(r) + (r.emp ? ' <span class="small">(급여명세서)</span>' : '') + '</td>'
+        + '<td>' + esc(r.bank) + ' <span class="acc">' + esc(r.acc) + '</span></td>'
+        + '<td class="n">' + (r.wageNet ? won(r.wageNet) + dmIn(r.id, 'wage') : '–') + '</td><td class="n">' + (r.netFee ? won(r.netFee) + dmIn(r.id, 'fee') : '–') + '</td>'
+        + '<td class="n">' + (r.fuel ? won(r.fuel) + ' <span class="small">' + esc(r.fuelName || '') + '</span>' + dmIn(r.id, 'fuel') : '–') + '</td>'
+        + '<td class="n"><b>' + won((r.wageNet || 0) + (r.netFee || 0) + (r.fuel || 0)) + '</b></td></tr>').join('')
+    // 퇴직금 줄 (2026-10-04 은정님) — 이름 · 계좌 · 금액을 직접 적음 · 합계에 들어감
+    + '<tr class="rtrow"><td><div class="rtlab">퇴직금' + (RET.from && RET.from !== mon ? ' <span class="small">(' + esc(RET.from) + '부터)</span>' : '') + '</div>'
+    +   '<input id="rtNames" type="text" maxlength="300" placeholder="직원 이름" value="' + esc(RET.names) + '"></td>'
+    +   '<td><input id="rtAcc" type="text" maxlength="300" placeholder="입금 계좌 메모" value="' + esc(RET.acc) + '"></td>'
+    +   '<td><input id="rtW" data-won class="n" type="text" inputmode="numeric" placeholder="금액" value="' + (RET.w ? won(RET.w) : '') + '"></td>'
+    +   '<td><input id="rtF" data-won class="n" type="text" inputmode="numeric" placeholder="금액" value="' + (RET.f ? won(RET.f) : '') + '">' + dmIn(0, 'retire') + '</td>'
+    +   '<td class="n">–</td>'
+    +   '<td class="n"><b id="rtT">' + won(RET.w + RET.f) + '</b><div><button type="button" class="ctsm" id="rtSave">✓ 저장됨</button></div></td></tr>'
+    + '</tbody><tfoot><tr><td>합계</td><td></td><td class="n" id="sumW">' + won(sum('wageNet') + RET.w) + '</td><td class="n" id="sumF">' + won(sum('netFee') + RET.f) + '</td>'
+    + '<td class="n">' + won(sum('fuel')) + '</td><td class="n" id="sumT">' + won(sum('wageNet') + sum('netFee') + sum('fuel') + RET.w + RET.f) + '</td></tr>'
+    // 이체 기록 — 합계 아래 칸마다 메모 하나 (2026-10-04 은정님)
+    + '<tr class="pmrow"><td class="small">이체 기록</td><td></td>'
+    +   '<td><input id="pmWage" type="text" maxlength="500" placeholder="메모" value="' + esc(PAYMEMO.wage) + '"></td>'
+    +   '<td><input id="pmFee" type="text" maxlength="500" placeholder="메모" value="' + esc(PAYMEMO.fee) + '"></td>'
+    +   '<td><input id="pmFuel" type="text" maxlength="500" placeholder="메모" value="' + esc(PAYMEMO.fuel) + '"></td>'
+    +   '<td class="n"><button type="button" class="ctsm" id="pmSave">✓ 저장됨</button></td></tr>'
+    + '</tfoot></table>'
+    + '<div class="cthd" style="margin-top:18px;">세무사전달 &gt; 최정환세무사님<button type="button" class="ctgo" id="sumXls">엑셀 내려받기</button></div>'
+    + '<table class="sumt"><thead><tr><th>이름</th><th class="n">비영리</th><th class="n">면세</th><th>비고</th></tr></thead><tbody>'
+    + TAXROWS.map(r => '<tr><td>' + esc(r.name) + '</td><td class="n">' + (r.np ? won(r.np) : '–') + '</td><td class="n">' + (r.tf ? won(r.tf) : '–')
+        + '</td><td class="small">' + esc(r.note) + '</td></tr>').join('')
+    + '</tbody><tfoot><tr><td>합계</td><td class="n">' + won(tsum('np')) + '</td><td class="n">' + won(tsum('tf')) + '</td><td></td></tr></tfoot></table>'
+    + '<div class="edubox"><b>교육청 지원금액</b>'
+    +   '<input id="eduAmt" data-won type="text" inputmode="numeric" placeholder="금액" value="' + (EDU.amount != null ? won(EDU.amount) : '') + '">'
+    +   '<input id="eduMemo" type="text" maxlength="500" placeholder="메모 (예: 치료지원 ○명 · 방과후 ○명)" value="' + esc(EDU.memo) + '">'
+    +   '<button type="button" class="ctsm" id="eduSave">저장</button><span id="eduMsg" class="small"></span></div>'
+;
+  ['pmWage', 'pmFee', 'pmFuel'].forEach(id => { $(id).oninput = () => { $('pmSave').textContent = '💾 저장 전'; }; });
+  $('pmSave').onclick = savePayMemo;
+  // 입금일 메모 — 칸 밖을 누르면 바로 저장 (Enter 도)
+  box.querySelectorAll('input.dmi').forEach(el => {
+    el.onchange = () => dmSave(el);
+    el.onkeydown = e => { if (e.key === 'Enter') el.blur(); };
+  });
+  // 퇴직금 줄 — 적으면 합계를 바로 다시 셈 (저장 전)
+  const rtNum = id => Number(String($(id).value).replace(/[^0-9]/g, '')) || 0;
+  const rtRedraw = () => {
+    const w = rtNum('rtW'), f = rtNum('rtF');
+    $('rtT').textContent = won(w + f);
+    $('sumW').textContent = won(sum('wageNet') + w); $('sumF').textContent = won(sum('netFee') + f);
+    $('sumT').textContent = won(sum('wageNet') + sum('netFee') + sum('fuel') + w + f);
+    $('rtSave').textContent = '💾 저장 전';
+  };
+  ['rtNames', 'rtAcc', 'rtW', 'rtF'].forEach(id => { $(id).oninput = rtRedraw; });
+  ['rtW', 'rtF'].forEach(id => { $(id).onblur = () => { const v = rtNum(id); $(id).value = v ? won(v) : ''; }; });
+  $('rtSave').onclick = async () => {
+    const row = { from_month: mon, names: $('rtNames').value.trim() || null, account_memo: $('rtAcc').value.trim() || null,
+                  amt_wage: rtNum('rtW') || null, amt_fee: rtNum('rtF') || null, updated_at: new Date().toISOString() };
+    $('rtSave').disabled = true; $('rtSave').textContent = '저장 중…';
+    const { data, error } = await sb.from('nl_pay_retire').upsert(row, { onConflict: 'from_month' }).select('from_month');
+    $('rtSave').disabled = false;
+    if (error || !data || !data.length) { $('rtSave').textContent = '💾 저장 전'; alert('퇴직금 줄을 저장하지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+    RET = { from: mon, names: row.names || '', acc: row.account_memo || '', w: row.amt_wage || 0, f: row.amt_fee || 0 };
+    $('rtSave').textContent = '✓ 저장됨';
+    const lab = document.querySelector('.rtrow .rtlab'); if (lab) lab.textContent = '퇴직금';
+  };
+  $('sumXls').onclick = downXls;
+  $('eduSave').onclick = saveEdu;
+  ['eduAmt', 'eduMemo'].forEach(id => { $(id).oninput = () => { $('eduMsg').textContent = '저장 전'; }; });
+}
+async function savePayMemo(){
+  const v = id => $(id).value.trim() || null;
+  const row = { month_key: mon, memo_wage: v('pmWage'), memo_fee: v('pmFee'), memo_fuel: v('pmFuel'), updated_at: new Date().toISOString() };
+  $('pmSave').disabled = true; $('pmSave').textContent = '저장 중…';
+  const { data, error } = await sb.from('nl_tax_month').upsert(row, { onConflict: 'month_key' }).select('month_key');
+  $('pmSave').disabled = false;
+  if (error || !data || !data.length) { $('pmSave').textContent = '💾 저장 전'; alert('저장하지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+  PAYMEMO = { wage: row.memo_wage || '', fee: row.memo_fee || '', fuel: row.memo_fuel || '' };
+  $('pmSave').textContent = '✓ 저장됨';
+}
+async function saveEdu(){
+  const a = String($('eduAmt').value).replace(/[^0-9]/g, '');
+  const row = { month_key: mon, edu_amount: a === '' ? null : Number(a), edu_memo: $('eduMemo').value.trim() || null, updated_at: new Date().toISOString() };
+  $('eduSave').disabled = true;
+  const { data, error } = await sb.from('nl_tax_month').upsert(row, { onConflict: 'month_key' }).select('month_key');
+  $('eduSave').disabled = false;
+  if (error || !data || !data.length) { $('eduMsg').textContent = '❌ 저장하지 못했습니다' + (error ? ' · ' + error.message : ''); return; }
+  EDU = { amount: row.edu_amount, memo: row.edu_memo || '' };
+  $('eduAmt').value = row.edu_amount != null ? won(row.edu_amount) : '';
+  $('eduMsg').textContent = '✓ 저장됨';
+}
+async function downXls(){
+  if (!window.XLSX) {
+    await new Promise((ok, no) => { const sc = document.createElement('script');
+      sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; sc.onload = ok; sc.onerror = no; document.head.appendChild(sc); })
+      .catch(() => alert('엑셀 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'));
+    if (!window.XLSX) return;
+  }
+  // 엑셀에는 비고 칸을 넣지 않는다 (2026-10-04 은정님 · 화면에는 그대로)
+  const aoa = [[mon.slice(0, 4) + '년 ' + monNo(mon) + '월 세무사전달 > 최정환세무사님'], [], ['이름', '비영리', '면세']];
+  TAXROWS.forEach(r => aoa.push([r.name, r.np || 0, r.tf || 0]));
+  aoa.push(['합계', TAXROWS.reduce((t, r) => t + (r.np || 0), 0), TAXROWS.reduce((t, r) => t + (r.tf || 0), 0)]);
+  // 교육청 지원금액 — 화면 칸의 지금 값 (저장 안 했어도 적힌 그대로)
+  const ea = String(($('eduAmt') || {}).value || '').replace(/[^0-9]/g, '');
+  aoa.push([]);
+  aoa.push(['교육청 지원금액', ea === '' ? '' : Number(ea), '']);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 14 }];
+  for (let i = 3; i < aoa.length; i++) ['B', 'C'].forEach(c => { const a = ws[c + (i + 1)]; if (a && typeof a.v === 'number') a.z = '#,##0'; });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '세무사전달');
+  XLSX.writeFile(wb, mon + '_최정환세무사님.xlsx');
+}
+// 지급 모음을 열면 주소 끝에 #sum — 위쪽 ‹(뒤로)로 위탁수수료 화면에 돌아온다 (2026-10-03)
+if ($('sumBtn')) $('sumBtn').onclick = () => { if (location.hash !== '#sum') history.pushState({ sum: 1 }, '', '#sum'); buildSum(); };
+window.addEventListener('popstate', () => {
+  if (location.hash === '#sum') buildSum();
+  else if (document.body.classList.contains('summode')) backToSheet();
+});
+// 「위탁수수료」 — 고른 선생님 한 분 화면으로 (2026-10-03 · 같은 선생님을 다시 고르면 바뀌지 않던 것)
+function backToSheet(){
+  $('sumBox').style.display = 'none'; document.body.classList.remove('summode');
+  try { calc(); } catch (e) {}
+  window.scrollTo(0, 0);
+}
+if ($('sheetBtn')) $('sheetBtn').onclick = backToSheet;
+// ── 위탁계약 카드 (2026-10-03 은정님) ──────────────────────────
+//   8번만 보는 화면 맨 위 · 공개본 · 인쇄에 안 들어감 (noprint)
+//   주민번호 · 계좌는 nl_th_private (대표만) · 화면에는 가려 보이고 [보기]로만
+let CT = null, TTYPES = [], CT_RT0 = '';
+function initCard(){
+  // 지급 단가 · 출근 요일 상자를 고치기 창 안으로 옮긴다 (저장은 아래 「저장」 하나로)
+  const mv = $('ctMove');
+  [$('rtSave'), $('wdSave')].forEach(b => { const box = b && b.closest('.evalbox'); if (box) mv.appendChild(box); });
+  $('rtSave').style.display = 'none'; $('wdSave').style.display = 'none';
+  $('ctCancel').onclick = () => { $('ctEdit').style.display = 'none'; $('ctCard').style.display = ''; };
+  $('ct_licAdd').onclick = () => addLicRow('', '');
+  $('ct_memoClr').onclick = () => { if (!$('ct_memo').value || confirm('메모를 지울까요? (「저장」을 눌러야 지워집니다)')) $('ct_memo').value = ''; };
+  $('ctSave').onclick = saveCard;
+}
+function rtSnap(){ return ['rt_fee','rt_grp','rt_fuel','rt_fname','rt_ins','rt_dec','rt_ev1','rt_ev2','rt_ev3'].map(i => $(i).value).join('|')
+  + '|' + areaVals().map(a => a.therapy_type_id + ':' + a.fee + '/' + a.group_fee).join(','); }
+// 퇴사 뒤 상태 글 — 다음 날부터 14일은 기록지만, 그 뒤는 막힘 (서버 nl_me 와 같은 셈)
+function leftNote(d){
+  const t0 = new Date(); const today = t0.getFullYear() + '-' + String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0');
+  const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 14);
+  const end = x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  if (today <= d) return '퇴사 전 · ' + end + '까지 기록지 사용 가능';
+  if (today <= end) return '기록지만 사용 중 · ' + end + '까지';
+  return '계정 막힘 (' + end + ' 지남)';
+}
+function maskAcc(v){ v = String(v || ''); return v ? '****' + v.replace(/[^0-9]/g, '').slice(-4) : ''; }
+function maskTel(v){ v = String(v || ''); return v ? v.replace(/(\d{3})-?(\d{3,4})-?(\d{4})/, '$1-****-$3') : ''; }
+async function loadCard(){
+  if (!thId) return;
+  try {
+    if (!TTYPES.length) { const { data: tt } = await sb.from('nl_therapy_types').select('id, name').order('id'); TTYPES = tt || []; }
+    const [a, b, c, d, e, f] = await Promise.all([
+      sb.from('nl_therapists').select('id, name, phone, hired_on, left_on, login_id, login_email').eq('id', thId).maybeSingle(),
+      sb.from('nl_th_private').select('rrn, bank, account_no').eq('therapist_id', thId).maybeSingle(),
+      sb.from('nl_th_contract').select('contract_type, provider_no, memo').eq('therapist_id', thId).maybeSingle(),
+      sb.from('nl_th_licenses').select('id, lic_name, lic_no').eq('therapist_id', thId).order('id'),
+      sb.from('nl_th_areas').select('therapy_type_id').eq('therapist_id', thId),
+      sb.from('nl_therapist_days').select('weekday, works, first_hm, last_hm').eq('therapist_id', thId)
+    ]);
+    const err = [a, b, c, d, e, f].find(x => x.error);
+    if (err) throw err.error;
+    CT = { th: a.data || {}, pv: b.data || {}, ct: c.data || {}, lic: d.data || [], areas: (e.data || []).map(x => x.therapy_type_id), days: f.data || [] };
+  } catch (e) { $('ctCard').innerHTML = '<div class="ctwarn">위탁계약을 읽지 못했습니다. ' + esc(e.message || e) + '</div>'; return; }
+  drawCard();
+}
+function drawCard(){
+  const t = CT.th, pv = CT.pv, ct = CT.ct;
+  const tn = id => (TTYPES.find(x => x.id === id) || {}).name || id;
+  const hm = v => v ? String(v).slice(0, 5) : '';
+  const days = ['월','화','수','목','금','토','일'].map(w => CT.days.find(x => x.weekday === w)).filter(x => x && x.works)
+    .map(x => x.weekday + (x.first_hm ? ' ' + hm(x.first_hm) + '~' + hm(x.last_hm) : '')).join(' · ') || '정하지 않음';
+  const rates = RATES_ALL.filter(x => x.therapist_id === thId).sort((p, q) => String(q.started_on).localeCompare(String(p.started_on)));
+  const rl = r => String(r.started_on || '').slice(0, 7) + '~ · 회기 ' + won(r.session_fee) + ' · 60분 ' + won(Math.round((r.session_fee || 0) * 1.5))
+    + areaTxt(r) + (r.group_fee ? ' · 그룹 1인당 ' + won(r.group_fee) : '')
+    + ((r.eval1 || r.eval2 || r.eval3) ? ' · 평가 ' + [r.eval1, r.eval2, r.eval3].map(v => v ? won(v) : '공통').join('/') : ' · 평가 공통 단가')
+    + (r.daily_fuel ? ' · ' + (r.fuel_name || '주유비') + ' ' + won(r.daily_fuel) + '/일' : '')
+    + ' · 4대보험 ' + (r.insured ? '가입 (기본급 ' + won(r.declared_amt) + ')' : '미가입');
+  $('ctCard').innerHTML = '<div class="cthd">' + thId + '번 ' + esc(t.name || '') + ' 선생님 · 위탁계약'
+      + '<button id="ctEditBtn" type="button" class="ctsm">수정</button></div>'
+    + (t.left_on ? '<div class="ctl ctleft">퇴사일 <b>' + esc(t.left_on) + '</b> · ' + esc(leftNote(t.left_on)) + '</div>' : '')
+    + '<div class="ctl">입사일 <b>' + esc(t.hired_on || '—') + '</b> · 연락처 ' + esc(maskTel(t.phone) || '—')
+      + ' · 계정 아이디 ' + esc(t.login_id || t.login_email || '—') + '</div>'
+    + '<div class="ctl">발달 제공인력번호 ' + esc(ct.provider_no || '—') + ' · 치료 영역 '
+      + esc(CT.areas.map(tn).join(' · ') || '—') + ' · 계약 형태 <b>' + esc(ct.contract_type || '—') + '</b></div>'
+    + '<div class="ctl">주민번호 <span id="ctRrn">' + (pv.rrn ? '******-*******' : '—') + '</span>'
+      + (pv.rrn ? ' <button type="button" class="ctsm" data-show="rrn">보기</button>' : '')
+      + ' · 계좌 ' + esc(pv.bank || '') + ' <span id="ctAcc">' + esc(maskAcc(pv.account_no) || '—') + '</span>'
+      + (pv.account_no ? ' <button type="button" class="ctsm" data-show="acc">보기</button>' : '') + '</div>'
+    + '<div class="ctl">면허 ' + (CT.lic.length ? CT.lic.map(l => esc(l.lic_name) + (l.lic_no ? ' ' + esc(l.lic_no) : '')).join(' · ') : '—') + '</div>'
+    + '<div class="ctl">근무 ' + esc(days) + '</div>'
+    + '<div class="ctl">수당 단가 <span class="small">(적용 시작 달마다 쌓임 · 지난 기록 그대로)</span>'
+      + (rates.length ? rates.map((r, i) => '<div class="ctrate' + (i ? ' old' : '') + '">' + esc(rl(r)) + '</div>').join('') : ' —') + '</div>'
+    + (ct.memo ? '<div class="ctl small">메모 · ' + esc(ct.memo) + '</div>' : '');
+  $('ctCard').onclick = ev => {
+    const sb2 = ev.target.closest('[data-show]');
+    if (sb2) {
+      if (sb2.dataset.show === 'rrn') $('ctRrn').textContent = CT.pv.rrn || '';
+      else $('ctAcc').textContent = CT.pv.account_no || '';
+      sb2.remove(); return;
+    }
+    if (ev.target.closest('#ctEditBtn')) openCardEdit();
+  };
+}
+function addLicRow(nm, no){
+  const d = document.createElement('div'); d.className = 'ctlic';
+  d.innerHTML = '<input class="lnm" type="text" maxlength="60" placeholder="면허 이름 (예: 언어재활사 1급)" value="' + esc(nm) + '">'
+    + '<input class="lno" type="text" maxlength="40" placeholder="번호" value="' + esc(no) + '">'
+    + '<button type="button" class="ctsm lx">✕</button>';
+  d.querySelector('.lx').onclick = () => d.remove();
+  $('ct_lics').appendChild(d);
+}
+function openCardEdit(){
+  const t = CT.th, pv = CT.pv, ct = CT.ct;
+  $('ct_hired').value = t.hired_on || ''; $('ct_left').value = t.left_on || ''; $('ct_phone').value = t.phone || '';
+  $('ct_login').value = t.login_id || t.login_email || '';
+  $('ct_type').value = ct.contract_type || ''; $('ct_prov').value = ct.provider_no || '';
+  $('ct_rrn').value = pv.rrn || ''; $('ct_bank').value = pv.bank || ''; $('ct_acc').value = pv.account_no || '';
+  $('ct_memo').value = ct.memo || '';
+  $('ct_areas').innerHTML = TTYPES.map(x => '<label class="ctchk"><input type="checkbox" value="' + x.id + '"'
+    + (CT.areas.indexOf(x.id) >= 0 ? ' checked' : '') + '> ' + esc(x.name) + '</label>').join('');
+  (function(){ const r0 = RATES[thId]; if (!r0) return; AREA_RATES.filter(x => x.pay_rate_id === r0.id).forEach(x => {
+    const c = $('ct_areas').querySelector('input[type=checkbox][value="' + x.therapy_type_id + '"]'); if (c) c.checked = true; }); })();
+  $('ct_areas').onchange = () => drawAreaInputs();
+  $('ct_lics').innerHTML = ''; CT.lic.forEach(l => addLicRow(l.lic_name, l.lic_no || ''));
+  $('ctCard').style.display = 'none'; $('ctEdit').style.display = '';
+  RT_EXTRA = []; drawRateBox(); CT_RT0 = rtSnap();
+  $('ctMsg').textContent = '';
+}
+async function saveCard(){
+  const v = id => $(id).value.trim();
+  const rrn = v('ct_rrn'), acc = v('ct_acc');
+  if (rrn && !/^\d{6}-\d{7}$/.test(rrn)) { alert('주민번호는 000000-0000000 모양으로 적어 주세요.'); return; }
+  if (acc && !/^[0-9-]{6,30}$/.test(acc)) { alert('계좌번호는 숫자와 - 만 적어 주세요.'); return; }
+  const lics = Array.from($('ct_lics').querySelectorAll('.ctlic'))
+    .map(d => ({ therapist_id: thId, lic_name: d.querySelector('.lnm').value.trim(), lic_no: d.querySelector('.lno').value.trim() || null }))
+    .filter(x => x.lic_name);
+  const areas = Array.from($('ct_areas').querySelectorAll('input:checked')).map(x => ({ therapist_id: thId, therapy_type_id: Number(x.value) }));
+  if (v('ct_phone') && !telOk(v('ct_phone'))) { alert('연락처 숫자 자리 수가 맞지 않습니다.\n휴대폰 11자리 (010-0000-0000) · 일반 전화 9~11자리로 넣어 주세요.'); return; }
+  const btn = $('ctSave'); btn.disabled = true; btn.textContent = '저장 중…';
+  try {
+    const r1 = await sb.from('nl_therapists').update({ hired_on: v('ct_hired') || null, left_on: v('ct_left') || null, phone: v('ct_phone') || null }).eq('id', thId).select('id');
+    if (r1.error) throw r1.error;
+    if (!r1.data || !r1.data.length) throw new Error('입사일 · 연락처가 저장되지 않았습니다 (직원 표 권한).');
+    const pvRow = { therapist_id: thId, rrn: rrn || null, bank: v('ct_bank') || null, account_no: acc || null, updated_at: new Date().toISOString() };
+    const r2 = await sb.from('nl_th_private').upsert(pvRow, { onConflict: 'therapist_id' }).select('therapist_id');
+    if (r2.error) throw r2.error;
+    const r3 = await sb.from('nl_th_contract').upsert({ therapist_id: thId, contract_type: v('ct_type') || null, provider_no: v('ct_prov') || null,
+      memo: v('ct_memo') || null, updated_at: new Date().toISOString() }, { onConflict: 'therapist_id' }).select('therapist_id');
+    if (r3.error) throw r3.error;
+    // 면허 · 영역 — 지우고 넣기 (실패하면 옛 줄을 되살림)
+    const oldL = CT.lic.map(l => ({ therapist_id: thId, lic_name: l.lic_name, lic_no: l.lic_no }));
+    const dL = await sb.from('nl_th_licenses').delete().eq('therapist_id', thId);
+    if (dL.error) throw dL.error;
+    if (lics.length) { const iL = await sb.from('nl_th_licenses').insert(lics).select('id');
+      if (iL.error || !iL.data || iL.data.length !== lics.length) { if (oldL.length) await sb.from('nl_th_licenses').insert(oldL); throw (iL.error || new Error('면허가 저장되지 않았습니다.')); } }
+    const oldA = CT.areas.map(id => ({ therapist_id: thId, therapy_type_id: id }));
+    const dA = await sb.from('nl_th_areas').delete().eq('therapist_id', thId);
+    if (dA.error) throw dA.error;
+    if (areas.length) { const iA = await sb.from('nl_th_areas').insert(areas).select('therapist_id');
+      if (iA.error || !iA.data || iA.data.length !== areas.length) { if (oldA.length) await sb.from('nl_th_areas').insert(oldA); throw (iA.error || new Error('치료 영역이 저장되지 않았습니다.')); } }
+    // 수당 단가 — 바꿨을 때만 (안 바꿨는데 저장하면 이 달부터 새 줄이 생기므로)
+    if (rtSnap() !== CT_RT0) {
+      $('rtMsg').className = 'out'; $('rtMsg').textContent = '';
+      await $('rtSave').onclick();
+      // 단가 저장이 막혔으면 창을 닫지 않고 까닭을 띄운다 (2026-10-03 — 2번 선생님 주유비가 말없이 빠졌던 것)
+      if (/err/.test($('rtMsg').className) || !/저장했습니다/.test($('rtMsg').textContent))
+        throw new Error('수당 단가: ' + ($('rtMsg').textContent || '저장되지 않았습니다'));
+    }
+    // 출근 요일 · 수업 시각
+    await $('wdSave').onclick();
+    await loadAreaRates();
+    await loadCard();
+    $('ctEdit').style.display = 'none'; $('ctCard').style.display = '';
+  } catch (e) {
+    $('ctMsg').textContent = '❌ ' + (e.message || e);
+    alert('저장하지 못했습니다.\n' + (e.message || e));
+  } finally { btn.disabled = false; btn.textContent = '저장'; }
+}
+// ── 출근 요일 · 수업 시각 (2026-09-11) ───────────────────────
+//   nl_therapist_days 에 선생님 · 요일마다 한 줄. 대표(8번)만 고친다
+const WD7 = ['월','화','수','목','금','토','일'];
+function wdMsg(t, ok){
+  const e = $('wdMsg');
+  e.style.display = t ? 'block' : 'none';
+  e.textContent = t || '';
+  e.className = 'out ' + (ok ? 'ok' : 'err');
+}
+function wdState(k){
+  const b = $('wdSave');
+  b.classList.remove('busy', 'done');
+  if (k === 'busy') { b.classList.add('busy'); b.textContent = '저장 중…'; }
+  else if (k === 'done') { b.classList.add('done'); b.textContent = '✓ 저장됨'; }
+  else b.textContent = '저장 전';
+}
+async function drawWorkDays(){
+  if (!thId) return;
+  wdMsg('');
+  $('wdTitle').textContent = thId + '번 선생님 · 출근 요일과 수업 시각';
+  const { data, error } = await sb.from('nl_therapist_days')
+    .select('weekday, works, first_hm, last_hm').eq('therapist_id', thId);
+  if (error) { wdMsg('불러오지 못했습니다.\n' + error.message, false); return; }
+  const by = {};
+  (data || []).forEach(r => { by[r.weekday] = r; });
+  const hm = v => v ? String(v).slice(0, 5) : '';
+  $('wdRows').innerHTML = WD7.map(w => {
+    const r = by[w] || { works: false };
+    return '<tr data-wd="' + w + '"' + (r.works ? '' : ' class="offday"') + '>'
+      + '<td>' + w + '</td>'
+      + '<td><label style="font-weight:normal;margin:0;"><input type="checkbox" class="wdOn"'
+      + (r.works ? ' checked' : '') + '> 출근</label></td>'
+      + '<td><input type="time" class="wdF" value="' + hm(r.first_hm) + '"' + (r.works ? '' : ' disabled') + '></td>'
+      + '<td><input type="time" class="wdL" value="' + hm(r.last_hm) + '"' + (r.works ? '' : ' disabled') + '></td>'
+      + '</tr>';
+  }).join('');
+  $('wdRows').querySelectorAll('tr').forEach(tr => {
+    const on = tr.querySelector('.wdOn');
+    on.onchange = () => {
+      tr.classList.toggle('offday', !on.checked);
+      tr.querySelector('.wdF').disabled = !on.checked;
+      tr.querySelector('.wdL').disabled = !on.checked;
+      wdState('');
+    };
+    tr.querySelectorAll('input[type=time]').forEach(x => x.oninput = () => wdState(''));
+  });
+  wdState('done');
+}
+$('wdSave').onclick = async () => {
+  if (!thId) return;
+  const rows = [];
+  let bad = '';
+  $('wdRows').querySelectorAll('tr').forEach(tr => {
+    const on = tr.querySelector('.wdOn').checked;
+    const f = tr.querySelector('.wdF').value || null;
+    const l = tr.querySelector('.wdL').value || null;
+    if (on && f && l && f > l) bad = tr.dataset.wd + '요일 첫 수업이 마지막 수업보다 늦습니다.';
+    rows.push({ therapist_id: thId, weekday: tr.dataset.wd, works: on,
+                first_hm: on ? f : null, last_hm: on ? l : null,
+                updated_at: new Date().toISOString() });
+  });
+  if (bad) { wdMsg(bad, false); return; }
+  wdState('busy');
+  const { error } = await sb.from('nl_therapist_days')
+    .upsert(rows, { onConflict: 'therapist_id,weekday' });
+  if (error) { wdState(''); wdMsg('저장하지 못했습니다.\n' + error.message, false); return; }
+  wdMsg('저장했습니다. 학부모 보강 요청 · 보강 확정에 바로 쓰입니다.', true);
+  await drawWorkDays();
+};
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase(), pw = $('pw').value;
+  if (!email || !pw) { show('이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) { show('❌ 로그인 실패\n'+e.message, false); }
+  finally { $('btn').disabled = false; $('btn').textContent = '로그인'; }
+};
+$('out').onclick = async () => {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+  else {
+    // 로그인이 없으면 첫 화면으로 보낸다 (빈 화면이 열리는 것을 막기 위함)
+    location.replace('index.html');
+  }
+})();
+</script>
+</body>
+</html>

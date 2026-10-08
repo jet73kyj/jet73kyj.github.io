@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>문자 안내 · 나무링크</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3c7a4a">
+<style>
+  :root { --ink:#2F2926; --ink2:#5F5E5A; --ink3:#A39C95;
+          --line:#ECE8E3; --bg:#F5F4F2; --acc:#B07A4A; --acc-bg:#F8F1E8;
+          --camB:#C9A27E; --camBg:#FBF5EE; }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--ink); -webkit-font-smoothing:antialiased; }
+  .hd { background:#fff; border-bottom:1px solid var(--line);
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar0 { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:820px; margin:0 auto; padding:16px; }
+  .box { background:#fff; border:1px solid var(--line); border-radius:12px;
+         padding:16px 18px; margin-bottom:12px; }
+  #loginBox { max-width:420px; margin:60px auto; padding:28px; }
+  #loginBox img.lg { height:26px; display:block; margin:0 auto 14px; }
+  h1 { font-size:18px; font-weight:600; margin:0 0 4px; }
+  .who { font-size:12px; color:var(--ink3); }
+  .top { display:flex; justify-content:space-between; align-items:flex-start;
+         gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  label { display:block; font-size:12px; color:var(--ink2); margin:12px 0 5px; }
+  input { width:100%; font:inherit; font-size:14px; padding:9px 11px;
+    border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); }
+  input:focus { outline:2px solid var(--acc); outline-offset:-1px; border-color:transparent; }
+  button { font:inherit; font-size:14px; padding:7px 15px; border-radius:8px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+  button:hover { background:var(--acc-bg); }
+  .go { background:#fff; color:var(--ink); border-color:var(--ink3); font-weight:500; }
+  .btns { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .out { margin-top:12px; font-size:13.5px; line-height:1.7; white-space:pre-wrap; }
+  .ok { color:var(--ink2); } .err { color:#993C1D; }
+
+  .dayt { font-size:13.5px; font-weight:500; color:var(--ink2);
+          margin:18px 0 8px; padding-left:2px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px;
+          padding:15px 16px; margin-bottom:11px; }
+  .c1 { display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .kind { font-size:12px; font-weight:500; padding:2px 10px; border-radius:10px;
+          white-space:nowrap; background:var(--acc-bg); color:#4A1B0C; }
+  .k-보강 { background:#FAEEDA; color:#854F0B; }
+  .k-첫수업 { background:#EAF3DE; color:#3B6D11; }
+  .k-평가 { background:#FBEAF0; color:#993556; }
+  .k-상담 { background:#FBEAF0; color:#993556; }
+  .k-요일변경 { background:#E6F1FB; color:#185FA5; }
+  .k-시간변경 { background:#E6F1FB; color:#185FA5; }
+  .k-체험 { background:#EEF5FA; color:#185FA5; }
+  .k-발추 { background:#F1ECF8; color:#5B3E9B; }
+  .k-추가 { background:#F1ECF8; color:#5B3E9B; }
+  .k-주차 { background:#FFF4D6; color:#854F0B; }
+  .k-릴스 { background:#FBEAF0; color:#993556; }
+  .k-휴무 { background:#F1EFEA; color:#5F5E5A; }
+  .k-발달안내 { background:#EAF3DE; color:#27500A; }
+  .tpl-ed { background:#fff; border:1px solid #C9A27E; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .tpl-ed label { display:block; font-size:12.5px; color:var(--ink2); margin:8px 0 4px; }
+  .tpl-ed textarea { width:100%; font:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line);
+    border-radius:8px; line-height:1.6; resize:vertical; min-height:220px; box-sizing:border-box; }
+  .tpl-ed .ck { display:flex; align-items:center; gap:7px; font-size:13.5px; margin-top:8px; }
+  .tpl-ed .ck input { width:auto; margin:0; }
+  .tpl-t { font-weight:600; font-size:14.5px; }
+  .tpl-p { white-space:pre-wrap; color:var(--ink2); font-size:13px; line-height:1.6; margin-top:6px;
+    max-height:4.8em; overflow:hidden; }
+  .tpl-on { font-size:11.5px; padding:1px 8px; border-radius:9px; background:#FBEAF0; color:#993556; margin-left:6px; }
+  .done-btn { background:#EAF3DE !important; border-color:#97C459 !important; color:#27500A !important; }
+  .k-공휴수업 { background:#FBE4DE; color:#993C1D; }
+  .reel { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+          font-size:12.5px; color:#5F5E5A; margin-top:7px; }
+  .reel b { font-weight:500; color:#993556; }
+  .reel button { font-size:12px; padding:3px 10px; width:auto; margin:0; }
+  .nm { font-weight:500; font-size:15px; }
+  .ph { font-size:13px; color:var(--ink2); }
+  .ph b { font-weight:500; color:var(--ink); }
+  .msg { background:var(--camBg); border-radius:9px; padding:12px 14px;
+         font-size:13.5px; line-height:1.8; white-space:pre-wrap; color:var(--ink); }
+  .rb { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; }
+  .rb button { font-size:13px; padding:5px 14px; }
+  .cp { border-color:var(--ink3); }
+  .sd { background:#fff; color:var(--ink); border-color:var(--line); font-weight:400; }
+  .none { text-align:center; color:var(--ink3); font-size:13.5px; padding:30px 0; }
+  .tabs { display:flex; gap:16px; margin-bottom:10px; flex-wrap:wrap;
+          border-bottom:1px solid var(--line); }
+  .tab { font-size:13.5px; padding:2px 0 7px; border:none; border-bottom:2px solid transparent;
+         border-radius:0; background:none; color:var(--ink3); cursor:pointer; }
+  .tab:hover { background:none; color:var(--ink); }
+  .tab.on { background:none; color:var(--ink); font-weight:500; border-bottom-color:var(--acc); }
+  .hint { font-size:11.5px; color:var(--ink3); margin-top:2px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 로그인 -->
+  <div class="box" id="loginBox">
+    <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+    <h1 style="text-align:center">문자 안내</h1>
+    <div class="who" style="text-align:center">나무링크에 로그인해 주세요.</div>
+    <label for="em">이메일</label>
+    <input id="em" type="email" autocomplete="username">
+    <label for="pw">비밀번호</label>
+    <input id="pw" type="password" autocomplete="current-password">
+    <div class="btns"><button id="btn" class="go">로그인</button>
+      <button onclick="location.href='index.html'">처음으로</button></div>
+    <div id="msg" class="out"></div>
+  </div>
+
+</div>
+
+  <!-- 본 화면 -->
+  <div id="mainBox" style="display:none;">
+    <div class="hd">
+      <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+      <span class="bar0"></span>
+      <h1>문자 안내</h1>
+      <span class="who" id="who"></span>
+      <span class="sp"></span>
+      <div class="btns" style="margin:0;">
+        <button id="out">로그아웃</button>
+        <button onclick="location.href='index.html'" style="color:#B07A4A">처음으로</button>
+      </div>
+    </div>
+    <div class="wrap">
+    <div class="box">
+      <div class="tabs">
+        <button class="tab on" data-f="안보냄">아직 안 보낸 것</button>
+        <button class="tab" data-f="전체">전체</button>
+        <button class="tab" data-f="보관">보관 문자</button>
+      </div>
+      <div class="hint">일정 안내는 오늘부터 사흘 안, 휴무 · 공휴일 수업 안내는 일주일 안입니다.
+        「복사」를 누르면 문자 내용이 복사되고, 문자를 보내신 뒤 「보냄」을 누르면 목록에서 빠집니다.</div>
+      <div id="sum" class="out"></div>
+    </div>
+
+    <div id="list"></div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: window.nlStore, persistSession: true, autoRefreshToken: true }
+});
+const $ = id => document.getElementById(id);
+
+let ME = null, ITEMS = [], SENT = {}, fFilter = '안보냄';
+// 릴스 (2026-10-08 은정님) — 모든 문자에 붙인다
+//   REELS  쓸 수 있는 릴스 (조회수 많은 것 → 조회수 빈 것은 최신 순)
+//   HIST   보낸 기록 { key, cid, news } — 그 집에 보낸 릴스를 다시 안 보내려고
+//   FAM    아동 → 집 (학부모 계정이 같거나 대표 번호가 같으면 한 집)
+let REELS = [], REEL = {}, HIST = [], FAM = {}, SENTNEWS = {};
+const CENTER_TEL = '042-488-6011';
+const WD = ['일','월','화','수','목','금','토'];
+
+function show(el, t, ok) { el.textContent = t; el.className = 'out ' + (ok ? 'ok' : 'err'); }
+function esc(s) { return String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function p2(n) { return String(n).padStart(2,'0'); }
+function ymd(d) { return d.getFullYear() + '-' + p2(d.getMonth()+1) + '-' + p2(d.getDate()); }
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+
+// 2026-09-03 -> 9월 3일 목요일
+function dayKo(s) {
+  const d = new Date(s + 'T00:00:00');
+  return (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + WD[d.getDay()] + '요일';
+}
+// 15:00 -> 오후 3시 / 19:20 -> 오후 7시 20분
+function timeKo(hm) {
+  if (!hm) return '';
+  const p = String(hm).slice(0,5).split(':');
+  const h = Number(p[0]), m = Number(p[1]);
+  const ap = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return ap + ' ' + h12 + '시' + (m ? ' ' + m + '분' : '');
+}
+
+// ── 문자 내용 만들기 ─────────────────────────────
+const HEAD = '안녕하세요^^\n자라는 나무 입니다\n\n';
+const FOOT = '\n\n일정에 변경이 있을 경우 미리 연락 주세요\n' + CENTER_TEL;
+const LINE1 = {
+  '보강':     '아동 보강 수업이 예약되어 있습니다',
+  '첫수업':   '아동 첫 수업이 시작됩니다',
+  '평가':     '아동 평가 예약이 되었습니다',
+  '상담':     '아동 평가 상담 예약이 되었습니다',
+  '요일변경': '아동 수업 요일이 바뀌었습니다',
+  '시간변경': '아동 수업 시간이 바뀌었습니다',
+  '체험':     '아동 체험 수업이 예약되어 있습니다',
+  '발추':     '아동 추가 수업이 예약되어 있습니다',
+  '추가':     '아동 추가 수업이 예약되어 있습니다'
+};
+// 쪼개기 조각(40분 미만 보강)인지 (2026-09-21)
+function isPiece(it) { return it.kind === '보강' && it.mins > 0 && it.mins < 40; }
+function kindLabel(it) {
+  if (it.kind === '공휴수업') return '공휴일 수업';
+  if (it.kind === '발달안내') return '발달재활 첫 안내';
+  if (isPiece(it)) return '보강 +' + it.mins;
+  return it.kind === '상담' ? '평가 상담' : it.kind;
+}
+// 주차 안내 — 센터에 처음 오는 아동의 첫 방문 문자에만 붙인다 (2026-10-08 은정님)
+const PARKING = '\n\n[주차 안내]\n'
+  + '① 건물 내 기계식 주차 (SUV 차량 주차 불가)\n'
+  + '② 인근 개나리아파트 상가 라인 또는 106동 앞\n'
+  + '※ 개나리아파트 주차 시 "꽃집 방문객입니다~" 라고 말씀해 주세요\n'
+  + '※ 가급적 106동(상가 쪽) 쪽문을 이용해 주세요';
+const REEL_TXT = '\n\n가정에서도 아이들과 함께 가볍게 보실 수 있도록 교육 자료(릴스 영상)도 함께 보내 드리니, '
+  + '시간 나실 때 가볍게 시청해 보시면 좋을 것 같습니다. ⬇️⬇️\n';
+const BLOG_TXT = '\n\n가정에서도 함께 가볍게 읽어 보실 수 있도록 교육 자료(블로그 글)도 함께 보내 드리니, '
+  + '시간 나실 때 가볍게 읽어 보시면 좋을 것 같습니다. ⬇️⬇️\n';
+function reelPart(it) {
+  const r = it.news ? REEL[it.news] : null;
+  if (!r || !r.url) return '';
+  return (r.kind === '블로그' ? BLOG_TXT : REEL_TXT) + r.url;
+}
+function reelName(r) { return r && r.kind === '블로그' ? '블로그' : '릴스'; }
+// 받침이 있으면 「은」, 없으면 「는」 (한글날은 · 추석 연휴는)
+function eunNeun(w) {
+  const c = String(w || '').trim().slice(-1).charCodeAt(0);
+  if (!(c >= 0xAC00 && c <= 0xD7A3)) return '은';
+  return (c - 0xAC00) % 28 ? '은' : '는';
+}
+const THANKS = '\n\n늘 자라는나무를 믿고 맡겨주셔서 감사합니다.\n궁금하신 점이 있으시면 언제든 편하게 말씀해 주세요.\n감사합니다. ❤️';
+// 발달재활 수업을 처음 시작하는 학부모께 — 운영 수칙 (2026-10-08 은정님 글)
+const DEV_INFO_BODY = '안녕하세요, 자라는나무입니다.\n'
+  + '소중한 아이와 함께하게 되어 기쁜 마음입니다. 원활한 발달재활서비스 이용을 위해 꼭 확인해 주셔야 할 운영 수칙을 안내드립니다.\n\n'
+  + '본인부담금 선납 안내\n'
+  + '관련 법령에 따라 본인부담금은 수업 전 선납을 원칙으로 합니다. 투명한 행정 처리를 위해 수업 전 아동 이름으로 입금 부탁드리며, 입금된 일자를 기준으로 관련 기관의 점검이 진행되오니 협조 부탁드립니다.\n\n'
+  + '바우처 카드 상시 소지\n'
+  + '매 수업 시 바우처 카드를 꼭 지참해 주세요. 카드 미소지 시 결제 처리에 어려움이 있을 수 있으니, 번거로우시더라도 댁으로 다시 돌아가시는 일이 없도록 방문 전 한 번 더 확인 부탁드립니다.\n\n'
+  + '결석 및 보강 규정\n'
+  + '결석 시 보강은 당월 내 진행이 원칙입니다. 바우처 포인트는 해당 월말에 소멸되어 다음 달로 이월되지 않으므로, 아이의 지속적인 성장을 위해 당월 내에 꼭 보강 일정을 잡아주시길 권장합니다.';
+const DEV_INFO_END = '\n\n아이의 건강한 성장을 위해 늘 정성을 다하는 자라는나무가 되겠습니다. 감사합니다.';
+function smsText(it) {
+  if (it.kind === '발달안내') return DEV_INFO_BODY + reelPart(it) + DEV_INFO_END;
+  if (it.kind === '휴무') {
+    return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 수업이 없습니다.\n\n'
+      + showLines(it).map(l => '· ' + l.text).join('\n')
+      + reelPart(it) + THANKS;
+  }
+  if (it.kind === '공휴수업') {
+    return '안녕하세요\n자라는나무입니다. ^^\n\n'
+      + it.name + ' 아동 ' + dayKo(it.on_date) + ' ' + it.hol + eunNeun(it.hol) + ' 공휴일이지만\n'
+      + '담당 ' + (it.ther || '') + ' 선생님 수업이 예약되어 있습니다.\n'
+      + timeKo(it.on_time) + ' 수업에 꼭 방문해 주세요.'
+      + reelPart(it)
+      + '\n\n늘 자라는나무를 믿고 맡겨주셔서 감사합니다. ❤️\n' + CENTER_TEL;
+  }
+  const l1 = isPiece(it)
+    ? '아동 정규 수업에 이어 보강 ' + it.mins + '분이 진행됩니다'
+    : (LINE1[it.kind] || '아동 일정 안내입니다');
+  return HEAD + it.name + ' ' + l1 + '\n\n'
+       + dayKo(it.on_date) + ' ' + timeKo(it.on_time) + '\n'
+       + '담당 ' + (it.ther || '') + ' 선생님'
+       + (it.parking ? PARKING : '')
+       + reelPart(it)
+       + FOOT;
+}
+
+// ── 자료 모으기 ──────────────────────────────────
+async function loadAll() {
+  const t0 = new Date();
+  const from = ymd(t0), to = ymd(addDays(t0, 3));
+  const to7 = ymd(addDays(t0, 7));   // 휴무 · 공휴일 수업 안내는 일주일 앞까지 (2026-10-08)
+
+  const [kidsR, thsR, gdR, sentR, reelR, pcR] = await Promise.all([
+    sb.from('nl_children').select('id, name, phone'),
+    sb.from('nl_therapists').select('id, name'),
+    sb.from('nl_guardians').select('child_id, name, phone, relation'),
+    // 보낸 기록은 오늘부터 일주일 안만 읽는다 (1,000줄 한도 · 2026-09-21 · 2026-10-08 일주일로)
+    sb.from('nl_sms_sent').select('kind, child_id, on_date, on_time')
+      .gte('on_date', from).lte('on_date', to7),
+    sb.from('nl_news').select('id, kind, title, url, views, from_date, to_date')
+      .in('kind', ['인스타그램', '블로그']).not('url', 'is', null),
+    sb.from('nl_parent_children').select('account_id, child_id')
+  ]);
+  // 읽기가 실패하면 조용히 비우지 않고 알린다 (2026-09-21)
+  [kidsR, thsR, gdR, sentR, reelR].forEach(r => { if (r.error) throw r.error; });
+  // 학부모 계정 묶음을 못 읽으면 대표 번호로만 집을 묶는다 (화면은 멈추지 않음)
+  if (pcR.error) pcR.data = [];
+
+  // 릴스 — 내리는 날이 지난 것은 뺀다 · 조회수 많은 것 → 조회수 빈 것은 최신 순
+  //   릴스를 다 받은 집에는 블로그 글로 대신한다 (2026-10-08 은정님) — 릴스 먼저, 블로그 나중
+  REELS = (reelR.data || []).filter(r => String(r.url || '').trim()
+      && (!r.to_date || r.to_date >= from))
+    .sort((a, b) => {
+      const ak = a.kind === '블로그' ? 1 : 0, bk = b.kind === '블로그' ? 1 : 0;
+      if (ak !== bk) return ak - bk;
+      const av = a.views == null ? -1 : Number(a.views), bv = b.views == null ? -1 : Number(b.views);
+      return (bv - av)
+        || String(b.from_date || '').localeCompare(String(a.from_date || ''))
+        || (b.id - a.id);
+    });
+  REEL = {}; REELS.forEach(r => REEL[r.id] = r);
+
+  // 보낸 릴스 기록 — 기간 없이 모두 (1,000줄씩)
+  HIST = []; SENTNEWS = {};
+  for (let f = 0; ; f += 1000) {
+    const { data: part, error: hE } = await sb.from('nl_sms_sent')
+      .select('id, kind, child_id, on_date, on_time, news_id')
+      .not('news_id', 'is', null).order('id').range(f, f + 999);
+    if (hE) throw hE;
+    (part || []).forEach(h => {
+      const key = h.kind + '|' + h.child_id + '|' + h.on_date + '|' + String(h.on_time || '').slice(0,5);
+      HIST.push({ key: key, cid: h.child_id, news: h.news_id });
+      SENTNEWS[key] = h.news_id;
+    });
+    if (!part || part.length < 1000) break;
+  }
+  const KID = {}; (kidsR.data || []).forEach(k => KID[k.id] = k);
+  const TH  = {}; (thsR.data  || []).forEach(t => TH[t.id]  = t.name);
+  const GD  = {}; (gdR.data   || []).forEach(g => {
+    (GD[g.child_id] = GD[g.child_id] || []).push(g);
+  });
+  // 집 묶기 — 학부모 계정이 같거나, 아동 표 대표 번호가 같으면 한 집
+  const up = {};
+  const root = x => { while (up[x] !== undefined && up[x] !== x) x = up[x]; return x; };
+  const join = (a, b) => { const ra = root(a), rb = root(b); if (ra !== rb) up[rb] = ra; };
+  const byAcc = {}, byTel = {};
+  (pcR.data || []).forEach(r => {
+    const k = 'c' + r.child_id; if (up[k] === undefined) up[k] = k;
+    if (byAcc[r.account_id]) join(byAcc[r.account_id], k); else byAcc[r.account_id] = k;
+  });
+  (kidsR.data || []).forEach(c => {
+    const k = 'c' + c.id; if (up[k] === undefined) up[k] = k;
+    const t = String(c.phone || '').replace(/\D/g, '');
+    if (t.length < 9) return;
+    if (byTel[t]) join(byTel[t], k); else byTel[t] = k;
+  });
+  FAM = {}; Object.keys(up).forEach(k => FAM[k.slice(1)] = root(k));
+  SENT = {};
+  (sentR.data || []).forEach(s => {
+    SENT[s.kind + '|' + s.child_id + '|' + s.on_date + '|'
+       + String(s.on_time || '').slice(0,5)] = true;
+  });
+
+  const out = [];
+  const push = (kind, cid, d, hm, thId, extra, mins, meet) => {
+    const k = KID[cid]; if (!k) return;
+    out.push({
+      kind: kind, cid: cid, name: k.name || ('아동 ' + cid),
+      on_date: d, on_time: String(hm || '').slice(0,5),
+      ther: thId ? (TH[thId] || '') : '',
+      phone: k.phone || '', gds: GD[cid] || [], extra: extra || '',
+      mins: Number(mins) || 0, meet: meet || '', parking: false
+    });
+  };
+
+  // ① 보강 · ② 첫 수업 — 회기 표에서
+  const { data: ss, error: ssE } = await sb.from('nl_sessions')
+    .select('child_id, plan_date, start_time, status, therapist_id, makeup_for, schedule_id, support_type_id, memo, minutes')
+    .gte('plan_date', from).lte('plan_date', to);
+  if (ssE) throw ssE;
+  (ss || []).forEach(s => {
+    if (s.status === '휴무' || s.status === '쉼' || s.status === '결석'
+        || s.status === '취소') return;
+    if (s.makeup_for) { push('보강', s.child_id, s.plan_date, s.start_time, s.therapist_id, '', s.minutes); return; }
+    // ⑧ 발추(이) 수업 — 달마다 날짜가 달라지므로 따로 알린다 (2026-09-19)
+    //   보강 줄은 위에서 「보강」으로 이미 담았고,
+    //   메모에 [분산]이 든 자리표는 정규 수업에 10분씩 얹는 것이라 뺀다
+    if (Number(s.support_type_id) === 8
+        && String(s.memo || '').indexOf('분산') < 0)
+      push('발추', s.child_id, s.plan_date, s.start_time, s.therapist_id);
+  });
+
+  // 첫 수업 — 요일줄 시작날이 사흘 안
+  const { data: sc, error: scE } = await sb.from('nl_therapy_schedules')
+    .select('id, therapy_id, weekday, start_time, therapist_id, from_date');
+  if (scE) throw scE;
+  const { data: th, error: thE } = await sb.from('nl_therapies').select('id, child_id');
+  if (thE) throw thE;
+  const THC = {}; (th || []).forEach(x => THC[x.id] = x.child_id);
+  const firstOf = {};
+  (ss || []).forEach(s => {
+    if (!s.schedule_id) return;
+    const k = s.schedule_id;
+    if (!firstOf[k] || s.plan_date < firstOf[k].plan_date) firstOf[k] = s;
+  });
+  (sc || []).forEach(x => {
+    if (!x.from_date || x.from_date < from || x.from_date > to) return;
+    // 담당·요일을 바꿔 나뉜 요일줄은 첫 수업이 아니다 (2026-09-21)
+    //   같은 치료에 더 앞선(또는 시작날이 빈) 요일줄이 있으면 뺀다
+    const older = (sc || []).some(y => y.id !== x.id && y.therapy_id === x.therapy_id
+      && (!y.from_date || y.from_date < x.from_date));
+    if (older) return;
+    const cid = THC[x.therapy_id]; if (!cid) return;
+    push('첫수업', cid, x.from_date, x.start_time, x.therapist_id);
+  });
+
+  // ③ 평가 — 평가 표에서
+  const { data: ev, error: evE } = await sb.from('nl_evaluations')
+    .select('child_id, eval_date, eval_time, therapist_id, status')
+    .gte('eval_date', from).lte('eval_date', to);
+  if (evE) throw evE;
+  (ev || []).forEach(e => {
+    if (e.status === '취소') return;   // 취소한 평가는 안내 문자를 안 띄운다 (2026-09-11)
+    push('평가', e.child_id, e.eval_date, e.eval_time, e.therapist_id);
+  });
+
+  // ④ 평가 상담 — 휴무 표의 「상담」 줄
+  const { data: cs, error: csE } = await sb.from('nl_offdays')
+    .select('off_date, kind, therapist_id, start_time, child_id, meet_type')
+    .eq('kind', '상담').gte('off_date', from).lte('off_date', to);
+  if (csE) throw csE;
+  (cs || []).forEach(c =>
+    push('상담', c.child_id, c.off_date, c.start_time, c.therapist_id, '', 0, c.meet_type || '대면'));
+
+  // ⑦ 체험 수업 — 체험 표에서 (2026-09-19)
+  const { data: tr, error: trE } = await sb.from('nl_trial_lessons')
+    .select('child_id, lesson_date, lesson_time, therapist_id, status, kind')
+    .gte('lesson_date', from).lte('lesson_date', to);
+  if (trE) throw trE;
+  (tr || []).forEach(t => {
+    if (t.status === '취소') return;   // 취소한 체험은 안내 문자를 안 띄운다
+    // 추가 수업(갈래 「추가」)은 「추가」 갈래로 (2026-09-30)
+    push(t.kind === '추가' ? '추가' : '체험', t.child_id, t.lesson_date, t.lesson_time, t.therapist_id);
+  });
+
+  // ⑤⑥ 요일·시간 변경 — 알림 표에서. 바뀐 뒤 첫 수업이 사흘 안일 때만
+  const { data: al, error: alE } = await sb.from('nl_alerts')
+    .select('id, kind, child_id, body, created_at')
+    .eq('kind', '시간변경')
+    .gte('created_at', ymd(addDays(t0, -30)));
+  if (alE) throw alE;
+  // 알림 뒤 「첫 수업」이 사흘 안일 때만 한 번 (2026-09-21)
+  //   전에는 30일 동안 사흘 안 수업마다 다시 떴다
+  //   바뀐 수업 줄은 알림 뒤에 새로 깔리거나 고쳐지므로, 그 뒤에 만들어지거나
+  //   고쳐진 줄 가운데 가장 이른 것을 첫 수업으로 본다
+  const alist = (al || []).filter(a => a.child_id);
+  if (alist.length) {
+    const aDay = a => ymd(new Date(a.created_at));
+    const minD = alist.map(aDay).sort()[0];
+    const cids = Array.from(new Set(alist.map(a => a.child_id)));
+    const aft = [];
+    for (let f = 0; ; f += 1000) {
+      const { data: part, error: pE } = await sb.from('nl_sessions')
+        .select('id, child_id, plan_date, start_time, status, therapist_id, makeup_for, created_at, updated_at')
+        .in('child_id', cids).gte('plan_date', minD).lte('plan_date', to)
+        .order('id').range(f, f + 999);
+      if (pE) throw pE;
+      aft.push(...(part || []));
+      if (!part || part.length < 1000) break;
+    }
+    alist.forEach(a => {
+      const cid = a.child_id, ad = aDay(a), at = new Date(a.created_at).getTime() - 60000;
+      let hit = null;
+      aft.forEach(s => {
+        if (s.child_id !== cid || s.makeup_for) return;
+        if (['휴무','쉼','결석','취소'].indexOf(s.status) >= 0) return;
+        if (s.plan_date < ad) return;
+        const touched = Math.max(new Date(s.created_at || 0).getTime(),
+                                 new Date(s.updated_at || 0).getTime());
+        if (touched < at) return;
+        if (!hit || s.plan_date < hit.plan_date
+            || (s.plan_date === hit.plan_date && String(s.start_time) < String(hit.start_time))) hit = s;
+      });
+      if (!hit || hit.plan_date < from) return;   // 첫 수업이 이미 지났으면 안 띄움
+      // 글에 「→」 앞뒤로 요일이 둘 다 있으면 요일 변경
+      const b = String(a.body || '');
+      const two = (b.match(/요일/g) || []).length >= 2;
+      push(two ? '요일변경' : '시간변경', cid,
+           hit.plan_date, hit.start_time, hit.therapist_id, b);
+    });
+  }
+
+  // ⑩ 휴무 안내 · ⑪ 공휴일 수업 안내 — 일주일 안 (2026-10-08 은정님)
+  //   휴무: 원래 수업 줄이 「휴무」인 날 — 공휴일 · 센터휴무는 그 이름, 치료사휴무는 「담당 ○○ 선생님 휴무」
+  //         아동마다 한 장으로 묶고, 보낸 날은 날짜마다 적는다 (새 휴무가 생기면 그 날만 다시 뜸)
+  //   공휴일 수업: 공휴일 · 센터휴무인 날인데 원래 수업이 「예정」 — 선생님이 「나오는 날」이라 수업이 있는 것
+  {
+    const [ofR, s7R, thR2, ttR] = await Promise.all([
+      sb.from('nl_offdays').select('off_date, kind, therapist_id, reason')
+        .in('kind', ['공휴일', '센터휴무', '치료사휴무']).gte('off_date', from).lte('off_date', to7),
+      sb.from('nl_sessions').select('child_id, plan_date, start_time, status, therapist_id, therapy_id, makeup_for, minutes')
+        .gte('plan_date', from).lte('plan_date', to7).is('makeup_for', null),
+      sb.from('nl_therapies').select('id, therapy_type_id'),
+      sb.from('nl_therapy_types').select('id, name')
+    ]);
+    [ofR, s7R, thR2, ttR].forEach(r => { if (r.error) throw r.error; });
+    const TT = {}; (ttR.data || []).forEach(t => TT[t.id] = String(t.name || '').replace(/재활$|치료$/, ''));
+    const TY = {}; (thR2.data || []).forEach(t => TY[t.id] = TT[t.therapy_type_id] || '');
+    const holOf = d => (ofR.data || []).find(o => o.off_date === d && !o.therapist_id
+                         && (o.kind === '공휴일' || o.kind === '센터휴무'));
+    const vacOf = (d, th) => (ofR.data || []).find(o => o.off_date === d && o.kind === '치료사휴무'
+                         && Number(o.therapist_id) === Number(th));
+    const offName = o => String(o.reason || '').trim() || (o.kind === '센터휴무' ? '센터 휴무' : '공휴일');
+    const H = {};   // 아동 → [{date, text}]
+    (s7R.data || []).sort((a, b) => String(a.plan_date).localeCompare(String(b.plan_date))
+        || String(a.start_time).localeCompare(String(b.start_time))).forEach(x => {
+      const k = KID[x.child_id]; if (!k) return;
+      const area = TY[x.therapy_id] ? TY[x.therapy_id] + ' 수업' : '수업';
+      if (x.status === '휴무') {
+        const h = holOf(x.plan_date), v = h ? null : vacOf(x.plan_date, x.therapist_id);
+        const text = dayKo(x.plan_date) + ' ' + (h ? offName(h) + ' — ' + area + ' 휴무'
+          : v ? '— 담당 ' + (TH[x.therapist_id] || '') + ' 선생님 휴무 (' + area + ')'
+          : '— ' + area + ' 휴무');
+        const L = H[x.child_id] = H[x.child_id] || [];
+        if (!L.some(l => l.text === text)) L.push({ date: x.plan_date, text: text });
+        return;
+      }
+      if ((x.status === '예정' || x.status === '보강') && (!x.minutes || x.minutes >= 40)) {
+        const h = holOf(x.plan_date);
+        if (h) {
+          out.push({
+            kind: '공휴수업', cid: x.child_id, name: k.name || ('아동 ' + x.child_id),
+            on_date: x.plan_date, on_time: String(x.start_time || '').slice(0, 5),
+            ther: x.therapist_id ? (TH[x.therapist_id] || '') : '', hol: offName(h),
+            phone: k.phone || '', gds: GD[x.child_id] || [], extra: '', mins: 0, meet: '', parking: false
+          });
+        }
+      }
+    });
+    Object.keys(H).forEach(cid => {
+      const k = KID[cid]; const L = H[cid];
+      const dates = Array.from(new Set(L.map(l => l.date))).sort();
+      out.push({
+        kind: '휴무', cid: Number(cid), name: k.name || ('아동 ' + cid),
+        on_date: dates[0], on_time: '', lines: L, dates: dates,
+        ther: '', phone: k.phone || '', gds: GD[cid] || [], extra: '', mins: 0, meet: '', parking: false
+      });
+    });
+  }
+
+  // ⑫ 발달재활 첫 안내 — 발달재활 수업을 처음 받는 아동의 첫 수업이 사흘 안 (2026-10-08 은정님)
+  //   그 아동의 발달재활 원래 수업 줄 가운데 가장 이른 날이 사흘 안이면 한 번만 뜬다
+  //   (이미 받던 아이가 요일 · 선생님을 바꿔 새 요일줄이 생긴 경우는 앞선 줄이 있어 안 뜸)
+  {
+    const first = {};
+    (ss || []).forEach(x => {
+      if (Number(x.support_type_id) !== 2 || x.makeup_for || x.status === '취소') return;
+      const f = first[x.child_id];
+      if (!f || x.plan_date < f.plan_date || (x.plan_date === f.plan_date && String(x.start_time) < String(f.start_time))) first[x.child_id] = x;
+    });
+    const dcids = Object.keys(first).map(Number);
+    if (dcids.length) {
+      // 아동마다 앞선 발달재활 줄이 하나라도 있는지만 본다 (한꺼번에 읽으면 1,000줄을 넘어 잘림)
+      const olds = await Promise.all(dcids.map(cid => sb.from('nl_sessions').select('id')
+        .eq('child_id', cid).eq('support_type_id', 2).is('makeup_for', null).lt('plan_date', from).limit(1)));
+      olds.forEach(r => { if (r.error) throw r.error; });
+      const had = new Set(dcids.filter((cid, i) => (olds[i].data || []).length > 0));
+      dcids.forEach(cid => {
+        if (had.has(cid)) return;
+        const x = first[cid];
+        push('발달안내', cid, x.plan_date, x.start_time, x.therapist_id);
+      });
+    }
+  }
+
+  // ⑨ 주차 안내 — 센터에 처음 오는 아동 (2026-10-08 은정님)
+  //   첫수업 · 체험 · 평가 · 평가상담(대면) 가운데
+  //   그 날 앞에 완료된 수업 · 평가 · 체험 · 대면 상담이 하나도 없는 아동의
+  //   가장 이른 한 건에만 붙인다 (재평가 · 다니는 아동의 체험에는 안 붙음)
+  const VISIT = ['첫수업', '체험', '평가', '상담'];
+  const isVisit = x => VISIT.indexOf(x.kind) >= 0 && !(x.kind === '상담' && x.meet === '비대면');
+  const vcids = Array.from(new Set(out.filter(isVisit).map(x => x.cid)));
+  for (const cid of vcids) {
+    const mine = out.filter(x => x.cid === cid && isVisit(x)).sort((a, b) =>
+      String(a.on_date).localeCompare(String(b.on_date))
+      || String(a.on_time).localeCompare(String(b.on_time)));
+    const first = mine[0];
+    const before = first.on_date;
+    // 앞서 온 적이 있는지 — 넷 중 하나라도 있으면 처음이 아니다
+    const [r1, r2, r3, r4] = await Promise.all([
+      sb.from('nl_sessions').select('id').eq('child_id', cid).eq('status', '완료')
+        .lt('plan_date', before).limit(1),
+      sb.from('nl_evaluations').select('id').eq('child_id', cid).eq('status', '완료')
+        .lt('eval_date', before).limit(1),
+      sb.from('nl_trial_lessons').select('id').eq('child_id', cid).eq('status', '완료')
+        .lt('lesson_date', before).limit(1),
+      sb.from('nl_offdays').select('id').eq('child_id', cid).eq('kind', '상담')
+        .or('meet_type.is.null,meet_type.neq.비대면').lt('off_date', before).limit(1)
+    ]);
+    [r1, r2, r3, r4].forEach(r => { if (r.error) throw r.error; });
+    const came = [r1, r2, r3, r4].some(r => (r.data || []).length > 0);
+    if (!came) first.parking = true;
+  }
+
+  // 같은 것이 두 번 들어가지 않게
+  const seen = {};
+  ITEMS = out.filter(x => {
+    const k = x.kind + '|' + x.cid + '|' + x.on_date + '|' + x.on_time;
+    if (seen[k]) return false; seen[k] = true; return true;
+  }).sort((a, b) =>
+    String(a.on_date).localeCompare(String(b.on_date))
+    || String(a.on_time).localeCompare(String(b.on_time))
+    || (a.cid - b.cid));
+  ITEMS.forEach(it => { it.rot = 0; });
+  assignReels();
+}
+
+// 릴스 나누기 — 이미 보낸 카드는 보낸 릴스 그대로, 안 보낸 카드는 그 집이 안 받은 것
+function famOf(cid) { return FAM[String(cid)] || ('c' + cid); }
+function assignReels() {
+  const used = {};
+  const add = (cid, nid) => { const f = famOf(cid); (used[f] = used[f] || {})[nid] = true; };
+  HIST.forEach(h => add(h.cid, h.news));
+  ITEMS.forEach(it => {
+    it.cands = 0;
+    if (isSent(it)) {
+      const ks = it.kind === '휴무' ? it.dates.map(d => dayKey(it.cid, d)) : [sentKey(it)];
+      it.news = ks.map(k => SENTNEWS[k]).find(Boolean) || null; return;
+    }
+    const u = used[famOf(it.cid)] || {};
+    const c = REELS.filter(r => !u[r.id]);
+    it.cands = c.length;
+    it.news = c.length ? c[it.rot % c.length].id : null;
+    if (it.news) add(it.cid, it.news);
+  });
+}
+
+function sentKey(it) {
+  return it.kind + '|' + it.cid + '|' + it.on_date + '|' + it.on_time;
+}
+// 휴무 안내는 날짜마다 보냄을 적는다 — 아직 안 보낸 날이 있으면 그 날만 다시 뜸
+function dayKey(cid, d) { return '휴무|' + cid + '|' + d + '|'; }
+function unsentDates(it) { return (it.dates || []).filter(d => !SENT[dayKey(it.cid, d)]); }
+function isSent(it) {
+  if (it.kind === '휴무') return unsentDates(it).length === 0;
+  return !!SENT[sentKey(it)];
+}
+function showLines(it) {
+  const u = unsentDates(it);
+  return u.length ? it.lines.filter(l => u.indexOf(l.date) >= 0) : it.lines;
+}
+
+// ── 그리기 ───────────────────────────────────────
+function reelLine(it, i, done) {
+  if (!REELS.length) return '';
+  const r = it.news ? REEL[it.news] : null;
+  if (!r) return '<div class="reel">' + (done ? '교육 자료 없이 보냄' : '보낼 교육 자료 없음 (이 집은 릴스 · 블로그를 모두 받았습니다)') + '</div>';
+  return '<div class="reel">' + reelName(r) + ': <b>「' + esc(r.title || '') + '」</b>'
+    + (r.views != null ? ' · 조회수 ' + Number(r.views).toLocaleString() : '')
+    + (!done && it.cands > 1 ? ' <button data-rr="' + i + '">다른 자료</button>' : '')
+    + '</div>';
+}
+function draw() {
+  if (fFilter === '보관') { drawTpl(); return; }
+  const rows = ITEMS.filter(x => fFilter === '전체' || !isSent(x));
+  const nLeft = ITEMS.filter(x => !isSent(x)).length;
+  show($('sum'), '안내할 일정 ' + ITEMS.length + '건 · 아직 안 보낸 것 ' + nLeft + '건', true);
+
+  if (!rows.length) {
+    $('list').innerHTML = '<div class="box"><div class="none">'
+      + (fFilter === '전체' ? '안내드릴 일정이 없습니다.'
+                            : '아직 안 보낸 것이 없습니다.') + '</div></div>';
+    return;
+  }
+
+  let html = '', lastD = '';
+  rows.forEach((it, i) => {
+    if (it.on_date !== lastD) {
+      html += '<div class="dayt">' + dayKo(it.on_date) + '</div>';
+      lastD = it.on_date;
+    }
+    const done = isSent(it);
+    // 번호 — 아동 표와 보호자 표 둘 다 보여준다
+    const phs = [];
+    if (it.phone) phs.push('<b>' + esc(it.phone) + '</b>');
+    it.gds.forEach(g => {
+      if (!g.phone || g.phone === it.phone) return;
+      phs.push(esc((g.relation && g.relation !== '미상' ? g.relation + ' ' : '')
+                   + (g.name ? g.name + ' ' : '') + g.phone));
+    });
+    html += '<div class="card"' + (done ? ' style="opacity:.5;"' : '') + '>'
+      + '<div class="c1">'
+      +   '<span class="kind k-' + it.kind + '">'
+      +     esc(kindLabel(it)) + '</span>'
+      +   (it.parking ? '<span class="kind k-주차">+ 주차 안내</span>' : '')
+      +   (it.news && REEL[it.news] ? '<span class="kind k-릴스">+ ' + reelName(REEL[it.news]) + '</span>' : '')
+      +   '<span class="nm">' + it.cid + '번 ' + esc(it.name) + '</span>'
+      +   '<span class="ph">' + (phs.length ? phs.join(' · ') : '번호 없음') + '</span>'
+      +   (done ? '<span class="ph">✅ 보냄</span>' : '')
+      + '</div>'
+      + '<div class="msg" id="m' + i + '">' + esc(smsText(it)) + '</div>'
+      + (it.extra ? '<div class="hint">' + esc(it.extra) + '</div>' : '')
+      + reelLine(it, i, done)
+      + '<div class="rb">'
+      +   '<button class="cp" data-cp="' + i + '">복사</button>'
+      +   (done ? '<button data-un="' + i + '">보냄 취소</button>'
+                : '<button class="sd" data-sd="' + i + '">보냄</button>')
+      + '</div>'
+      + '</div>';
+  });
+  $('list').innerHTML = html;
+
+  $('list').querySelectorAll('[data-cp]').forEach(el => {
+    el.onclick = () => {
+      const it = rows[Number(el.dataset.cp)];
+      const t = smsText(it);
+      if (navigator.clipboard) navigator.clipboard.writeText(t);
+      else {
+        const ta = document.createElement('textarea');
+        ta.value = t; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+      }
+      el.textContent = '복사됨'; setTimeout(() => { el.textContent = '복사'; }, 1200);
+    };
+  });
+  $('list').querySelectorAll('[data-rr]').forEach(el => {
+    el.onclick = () => {
+      const it = rows[Number(el.dataset.rr)];
+      it.rot = (it.rot || 0) + 1;
+      assignReels();
+      draw();
+    };
+  });
+  $('list').querySelectorAll('[data-sd]').forEach(el => {
+    el.onclick = () => markSent(rows[Number(el.dataset.sd)], true);
+  });
+  $('list').querySelectorAll('[data-un]').forEach(el => {
+    el.onclick = () => markSent(rows[Number(el.dataset.un)], false);
+  });
+}
+
+async function markSent(it, on) {
+  if (it.kind === '휴무') return markSentDays(it, on);
+  if (on) {
+    const { error } = await sb.from('nl_sms_sent').insert({
+      kind: it.kind, child_id: it.cid, on_date: it.on_date,
+      on_time: it.on_time ? it.on_time + ':00' : null,
+      sent_by: ME ? ME.id : null,
+      news_id: it.news || null
+    });
+    if (error && !String(error.message).includes('duplicate')) {
+      show($('sum'), '❌ 표시하지 못했습니다.\n' + error.message, false); return;
+    }
+    // 이미 보냄으로 적혀 있던 줄(겹침)이면 서버에 적힌 릴스를 다시 읽는다
+    if (error) { await reloadHist(); }
+    else if (it.news) {
+      HIST.push({ key: sentKey(it), cid: it.cid, news: it.news });
+      SENTNEWS[sentKey(it)] = it.news;
+    }
+    SENT[sentKey(it)] = true;
+  } else {
+    if (!confirm('「보냄」 표시를 지울까요?')) return;
+    let q = sb.from('nl_sms_sent').delete()
+      .eq('kind', it.kind).eq('child_id', it.cid).eq('on_date', it.on_date);
+    q = it.on_time ? q.eq('on_time', it.on_time + ':00') : q.is('on_time', null);
+    const { error } = await q;
+    if (error) { show($('sum'), '❌ 지우지 못했습니다.\n' + error.message, false); return; }
+    delete SENT[sentKey(it)];
+    HIST = HIST.filter(h => h.key !== sentKey(it));
+    delete SENTNEWS[sentKey(it)];
+  }
+  assignReels();
+  draw();
+}
+// 휴무 안내 — 보낸 날짜마다 한 줄씩 적고, 취소하면 그 아동의 이 카드 날짜를 모두 지운다
+async function markSentDays(it, on) {
+  if (on) {
+    const ds = unsentDates(it);
+    if (!ds.length) return;
+    const { error } = await sb.from('nl_sms_sent').insert(ds.map((d, i) => ({
+      kind: '휴무', child_id: it.cid, on_date: d, on_time: null,
+      sent_by: ME ? ME.id : null, news_id: i === 0 ? (it.news || null) : null
+    })));
+    if (error && !String(error.message).includes('duplicate')) {
+      show($('sum'), '❌ 표시하지 못했습니다.\n' + error.message, false); return;
+    }
+    if (error) await reloadHist();
+    else if (it.news) { HIST.push({ key: dayKey(it.cid, ds[0]), cid: it.cid, news: it.news }); SENTNEWS[dayKey(it.cid, ds[0])] = it.news; }
+    ds.forEach(d => SENT[dayKey(it.cid, d)] = true);
+  } else {
+    if (!confirm('「보냄」 표시를 지울까요?')) return;
+    const { error } = await sb.from('nl_sms_sent').delete()
+      .eq('kind', '휴무').eq('child_id', it.cid).in('on_date', it.dates);
+    if (error) { show($('sum'), '❌ 지우지 못했습니다.\n' + error.message, false); return; }
+    it.dates.forEach(d => { const k = dayKey(it.cid, d); delete SENT[k]; delete SENTNEWS[k]; });
+    HIST = HIST.filter(h => it.dates.map(d => dayKey(it.cid, d)).indexOf(h.key) < 0);
+  }
+  assignReels();
+  draw();
+}
+async function reloadHist() {
+  const h2 = [], sn = {};
+  for (let f = 0; ; f += 1000) {
+    const { data: part, error } = await sb.from('nl_sms_sent')
+      .select('id, kind, child_id, on_date, on_time, news_id')
+      .not('news_id', 'is', null).order('id').range(f, f + 999);
+    if (error) return;
+    (part || []).forEach(h => {
+      const key = h.kind + '|' + h.child_id + '|' + h.on_date + '|' + String(h.on_time || '').slice(0,5);
+      h2.push({ key: key, cid: h.child_id, news: h.news_id }); sn[key] = h.news_id;
+    });
+    if (!part || part.length < 1000) break;
+  }
+  HIST = h2; SENTNEWS = sn;
+}
+
+document.querySelectorAll('.tab').forEach(b => {
+  b.onclick = () => {
+    if (!tplLeaveOk()) return;
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    fFilter = b.dataset.f;
+    draw();
+  };
+});
+
+async function afterLogin(user) {
+  const { data: me, error } = await sb.from('nl_therapists')
+    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (error) { show($('msg'), '❌ 직원 조회 실패\n' + error.message, false); return; }
+  if (!me)   { show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.', false); return; }
+  if ([8, 19].indexOf(Number(me.id)) < 0) {
+    show($('msg'), '⚠️ 이 화면은 관리자·행정만 볼 수 있습니다.', false); return;
+  }
+  nlKeep(me.id);
+  ME = me;
+  $('who').textContent = me.name + ' (' + me.role + ') 님';
+
+  try { await loadAll(); }
+  catch (e) { show($('msg'), '❌ 자료를 읽지 못했습니다.\n' + e.message, false); return; }
+  await loadTpl();
+  draw();
+
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+}
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 넣으세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false; $('btn').textContent = '로그인';
+  }
+};
+
+$('out').onclick = async () => {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+})();
+
+// ═══════════════ 보관 문자 (2026-10-08 은정님) ═══════════════
+//   가끔 보내는 문자(모집 안내 등)를 적어 두고 [복사] 로 꺼내 쓴다 · 표 nl_sms_templates (8 · 19번)
+//   「릴스 붙이기」를 켜 두면 복사할 때 조회수 많은 릴스 하나를 끝에 붙인다 (같은 집 두 번 안 감은 안 따짐)
+let TPL = [], TPL_ED = null, TPL_ORIG = '', TPL_SAVING = false, TPL_ERR = '';
+async function loadTpl() {
+  const { data, error } = await sb.from('nl_sms_templates').select('*').order('sort_no').order('id');
+  TPL_ERR = error ? error.message : '';
+  TPL = data || [];
+}
+function tplSnap() {
+  if (!TPL_ED || !$('tplT')) return '';
+  return [$('tplT').value, $('tplB').value, $('tplR').checked].join('\u0001');
+}
+function tplDirty() { return !!TPL_ED && tplSnap() !== TPL_ORIG; }
+function tplLeaveOk() {
+  if (!tplDirty()) return true;
+  if (!confirm('저장하지 않은 보관 문자가 있습니다.\n그래도 나갈까요?')) return false;
+  TPL_ED = null; return true;
+}
+function tplText(t) {
+  let out = t.body;
+  if (t.add_reel && REELS.length) {
+    const r = REELS[0];
+    out += (r.kind === '블로그' ? BLOG_TXT : REEL_TXT) + r.url;
+  }
+  return out;
+}
+function tplBtn(st) {
+  const b = $('tplSave'); if (!b) return;
+  b.disabled = st === 'saving';
+  b.classList.toggle('done-btn', st === 'done');
+  b.textContent = st === 'saving' ? '저장 중…' : st === 'done' ? '✓ 저장됨' : '💾 저장 전';
+}
+function drawTpl() {
+  // 고치던 글은 다시 그려도 남게 (차례 바꾸기 · 지우기 때)
+  if (TPL_ED && $('tplT')) { TPL_ED.title = $('tplT').value; TPL_ED.body = $('tplB').value; TPL_ED.add_reel = $('tplR').checked; }
+  show($('sum'), TPL_ERR ? '❌ 보관 문자를 읽지 못했습니다.\n' + TPL_ERR : '보관 문자 ' + TPL.length + '개', !TPL_ERR);
+  let html = '<div style="display:flex;justify-content:flex-end;margin-bottom:10px;">'
+    + '<button type="button" id="tplNew" class="cp">＋ 새 문자</button></div>';
+  if (TPL_ED) {
+    html += '<div class="tpl-ed">'
+      + '<label for="tplT">제목</label><input id="tplT" type="text" maxlength="100" value="' + esc(TPL_ED.title || '').replace(/"/g, '&quot;') + '">'
+      + '<label for="tplB">내용</label><textarea id="tplB" maxlength="4000"></textarea>'
+      + '<label class="ck"><input type="checkbox" id="tplR"' + (TPL_ED.add_reel ? ' checked' : '') + '> 복사할 때 릴스 · 블로그 붙이기</label>'
+      + '<div class="rb"><button type="button" id="tplCancel">취소</button>'
+      + '<button type="button" id="tplSave" class="cp">💾 저장 전</button></div>'
+      + '<div id="tplMsg" class="out"></div></div>';
+  }
+  if (!TPL.length && !TPL_ED) html += '<div class="box"><div class="none">아직 보관한 문자가 없습니다. 「＋ 새 문자」를 눌러 적어 두세요.</div></div>';
+  TPL.forEach((t, i) => {
+    if (TPL_ED && TPL_ED.id === t.id) return;
+    html += '<div class="card">'
+      + '<div><span class="tpl-t">' + esc(t.title) + '</span>' + (t.add_reel ? '<span class="tpl-on">+ 릴스</span>' : '') + '</div>'
+      + '<div class="tpl-p">' + esc(t.body) + '</div>'
+      + '<div class="rb">'
+      +   '<button type="button" class="cp" data-tcp="' + t.id + '">복사</button>'
+      +   '<button type="button" data-ted="' + t.id + '">고치기</button>'
+      +   '<button type="button" data-tdel="' + t.id + '" style="color:#c62828;">지우기</button>'
+      +   (i > 0 ? '<button type="button" data-tup="' + t.id + '">▲</button>' : '')
+      +   (i < TPL.length - 1 ? '<button type="button" data-tdn="' + t.id + '">▼</button>' : '')
+      + '</div></div>';
+  });
+  $('list').innerHTML = html;
+  if (TPL_ED) {
+    $('tplB').value = TPL_ED.body || '';
+    TPL_ORIG = TPL_ED._orig;
+    tplBtn(TPL_ED.id && !tplDirty() ? 'done' : 'before');
+    ['tplT', 'tplB', 'tplR'].forEach(id => { $(id).addEventListener('input', () => tplBtn('before')); $(id).addEventListener('change', () => tplBtn('before')); });
+    $('tplCancel').onclick = () => { if (!tplLeaveOk()) return; TPL_ED = null; drawTpl(); };
+    $('tplSave').onclick = tplSave;
+    $('tplT').focus();
+  }
+  $('tplNew').onclick = () => {
+    if (!tplLeaveOk()) return;
+    TPL_ED = { id: null, title: '', body: '', add_reel: false, _orig: ['', '', false].join('\u0001') }; drawTpl();
+  };
+  $('list').querySelectorAll('[data-tcp]').forEach(b => b.onclick = () => {
+    const t = TPL.find(x => x.id === Number(b.dataset.tcp)); if (!t) return;
+    const txt = tplText(t);
+    if (navigator.clipboard) navigator.clipboard.writeText(txt);
+    else { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+    b.textContent = '복사됨'; setTimeout(() => { b.textContent = '복사'; }, 1200);
+  });
+  $('list').querySelectorAll('[data-ted]').forEach(b => b.onclick = () => {
+    if (!tplLeaveOk()) return;
+    const t = TPL.find(x => x.id === Number(b.dataset.ted)); if (!t) return;
+    TPL_ED = Object.assign({}, t, { _orig: [t.title, t.body, !!t.add_reel].join('\u0001') }); drawTpl();
+  });
+  $('list').querySelectorAll('[data-tdel]').forEach(b => b.onclick = () => tplDel(Number(b.dataset.tdel)));
+  $('list').querySelectorAll('[data-tup]').forEach(b => b.onclick = () => tplMove(Number(b.dataset.tup), -1));
+  $('list').querySelectorAll('[data-tdn]').forEach(b => b.onclick = () => tplMove(Number(b.dataset.tdn), 1));
+}
+async function tplSave() {
+  if (TPL_SAVING || !TPL_ED) return;
+  const title = $('tplT').value.trim(), body = $('tplB').value.replace(/\s+$/, '');
+  if (!title || !body.trim()) { show($('tplMsg'), '제목과 내용을 모두 적어 주세요.', false); return; }
+  const row = { title: title, body: body, add_reel: $('tplR').checked, updated_by: ME.id, updated_at: new Date().toISOString() };
+  TPL_SAVING = true; tplBtn('saving');
+  try {
+    let q;
+    if (TPL_ED.id) q = sb.from('nl_sms_templates').update(row).eq('id', TPL_ED.id).select().single();
+    else {
+      row.created_by = ME.id;
+      row.sort_no = TPL.reduce((m, t) => Math.max(m, t.sort_no || 0), 0) + 1;
+      q = sb.from('nl_sms_templates').insert(row).select().single();
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data) throw new Error('저장한 줄을 돌려받지 못했습니다.');
+    const i = TPL.findIndex(t => t.id === data.id);
+    if (i >= 0) TPL[i] = data; else TPL.push(data);
+    TPL_ED = null; TPL_SAVING = false;
+    drawTpl();
+    show($('sum'), '✅ 「' + data.title + '」을(를) 저장했습니다 · 보관 문자 ' + TPL.length + '개', true);
+  } catch (e) {
+    TPL_SAVING = false; tplBtn('before');
+    show($('tplMsg'), '❌ 저장하지 못했습니다.\n' + e.message, false);
+  }
+}
+async function tplDel(id) {
+  const t = TPL.find(x => x.id === id); if (!t) return;
+  if (!confirm('「' + t.title + '」 보관 문자를 지울까요?\n지운 뒤에는 되돌릴 수 없습니다.')) return;
+  const { data, error } = await sb.from('nl_sms_templates').delete().eq('id', id).select('id');
+  if (error || !data || !data.length) { show($('sum'), '❌ 지우지 못했습니다.' + (error ? '\n' + error.message : ''), false); return; }
+  TPL = TPL.filter(x => x.id !== id);
+  drawTpl();
+}
+let TPL_MOVING = false;
+async function tplMove(id, dir) {
+  if (TPL_MOVING) return;
+  const i = TPL.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= TPL.length) return;
+  // 차례 번호를 1, 2, 3 … 으로 다시 매긴 뒤 두 줄을 바꾼다
+  const L = TPL.slice(); const tmp = L[i]; L[i] = L[j]; L[j] = tmp;
+  TPL_MOVING = true;
+  try {
+    for (let k = 0; k < L.length; k++) {
+      if (L[k].sort_no === k + 1) continue;
+      const { data, error } = await sb.from('nl_sms_templates').update({ sort_no: k + 1 }).eq('id', L[k].id).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('차례를 바꾸지 못했습니다.');
+      L[k].sort_no = k + 1;
+    }
+    TPL = L;
+  } catch (e) {
+    show($('sum'), '❌ 차례를 바꾸지 못했습니다.\n' + e.message, false);
+    await loadTpl();
+  } finally { TPL_MOVING = false; }
+  drawTpl();
+}
+window.addEventListener('beforeunload', e => { if (tplDirty()) { e.preventDefault(); e.returnValue = ''; } });
+</script>
+</body>
+</html>

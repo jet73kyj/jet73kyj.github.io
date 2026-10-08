@@ -1,0 +1,3984 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>납부 내역 - 나무링크</title>
+<style>
+  :root {
+    /* 꾸밈 B (2026-09-17) — 시간표·홈과 같은 색. 옛 초록은 --acc:#3c7a4a */
+    --ink:#2F2926; --ink2:#4A433F; --ink3:#A39C95;
+    --line:#ECE8E3; --bg:#F5F4F2; --acc:#B07A4A; --acc-bg:#F8F1E8;
+  }
+  * { box-sizing:border-box; }
+  body { font-family:-apple-system, "Malgun Gothic", sans-serif; background:var(--bg);
+         margin:0; padding:28px 20px; color:var(--ink);
+         font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased; }
+
+  .box  { max-width:400px; margin:56px auto; background:#fff; border-radius:14px;
+          padding:32px; border:1px solid var(--line); }
+  .wide { max-width:820px; margin:0 auto; }
+
+  h1 { font-size:19px; font-weight:600; letter-spacing:-.01em; margin:0; color:var(--ink); }
+  .sub { font-size:13px; color:var(--ink3); margin:6px 0 24px; }
+  label { display:block; font-size:12px; color:var(--ink2); margin:16px 0 6px; }
+
+  input, select { font:inherit; font-size:14px; padding:9px 11px; color:var(--ink);
+                  border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input:focus, select:focus { outline:2px solid var(--acc); outline-offset:-1px;
+                              border-color:transparent; }
+  .box input { width:100%; }
+
+  button { font:inherit; font-size:14px; font-weight:500; padding:10px 16px;
+           background:var(--acc); color:#fff; border:none; border-radius:8px;
+           cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  button:disabled { background:#c3c8c0; cursor:default; }
+  .box button { width:100%; padding:12px; margin-top:24px; }
+  .ghost { background:none; color:var(--ink2); border:1px solid var(--line); }
+
+  .out { margin-top:16px; padding:12px 14px; border-radius:8px; font-size:13.5px;
+         line-height:1.6; display:none; white-space:pre-wrap; }
+  .ok  { background:var(--acc-bg); color:#2c5c37; display:block; }
+  .err { background:#fdeeee; color:#9c2b2b; display:block; }
+
+  .top { display:flex; justify-content:space-between; align-items:flex-start;
+         gap:12px; margin-bottom:24px; }
+  .who { font-size:13px; color:var(--ink3); margin-top:4px; }
+
+  .tools { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+           padding-bottom:18px; border-bottom:1px solid var(--line); margin-bottom:8px; }
+  .paytabs { display:inline-flex; gap:4px; }
+  .ptab { padding:8px 14px; font-size:13px; background:#fff; color:#5a6156;
+          border:1px solid #e8ebe4; border-radius:8px; cursor:pointer; }
+  .ptab.on { background:#3c7a4a; color:#fff; border-color:#3c7a4a; }
+  .btn-cash { display:inline-block; padding:8px 15px; background:#8a5a2b; color:#fff;
+              font-size:13px; border-radius:8px; text-decoration:none;
+              white-space:nowrap; margin-left:4px; }
+  .btn-cash:hover { filter:brightness(1.12); }
+  .tools label { margin:0; }
+  .allsum { margin-left:auto; font-size:14px; color:var(--ink2); }
+
+  .note { font-size:12.5px; color:var(--ink3); line-height:1.9; margin:14px 0 22px; }
+  .note b { color:var(--ink2); font-weight:600; }
+
+  /* ── 아동 카드 ── */
+  .kid { background:#fff; border:1px solid var(--line); border-radius:14px;
+         padding:22px 24px; margin-bottom:14px; }
+  .kidhead { display:flex; align-items:baseline; gap:10px; margin-bottom:18px; }
+  .kidname { font-size:16px; font-weight:600; letter-spacing:-.01em; }
+  .kidno   { font-size:12px; color:var(--ink3); }
+  .ktotal  { margin-left:auto; font-size:17px; font-weight:600; }
+
+  .sect { font-size:11px; font-weight:600; letter-spacing:.06em; color:var(--ink3);
+          margin:0 0 10px; }
+  .sect.bank { margin-top:24px; margin-bottom:0; padding:12px 14px 8px;
+               background:#eef1fb; border-radius:10px 10px 0 0;
+               color:#4a56a6; border-top:none; }
+  .bankbody { background:#eef1fb; border-radius:0 0 10px 10px;
+              padding:2px 14px 14px; margin-bottom:4px; }
+  .bankbody .r { padding:6px 0; }
+  .bankbody .nm { color:#3b4694; font-weight:600; }
+  .bankbody .am { color:#3b4694; font-weight:600; }
+  .bankbody input { border-color:#c9d0ec; }
+  .bankbody .pay { margin-top:10px; }
+
+  .r { display:flex; align-items:center; gap:12px; padding:5px 0; font-size:14px; }
+  .r .nm  { flex:0 0 170px; color:var(--ink2); }
+  .r .de  { flex:1; color:var(--ink3); font-size:13px; }
+  .thr { color:var(--ink2); font-weight:600; white-space:nowrap; }
+  .r .de { min-width:0; white-space:normal; word-break:keep-all;
+           line-height:1.45; }
+  .r .ap  { flex:0 0 72px; }
+  .r .ct  { flex:0 0 78px; white-space:nowrap; }
+  .r .up  { flex:0 0 68px; text-align:right; color:var(--ink3); font-size:13px; }
+  .r .am  { flex:0 0 96px; text-align:right; }
+  .r input.cnt { width:46px; padding:5px 0; text-align:center; font-size:13px; }
+  .r input.apu { width:72px; padding:5px 4px; text-align:center; font-size:12.5px;
+                 border-style:dashed; color:#8a5a1a; }
+  .r input.apu::placeholder { color:#c9c9c0; font-size:11.5px; }
+  .r.line.hasap { background:#fdf6ea; border-radius:6px; }
+  .r.line.hasap input.apu { border-style:solid; border-color:#d8a349;
+                            background:#fff; font-weight:600; }
+  .oldup { text-decoration:line-through; color:#c0c5bc; }
+  /* 본인부담금 이번 달 금액 (2026-09-15) — 적으면 등급 금액보다 우선 */
+  .r input.spov { width:94px; padding:5px 4px; text-align:right; font-size:12.5px;
+                  border-style:dashed; color:#8a5a1a; }
+  .r input.spov::placeholder { color:#c9c9c0; font-size:11px; }
+  .r.gsum.hasov { background:#fdf6ea; border-radius:6px; }
+  .r.gsum.hasov input.spov { border-style:solid; border-color:#d8a349; background:#fff; font-weight:600; }
+  .aptag { font-size:11px; color:#a9701c; font-weight:600; margin-left:5px; }
+  /* 줄 앞 딱지 — 어느 사업으로 청구되는지, 회기방식이 무엇인지 */
+  .sttag { display:inline-block; font-size:11px; font-weight:600;
+           padding:1px 7px; border-radius:10px; margin-right:6px;
+           background:#eef3ec; color:#3f6b47; white-space:nowrap; }
+  .sttag.dev  { background:#e8f3ea; color:#2e7d32; }
+  .sttag.ctr  { background:#eef2f8; color:#3a5a86; }
+  .sttag.five { background:#fdf3e3; color:#a9701c; }
+  /* 보기만 하는 줄 — 금액은 계좌입금 상자에서 셈한다 */
+  .r.look { background:#f6faf5; }
+  .r.look .de, .r.look .lookcnt, .r.look .lookam { color:#6b7a6e; }
+  .lookttl { font-size:11px; color:#6b7a6e; }
+  .lookcnt { font-size:12.5px; }
+  .lookam  { font-size:11.5px; }
+  /* 회기 단추 줄 (2026-09-11) — 수업마다 그 달 날짜 단추. 색 있음 = 청구 / 회색 = 청구 안 함 */
+  .sbrow { display:flex; flex-wrap:wrap; gap:5px; padding:1px 0 7px 182px; }
+  .sb { font-size:12px; padding:4px 8px; border-radius:6px; border:1px solid;
+        cursor:pointer; line-height:1.3; white-space:nowrap; user-select:none; }
+  .sb.s1 { background:#E6F1FB; color:#0C447C; border-color:#378ADD; }
+  .sb.s2 { background:#EAF3DE; color:#27500A; border-color:#639922; }
+  .sb.s3, .sb.s4 { background:#EEEDFE; color:#3C3489; border-color:#7F77DD; }
+  .sb.s5 { background:#FAECE7; color:#712B13; border-color:#D85A30; }
+  .sb.s6, .sb.s7 { background:#FBEAF0; color:#72243E; border-color:#D4537E; }
+  .sb.s8 { background:#FAEEDA; color:#633806; border-color:#BA7517; }
+  .sb.off { background:#F1EFE8; color:#5F5E5A; border-color:#B4B2A9; }
+  .sb.lock { cursor:default; }
+  .sb.busy { opacity:.5; pointer-events:none; }
+  /* 발달추가비용 · 평가비 · 리뷰 차감 — 왼쪽 이름 칸을 좁힌다 (2026-09-13) */
+  .r.narrownm .nm { flex:0 0 72px; }
+  .r.narrownm select.xthr  { max-width:92px; }
+  .r.narrownm select.xmode { max-width:112px; }
+  .r input.cnt.ro { border-color:transparent; background:transparent; font-weight:600; }
+  .cntwarn { display:block; font-size:10.5px; color:#b3261e; white-space:nowrap;
+             cursor:pointer; text-decoration:underline; }
+  .r select.evsel { padding:4px 6px; font-size:12.5px; border-radius:6px;
+                    border:1px solid var(--line); max-width:190px; }
+  .r select.xmode { padding:4px 6px; font-size:12.5px; border-radius:6px;
+                    border:1px solid var(--line); max-width:130px; margin-left:6px; }
+  .r input.mn  { width:96px; padding:5px 8px; text-align:right; font-size:13px; }
+  .r select.xthr { padding:4px 6px; font-size:12.5px; border-radius:6px;
+                   border:1px solid var(--line); max-width:110px; }
+
+  .r.sum { padding-top:11px; margin-top:5px; border-top:1px solid var(--line);
+           font-weight:600; }
+  .r.sub2 .am { color:var(--ink3); font-size:13px; }
+  .r.tot { margin-top:9px; padding-top:11px; border-top:1.5px solid var(--ink);
+           font-size:15px; font-weight:600; }
+  .cut { color:var(--ink3); font-size:12px; font-weight:400; }
+  .warn { color:#b5651d; font-size:12.5px; }
+  .wkbox { display:none; margin:2px 0 6px 0; padding:6px 8px;
+           background:#f4f6f5; border:1px solid #dfe4e1; border-radius:6px;
+           font-size:12px; color:#4a524d; }
+  .wkbox.on { display:block; }
+  .wkb { display:inline-block; min-width:50px; margin:0 3px;
+         padding:4px 8px; border-radius:5px; border:1px solid #cfd4d0;
+         background:#fff; color:#666; cursor:pointer; font-size:12px; }
+  .wkb.yes { background:#2f7d4f; border-color:#2f7d4f; color:#fff; }
+  .wkb.no  { background:#eef0ef; color:#9aa19c; text-decoration:line-through; }
+  .wkb.dim { opacity:.35; cursor:default; }
+  .wkhint { margin-left:6px; color:#7a827d; }
+  .wkopen { margin-left:3px; padding:3px 4px; font-size:10.5px;
+            border:1px solid #cfd4d0; border-radius:5px;
+            background:#fff; color:#5a625c; cursor:pointer;
+            vertical-align:middle; }
+  .wkopen:hover { background:#eef1ef; }
+  .wkopen.on { background:#2f7d4f; border-color:#2f7d4f; color:#fff; }
+  .shortc { border:1px solid #e8c9a4; background:#fffaf2; border-radius:8px;
+            padding:9px 12px; margin:8px 0 4px; font-size:12.5px; color:#5a4a30; }
+  .shortline { line-height:1.6; }
+  .shortline + .shortline { margin-top:5px; padding-top:5px;
+                            border-top:1px dotted #e8c9a4; }
+  .sred { color:#b03a20; }
+  .shortwhy { font-size:11.5px; color:#8a7a5a; margin:1px 0 0; }
+  .shortnote { font-size:11.5px; color:#8a7a5a; margin:6px 0 0; }
+  .shortact { margin:5px 0 0; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .shortact .nmwhy { font:inherit; font-size:11.5px; padding:3px 6px;
+    border:1px solid #ddd; border-radius:5px; background:#fff; }
+  .shortact .nmbtn { font:inherit; font-size:11.5px; padding:3px 10px; cursor:pointer;
+    border:1px solid #c9a97a; border-radius:5px; background:#fff5e6; color:#7a5c2a; }
+  .shortact .nmbtn:hover { background:#f3e4cc; }
+  /* 「보강 잡기」 — 회기를 채우고 저장한다 (2026-09-04) */
+  .shortact .mkbtn { font:inherit; font-size:11.5px; padding:3px 10px; cursor:pointer;
+    margin-left:5px;
+    border:1px solid #7cc466; border-radius:5px; background:#eef7ea; color:#2c5c37; }
+  .shortact .mkbtn:hover { background:#dcefd4; }
+  .shortdone { font-size:11.5px; color:#2e7d32; margin:4px 0 0; }
+  .kfix { cursor:pointer; font-family:inherit;
+          font-size:11px; font-weight:bold; padding:2px 8px; border-radius:10px;
+    margin-left:6px; white-space:nowrap; }
+  .kfix.no  { background:#eceff1; color:#78838c; border:1px solid #d5dde2; }
+  .kfix.yes { background:#e3f3e6; color:#2e7d32; border:1px solid #a9d6b3; }
+  .shortmust { font-size:11.5px; color:#c62828; font-weight:bold; margin:4px 0 0;
+    background:#fff0f0; border-left:3px solid #e57373; padding:4px 8px; border-radius:3px; }
+  .nmk { border:1px solid #e3e6e0; background:#fafbf9; border-radius:8px;
+         padding:9px 12px; margin:8px 0 4px; font-size:12.5px; color:#4a5148; }
+  .nmk-hot { border-color:#e8b4a4; background:#fdf5f2; }
+  .nmk b { font-size:13px; color:#333; }
+  .nmkline { margin:6px 0 0; line-height:1.55; }
+  .nmk-must { color:#b03a20; }
+  .nmk-can  { color:#8a6d1f; }
+  .nmkwhy { font-size:11.5px; color:#7a7a7a; margin:2px 0 0; }
+
+  .pay { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  .pay input.dt { width:150px; }
+  .pay input.tx { flex:1; min-width:150px; }
+  /* 카드 줄 한 줄 — 날짜 / 승인번호(좁게) / 특이사항(남은 폭) / 카드 저장 (2026-10-03) */
+  .pay input.kmemo { flex:0 0 130px; width:130px; min-width:0; }
+  .pay input.knote { flex:1; min-width:160px; }
+  .kidfoot { display:flex; gap:8px; margin-top:20px; }
+  .kidfoot .ksave { margin-left:auto; }
+  /* 신규 상담 평가 줄 (2026-09-16) */
+  .evinfo { margin:2px 0 6px 70px; padding:5px 10px; background:#f3f0fb; color:#3c3489;
+            border-radius:6px; font-size:12.5px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+  .evinfo .evst { background:#fff3e0; color:#8a4b00; border-radius:4px; padding:0 6px; }
+  .evinfo .evst.ok { background:#e8f3ea; color:#2e7d32; }
+  .evinfo.trinfo { background:#eef6fb; color:#0c447c; }
+  /* 추가 수업 (2026-09-30) */
+  .evinfo.stale { background:#fdeeea; color:#B5533C; }   /* 모두 취소됐는데 저장 금액이 남음 (2026-10-01) */
+  .evinfo.xlinfo { background:#f4effa; color:#5b3a8c; }
+  .evinfo .xldel { margin-left:auto; border:none; background:none; color:#B5533C; cursor:pointer; font-size:14px; padding:0 4px; }
+  .xladd { margin:2px 0 6px 70px; padding:4px 12px; border:1px dashed #b9a6d8; border-radius:7px; background:#fff;
+           color:#5b3a8c; font-size:12.5px; cursor:pointer; }
+  .xlpop { position:fixed; inset:0; background:rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center; z-index:9999; }
+  .xlpop .bx { background:#fff; border-radius:12px; padding:16px 18px; width:min(440px, 92vw); box-shadow:0 8px 30px rgba(0,0,0,.18); }
+  .xlpop h3 { margin:0 0 10px; font-size:16px; }
+  .xlpop .rw { display:flex; gap:8px; align-items:center; margin:7px 0; flex-wrap:wrap; font-size:13.5px; }
+  .xlpop .rw label { width:52px; color:#666; }
+  .xlpop input, .xlpop select { padding:5px 7px; border:1px solid #ccc; border-radius:6px; font-size:13.5px; }
+  .xlpop .bt { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  .xlpop .bt button { padding:6px 14px; border-radius:7px; border:1px solid #ccc; background:#fff; cursor:pointer; }
+  .xlpop .bt .go { background:#B07A4A; border-color:#B07A4A; color:#fff; }
+  /* 저장 단추 — 저장 전(연한 초록) / 저장 중(회색) / 저장됨(진한 초록) */
+  .pay .ksave2 { margin-left:8px; padding:7px 14px;
+                 background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3;
+                 border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+  .pay .ksave2.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .pay .ksave2:disabled { background:#bbb; color:#fff; border-color:#bbb; }
+  .kidfoot .ksave { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
+  .kidfoot .ksave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .kidfoot .ksave:disabled { background:#bbb; color:#fff; border-color:#bbb; }
+  .kidfoot .knotice { background:#fff; color:#2c5c37; border:1px solid #3c7a4a; }
+  .kidfoot .kdeduct { background:#fff; color:#8a6116; border:1px solid #c9922b; }
+
+  /* 교육비 납입증명서 */
+  .dcover { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:900;
+            display:flex; align-items:flex-start; justify-content:center;
+            padding:20px; overflow:auto; }
+  .dwin { background:#fff; border-radius:10px; width:100%; max-width:760px; }
+  .dbody { padding:26px 30px; }
+  .dfoot { padding:12px 18px; border-top:1px solid #e8ebe4; display:flex; gap:8px;
+           justify-content:flex-end; }
+  .dfoot .dclose { background:#fff; color:#5a6156; border:1px solid #e8ebe4; }
+  .dtitle { text-align:center; font-size:19px; font-weight:700; letter-spacing:.35em;
+            border:1px solid #333; padding:14px; margin-bottom:16px; }
+  .dsec { background:#eef3ec; font-weight:600; font-size:13px;
+          border:1px solid #333; border-bottom:none; padding:6px 9px; }
+  table.dt { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:14px; }
+  table.dt th, table.dt td { border:1px solid #333; padding:7px 9px; }
+  table.dt th { background:#f7f8f5; font-weight:600; text-align:left; white-space:nowrap; }
+  table.dt td.num { text-align:right; }
+  table.dt tr.sum td, table.dt tr.sum th { background:#fdf6e3; font-weight:700; }
+  .dnote { font-size:11.5px; color:#5a6156; line-height:1.7; margin-bottom:14px; }
+  .dsign { font-size:13px; line-height:2.1; margin-top:18px; }
+  .dsign .r { text-align:right; }
+  @media print {
+    body > *:not(.dcover) { display:none !important; }
+    .dcover { position:static; background:none; padding:0; display:block; overflow:visible; }
+    .dwin { max-width:none; border-radius:0; }
+    .dfoot { display:none !important; }
+  }
+
+  /* 안내문 미리보기 창 */
+  .ncover { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:900;
+            display:flex; align-items:center; justify-content:center; padding:20px; }
+  .nwin { background:#fff; border-radius:12px; width:100%; max-width:460px;
+          max-height:88vh; display:flex; flex-direction:column; overflow:hidden; }
+  .nhead { padding:14px 18px; border-bottom:1px solid #e8ebe4;
+           display:flex; align-items:center; gap:10px; }
+  .nhead b { font-size:15px; }
+  .nwho { font-size:13px; color:#9c2b2b; font-weight:600; }
+  .nbody { padding:14px 18px; overflow:auto; flex:1; }
+  .nbody textarea { width:100%; min-height:340px; font-family:"D2Coding","Consolas",monospace;
+                    font-size:12.5px; line-height:1.65; padding:12px;
+                    border:1px solid #ddd; border-radius:8px; resize:vertical; }
+  .nfoot { padding:12px 18px; border-top:1px solid #e8ebe4;
+           display:flex; gap:8px; align-items:center; }
+  .nfoot .nmsg { font-size:13px; color:#2c5c37; margin-right:auto; }
+  .nfoot .nclose { background:#fff; color:#5a6156; border:1px solid #e8ebe4; }
+  .saved { font-size:11px; color:var(--acc); font-weight:500; margin-left:5px; }
+  .empty { padding:60px 20px; text-align:center; color:var(--ink3); font-size:14px; }
+
+  @media (max-width:640px) {
+    .r { flex-wrap:wrap; gap:8px; }
+    .r .nm { flex:0 0 100%; }
+    .r .de { flex:1 1 auto; }
+    .sbrow { padding-left:0; }
+  }
+
+  .btn-home { display:inline-block; padding:8px 16px; background:#2e7d32; color:#fff;
+              font-size:13px; border-radius:8px; text-decoration:none;
+              white-space:nowrap; margin-right:8px; }
+  .btn-home:hover { filter:brightness(1.08); }
+  .r.tmemo .de { color:#a9701c; font-size:11.5px; line-height:1.5; }
+  /* 도움말 접기 (2026-09-11) */
+  .helpfold > summary { cursor:pointer; color:#5a6156; font-weight:bold; list-style:revert; }
+  .helpfold:not([open]) { padding-top:8px; padding-bottom:8px; }
+  .helpfold[open] > summary { margin-bottom:6px; }
+
+  /* ===== 꾸밈 B (2026-09-17) — 흰색 미니멀 · 시간표·홈과 같은 규칙 =====
+     계산·저장 코드는 그대로. 되돌리려면 이 묶음(꾸밈 B ~ 꾸밈 B 끝)과 :root 색만 되돌리면 된다 */
+  .wide { max-width:860px; }
+  button:hover { filter:none; }
+  .top { background:#fff; border:1px solid #ECE8E3; border-radius:12px; padding:12px 16px;
+         align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .toptitle { display:flex; align-items:center; gap:14px; }
+  .toptitle > div { border-left:1px solid #ECE8E3; padding-left:14px; }
+  .toplogo { height:48px; width:auto; display:block; }
+  .toprt { display:flex; align-items:center; gap:6px; }
+  .ghost { background:#fff; color:#4A433F; border:1px solid #E4E0DA; padding:8px 13px; font-size:13px; }
+  .ghost:hover { background:#F7F6F4; }
+  /* 색이 꽉 찬 단추는 두지 않는다 — 처음으로는 카멜 글씨, 불러오기는 흰 테두리 */
+  .btn-home { background:#fff; color:#7E5530; border:1px solid #D9C3A7; margin-right:0; font-weight:600;
+              padding:8px 14px; }
+  .btn-home:hover { filter:none; background:#FBF5EE; }
+  #load { background:#fff; color:#4A433F; border:1px solid #E4E0DA; }
+  #load:hover { background:#F7F6F4; }
+  .ok { color:#7E5530; }
+  /* 도구 줄 */
+  .tools { border-bottom-color:#ECE8E3; }
+  .paytabs { gap:14px; margin-left:6px; }
+  .ptab { background:transparent; color:#A39C95; border:none; border-bottom:2px solid transparent;
+          border-radius:0; padding:6px 2px; }
+  .ptab:hover { color:#2F2926; }
+  .ptab.on { background:transparent; color:#2F2926; border-bottom-color:#2F2926; font-weight:700; }
+  .btn-cash { background:#fff; color:#4A433F; border:1px solid #E4E0DA; }
+  .btn-cash:hover { filter:none; background:#F7F6F4; }
+  .helpfold > summary { color:#7D7670; }
+  /* 아동 카드 — 이름 줄은 옅은 카멜 띠 */
+  .kid { border-color:#ECE8E3; border-radius:12px; }
+  .kidhead { margin:-22px -24px 16px; padding:12px 24px; background:#F8F1E8;
+             border-bottom:1px solid #EFE3D3; border-radius:12px 12px 0 0; align-items:center; }
+  .kidno { color:#A39C95; }
+  .kfix.no  { background:#fff; color:#7D7670; border:1px solid #E4E0DA; }
+  .kfix.yes { background:#EEF5EF; color:#3F6B4B; border:1px solid #CFE2D3; }
+  .sect { color:#7D7670; letter-spacing:0; font-size:11.5px; }
+  .r.tot { border-top:1px solid #ECE8E3; }
+  .r.sum { border-top-color:#ECE8E3; }
+  .sttag { background:#F7F6F4; color:#4A433F; }
+  .sttag.dev  { background:#EEF5EF; color:#3F6B4B; }
+  .sttag.ctr  { background:#EFF4F9; color:#4A76A0; }
+  .sttag.five { background:#FBF3E4; color:#9A6E20; }
+  /* 발달재활 보기 줄 — 흰 바탕 + 왼쪽 세이지 줄 */
+  /* 한 줄로 넓게 — 왼쪽 빈 이름 칸을 없앤다 */
+  .r.look { background:transparent; border-left:2px solid #8FB39A; padding:3px 0 1px 10px; }
+  .r.look .nm, .r.look .ap { display:none; }
+  .r.look .de { font-size:12.5px; }
+  .r.look + .sbrow { border-left:2px solid #8FB39A; padding:2px 0 6px 10px; margin-bottom:4px; }
+  .r.look + .sbrow .sb { font-size:11px; padding:3px 7px; }
+  .r.look .de, .r.look .lookcnt, .r.look .lookam { color:#4A433F; }
+  .lookttl { color:#4E8A5D; }
+  /* 계좌입금 상자 — 흰 바탕 + 왼쪽 카멜 줄 */
+  .sect.bank { background:#fff; color:#7E5530; border:1px solid #ECE8E3; border-left:3px solid #C9A27E;
+               border-bottom:none; }
+  .bankbody { background:#fff; border:1px solid #ECE8E3; border-left:3px solid #C9A27E; border-top:none; }
+  /* 카드 저장 줄과 계좌입금 상자 사이 구분선 (2026-09-17) */
+  .sect.bank { position:relative; margin-top:36px; }
+  .sect.bank::before { content:''; position:absolute; left:-4px; right:-1px; top:-19px;
+                       border-top:1px solid #DDD6CD; }
+  .bankbody .nm, .bankbody .am { color:#2F2926; }
+  .bankbody .de { color:#A39C95; }
+  .bankbody input { border-color:#ECE8E3; }
+  .bankbody .grchg { background:#fff !important; color:#7D7670 !important;
+                     border:1px solid #E4E0DA !important; }
+  /* 숫자 칸 — 테두리 없이 밑줄만. 누르면 테두리 */
+  .r input.cnt, .r input.mn, .r input.spov, .r input.apu {
+    border:none; border-bottom:1px solid #E4E0DA; border-radius:0; background:transparent; }
+  .r input.apu, .r input.spov { border-bottom-style:dashed; border-bottom-color:#D9C3A7; }
+  .r input.cnt:focus, .r input.mn:focus, .r input.spov:focus, .r input.apu:focus {
+    border:1px solid #B07A4A; border-radius:5px; background:#fff; outline:none; }
+  .r.line.hasap input.apu, .r.gsum.hasov input.spov {
+    border:none; border-bottom:1px solid #D8A349; background:transparent; }
+  .r input.spov::placeholder, .r input.apu::placeholder { color:#C9C0B5; }
+  .r select.xthr, .r select.xmode, .r select.evsel {
+    background:#FAF9F7; border-color:#ECE8E3; color:#4A433F; }
+  .pay input { border-color:#ECE8E3; }
+  /* 저장 단추 — 저장 전은 흰 테두리, 저장됨만 초록 */
+  .pay .ksave2, .kidfoot .ksave { background:#fff; color:#4A433F; border:1px solid #E4E0DA; }
+  .pay .ksave2:hover, .kidfoot .ksave:hover { background:#F7F6F4; }
+  .pay .ksave2.done, .kidfoot .ksave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .pay .ksave2:disabled, .kidfoot .ksave:disabled { background:#bbb; color:#fff; border-color:#bbb; }
+  /* 아래 두 단추 — 흰 테두리 · 납부내역 안내만 카멜 글씨 */
+  .kidfoot .knotice { background:#fff; color:#7E5530; border:1px solid #D9C3A7; font-weight:600; }
+  .kidfoot .kdeduct { background:#fff; color:#4A433F; border:1px solid #E4E0DA; }
+  .kidfoot .knotice:hover, .kidfoot .kdeduct:hover { background:#F7F6F4; }
+  /* 창 */
+  .dsec { background:#F8F1E8; }
+  .nfoot .nmsg { color:#7E5530; }
+  .saved { color:#7E5530; }
+  /* ===== 꾸밈 B 끝 ===== */
+.gtag{display:inline-block;background:#EDE7F6;color:#5E35B1;border-radius:4px;padding:0 4px;margin-right:4px;font-size:10.5px;line-height:1.5;vertical-align:1px;font-weight:600}
+
+  /* 분 변경 (2026-10-03) */
+  .sbrow .durbtn { width:auto; margin:0 0 0 6px; padding:2px 9px; font-size:12px; border:1px solid #E4E0DA;
+            border-radius:10px; background:#fff; color:#6b625b; cursor:pointer; }
+  .sb .durtag { font-size:11px; color:#C2553A; }
+  .corow.coauto { background:#FFF8E1; }
+  .durnote { margin:2px 0 6px 182px; font-size:12px; color:#9A6E20; background:#FFF8E1; border-radius:6px; padding:4px 8px; display:inline-block; }
+  @media (max-width:640px) { .durnote { margin-left:0; } }
+  .corow .cowhy { display:block; font-size:11px; color:#9A6E20; font-weight:400; }
+
+  .durbg { position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:900; display:none; align-items:center; justify-content:center; }
+  .durpop { background:#fff; border-radius:10px; width:min(460px, 94vw); max-height:86vh; display:flex; flex-direction:column; }
+  .durhd { padding:12px 14px; background:#F8F1E8; border-bottom:2px solid #C9A27E; font-weight:600; border-radius:10px 10px 0 0; }
+  .durhd small { font-weight:400; color:#9A6E20; }
+  .durbd { padding:8px 14px; overflow:auto; }
+  .durrow { display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #F0ECE7; }
+  .durd { flex:1; font-size:14px; }
+  .durm { width:auto; margin:0; padding:4px 10px; border:1px solid #E4E0DA; border-radius:8px; background:#fff; cursor:pointer; }
+  .durm.on { background:#B07A4A; color:#fff; border-color:#B07A4A; }
+  /* 고르지 않은 단추 글이 흰색으로 덮여 안 보이던 것 (2026-10-03) */
+  .durm:not(.on) { color:#9a928b !important; background:#fff !important; }
+  .durft .durx { color:#4A433F !important; background:#fff !important; }
+  .durchg { font-size:11px; color:#C2553A; }
+  .durft { display:flex; justify-content:flex-end; gap:6px; padding:10px 14px; border-top:1px solid #ECE8E3; }
+  .durft button { width:auto; margin:0; padding:6px 14px; border:1px solid #E4E0DA; border-radius:8px; background:#fff; cursor:pointer; }
+  .durft .durgo { background:#B07A4A; color:#fff; border-color:#B07A4A; }
+</style>
+</head>
+<body>
+
+<!-- 로그인 전 -->
+<div class="box" id="loginBox">
+  <h1>납부 내역</h1>
+  <div class="sub">나무링크</div>
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username" placeholder="you@example.com">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn">로그인</button>
+  <div id="msg" class="out"></div>
+</div>
+
+<!-- 로그인 후 -->
+<div class="wide" id="mainBox" style="display:none;">
+  <div class="top">
+    <div class="toptitle">
+      <img src="img/nl-logo.png" alt="자라는나무" class="toplogo" onerror="this.style.display='none'">
+      <div>
+      <h1>납부 내역</h1>
+      <div class="who" id="who"></div>
+      </div>
+    </div>
+    <div class="toprt">
+    <button id="out" class="ghost">로그아웃</button>
+    <a href="index.html" class="btn-home">처음으로</a>
+    </div>
+  </div>
+
+  <div class="tools">
+    <input id="mk" type="month" value="2026-08">
+    <input id="q" type="search" placeholder="아동 이름 · 입금자명" style="width:190px;">
+    <button id="load">불러오기</button>
+    <span class="paytabs">
+      <button class="ptab on" data-pay="all" id="tabAll">전체</button>
+      <button class="ptab" data-pay="unpaid" id="tabUn">미납만</button>
+      <button class="ptab" data-pay="paid" id="tabPd">완납만</button>
+      <button class="ptab" data-pay="todo" id="tabTodo">예정만</button>
+    </span>
+    <a href="cash-receipt.html" class="btn-cash">현금영수증</a>
+    <span class="allsum" id="allsum"></span>
+  </div>
+
+  <!-- 도움말은 접어 둔다 (2026-09-11). 「도움말」을 누르면 펼쳐진다 -->
+  <details class="note helpfold">
+    <summary>도움말 (눌러서 펼치기)</summary>
+    <b>회기</b>는 수업 줄 아래 <b>날짜 단추</b>로 정합니다. 색 있음 = 청구, 회색 = 청구 안 함. 회기 수 = 켜진 단추 수.<br>
+    켜진 단추를 누르면 회색(보강 없음), 회색 쉬는 날을 누르면 켜짐(보강 받음 → 시간표 「회기가 모자란 수업」).
+    발달재활 단추는 여기서 바꾸지 않습니다. 매달 되풀이하는 주차는 시간표 수정 창 「오는 주차」에서 바꿉니다.<br>
+    저장한 회기와 단추 수가 다르면 회기 아래에 빨간 「단추 ○회」가 뜹니다. 누르면 단추 수로 맞춥니다.<br>
+    회기가 아직 없는 달이면 요일 수로 채워집니다. 다르면 숫자를 고치세요.<br>
+    <b>적용단가</b>를 넣으면 치료사 단가 대신 그 값으로 계산합니다 (할인 등). 다음 달에도 이어집니다.
+    할인을 끝낼 때는 칸을 비우세요.<br>
+    <b>리뷰</b>는 1건 5,000원, 월 4건까지. 발달재활 본인부담금에서는 빠지지 않습니다.<br>
+    <b>승인번호</b>는 다음 달로 넘어가지 않습니다. 매달 새로 넣으세요.<br>
+    날짜를 넣으면 납부완료, 비워두면 미납으로 저장됩니다.
+  </details>
+
+  <div id="kids"></div>
+  <div class="empty" id="empty">달을 고르고 불러오기를 누르세요.</div>
+  <div id="msg2" class="out"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script src="nl-live-alert.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+
+// 로그인을 창(탭) 안에서만 유지한다. 창을 닫으면 자동으로 끊긴다.
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $  = id => document.getElementById(id);
+
+const REVIEW_UNIT = 5000;   // 리뷰 1건당 차감액
+const REVIEW_MAX  = 4;      // 월 최대 건수
+
+let CHILDREN = [], TYPES = {}, TTYPES = {}, THERAPISTS = [];
+let ALLKIDS  = [];          // 종결까지 다 담은 아동 목록
+let FEES = {}, RULES = {}, GRADES = {};
+let NOMAKEUP = {};          // 아동번호 -> 보강 못 잡은 결석 목록
+let HOLDAY = {};            // 날짜 -> true (센터 전체가 쉬는 공휴일)
+let SHORTCNT = {};          // 아동|유형 -> { 실제 회기, 빠진 날 }
+let X8FIVE = {};            // 발4+5주발추 아동 — 저장 전 달은 「5주차만 1회」로 놓는다 (2026-09-15)
+let X8NEED = {};            // 발추 1회를 잡아야 하는 아동 (발4+발추1)
+let NEEDCNT  = {};          // 아동|유형 -> 기준 회기
+
+// 다음 달로 이월 보강이 되는가
+//   2 발달재활        — 월 4회 당월 필수. 이월 안 됨
+//   3·4 치료지원      — 1~3회기 당월 필수, 4회기부터 이월 가능
+//   5 방과후활동비    — 1~3회기 당월 필수, 4회기부터 이월 가능
+//   6·7 방과후치료지원— 1~3회기 당월 필수, 4회기부터 이월 가능
+//   1 센터비용        — 언제든 이월 가능
+//   8 발추(이)        — 언제든 이월 가능
+function canCarry(supportTypeId, seq) {
+  const st = Number(supportTypeId);
+  if (st === 2) return false;
+  if (st === 1 || st === 8) return true;
+  if ([3,4,5,6,7].indexOf(st) >= 0) return Number(seq) >= 4;
+  return true;
+}
+function carryWhy(supportTypeId, seq) {
+  const st = Number(supportTypeId);
+  if (st === 2) return '발달재활은 월 4회를 당월에 채워야 합니다';
+  if ([3,4,5,6,7].indexOf(st) >= 0 && Number(seq) < 4)
+    return (seq || '?') + '회기라 당월에 보강해야 합니다 (4회기부터 이월 가능)';
+  return '';
+}
+let SCHED = {};             // child_id -> 수업 목록
+let GRPS  = {};             // 그룹 번호 -> {name, fee, mk_diff} (2026-10-02)
+let XDIFF = {};             // 'child|st' -> {n, unit} 그룹 1:1 보강 차액
+let SESSCNT = {};           // 수업번호 -> { 지원유형: 회기수 }
+// 회기 단추 (2026-09-11) — 켜진 단추 수 = 청구 회수 (예정 교육비 nl_estimate_calc 와 같은 규칙)
+let SROWS   = {};           // '수업번호|지원유형' -> 그 달 원래 수업 줄들 (날짜 차례)
+let SBYID_G = {};           // 회기 줄 번호 -> 줄
+let X8SESS  = {};           // 아동번호 -> 그 달 발추 줄 (단추 글의 날짜)
+// 방과후 치료지원은 「방치언 · 방치작」 (시간표와 같게, 2026-09-11)
+const ABBR = {1:'센', 2:'발', 3:'치언', 4:'치작', 5:'방', 6:'방치언', 7:'방치작', 8:'이'};
+// 이 줄이 청구에 들어가나 (단추가 켜져 있나)
+//   「보강 없음」 → 꺼짐
+//   쉬는 날(휴무) — 발달재활·발추는 늘 켜짐 (회차 0 은 채울 것이 없어 꺼짐)
+//                  그 밖은 「보강 받음」(want_makeup)이 켜진 것만
+function sessOn(x) {
+  if (x.no_makeup) return false;
+  if (x.status !== '휴무') return true;
+  const sp = Number(x.support_type_id) || 0;
+  if (sp === 2 || sp === 8) return Number(x.run_no || 0) > 0;
+  return !!x.want_makeup;
+}
+let WKWAS   = {};           // 요일줄번호 -> 불러올 때의 주차 상태
+let SAVED = {};             // child_id -> 저장된 납부 (이번 달)
+let PREV  = {};             // child_id -> 지난달 납부 (적용단가·발추방식 이어받기용)
+let LASTX = {};             // child_id -> 지난 발추 담당 치료사
+let LOADED_MK = null;
+let CALC = {};             // 아동 번호 -> { card, bank } 화면이 셈한 금액 (2026-09-15)
+let PAYFILTER = 'all';      // 전체 / unpaid 미납만 / paid 완납만
+
+// 평가비 기준 — nl_eval_fees 표를 읽어오고, 못 읽으면 아래 기본값을 쓴다
+const EVAL_FALLBACK = [
+  { id:1, name:'심리평가 (기본)',        amount:180000 },
+  { id:2, name:'지능평가 + 심리평가',    amount:250000 },
+  { id:3, name:'언어평가 1개',           amount:80000  },
+  { id:4, name:'언어평가 2개',           amount:130000 },
+  { id:5, name:'언어평가 3개',           amount:180000 },
+  { id:6, name:'발달평가 1개',           amount:80000  },
+  { id:7, name:'발달평가 2개',           amount:130000 },
+  { id:8, name:'발달평가 3개',           amount:180000 },
+  { id:9, name:'베일리평가',             amount:250000 }
+];
+let EVALFEES = EVAL_FALLBACK.slice();
+// 신규 상담의 평가 표 (2026-09-16)
+//   EVMON  아동 번호 -> 그 달 평가 줄 (취소 뺌)
+//   ETYPES 평가 종류 번호 -> 이름 / THNAME 치료사 번호 -> 이름 (그만둔 분 포함)
+let EVMON  = {};
+let TRMON  = {};   // 아동 번호 -> 그 달 체험 수업 (취소 뺌) (2026-09-16)
+let XLMON  = {};   // 아동 번호 -> 그 달 추가 수업 (취소 뺌) · 체험 표 갈래 「추가」 (2026-09-30)
+let ETYPES = {};
+let THNAME = {};
+
+// 발추 적용 방식
+const XMODES = {
+  1: '매월 1회',
+  2: '5주차만 1회',
+  3: '적용 없음'
+};
+
+// 지난달 (2026-08 -> 2026-07)
+function prevMonth(mk) {
+  const [y, m] = mk.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function show(el, text, ok) {
+  el.textContent = text;
+  el.className = 'out ' + (ok ? 'ok' : 'err');
+}
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function won(n) { return (n || 0).toLocaleString() + '원'; }
+
+// ── 학부모 안내문 ──────────────────────────────
+// 화면에 이미 계산돼 있는 값을 그대로 읽어서 글로 만든다.
+// 따로 계산하지 않으므로 화면에 보이는 금액과 항상 같다.
+const NBAR = '\u2501'.repeat(13);        // 카카오톡에서 안 무너지는 가로줄
+
+function nNum(el) {
+  if (!el) return 0;
+  const v = (el.value !== undefined ? el.value : el.textContent) || '';
+  return Number(String(v).replace(/[^0-9-]/g, '')) || 0;
+}
+
+// 아동 카드 하나를 읽어 안내문 글을 만든다
+// 화면에 이미 계산돼 있는 값을 그대로 읽으므로 화면 금액과 항상 같다
+function noticeText(childId) {
+  const box = document.querySelector('.kid[data-child="' + childId + '"]');
+  if (!box) return null;
+  const c = CHILDREN.find(x => x.id === childId);
+  const mk = LOADED_MK || $('mk').value;
+  const mon = Number(String(mk).split('-')[1]);
+
+  const L = [];
+  L.push('[자라는나무] ' + mon + '월 수업료 안내');
+  L.push('');
+  L.push((c ? c.name : '') + ' 아동');
+  L.push('');
+
+  // ── 카드결제 묶음 ──
+  const rows = [];
+  box.querySelectorAll('.r.line').forEach(tr => {
+    const amt = nNum(tr.querySelector('.lineamt'));
+    if (amt <= 0) return;
+    const st  = Number(tr.dataset.st);
+    const nm  = TYPES[st] || ('유형' + st);
+    const de  = tr.querySelector('.de');
+    const lab = de ? (de.childNodes[0] ? de.childNodes[0].textContent : '') : '';
+    const thr = de && de.querySelector('.thr') ? de.querySelector('.thr').textContent : '';
+    const day = (String(lab).match(/([월화수목금토일])/) || [])[1] || '';
+    rows.push({ nm: nm, day: day, thr: thr,
+                cnt: nNum(tr.querySelector('.cnt')), amt: amt });
+  });
+  // 발추
+  const x8 = box.querySelector('.gsum[data-st="8"]');
+  if (x8) {
+    const a8 = nNum(x8.querySelector('.gamt'));
+    if (a8 > 0) {
+      const sel = x8.querySelector('.xthr');
+      rows.push({ nm: TYPES[8] || '발달재활 추가', day: '',
+        thr: sel ? ((sel.options[sel.selectedIndex] || {}).text || '') : '',
+        cnt: nNum(x8.querySelector('.xcnt')), amt: a8 });
+    }
+  }
+  // 평가비
+  const x9 = box.querySelector('.gsum[data-st="9"]');
+  if (x9) {
+    const a9 = nNum(x9.querySelector('.evamt'));
+    if (a9 > 0) rows.push({ nm: '평가비', day: '', thr: '', cnt: 0, amt: a9 });
+  }
+  // 체험수업 (2026-09-16)
+  const x10 = box.querySelector('.gsum[data-st="10"]');
+  if (x10) {
+    const a10 = nNum(x10.querySelector('.tramt'));
+    if (a10 > 0) rows.push({ nm: '체험수업', day: '', thr: '', cnt: 0, amt: a10 });
+  }
+  // 추가수업 (2026-09-30)
+  const x11 = box.querySelector('.gsum[data-st="11"]');
+  if (x11) {
+    const a11 = nNum(x11.querySelector('.xlamt'));
+    if (a11 > 0) rows.push({ nm: '추가수업', day: '', thr: '', cnt: 0, amt: a11 });
+  }
+
+  const cardTot = nNum(box.querySelector('.cardtotal'));
+  if (rows.length) {
+    L.push(NBAR);
+    L.push('\uD83D\uDCB3 신용카드 · 계좌입금');
+    L.push(NBAR);
+    rows.forEach(r => {
+      let t1 = '· ' + r.nm;
+      if (r.day) t1 += '  ' + r.day;
+      if (r.thr) t1 += ' (' + r.thr + ')';
+      L.push(t1);
+      L.push('   ' + (r.cnt ? r.cnt + '회 · ' : '') + r.amt.toLocaleString() + '원');
+    });
+    L.push('');
+    L.push('소계  ' + cardTot.toLocaleString() + '원');
+    L.push('');
+    L.push('· 현장 또는 모바일 결제');
+    L.push('· 국민 자라는나무');
+    L.push('  749601-01-330411');
+    L.push('  (교육비 전용계좌)');
+    L.push('');
+  }
+
+  // ── 계좌입금 묶음 (발달재활서비스 본인부담금) ──
+  const dev = box.querySelector('.gsum[data-st="2"]');
+  // 이번 달 금액 칸이 있으면 오른쪽 글자(등급 금액)와 다르므로 셈한 금액을 쓴다 (2026-09-15)
+  let devAmt = dev ? nNum(dev.querySelector('.gamt')) : 0;
+  try {
+    const pp = JSON.parse(box.dataset.parts || '[]').find(x => Number(x.st) === 2);
+    if (pp) devAmt = Number(pp.amt) || 0;
+  } catch (e) { /* 옛 셈 */ }
+  if (devAmt > 0) {
+    L.push(NBAR);
+    L.push('\uD83C\uDFE6 계좌입금');
+    L.push(NBAR);
+    L.push('· 발달재활서비스');
+    L.push('   ' + devAmt.toLocaleString() + '원');
+    L.push('');
+    L.push('소계  ' + devAmt.toLocaleString() + '원');
+    L.push('');
+    L.push('· 아동 이름으로 입금해 주세요');
+    L.push('· 국민 자라는나무');
+    L.push('  749601-01-348791');
+    L.push('  (본인부담금 전용계좌)');
+    L.push('');
+  }
+
+  L.push(NBAR);
+  L.push('합계  ' + (devAmt + cardTot).toLocaleString() + '원');
+  L.push(NBAR);
+  L.push('');
+  L.push('문의 : 042-488-6011');
+
+  return { name: (c ? c.name : ''), text: L.join('\n') };
+}
+
+// ── 교육비 납입증명서 (소득공제) ─────────────
+// 그해 낸 돈을 달마다 모아 보여 준다.
+// 연간합계에서 지원유형별 제외액을 한 번에 뺀다.
+const DEDUCT = {          // 지원유형별 한 해 제외액
+  3: 120000,              // 치료지원(언어)
+  4: 120000,              // 치료지원(작업)
+  5: 120000,              // 방과후활동비
+  6: 240000,              // 방과후치료지원(언어)
+  7: 240000               // 방과후치료지원(작업)
+};
+const CENTER = {
+  name: '자라는 나무',
+  biz:  '314-82-75463',
+  addr: '대전광역시 서구 문정로 22, 10층 (탄방동 충렬공회관)'
+};
+
+function jumin6(b) {
+  const t = String(b || '').replace(/[^0-9]/g, '');
+  return t.length >= 8 ? t.slice(2, 8) + '-' : '';
+}
+
+async function openDeduct(childId) {
+  const c = CHILDREN.find(x => x.id === childId);
+  if (!c) return;
+  const yr = String(LOADED_MK || $('mk').value).slice(0, 4);
+
+  const old = document.querySelector('.dcover');
+  if (old) old.remove();
+
+  const cover = document.createElement('div');
+  cover.className = 'dcover';
+  cover.innerHTML = '<div class="dwin"><div class="dbody">불러오는 중...</div></div>';
+  document.body.appendChild(cover);
+  cover.addEventListener('click', e => {
+    if (e.target === cover || e.target.classList.contains('dclose')) cover.remove();
+    if (e.target.classList.contains('dprint')) window.print();
+  });
+
+  let rows;
+  try {
+    const { data, error } = await sb.from('nl_payments')
+      .select('month_key, amount, support_type_id')
+      .eq('child_id', childId)
+      .gte('month_key', yr + '-01').lte('month_key', yr + '-12')
+      .not('paid_on', 'is', null);
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    cover.querySelector('.dbody').textContent = '납부 기록을 읽지 못했습니다. ' + e.message;
+    return;
+  }
+
+  const mon = {}, used = {};
+  rows.forEach(r => {
+    const m = Number(String(r.month_key).slice(5, 7));
+    mon[m] = (mon[m] || 0) + (Number(r.amount) || 0);
+    if (Number(r.amount) > 0) used[Number(r.support_type_id)] = true;
+  });
+
+  let gross = 0;
+  for (let m = 1; m <= 12; m++) gross += (mon[m] || 0);
+
+  let cut = 0;
+  const cutList = [];
+  Object.keys(DEDUCT).forEach(k => {
+    if (used[Number(k)]) {
+      cut += DEDUCT[k];
+      cutList.push((TYPES[k] || ('유형' + k)) + ' ' + DEDUCT[k].toLocaleString() + '원');
+    }
+  });
+  const net = Math.max(0, gross - cut);
+
+  const cell = m => (mon[m] ? mon[m].toLocaleString() : '');
+  let payRows = '';
+  for (let i = 1; i <= 6; i++) {
+    const j = i + 6;
+    payRows += '<tr>'
+      + '<th>' + String(i).padStart(2, '0') + ' 월</th>'
+      + '<td class="num">' + cell(i) + ' 원</td>'
+      + '<th>' + String(j).padStart(2, '0') + ' 월</th>'
+      + '<td class="num">' + cell(j) + ' 원</td></tr>';
+  }
+
+  cover.querySelector('.dwin').innerHTML =
+      '<div class="dbody">'
+    + '<div class="dtitle">' + yr + '년 교육비 납입증명서</div>'
+
+    + '<div class="dsec">1. 신청인</div>'
+    + '<table class="dt">'
+    + '<tr><th style="width:15%">① 성 명</th><td style="width:35%"></td>'
+    +     '<th style="width:22%">② 주민등록번호<br>(납세번호)</th><td></td></tr>'
+    + '<tr><th>③ 주 소</th><td colspan="3"></td></tr>'
+    + '<tr><th rowspan="2">대상<br>학생</th>'
+    +     '<td>④ 성 명: <b>' + esc(c.name) + '</b></td>'
+    +     '<th>주민등록번호</th><td>' + jumin6(c.birth) + '</td></tr>'
+    + '<tr><td>⑥ 주 소</td><td colspan="2">⑦ 관계: <b>자녀</b></td></tr>'
+    + '</table>'
+
+    + '<div class="dsec">2. 교육기관</div>'
+    + '<table class="dt">'
+    + '<tr><th style="width:15%">⑧ 기관명</th><td style="width:35%"><b>' + CENTER.name + '</b></td>'
+    +     '<th style="width:22%">⑨ 사업자등록번호</th><td><b>' + CENTER.biz + '</b></td></tr>'
+    + '<tr><th>⑩ 소재지</th><td colspan="2">' + CENTER.addr + '</td>'
+    +     '<th>⑪ 전화<br>팩스</th></tr>'
+    + '</table>'
+
+    + '<div class="dsec">3. 수강료 납입금액</div>'
+    + '<table class="dt">'
+    + '<tr><th>납부 월</th><th>납부금액</th><th>납부 월</th><th>납부금액</th></tr>'
+    + payRows
+    + '<tr class="sum"><th colspan="2" style="text-align:center;">연간합계액</th>'
+    +     '<td class="num">' + net.toLocaleString() + ' 원</td>'
+    +     '<td style="text-align:center;">용도: 제출용</td></tr>'
+    + '</table>'
+
+    + (cut
+        ? '<div class="dnote">※ 납부액 합계 ' + gross.toLocaleString() + '원에서 '
+          + '교육비 공제 제외액 ' + cut.toLocaleString() + '원을 뺀 금액입니다.<br>'
+          + '&nbsp;&nbsp;&nbsp;제외 내역 — ' + cutList.join(' · ') + '</div>'
+        : '')
+
+    + '<div class="dnote">소득세법 제52조 및 소득세법시행령 제113조 제1항의 규정에 의하여 '
+    + '위와 같이 교육비를 납부하였음을 증명하여 주시기 바랍니다.</div>'
+    + '<div class="dsign"><div class="r">' + yr + ' 년 &nbsp;&nbsp; 월 &nbsp;&nbsp; 일</div>'
+    + '<div class="r">신 청 인 &nbsp;&nbsp;&nbsp;&nbsp; (서명 또는 날인)</div></div>'
+
+    + '<div class="dnote" style="margin-top:16px;">위와 같이 교육비를 납입하였음을 증명합니다.</div>'
+    + '<div class="dsign"><div class="r">' + yr + ' 년 &nbsp;&nbsp; 월 &nbsp;&nbsp; 일</div>'
+    + '<div class="r" style="font-size:15px;font-weight:600;letter-spacing:.3em;">'
+    + CENTER.name + ' &nbsp;[직인]</div></div>'
+    + '</div>'
+    + '<div class="dfoot">'
+    + '<button class="dclose" type="button">닫기</button>'
+    + '<button class="dprint" type="button">인쇄 · PDF</button></div>';
+}
+
+// 미리보기 창을 띄운다
+function openNotice(childId) {
+  const r = noticeText(childId);
+  if (!r) return;
+  const old = document.querySelector('.ncover');
+  if (old) old.remove();
+
+  const cover = document.createElement('div');
+  cover.className = 'ncover';
+  cover.innerHTML =
+      '<div class="nwin">'
+    + '<div class="nhead"><b>안내문</b>'
+    + '<span class="nwho">' + esc(r.name) + ' 아동</span></div>'
+    + '<div class="nbody"><textarea class="ntx" spellcheck="false"></textarea></div>'
+    + '<div class="nfoot"><span class="nmsg"></span>'
+    + '<button class="nclose" type="button">닫기</button>'
+    + '<button class="ncopy" type="button">복사하기</button></div></div>';
+  document.body.appendChild(cover);
+  cover.querySelector('.ntx').value = r.text;
+
+  cover.addEventListener('click', e => {
+    if (e.target === cover || e.target.classList.contains('nclose')) {
+      cover.remove(); return;
+    }
+    if (e.target.classList.contains('ncopy')) {
+      const ta = cover.querySelector('.ntx');
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      if (!ok && navigator.clipboard) {
+        navigator.clipboard.writeText(ta.value)
+          .then(() => { cover.querySelector('.nmsg').textContent = '복사했습니다.'; })
+          .catch(() => { cover.querySelector('.nmsg').textContent = '복사가 안 됩니다. 글을 직접 선택해 복사하세요.'; });
+        return;
+      }
+      cover.querySelector('.nmsg').textContent =
+        ok ? '복사했습니다. 카카오톡에 붙여넣으세요.' : '복사가 안 됩니다. 글을 직접 선택해 복사하세요.';
+    }
+  });
+}
+// 2019-03-14 -> 190314
+function ymd(b) {
+  const s = String(b || '').replace(/[^0-9]/g, '');
+  return s.length >= 8 ? s.slice(2, 8) : '';
+}
+
+// 그 달에 해당 요일이 몇 번 있는지 센다
+// 그 요일이 그 달에 몇 번인가 — 공휴일·센터휴무 날은 빼고 센다 (2026-09-11)
+//   5주차(발추·5주차 센터) 판단에 쓴다. 규칙 [7] 「휴무가 아닌 날 중 몇 번째」
+//   보기: 2026년 10월 금요일은 5번이지만 9일 한글날이 빠져 4번
+//   HOLDAY(센터 전체가 쉬는 날)는 불러오기 때 채워 둔다
+function countWeekdayOpen(mk, day) {
+  const NAMES = ['일','월','화','수','목','금','토'];
+  const [y, m] = mk.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  let n = 0;
+  for (let d = 1; d <= last; d++) {
+    if (NAMES[new Date(y, m - 1, d).getDay()] !== day) continue;
+    const ds = y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    if (HOLDAY[ds]) continue;
+    n++;
+  }
+  return n;
+}
+function countWeekday(mk, day) {
+  const NAMES = ['일','월','화','수','목','금','토'];
+  const [y, m] = mk.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  let n = 0;
+  for (let d = 1; d <= last; d++) {
+    if (NAMES[new Date(y, m - 1, d).getDay()] === day) n++;
+  }
+  return n;
+}
+
+// 여러 줄 중 from_month 가 기준달 이하인 것 중 가장 최근 것을 고른다
+function pickLatest(rows, mk, keyName) {
+  const out = {};
+  (rows || []).forEach(r => {
+    if (r.from_month > mk) return;
+    const k = r[keyName];
+    if (!out[k] || r.from_month > out[k].from_month) out[k] = r;
+  });
+  return out;
+}
+
+// 로그인한 직원 번호 — 그 달 전체 금액은 대표(8번)만 본다 (2026-09-17)
+let ME_ID = null;
+
+async function afterLogin(user) {
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists').select('id, name, role')
+    .eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (e1)  { show($('msg'), '❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) { show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.', false); return; }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+  // 학부모 결석 요청을 실시간으로 띄운다 (2026-09-22)
+  if (window.NLLive) NLLive.start(sb, me.id, {});
+  ME_ID = Number(me.id);
+
+  const [c, st, tt, th, ef] = await Promise.all([
+    sb.from('nl_children').select('id, name, birth, manager_no, status').order('name'),
+    sb.from('nl_support_types').select('id, name').order('id'),
+    sb.from('nl_therapy_types').select('id, name').order('id'),
+    sb.from('nl_therapists').select('id, name, active, role').order('id'),
+    sb.from('nl_eval_fees').select('id, name, amount, active').order('id')
+  ]);
+  if (c.error)  { show($('msg'), '❌ 아동 조회 실패\n' + c.error.message, false); return; }
+  if (st.error) { show($('msg'), '❌ 지원유형 조회 실패\n' + st.error.message, false); return; }
+
+  // 종결한 아동도 함께 담아 둔다.
+  //   종결 아동은 지난 달 납부 내역을 봐야 하므로 여기서 버리지 않고,
+  //   달마다 「그 달에 수업이나 납부가 있는지」로 가린다 (아래 load)
+  ALLKIDS  = c.data || [];
+  CHILDREN = ALLKIDS.filter(x => x.status === '치료중' || x.status === '대기중');
+  (st.data || []).forEach(x => TYPES[x.id] = x.name);
+  (tt.data || []).forEach(x => TTYPES[x.id] = x.name);
+  THERAPISTS = (th.data || []).filter(x => x.active !== false);
+  (th.data || []).forEach(x => { THNAME[x.id] = x.name; });
+  try {
+    const { data: et } = await sb.from('nl_eval_types').select('*').order('id');
+    (et || []).forEach(x => { ETYPES[x.id] = x.name || x.label || ''; });
+  } catch (e) { console.warn('평가 종류 못 가져옴', e); }
+
+  // 평가비 표를 못 읽으면 기본값을 그대로 쓴다 (화면이 멈추지 않도록)
+  if (!ef.error && ef.data && ef.data.length) {
+    EVALFEES = ef.data.filter(x => x.active !== false);
+  }
+
+  const nT = CHILDREN.filter(x => x.status === '치료중').length;
+  const nW = CHILDREN.length - nT;
+  $('who').textContent = me.name + ' (' + me.role + ') 님 · 치료중 ' + nT + '명'
+                       + (nW ? ' · 대기중 ' + nW + '명' : '');
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+}
+
+async function load() {
+  // 같은 달을 다시 불러오면 적어 둔 칸이 다시 들어가므로 바뀜 표시도 남긴다 (2026-09-15)
+  if ($('mk').value !== LOADED_MK) CHANGED = {};
+  CALC = {};
+  const mk = $('mk').value;
+  if (!mk) { show($('msg2'), '달을 골라주세요.', false); return; }
+  // 보던 달을 기억해 둔다. 새로고침해도 그 달로 열린다
+  try { localStorage.setItem('nl_bill_mon', mk); } catch (e) {}
+
+  $('load').disabled = true;
+  $('load').textContent = '불러오는 중...';
+  try {
+    // 자료는 종결한 아동까지 다 가져온다.
+    // (지난 달 수업·납부를 봐야 하므로. 화면에 그릴 아동은 아래에서 가린다)
+    const ids = ALLKIDS.map(c => c.id);
+
+    const pmk = prevMonth(mk);
+
+    // 그 달에 살아 있던 수업 줄 — 시간표와 같은 잣대 (2026-09-19)
+    //   창구를 못 부르면 아래에서 옛 셈으로 그린다 (화면이 비지 않게)
+    let LIVESC = null, LIVETH = null;
+    try {
+      const lv = await sb.rpc('nl_live_rows', { p_month: mk });
+      if (!lv.error && lv.data && lv.data.length) {
+        LIVESC = new Set(lv.data.map(r => Number(r.schedule_id)));
+        LIVETH = new Set(lv.data.map(r => Number(r.therapy_id)));
+      }
+    } catch (e) { LIVESC = null; LIVETH = null; }
+
+    const [th, fe, ru, gr, pay, px, pv, ss] = await Promise.all([
+      sb.from('nl_therapies')
+        .select('id, child_id, therapy_type_id, support_type_id, monthly_count, count_mode, memo, ended_on, group_id, nl_therapy_schedules(id, weekday, start_time, therapist_id, duration, week1, week2, week3, week4, from_month, to_month)')
+        .in('child_id', ids),
+      sb.from('nl_therapist_fees').select('*'),
+      sb.from('nl_support_rules').select('*'),
+      sb.from('nl_child_grades').select('*'),
+      sb.from('nl_payments').select('child_id, support_type_id, amount, paid_on, memo, carry_over')
+        .eq('month_key', mk),
+      sb.from('nl_payments').select('child_id, month_key, memo')
+        .eq('support_type_id', 8).lt('month_key', mk)
+        .order('month_key', { ascending: false }),
+      sb.from('nl_payments').select('child_id, support_type_id, memo')
+        .eq('month_key', pmk),
+      // 1,000줄씩 나눠 끝까지 가져온다 (2026-09-21) — 한 번에는 1,000줄까지만 오고 뒤는 조용히 잘린다
+      (async () => {
+        let all = [];
+        for (let f = 0; ; f += 1000) {
+          const r = await sb.from('nl_sessions')
+            .select('id, child_id, schedule_id, support_type_id, status, plan_date, start_time, month_key, run_no, makeup_for, no_makeup, no_makeup_why, want_makeup, minutes, dur_min')
+            .eq('month_key', mk).order('id').range(f, f + 999);
+          if (r.error) return r;
+          all = all.concat(r.data || []);
+          if ((r.data || []).length < 1000) break;
+        }
+        return { data: all, error: null };
+      })()
+    ]);
+
+    // 그 달 공휴일 (센터 전체가 쉬는 날). 치료사 휴가와 가려 적기 위함
+    HOLDAY = {};
+    try {
+      const _p  = String(mk).split('-');
+      const _nx = new Date(Number(_p[0]), Number(_p[1]), 1);   // 다음 달 1일
+      const _to = _nx.getFullYear() + '-'
+                + String(_nx.getMonth() + 1).padStart(2, '0') + '-01';
+      const { data: _off, error: _oe } = await sb.from('nl_offdays')
+        .select('off_date, therapist_id, kind, reason')
+        .gte('off_date', mk + '-01').lt('off_date', _to);
+      if (_oe) console.warn('공휴일 못 가져옴', _oe);
+      // 공휴일 이름도 담아 둔다 (날짜 단추 글 「25일 추석 연휴」에 씀)
+      (_off || []).forEach(o => { if (!o.therapist_id) HOLDAY[o.off_date] = o.reason || o.kind || '공휴일'; });
+    } catch (e) { console.warn('공휴일 못 가져옴', e); }
+    // 그 달 평가 (신규 상담에서 적은 것). 취소는 뺀다 (2026-09-16)
+    EVMON = {};
+    try {
+      const { data: _ev, error: _ee } = await sb.from('nl_evaluations')
+        .select('id, child_id, eval_type_id, eval_date, eval_time, therapist_id, fee, item_cnt, status')
+        .gte('eval_date', mk + '-01').lte('eval_date', monEndDay(mk))
+        .order('eval_date');
+      if (_ee) console.warn('평가 못 가져옴', _ee);
+      (_ev || []).filter(v => v.status !== '취소').forEach(v => {
+        (EVMON[v.child_id] = EVMON[v.child_id] || []).push(v);
+      });
+    } catch (e) { console.warn('평가 못 가져옴', e); }
+    // 그 달 체험 수업 (신규 상담·아동 목록에서 적은 것). 취소는 뺀다 (2026-09-16)
+    TRMON = {}; XLMON = {};
+    try {
+      const { data: _tl, error: _te } = await sb.from('nl_trial_lessons')
+        .select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo')
+        .gte('lesson_date', mk + '-01').lte('lesson_date', monEndDay(mk))
+        .order('lesson_date');
+      if (_te) console.warn('체험 못 가져옴', _te);
+      (_tl || []).filter(v => v.status !== '취소').forEach(v => {
+        const M = v.kind === '추가' ? XLMON : TRMON;
+        (M[v.child_id] = M[v.child_id] || []).push(v);
+      });
+    } catch (e) { console.warn('체험 못 가져옴', e); }
+    if (th.error)  throw th.error;
+    if (fe.error)  throw fe.error;
+    if (ru.error)  throw ru.error;
+    if (gr.error)  throw gr.error;
+    if (pay.error) throw pay.error;
+    if (px.error)  throw px.error;
+    if (pv.error)  throw pv.error;
+    // 회기를 못 읽었으면 멈춘다 (2026-09-21) — 전에는 조용히 0회로 그려졌다
+    if (ss && ss.error) throw ss.error;
+
+    FEES   = pickLatest(fe.data, mk, 'therapist_id');
+    RULES  = pickLatest(ru.data, mk, 'support_type_id');
+    GRADES = pickLatest(gr.data, mk, 'child_id');
+
+    // 그 달 회기 수를 수업+지원유형별로 세어둔다 (휴무·보강은 뺀다)
+    const sess = (ss && ss.data) ? ss.data : [];
+    // 보강 줄(쪼갠 조각 포함)을 셀지 정한다 (2026-09-11 — 예정 교육비 셈과 같은 규칙)
+    //   원래 줄이 결석·완료·예정이면 원래 줄이 이미 1회로 세어지므로 보강은 세지 않는다
+    //   (전에는 마친 보강·조각을 또 세어 한 회가 두 번 잡혔다)
+    //   원래 줄이 휴무면 원래 줄이 안 세어지므로 보강을 센다
+    //   40분 보강은 잡아 둔 것도 세고, 조각은 마친 만큼만 센다
+    const SBYID = {};
+    sess.forEach(x => { SBYID[x.id] = x; });
+    const mkCount = x => {
+      const o = SBYID[x.makeup_for];
+      if (!o || o.status !== '휴무') return false;
+      // 결석한 보강·조각은 안 센다 (2026-09-21 — 서버·시간표와 같은 규칙)
+      if (x.status === '취소' || x.status === '쉼' || x.status === '결석') return false;
+      return Number(x.minutes || 40) === 40 || x.status === '완료';
+    };
+    // 회기 단추 (2026-09-11) — 켜진 단추 수 = 청구 회수
+    //   원래 수업 줄만 단추가 된다. 보강·조각 줄은 세지 않는다
+    //   (쉬는 날을 메운 보강은 그 쉬는 날 단추가 「보강 받음」으로 켜져 한 회로 셈)
+    SESSCNT = {};
+    WKWAS   = {};
+    SROWS   = {};
+    SBYID_G = SBYID;
+    X8SESS  = {};
+    sess.forEach(x => {
+      if (!x.makeup_for && Number(x.support_type_id) === 8 && Number(x.run_no || 0) > 0)
+        X8SESS[x.child_id] = x;
+      if (x.makeup_for || x.status === '보강') return;
+      const k = x.schedule_id;
+      const sp = x.support_type_id || 0;
+      (SESSCNT[k] = SESSCNT[k] || {});
+      // 쉼·취소는 자리만 만들어 둔다 (회기 수는 안 올린다).
+      // 그래야 「한 달 통째로 쉼」인 수업이 0회로 그려진다.
+      // 자리를 안 만들면 회기가 없는 것으로 보고 요일 수로 세어
+      // 쉬는 달에도 금액이 생긴다.
+      if (SESSCNT[k][sp] == null) SESSCNT[k][sp] = 0;
+      if (x.status === '쉼' || x.status === '취소') return;
+      (SROWS[k + '|' + sp] = SROWS[k + '|' + sp] || []).push(x);
+      // 회기는 줄 수가 아니라 분으로 센다. 10분 네 줄이 한 회기 (2026-09-08)
+      if (sessOn(x)) SESSCNT[k][sp] += (Number(x.minutes || 40) / 40);
+    });
+    Object.keys(SROWS).forEach(k => SROWS[k].sort((a, b) =>
+      String(a.plan_date).localeCompare(String(b.plan_date))
+      || String(a.start_time || '').localeCompare(String(b.start_time || ''))));
+
+    // 보강을 이미 잡은 결석 모으기
+    const covered = {};
+    // 보강을 마치면 상태가 '완료'로 바뀐다. 그래도 보강을 잡은 것이므로
+    // 상태를 따지지 않고 makeup_for 가 있으면 '잡았다'로 센다
+    //   다만 결석·취소한 보강은 「못 한 보강」이라 잡은 것으로 안 본다 (2026-09-21)
+    sess.forEach(x => { if (x.makeup_for && x.status !== '결석' && x.status !== '취소') covered[x.makeup_for] = 1; });
+
+    // 아동·지원유형별 회기 순번 매기기 (날짜 순)
+    const ord = {};
+    sess.slice()
+      .filter(x => x.status !== '보강' && x.status !== '쉼')
+      .sort((a,b) => String(a.plan_date).localeCompare(String(b.plan_date)))
+      .forEach(x => {
+        const k = x.child_id + '|' + (x.support_type_id || 0);
+        ord[k] = (ord[k] || 0) + 1;
+        x._seq = ord[k];
+      });
+
+    // 아동·유형별 실제 회기와 빠진 날짜(휴무·결석)를 모아둔다
+    SHORTCNT = {};
+    sess.forEach(x => {
+      if (x.status === '쉼') return;
+      // 보강 줄은 위 회기 셈과 같은 규칙으로만 센다 (2026-09-11)
+      if (x.makeup_for) { if (!mkCount(x)) return; }
+      else if (x.status === '보강') return;
+      const k = x.child_id + '|' + (x.support_type_id || 0);
+      const g = SHORTCNT[k] = SHORTCNT[k] || { cnt: 0, miss: [], skip: 0, all: [] };
+      // 「보강 없음」에서 고를 수 있게 그 달 모든 줄을 담아둔다 (2026-09-08)
+      //   보강(쪼개기 포함)이 이미 딸린 날과 보강 줄 자체는 후보에서 뺀다 (2026-09-11)
+      //   이미 「보강 없음」인 날은 되돌릴 수 있게 남긴다
+      if (!x.makeup_for && (!covered[x.id] || x.no_makeup))
+        g.all.push({ id: x.id, d: x.plan_date,
+          s: (x.no_makeup ? (x.status + ' · 보강 없음') : x.status) });
+      // 「보강 없음」으로 정한 회기 — 세어두되 빠진 날 목록에는 남긴다
+      //   (예정인 동안은 「보강 잡기」로 되돌릴 수 있어야 하므로)
+      if (x.no_makeup) {
+        g.skip++;
+        // 「보강 없음」으로 정한 휴무·결석은 청구 회수에서 뺀다 (2026-09-08)
+        if (x.status !== '휴무' && x.status !== '결석')
+          g.cnt += (Number(x.minutes || 40) / 40);
+        g.miss.push({ id: x.id, d: x.plan_date, nm: true,
+          why: x.no_makeup_why || '',
+          s: (x.status === '휴무'
+                ? (HOLDAY[x.plan_date] ? '공휴일' : '휴가')
+                : '결석') + ' · 보강 없음' });
+        return;
+      }
+      if (x.status === '휴무') { g.miss.push({ id: x.id, d: x.plan_date,
+        s: (HOLDAY[x.plan_date] ? '공휴일' : '휴가') }); return; }
+      g.cnt += (Number(x.minutes || 40) / 40);
+      if (x.status === '결석') g.miss.push({ id: x.id, d: x.plan_date, s: '결석' });
+      // 빠진 날이 없을 때 「보강 없음」에서 고를 수 있게 예정 줄도 모아둔다
+      if (x.status === '예정') (g.plans = g.plans || []).push({ id: x.id, d: x.plan_date });
+    });
+
+    // 유형별 기준 회기 — 셈방식(count_mode)에 따라 계산한다
+    //   4회만    : 4
+    //   주차선택 : 켜둔 주차 개수 (5주차는 안 셈)
+    //   발4+센1  : 발달재활 4. 5주인 달만 센터비용 1회가 더 붙음
+    //   발4+발추1 : 발달재활 4 + 발추 1      (발추는 8번으로 따로 셈)
+    //   발추대체 : 그 요일이 4번인 달은 1주차가 발추(8번)로 빠져 이 유형은 1회 적다.
+    //              5번 있는 달은 그대로 다 이 유형이다.
+    //   발4+5주발추 : 그 요일이 5번 있는 달만 5회차가 발추(8번). 4번뿐인 달은 4회.
+    //   매주     : 그 달에 그 요일이 몇 번 있는지 (4주면 4, 5주면 5)
+    // 그 달에 해당하는 수업요일만 고른다.
+    //   시작달이 그 달보다 늦으면 아직 시작 전 (예: 「이 달은 쉼」)
+    //   끝난달이 그 달보다 이르면 이미 끝난 수업
+    //   창구(nl_live_rows)가 준 요일줄만 쓴다. 못 불렀으면 옛 셈으로
+    const liveScs = (t) => (t.nl_therapy_schedules || []).filter(s =>
+      LIVESC ? LIVESC.has(Number(s.id))
+             : ((!s.from_month || s.from_month <= mk) && (!s.to_month || s.to_month >= mk)));
+
+    NEEDCNT = {}; X8NEED = {}; X8FIVE = {};
+    (th.data || []).forEach(t => {
+      // 그 달에 살아 있던 치료만 기준에 넣는다
+      //   창구를 못 불렀으면 옛 셈(끝난날만 봄)으로
+      if (LIVETH ? !LIVETH.has(Number(t.id))
+                 : (t.ended_on && String(t.ended_on) < mk + '-01')) return;
+      const st   = Number(t.support_type_id) || 0;
+      const mode = String(t.count_mode || '').trim();
+      const scs  = liveScs(t);
+      let need   = Number(t.monthly_count) || 0;
+      let plus1  = 0;                      // 센터비용에 얹을 1회
+
+      if (mode === '매주') {
+        // 요일줄마다 그 달 요일 수를 세어 합친다. 꺼둔 주차는 뺀다.
+        let n = 0;
+        scs.forEach(sc => {
+          if (!sc.weekday) return;
+          const wc = countWeekday(mk, sc.weekday);
+          let off = 0;
+          for (let i = 1; i <= Math.min(wc, 4); i++) {
+            if (sc['week' + i] === false) off++;
+          }
+          n += Math.max(0, wc - off);
+        });
+        if (n) need = n;
+      } else if (mode === '4회만') {
+        // 주차를 꺼둔 것이 있으면 그만큼 뺀다 (격주 수업 등)
+        // 네 주차가 다 켜져 있으면 지금까지처럼 4회
+        let n = 0;
+        scs.forEach(sc => {
+          if (!sc.weekday) return;
+          for (let i = 1; i <= 4; i++) {
+            if (sc['week' + i] !== false) n++;
+          }
+        });
+        need = n || 4;
+      } else if (mode === '주차선택') {
+        // 3주 이하 — 켜둔 주차만 센다 (5주차는 세지 않는다)
+        let n = 0;
+        scs.forEach(sc => {
+          if (!sc.weekday) return;
+          const wc = Math.min(countWeekday(mk, sc.weekday), 4);
+          for (let i = 1; i <= wc; i++) {
+            if (sc['week' + i] !== false) n++;
+          }
+        });
+        need = n;
+      } else if (mode === '발4+발추1') {
+        need = 4;                          // 나머지 1회는 발추(8번)로 따로 센다
+      } else if (mode === '발4+5주발추') {
+        // 그 요일이 5번 있는 달 → 5회차가 발추로 빠지므로 이 유형은 4회
+        // 4번뿐인 달 → 4회 그대로
+        need = 4;
+      } else if (mode === '발추대체') {
+        // 4주인 달 → 1주차 1회가 발추로 빠지므로 이 유형은 (요일수 - 1)회
+        // 5주인 달 → 요일수 그대로
+        // 4주·5주는 「발달재활 요일」로 가린다 (2026-09-11 — 회기 까는 서버 셈과 같게)
+        //   센터비용 요일이 몇 번인지는 안 본다. 발달재활 요일은 공휴일·센터휴무 날을 빼고 센다
+        //   보기: 82번 발달 화 · 센터 목 — 10월 화요일 4번 → 목요일 5번 가운데 1주차가 발추 → 센터 4회
+        //   발달재활 수업이 없으면 옛 셈(센터비용 요일)으로 가린다
+        const devWds = [];
+        (th.data || []).forEach(t2 => {
+          if (Number(t2.child_id) !== Number(t.child_id)) return;
+          if (Number(t2.support_type_id) !== 2) return;
+          if (LIVETH ? !LIVETH.has(Number(t2.id))
+                     : (t2.ended_on && String(t2.ended_on) < mk + '-01')) return;
+          liveScs(t2).forEach(s2 => { if (s2.weekday) devWds.push(s2.weekday); });
+        });
+        const devFive = devWds.length ? devWds.some(w => countWeekdayOpen(mk, w) >= 5) : null;
+        let n = 0;
+        scs.forEach(sc => {
+          if (!sc.weekday) return;
+          const wc = countWeekday(mk, sc.weekday);
+          const five = (devFive === null) ? (wc >= 5) : devFive;
+          n += five ? wc : Math.max(0, wc - 1);
+        });
+        if (n) need = n;
+      } else if (mode === '발4+센1') {
+        // 4주인 달 → 발달재활 4회만
+        // 5주인 달 → 발달재활 4회 + 센터비용 1회 (5회기)
+        need = 4;
+        let five = false;
+        scs.forEach(sc => {
+          if (sc.weekday && countWeekdayOpen(mk, sc.weekday) >= 5) five = true;   // 공휴일 빼고 셈
+        });
+        plus1 = five ? 1 : 0;
+      }
+
+      const k = t.child_id + '|' + st;
+      NEEDCNT[k] = (NEEDCNT[k] || 0) + need;
+      // 발4+발추1 아동은 발추 1회를 따로 잡아야 한다
+      if (mode === '발4+발추1') X8NEED[t.child_id] = true;
+      if (mode === '발4+5주발추') X8FIVE[t.child_id] = true;
+      if (plus1) {
+        const k1 = t.child_id + '|1';
+        NEEDCNT[k1] = (NEEDCNT[k1] || 0) + plus1;
+      }
+    });
+
+    // 보강 못 잡은 결석 — 아동별로 모아둔다
+    //   시간표 「결석 보강」 상자와 같은 셈을 쓴다 (2026-09-11)
+    //   서버 창구 nl_staff_need(→ nl_need_rows) 가 준 줄만 올린다
+    //   (선생님 휴가도 들어가고, 쪼개기로 40분을 못 채운 결석도 남는다)
+    //   창구를 못 부르면 옛 셈으로 한다 — 상자가 비어 버리지 않게
+    let NEEDSET = null;
+    try {
+      const { data: nd, error: ne } = await sb.rpc('nl_staff_need', { p_mk: mk });
+      if (!ne && nd) {
+        NEEDSET = {};
+        nd.forEach(r => { NEEDSET[r.session_id] = r.why || ''; });
+      }
+    } catch (e) { NEEDSET = null; }
+    NOMAKEUP = {};
+    sess.forEach(x => {
+      if (NEEDSET) {
+        if (!(x.id in NEEDSET)) return;
+      } else {
+        if (x.status !== '결석') return;
+        if (covered[x.id]) return;                 // 보강을 이미 잡았음
+        if (x.no_makeup) return;                   // 「보강 없음」으로 정했음 (2026-09-08)
+      }
+      const st = x.support_type_id || 0;
+      (NOMAKEUP[x.child_id] = NOMAKEUP[x.child_id] || []).push({
+        st: st, date: x.plan_date, seq: x._seq || 0,
+        ok: canCarry(st, x._seq || 0),
+        why: NEEDSET ? (NEEDSET[x.id] || '') : ''
+      });
+    });
+
+    // 그룹 수업 — 그룹 금액 · 1:1 보강 차액 (2026-10-02)
+    GRPS = {}; XDIFF = {};
+    try {
+      const gq = await sb.from('nl_groups').select('id, name, fee, mk_diff');
+      (gq.data || []).forEach(g => { GRPS[g.id] = g; });
+      const gSc = {};   // 요일줄 번호 -> 그룹 번호
+      (th.data || []).forEach(t => {
+        if (!t.group_id) return;
+        (t.nl_therapy_schedules || []).forEach(s => { gSc[s.id] = t.group_id; });
+      });
+      const gAbs = {};  // 그룹 수업 결석 원래 줄 -> 그 줄
+      sess.forEach(x => {
+        if (!x.makeup_for && x.status === '결석' && gSc[x.schedule_id]) gAbs[x.id] = x;
+      });
+      sess.forEach(x => {
+        const o = x.makeup_for ? gAbs[x.makeup_for] : null;
+        if (!o || ['결석', '취소'].includes(x.status)) return;
+        if (x.minutes != null && Number(x.minutes) < 40) return;
+        const g = GRPS[gSc[o.schedule_id]];
+        if (!g || !(Number(g.mk_diff) > 0)) return;
+        const k = o.child_id + '|' + (o.support_type_id || 0);
+        XDIFF[k] = XDIFF[k] || { n: 0, unit: Number(g.mk_diff) };
+        XDIFF[k].n++;
+      });
+    } catch (e) { GRPS = {}; XDIFF = {}; }
+
+    SCHED = {};
+    (th.data || []).forEach(t => {
+      liveScs(t).forEach(s => {
+        (SCHED[t.child_id] = SCHED[t.child_id] || []).push({
+          sched_id: s.id,
+          therapy_id: t.id,
+          group_id: t.group_id || null,
+          therapy_type_id: t.therapy_type_id,
+          support_type_id: t.support_type_id,
+          weekday: s.weekday,
+          start_time: s.start_time,
+          therapist_id: s.therapist_id,
+          duration: s.duration || 40,
+          count_mode: String(t.count_mode || '').trim(),
+          wk: [s.week1 !== false, s.week2 !== false,
+               s.week3 !== false, s.week4 !== false],
+          tmemo: t.memo || ''
+        });
+        WKWAS[s.id] = [s.week1 !== false, s.week2 !== false,
+                       s.week3 !== false, s.week4 !== false];
+      });
+    });
+
+    SAVED = {};
+    (pay.data || []).forEach(p => {
+      (SAVED[p.child_id] = SAVED[p.child_id] || {})[p.support_type_id] = p;
+    });
+
+    // 확정 표 — 「예정」 단추를 눌러 확정으로 바꾼 아동
+    FIXED = {};
+    try {
+      const { data: fxs } = await sb.from('nl_pay_fix')
+        .select('child_id, fixed').eq('month_key', mk);
+      (fxs || []).forEach(x => { if (x.fixed) FIXED[x.child_id] = true; });
+    } catch (e) {}
+
+    // 카드 특이사항 — 아동마다 한 줄 · 달과 상관없이 지울 때까지 그대로 (2026-10-03)
+    PAYNOTE = {};
+    try {
+      const { data: nts, error: eN } = await sb.from('nl_pay_notes').select('child_id, card_note');
+      if (eN) throw eN;
+      (nts || []).forEach(x => { PAYNOTE[String(x.child_id)] = x.card_note || ''; });
+    } catch (e) {
+      console.error('특이사항 읽기 실패', e);
+    }
+    // 분 변경 차액 이월 (2026-10-03)
+    CARRYOUT = {}; CARRYIN = {};
+    try {
+      const { data: cr, error: eC } = await sb.from('nl_carry')
+        .select('id, child_id, support_type_id, session_id, amount, reason, from_month, to_month')
+        .or('from_month.eq.' + mk + ',to_month.eq.' + mk);
+      if (eC) throw eC;
+      (cr || []).forEach(x => {
+        if (x.from_month === mk && x.session_id) CARRYOUT[x.session_id] = x;
+        if (x.to_month === mk) (CARRYIN[x.child_id] = CARRYIN[x.child_id] || []).push(x);
+      });
+    } catch (e) {
+      console.error('분 변경 이월 읽기 실패', e);
+      show($('msg2'), '⚠ 분 변경 이월을 읽지 못했습니다. 새로고침 해 주세요.', false);
+      show($('msg2'), '⚠ 카드 특이사항을 읽지 못했습니다. 새로고침 해 주세요.', false);
+    }
+
+    // 지난달 기록 — 적용단가와 발추 방식만 이어받는다. 승인번호는 이어받지 않는다.
+    PREV = {};
+    (pv.data || []).forEach(p => {
+      (PREV[p.child_id] = PREV[p.child_id] || {})[p.support_type_id] = p;
+    });
+
+    // 지난달 이전 기록에서 아동별 발추 담당 치료사를 찾아둔다 (가장 최근 것)
+    LASTX = {};
+    (px.data || []).forEach(p => {
+      if (LASTX[p.child_id]) return;   // 이미 더 최근 것이 있음
+      const t = extraTherapistOf(p);
+      if (t) LASTX[p.child_id] = t;
+    });
+
+    LOADED_MK = mk;
+
+    // 그 달에 볼 아동을 정한다.
+    //   치료중·대기중은 늘 보이고,
+    //   종결한 아동은 그 달에 수업이나 저장된 납부가 있을 때만 보인다
+    //   (지난 달 납부 내역을 확인하실 수 있게)
+    CHILDREN = ALLKIDS.filter(x => {
+      if (x.status === '치료중' || x.status === '대기중') return true;
+      if (SCHED[x.id] && SCHED[x.id].length) return true;
+      if (SAVED[x.id] && Object.keys(SAVED[x.id]).length) return true;
+      return false;
+    });
+
+    drawAll();
+    show($('msg2'), mk + ' 계산했습니다. 회기와 리뷰를 확인하고 아동별로 저장하세요.', true);
+  } catch (e) {
+    show($('msg2'), '❌ 불러오지 못했습니다.\n' + e.message, false);
+  } finally {
+    $('load').disabled = false;
+    $('load').textContent = '불러오기';
+  }
+}
+
+// 줄 앞 딱지 — 「사업 · 회기방식」
+function tagOf(it){
+  const st = it.row_st || it.base_st;
+  const nm = TYPES[st] || '';
+  const md = it.mode || '';
+  // 오는 주가 일부만이면 「1·3주 (월 2회)」 (2026-09-17)
+  const wk = it.wk || [true, true, true, true];
+  const on = [1, 2, 3, 4].filter((w, i) => wk[i] !== false);
+  const wtxt = (on.length && on.length < 4) ? on.join('·') + '주 (월 ' + on.length + '회)' : '';
+  const txt = nm + (md ? ' · ' + md : '') + (wtxt ? ' · ' + wtxt : '');
+  if (!txt.trim()) return '';
+  let cls = 'sttag';
+  if (String(it.label).indexOf('5주차') >= 0) cls += ' five';
+  else if (Number(st) === 2) cls += ' dev';
+  else if (Number(st) === 1) cls += ' ctr';
+  return '<span class="' + cls + '">' + esc(txt) + '</span>';
+}
+
+// 한 아동의 계산 줄들을 만든다
+function buildRows(childId, mk) {
+  const list = SCHED[childId] || [];
+  const groups = {};   // support_type_id -> 줄들
+
+  list.forEach(s => {
+    const fee = FEES[s.therapist_id];
+    const grp = s.group_id ? GRPS[s.group_id] : null;
+    // 그룹 수업은 그룹 1회 금액 (2026-10-02)
+    const unit = grp ? Number(grp.fee)
+      : !fee ? null
+      : s.duration === 60 ? fee.fee_60
+      : s.duration === 50 ? fee.fee_50
+      : fee.fee_40;
+    const base = {
+      kind: '회기',
+      label: (TTYPES[s.therapy_type_id] || '치료') + ' ' + s.weekday + ' '
+             + String(s.start_time).slice(0,5) + ' (' + s.duration + '분)',
+      therapist_name: thrName(s.therapist_id),
+      therapist_id: s.therapist_id,
+      unit: unit,
+      sched_id: s.sched_id,
+      therapy_id: s.therapy_id,
+      group: !!grp,
+      ttname: TTYPES[s.therapy_type_id] || '치료',
+      hm: String(s.start_time).slice(0,5),
+      dur: s.duration,
+      mode: s.count_mode || '',
+      base_st: s.support_type_id,
+      wk: s.wk || [true,true,true,true],
+      tmemo: s.tmemo || '',
+      weekday: s.weekday,
+      wdCnt: countWeekday(mk, s.weekday)
+    };
+    // 회기 표가 있으면 그것으로, 없으면 요일 수로 센다
+    const cnt = SESSCNT[s.sched_id];
+    if (cnt && Object.keys(cnt).length) {
+      Object.keys(cnt).forEach(sp => {
+        const stid = Number(sp) || s.support_type_id;
+        // 분으로 센 값이라 소수가 나올 수 있다. 소수점 둘째까지만 남긴다
+        const c2 = Math.round(Number(cnt[sp]) * 100) / 100;
+        const row = Object.assign({}, base, { count: c2, row_st: stid });
+        if (stid !== s.support_type_id) row.label += ' · 5주차';
+        (groups[stid] = groups[stid] || []).push(row);
+      });
+    } else {
+      (groups[s.support_type_id] = groups[s.support_type_id] || []).push(
+        Object.assign({}, base, { count: countWeekday(mk, s.weekday),
+                                  row_st: s.support_type_id }));
+    }
+  });
+
+  const out = [];
+  Object.keys(groups).forEach(stid => {
+    const rule = RULES[stid] || { calc_type: '회기계산', deduction: 0, review_target: true };
+    out.push({
+      support_type_id: Number(stid),
+      calc_type: rule.calc_type,
+      deduction: rule.deduction || 0,
+      review_target: rule.review_target !== false,
+      items: groups[stid]
+    });
+  });
+
+  // 발달재활(2번)이 있으면 발추(8번) 줄도 만들어 둔다
+  // 회기에서 이미 8번 묶음이 만들어졌으면 새로 만들지 않고 그것에 값만 채운다
+  // (그러지 않으면 발추 회기가 있는 아동은 8번 줄이 두 개로 그려진다)
+  const dev = out.find(g => g.support_type_id === 2);
+  if (dev) {
+    const tid = dev.items.length ? dev.items[0].therapist_id : null;
+    const fee = tid ? FEES[tid] : null;
+    const rule8 = RULES[8] || { calc_type: '치료사정액', deduction: 0, review_target: true };
+    let g8 = out.find(g => g.support_type_id === 8);
+    if (!g8) {
+      g8 = { support_type_id: 8, items: [] };
+      out.push(g8);
+    }
+    g8.calc_type     = rule8.calc_type;
+    g8.deduction     = 0;
+    g8.review_target = rule8.review_target !== false;
+    g8.extra_unit      = fee ? (fee.fee_extra || 0) : null;
+    g8.extra_therapist = tid;
+    // 5주차 판단에 쓸 요일 —
+    //   발달재활 수업이 여러 요일이면, 그 달에 5번 오는 요일이 하나라도 있으면 그것을 쓴다
+    g8.extra_weekday = (() => {
+      const wds = dev.items.map(v => v.weekday).filter(v => v);
+      if (!wds.length) return null;
+      const five = wds.find(w => countWeekdayOpen(mk, w) >= 5);   // 공휴일 빼고 셈
+      return five || wds[0];
+    })();
+  }
+
+  out.sort((a, b) => a.support_type_id - b.support_type_id);
+  return out;
+}
+
+// 아동의 입금자명 — 이번 달에 없으면 지난달 것을 이어받는다
+function payerOf(childId) {
+  const cur = memoOf((SAVED[childId] || {})[2], true);
+  if (cur) return cur;
+  return memoOf((PREV[childId] || {})[2], true);
+}
+
+// 이 달에 실제로 낼 돈이 있는 아동인가
+//   · 저장된 줄에 0원보다 큰 금액이 있으면 낼 것이 있다
+//   · 아직 저장 전이면 수업이 있는지로 본다
+//     - 발달재활만 있는 아동은 등급 본인부담금이 0원이면(다형) 낼 것이 없다
+//     - 대기중처럼 수업이 아예 없으면 낼 것이 없다
+function hasBill(childId) {
+  const sv = SAVED[childId] || {};
+  if (Object.keys(sv).some(k => Number(sv[k].amount) > 0)) return true;
+  // 평가비를 아직 저장하지 않았는데 그 달 평가 금액이 있으면 낼 것이 있다 (2026-09-16)
+  if (!sv[9] && evalSumOf(childId) > 0) return true;
+  if (!sv[10] && trialSumOf(childId) > 0) return true;
+  if (!sv[11] && extraSumOf(childId) > 0) return true;
+
+  const gs = buildRows(childId, LOADED_MK) || [];
+  const withItems = gs.filter(g => g.items && g.items.length);
+  if (!withItems.length) return false;              // 수업이 없음 (대기중 등)
+
+  // 발달재활(2번) 말고 다른 유형이 하나라도 있으면 낼 것이 있다
+  if (withItems.some(g => g.support_type_id !== 2)) return true;
+
+  // 발달재활만 있는 경우 — 본인부담금이 0원보다 커야 낼 것이 있다
+  const gr = GRADES[childId];
+  return !!(gr && Number(gr.self_pay) > 0);
+}
+
+// 미납 — 낼 것이 있는데 아직 안 낸 아동
+//   · 저장된 줄 중 납부일이 비어 있는 것이 있거나
+//   · 아예 저장이 안 된 경우
+// 카드·계좌 가운데 화면이 금액을 셈했는데 저장 줄이 없는 쪽 (2026-09-15)
+//   카드만 저장하고 본인부담금(계좌)을 저장 안 하면 「미납만」에서 빠지고
+//   「완납만」에 들어가던 일(79번 9월)을 막는다
+// 그 쪽(카드·계좌)에 저장된 줄이 있고 바꾼 칸이 없으면 처음부터 「✓ 저장됨」 (2026-09-17)
+//   전에는 늘 「저장 전」으로 그려, 확정해서 저장한 뒤 다시 그리면 저장 안 된 것처럼 보였다
+function sideSaved(childId, side) {
+  const ch = CHANGED[childId];
+  if (ch && ch[side]) return false;
+  const ks = Object.keys(SAVED[childId] || {});
+  return side === 'bank' ? ks.some(k => Number(k) === 2) : ks.some(k => Number(k) !== 2);
+}
+
+function sideMissing(childId) {
+  const cal = CALC[childId];
+  if (!cal) return false;
+  const sv = SAVED[childId] || {};
+  const ks = Object.keys(sv);
+  const cardSaved = ks.some(k => Number(k) !== 2);
+  const bankSaved = ks.some(k => Number(k) === 2);
+  return (cal.card > 0 && !cardSaved) || (cal.bank > 0 && !bankSaved);
+}
+
+function isUnpaid(childId) {
+  if (!hasBill(childId)) return false;            // 낼 것이 없으면 미납이 아니다
+  if (sideMissing(childId)) return true;          // 카드·계좌 중 한쪽이라도 저장 안 됨
+  const sv = SAVED[childId] || {};
+  // 금액이 0원인 줄은 받을 돈이 없으므로 미납으로 세지 않는다
+  //   발달재활 다형 아동의 본인부담금 0원
+  //   발추 「5주차만」인데 4주뿐인 달 · 「적용 없음」 0원 등
+  const keys = Object.keys(sv).filter(k => Number(sv[k].amount) > 0);
+  if (!keys.length) return false;                 // 받을 돈이 하나도 없음
+  return keys.some(k => !sv[k].paid_on);          // 하나라도 날짜 없음
+}
+
+// 확정 — 학부모와 이야기를 마치고 「예정」 단추를 눌러 확정으로 바꾼 아동
+//   nl_pay_fix 표에 담긴다. 눌러서 예정 <-> 확정을 오갈 수 있다.
+let FIXED = {};   // 아동번호 -> true
+let CARRYOUT = {}; // 회기줄 -> 이 달 분 변경 차액이 다음 달로 넘어간 것 (nl_carry · 2026-10-03)
+let CARRYIN  = {}; // 아동번호 -> [{amount, reason}] 지난달에서 넘어온 분 변경 차액
+let PAYNOTE = {}; // 아동번호(글자) -> 카드 특이사항 · 지울 때까지 달마다 그대로 (nl_pay_notes · 2026-10-03)
+function isFixed(childId) {
+  return !!FIXED[childId];
+}
+
+// 완납 — 낼 것이 있고 모두 납부일이 채워진 아동
+function isPaid(childId) {
+  if (!hasBill(childId)) return false;
+  if (sideMissing(childId)) return false;         // 한쪽이라도 저장 안 됐으면 완납 아님
+  const sv = SAVED[childId] || {};
+  // 0원 줄은 셈에서 뺀다 (받을 돈이 없으므로)
+  const keys = Object.keys(sv).filter(k => Number(sv[k].amount) > 0);
+  if (!keys.length) return false;
+  return keys.every(k => !!sv[k].paid_on);
+}
+
+// 저장하지 않고 적어둔 값을 기억해 둔다.
+// 화면을 다시 그리면 칸이 저장된 값으로 되돌아가므로,
+// 다시 그린 뒤 적어두신 것을 그대로 되돌려 넣기 위함이다.
+// (「미납만」 단추를 누르면 적어둔 낸날이 사라지던 문제)
+let TYPED = {};
+
+function keepTyped() {
+  TYPED = {};
+  document.querySelectorAll('#kids .kid').forEach(box => {
+    const kid = box.dataset.child;
+    if (!kid) return;
+    const one = {};
+    box.querySelectorAll('input, select').forEach((el, i) => {
+      const nm = (el.className || '').split(' ')[0] || el.tagName;
+      const st = el.closest('[data-st]');
+      const key = nm + '|' + (st ? st.dataset.st : '') + '|' + i;
+      one[key] = el.value;
+    });
+    TYPED[kid] = one;
+  });
+}
+
+function putTyped() {
+  document.querySelectorAll('#kids .kid').forEach(box => {
+    const one = TYPED[box.dataset.child];
+    if (!one) return;
+    box.querySelectorAll('input, select').forEach((el, i) => {
+      const nm = (el.className || '').split(' ')[0] || el.tagName;
+      const st = el.closest('[data-st]');
+      const key = nm + '|' + (st ? st.dataset.st : '') + '|' + i;
+      if (one[key] != null && one[key] !== '') el.value = one[key];
+    });
+  });
+}
+
+function drawAll() {
+  keepTyped();
+  // 화면에 한 번도 안 그린 아동은 금액을 모르므로 숨긴 채로 그려 셈만 한다
+  //   (같은 번호 상자가 두 개면 셈이 엉키므로 목록을 먼저 비운다)
+  const notYet = CHILDREN.filter(c => !CALC[c.id]);
+  if (notYet.length) {
+    $('kids').innerHTML = '';
+    const hid = document.createElement('div');
+    hid.style.display = 'none';
+    hid.innerHTML = notYet.map(c => drawKid(c)).join('');
+    document.body.appendChild(hid);
+    notYet.forEach(c => { try { calcKid(c.id); } catch (e) { /* 셈 못 하면 옛 규칙 */ } });
+    hid.remove();
+  }
+  const q = $('q').value.trim().toLowerCase();
+  let list = CHILDREN.filter(c => {
+    if (!q) return true;
+    if (String(c.id) === q) return true;               // 아동 번호로 찾기
+    if ((c.name || '').toLowerCase().includes(q)) return true;
+    return payerOf(c.id).toLowerCase().includes(q);   // 입금자명으로도 찾기
+  });
+
+  // 미납만 / 완납만 걸러내기
+  if (PAYFILTER === 'unpaid')    list = list.filter(c => isUnpaid(c.id));
+  else if (PAYFILTER === 'paid') list = list.filter(c => isPaid(c.id));
+  else if (PAYFILTER === 'todo') list = list.filter(c => !isFixed(c.id));
+
+  // 단추에 인원수를 붙여 준다
+  const nUn = CHILDREN.filter(c => isUnpaid(c.id)).length;
+  const nPd = CHILDREN.filter(c => isPaid(c.id)).length;
+  const nTd = CHILDREN.filter(c => !isFixed(c.id)).length;
+  $('tabAll').textContent = '전체 ' + CHILDREN.length;
+  $('tabUn').textContent  = '미납만 ' + nUn;
+  $('tabPd').textContent  = '완납만 ' + nPd;
+  $('tabTodo').textContent = '예정만 ' + nTd;
+
+  $('empty').style.display = list.length ? 'none' : 'block';
+  if (!list.length) {
+    $('kids').innerHTML = ''; $('allsum').textContent = '';
+    $('empty').textContent =
+      PAYFILTER === 'unpaid' ? '미납인 아동이 없습니다.'
+    : PAYFILTER === 'paid'   ? '완납한 아동이 없습니다.'
+    : PAYFILTER === 'todo'   ? '모든 아동의 납부가 확정되었습니다.'
+    : '해당하는 아동이 없습니다.';
+    return;
+  }
+
+  $('kids').innerHTML = list.map(c => drawKid(c)).join('');
+  putTyped();
+  list.forEach(c => calcKid(c.id));
+  sumAll();
+}
+
+function dayOnly(v) { return Number(String(v || '').slice(8, 10)) || ''; }
+
+// ── 회기 단추 (2026-09-11) ────────────────────────
+// 회기 칸 — 날짜 단추가 있으면 켜진 단추 수를 보여 주기만 한다 (고치지 않음)
+//   저장한 회기가 단추 수와 다르면 아래에 빨간 「단추 ○회」 — 누르면 단추 수로 맞춘다
+//   이 달 회기가 아직 없으면 지금처럼 숫자를 고칠 수 있다
+function cntHtml(it, cnt) {
+  const rows = SROWS[it.sched_id + '|' + it.row_st];
+  if (!rows || !rows.length)
+    return '<input class="cnt" type="text" inputmode="numeric" value="' + cnt + '"'
+      + ' title="시간표에 이 달 회기가 아직 없어 요일 수로 채웠습니다. 다르면 고치세요.">';
+  const on = Math.round(Number(it.count || 0) * 100) / 100;
+  return '<input class="cnt ro" type="text" readonly value="' + cnt + '"'
+    + ' title="켜진 날짜 단추 수입니다. 단추를 눌러 바꿉니다.">'
+    + (Number(cnt) !== on
+        ? '<span class="cntwarn" data-n="' + on + '" title="눌러서 단추 수로 맞춥니다">단추 ' + on + '회</span>'
+        : '');
+}
+// 한 수업 줄의 날짜 단추 줄
+function btnRowHtml(it) {
+  const rows = SROWS[it.sched_id + '|' + it.row_st];
+  if (!rows || !rows.length) return '';
+  return '<div class="sbrow" data-sched="' + it.sched_id + '" data-bst="' + it.row_st + '">'
+    + rows.map(sbHtml).join('')
+    + (it.group ? '' : '<button class="durbtn" type="button" data-sched="' + it.sched_id + '" data-bst="' + it.row_st
+       + '" data-dur="' + (it.dur || 40) + '" data-th="' + (it.therapist_id || '') + '">분 변경</button>')
+    + '</div>' + carryNote(rows);
+}
+// 확정한 달 — 분을 바꿔 다음 달로 넘긴 차액을 그 줄 아래에 적는다 (2026-10-03)
+function carryNote(rows) {
+  const cs = rows.map(x => CARRYOUT[x.id]).filter(Boolean);
+  if (!cs.length) return '';
+  return '<div class="durnote">' + cs.map(c => {
+      const a = Number(c.amount || 0), m = Number(String(c.to_month || '').slice(5, 7));
+      return esc(c.reason || '') + ' · ' + (a > 0 ? Math.abs(a).toLocaleString() + '원 ' + m + '월 「전월 이월」로 넘김'
+                                               : Math.abs(a).toLocaleString() + '원 ' + m + '월에 더 받을 돈');
+    }).join('<br>') + '</div>';
+}
+// 분 변경 — 그 날만 수업 시간을 바꾼 회기 (2026-10-03)
+//   이 달 금액에 넣는 것 = 분을 바꿨고, 켜져 있고(청구), 다음 달로 차액이 넘어가지 않은 것
+function durAdjs(it) {
+  const rows = SROWS[it.sched_id + '|' + it.row_st] || [];
+  const dur = Number(it.dur) || 40;
+  return rows.filter(x => x.dur_min && Number(x.dur_min) !== dur && sessOn(x) && !CARRYOUT[x.id])
+             .map(x => Number(x.dur_min));
+}
+// 공휴일 이름 줄이기 — 「추석 연휴」 → 「추석」, 「대체공휴일」 → 「공휴일」 (찾기 창과 같음)
+function holiShort(v) {
+  const n = String(v || '').replace(/대체\s*공휴일|연휴/g, '').trim();
+  return n || '공휴일';
+}
+// 날짜 단추 하나 — 글은 사업 약칭 + 회차 + 날짜만. 쉬는 날은 「8일 휴가」 · 「25일 추석」 (2026-09-11 줄임)
+function sbHtml(x) {
+  const sp  = Number(x.support_type_id) || 0;
+  const dev = (sp === 2 || sp === 8);
+  const on  = sessOn(x);
+  const d   = dayOnly(x.plan_date);
+  let txt;
+  if (x.status === '휴무') {
+    txt = d + '일 ' + (HOLDAY[x.plan_date] ? holiShort(HOLDAY[x.plan_date]) : '휴가');
+  } else {
+    const mn = Number(String(x.month_key || LOADED_MK || '').slice(5, 7));
+    txt = (ABBR[sp] || '') + ' '
+        + (Number(x.run_no) > 0 ? mn + '-' + x.run_no + ' ' : '') + d + '일';
+  }
+  const tip = (x.no_makeup ? '보강 없음'
+              : x.status === '휴무' ? (on ? '쉬는 날 · 보강 받음' : '쉬는 날')
+              : (x.status || ''))
+    + (dev ? ' · 발달재활은 여기서 바꾸지 않습니다'
+           : (on ? ' · 누르면 회색 (청구 안 함)' : ' · 누르면 켜짐 (청구)'));
+  return '<span class="sb s' + sp + (on ? '' : ' off') + (dev ? ' lock' : '') + '"'
+    + ' data-sid="' + x.id + '" title="' + esc(tip) + '">'
+    + esc(txt) + (x.dur_min ? ' <b class="durtag">' + x.dur_min + '분</b>' : '')
+    + (dev && x.status === '휴무' ? ' \uD83D\uDD12' : '') + '</span>';
+}
+// 발추 단추 (이) — 켜짐 = 이번 달 발추 청구 / 회색 = 청구 안 함 (적용 없음)
+function x8BtnHtml(cid, mode, cnt) {
+  const s8 = X8SESS[cid];
+  const mn = Number(String(LOADED_MK || '').slice(5, 7));
+  const on = Number(mode) !== 3 && numOf(cnt) > 0;
+  // 적용방식 칸 오른쪽에 나란히 놓는다 (2026-09-13)
+  return '<span class="sb s8 x8b' + (on ? '' : ' off') + '"'
+    + ' style="margin-left:6px;vertical-align:middle;"'
+    + ' title="발추 · 누르면 켜고 끕니다 (적용방식이 함께 바뀜)">'
+    + '이 ' + mn + '-5' + (s8 ? ' ' + dayOnly(s8.plan_date) + '일' : '') + '</span>';
+}
+// 발추 단추를 적용방식 · 회기 칸에 맞춘다
+function syncX8(box) {
+  const row = box.querySelector('.gsum[data-st="8"]');
+  const bt  = box.querySelector('.x8b');
+  if (!row || !bt) return;
+  const md = row.querySelector('.xmode'), xc = row.querySelector('.xcnt');
+  const on = !!md && Number(md.value) !== 3 && numOf(xc ? xc.value : 0) > 0;
+  bt.classList.toggle('off', !on);
+  // 「적용 없음」이면 단추를 감춘다 (2026-09-15). 다시 켤 때는 적용방식 칸에서 고른다
+  bt.style.display = (md && Number(md.value) === 3) ? 'none' : '';
+}
+// 날짜 단추를 눌렀을 때
+//   켜짐 → 회색 : 쉬는 날이면 「보강 받음」을 끔 / 그 밖은 「보강 없음」 (예정·완료는 결석으로)
+//   회색 → 켜짐 : 쉬는 날이면 「보강 받음」을 켬 / 그 밖은 「보강 없음」을 풂
+//   사유는 묻지 않는다. 보강이 잡힌 날은 서버 장치가 막는다
+async function toggleSb(el) {
+  const kid = el.closest('.kid');
+  if (!kid) return;
+  const cid = Number(kid.dataset.child);
+  if (isFixed(cid)) {
+    alert('확정한 아동입니다.\n이름 옆 「확정」을 눌러 예정으로 되돌린 뒤 바꾸세요.');
+    return;
+  }
+  // 발추 단추 — 회기 표는 건드리지 않고 적용방식만 바꾼다
+  if (el.classList.contains('x8b')) {
+    const row = kid.querySelector('.gsum[data-st="8"]');
+    const md = row ? row.querySelector('.xmode') : null;
+    const xc = row ? row.querySelector('.xcnt') : null;
+    if (!md || !xc) return;
+    if (el.classList.contains('off')) { md.value = '1'; xc.value = 1; }
+    else { md.value = '3'; xc.value = 0; }
+    calcKid(cid); sumAll(); unDone(row);
+    return;
+  }
+  if (el.classList.contains('lock')) {
+    alert('발달재활은 그 달 4회를 채워야 해서 여기서 끄지 않습니다.\n'
+      + '보강을 못 하면 시간표 보강 잡기 창의 「포기」를 쓰세요.');
+    return;
+  }
+  const x = SBYID_G[Number(el.dataset.sid)];
+  if (!x) return;
+  const on = sessOn(x);
+  let upd;
+  if (on) {
+    if (x.status === '휴무') upd = { want_makeup: false };
+    else {
+      upd = { no_makeup: true, no_makeup_why: null };
+      if (x.status === '예정' || x.status === '완료') upd.status = '결석';
+    }
+  } else {
+    if (x.status === '휴무') upd = { want_makeup: true, no_makeup: false, no_makeup_why: null };
+    else {
+      upd = { no_makeup: false, no_makeup_why: null };
+      // 이 화면에서 결석으로 바꿨던 날이면 원래 상태로 되돌린다
+      if (x._was && x.status === '결석') upd.status = x._was;
+    }
+  }
+  el.classList.add('busy');
+  const { data, error } = await sb.from('nl_sessions').update(upd).eq('id', x.id)
+    .select('id, status, no_makeup, no_makeup_why, want_makeup').single();
+  el.classList.remove('busy');
+  if (error) {
+    alert(/보강/.test(error.message || '')
+      ? error.message + '\n\n시간표에서 보강을 먼저 지운 뒤 다시 누르세요.'
+      : '바꾸지 못했습니다.\n' + (error.message || error));
+    return;
+  }
+  if (on && upd.status === '결석') x._was = x.status;
+  else if (!on && upd.status) delete x._was;
+  Object.assign(x, data);
+
+  // 단추 · 회기 칸 · 금액을 다시 그린다
+  const rowEl = el.closest('.sbrow');
+  const sched = rowEl ? rowEl.dataset.sched : '';
+  const bst   = rowEl ? rowEl.dataset.bst : '';
+  el.outerHTML = sbHtml(x);
+  const list = SROWS[sched + '|' + bst] || [];
+  let n = 0;
+  list.forEach(v => { if (sessOn(v)) n += (Number(v.minutes || 40) / 40); });
+  n = Math.round(n * 100) / 100;
+  if (SESSCNT[sched]) SESSCNT[sched][bst] = n;
+  const line = kid.querySelector('.r.line[data-sched="' + sched + '"][data-st="' + bst + '"]');
+  if (line) {
+    const inp = line.querySelector('.cnt');
+    if (inp) inp.value = n;
+    const w = line.querySelector('.cntwarn');
+    if (w) w.remove();
+    unDone(line);
+  } else {
+    // 발달재활 보기 줄 — 회수 글만 고친다
+    const look = rowEl ? rowEl.previousElementSibling : null;
+    const lc = look ? look.querySelector('.lookcnt') : null;
+    if (lc) lc.textContent = '발 ' + n + '회';
+  }
+  calcKid(cid); sumAll();
+}
+
+function drawKid(c) {
+  const mk = LOADED_MK;
+  const groups = buildRows(c.id, mk);
+  const sv = SAVED[c.id] || {};
+
+  const fixed = isFixed(c.id);
+  const head = '<div class="kidhead">'
+    + '<span class="kidname">' + c.id + '. ' + esc(c.name) + '</span>'
+    + '<button class="kfix ' + (fixed ? 'yes' : 'no') + '" type="button"'
+    + ' title="눌러서 예정과 확정을 오갑니다">'
+    + (fixed ? '확정' : '예정') + '</button>'
+    + '<span class="kidno">' + ymd(c.birth) + '</span>'
+    + '<span class="kidno">' + esc(c.manager_no) + '</span>'
+    + '<span class="ktotal">0원</span></div>';
+
+  const lastM = PREV[c.id] || {};
+  const noClass = !groups.length;
+
+  let b = '';
+  if (noClass) {
+    b += '<div class="warn">수업이 등록되어 있지 않습니다. 평가비만 넣을 수 있습니다.</div>';
+  }
+
+  // 「몇 회 적음」 상자와 「보강을 아직 못 잡은 결석」 상자는 없앴다 (2026-09-11 회기 단추)
+  //   회기는 수업 줄 아래 날짜 단추로 켜고 끈다. 보강할 것은 시간표 상자가 알려 준다
+  // 발4+발추1 아동인데 발추(8번) 청구가 빠져 있으면 알려준다 (그대로 남김)
+  if (X8NEED[c.id]) {
+    const s8 = sv[8];
+    const m8 = (s8 !== undefined) ? (xmodeOf(s8) || 3) : 1;
+    if (m8 === 3 || (s8 !== undefined && !(Number(s8.amount) > 0)))
+      b += '<div class="shortc"><div class="shortline"><b>' + esc(TYPES[8] || '발추') + '</b> '
+        + '<b class="sred">발추 1회 청구가 빠져 있습니다</b>'
+        + '<div class="shortmust">발추 단추(이)를 눌러 켜 주세요.</div></div></div>';
+  }
+
+  b += '<div class="sect">카드결제</div>';
+
+  // 전월 이월은 아동당 한 줄만, 회기계산 항목이 다 끝난 뒤에 그린다
+  let lastCoSt = null;
+  const calcList = groups.filter(g => g.support_type_id !== 2);
+  let lastCalcIdx = -1;
+  calcList.forEach((g, k) => { if (g.calc_type === '회기계산') lastCalcIdx = k; });
+
+  calcList.forEach((g, gIdx) => {
+    const tn = TYPES[g.support_type_id] || ('유형' + g.support_type_id);
+    const sd = sv[g.support_type_id] !== undefined
+      ? '' : '';
+
+    if (g.calc_type === '회기계산') {
+      let savedCnt = countsOf(sv[g.support_type_id]);
+      // 저장된 회기 표시는 줄 순서로 맞춘다. 저장한 뒤 줄 수가 바뀌었으면(요일 변경 등) 쓰지 않는다 (2026-10-03 · 34번 10월)
+      if (savedCnt && savedCnt.length !== g.items.length) savedCnt = null;
+      // 적용단가 — 이번 달 저장분이 없으면 지난달 것을 이어받는다
+      const apList = unitsOf(sv[g.support_type_id]) || unitsOf(lastM[g.support_type_id]);
+      g.items.forEach((it, i) => {
+        const cnt = (savedCnt && savedCnt[i] != null && !isNaN(savedCnt[i]))
+                    ? savedCnt[i] : it.count;
+        // 그룹 수업은 그룹 1회 금액 그대로 — 지난달 1:1 줄의 적용단가를 줄 차례로 이어받지 않는다 (2026-10-09)
+        const ap = (!it.group && apList && apList[i] > 0) ? apList[i] : '';
+        b += '<div class="r line' + (ap ? ' hasap' : '') + '" data-st="' + g.support_type_id + '"'
+          + ' data-sched="' + (it.sched_id || '') + '"'
+          + ' data-th="' + (it.therapist_id || '') + '" data-dur="' + (it.dur || 40) + '"'
+          + ' data-adjs="' + (it.group ? '' : durAdjs(it).join(',')) + '"'
+          + ' data-five="' + (/5주차/.test(it.label) ? '1' : '0') + '">'
+          + '<span class="nm">' + (i === 0 ? sd : '') + '</span>'
+          + '<span class="de">' + (it.group ? '<span class="gtag">그룹</span>' : '') + tagOf(it) + esc(it.label)
+          + ' · <b class="thr">' + esc(it.therapist_name) + '</b></span>'
+          + '<span class="ap"><input class="apu" data-won type="text" inputmode="numeric" placeholder="적용단가" value="'
+          + (ap ? ap.toLocaleString() : '') + '"></span>'
+          + '<span class="ct">' + cntHtml(it, cnt) + '</span>'
+          + '<span class="up upbox">' + (it.unit == null ? '<span class="warn">단가없음</span>' : it.unit.toLocaleString()) + '</span>'
+          + '<span class="am lineamt" data-unit="' + (it.unit == null ? '' : it.unit) + '">0</span>'
+          + '</div>'
+          + btnRowHtml(it);
+      });
+      // 그룹 결석의 1:1 보강 차액 (2026-10-02) — 회기 칸 저장과 섞이지 않게 .line 이 아닌 줄
+      const xd = XDIFF[c.id + '|' + g.support_type_id];
+      if (xd && xd.n > 0) {
+        b += '<div class="r xdiffrow" data-st="' + g.support_type_id + '" data-amt="' + (xd.n * xd.unit) + '">'
+          + '<span class="nm"></span>'
+          + '<span class="de"><span class="gtag">그룹</span>1:1 보강 차액</span>'
+          + '<span class="ap"></span>'
+          + '<span class="ct">' + xd.n + '회</span>'
+          + '<span class="up">' + xd.unit.toLocaleString() + '</span>'
+          + '<span class="am">' + (xd.n * xd.unit).toLocaleString() + '</span></div>';
+      }
+      if (g.deduction > 0) {
+        b += '<div class="r sub2"><span class="nm"></span>'
+          + '<span class="de">지원금 제외</span><span class="ct"></span><span class="up"></span>'
+          + '<span class="am">−' + g.deduction.toLocaleString() + '</span></div>';
+        b += '<div class="r sum gsum" data-st="' + g.support_type_id + '" data-ded="' + g.deduction + '">'
+          + '<span class="nm"></span><span class="de"></span><span class="ct"></span>'
+          + '<span class="up"></span>'
+          + '<span class="am gamt">0</span></div>';
+      } else {
+        b += '<div class="r sum gsum" data-st="' + g.support_type_id + '" data-ded="0">'
+          + '<span class="nm"></span><span class="de"></span><span class="ct"></span>'
+          + '<span class="up"></span>'
+          + '<span class="am gamt">0</span></div>';
+      }
+      lastCoSt = g.support_type_id;
+      if (gIdx === lastCalcIdx) b += coHtml(g.support_type_id, sv, c.id);
+
+    } else if (g.calc_type === '치료사정액') {
+      const savedT = sv[8] ? extraTherapistOf(sv[8]) : null;
+      const curT = savedT || LASTX[c.id] || g.extra_therapist;
+
+      // 적용방식 — 이번 달 저장분이 있으면 그것을 그대로 쓴다
+      // (「적용 없음」으로 저장한 것이 지난달 값에 덮이지 않게)
+      // 저장분이 없을 때, 발4+발추1 아동은 무조건 「매월 1회」로 놓는다.
+      //   발추 1회는 일정을 다음 달로 넘길 수 있어도 납부는 그 달에 하기 때문이다.
+      //   지난달이 「적용 없음」이었어도 이어받지 않는다.
+      const mode = (sv[8] !== undefined)
+        ? (xmodeOf(sv[8]) || 3)
+        : (X8NEED[c.id] ? 1 : (X8FIVE[c.id] ? 2 : (xmodeOf(lastM[8]) || 3)));
+      // ↑ 발4+5주발추 아동은 지난달을 「적용 없음」으로 저장했어도 다음 달은 「5주차만 1회」로 돌아온다
+      // 5주차 여부
+      const five = g.extra_weekday ? (countWeekdayOpen(mk, g.extra_weekday) >= 5) : false;   // 공휴일 빼고 셈
+      let cnt;
+      if (sv[8] !== undefined && xmodeOf(sv[8])) {
+        const cs = countsOf(sv[8]);
+        cnt = (cs && cs[0] != null) ? cs[0] : autoXcnt(mode, five);
+      } else if (sv[8] !== undefined) {
+        cnt = 1;
+      } else {
+        cnt = autoXcnt(mode, five);
+      }
+
+      b += '<div class="r gsum narrownm" data-st="8" data-five="' + (five ? 1 : 0) + '">'
+        + '<span class="nm" title="' + esc(tn) + '">발추' + sd + '</span>'
+        + '<span class="de">담당 <select class="xthr">' + therapistOptions(curT) + '</select>'
+        + '<select class="xmode">' + xmodeOptions(mode) + '</select>'
+        + x8BtnHtml(c.id, mode, cnt)
+        + (five ? ' <span class="aptag">5주차</span>' : '') + '</span>'
+        + '<span class="ap"></span>'
+        + '<span class="ct"><input class="cnt xcnt" type="text" inputmode="numeric" value="' + cnt + '"></span>'
+        + '<span class="up xunit">' + feeExtra(curT).toLocaleString() + '</span>'
+        + '<span class="am gamt">0</span></div>';
+      // 발달재활 수업 — 보기만 한다 (본인부담금은 계좌입금 상자). 날짜 단추는 잠김
+      const devG = groups.find(x => x.support_type_id === 2);
+      if (devG && devG.items && devG.items.length) {
+        // 같은 치료 · 같은 사업이면 한 줄로 합친다 (2026-09-17)
+        //   달 중간에 시각·요일을 바꾸면 요일줄이 둘로 나뉘어 두 층으로 보이던 것
+        //   글은 「목 14:00→14:20」, 날짜 단추는 날짜 차례로 한 줄에. 회기 수는 더한다
+        const bag = [];
+        devG.items.forEach(it => {
+          const key = (it.therapy_id || it.sched_id) + '|' + it.row_st;
+          let g2 = bag.find(x => x.key === key);
+          if (!g2) { g2 = { key: key, list: [] }; bag.push(g2); }
+          g2.list.push(it);
+        });
+        bag.forEach(g2 => {
+          const it = g2.list[0];
+          const uniq = a => a.filter((v, i) => v && a.indexOf(v) === i);
+          const wds = uniq(g2.list.map(x => x.weekday));
+          const hms = uniq(g2.list.map(x => x.hm));
+          const lbl = g2.list.length === 1 ? it.label
+            : it.ttname + ' ' + wds.join('→') + ' ' + hms.join('→') + ' (' + it.dur + '분)'
+              + (/5주차/.test(it.label) ? ' · 5주차' : '');
+          const ths = uniq(g2.list.map(x => x.therapist_name));
+          const dn = Math.round(g2.list.reduce((a, x) => a + Number(x.count || 0), 0) * 100) / 100;
+          const srows = [];
+          g2.list.forEach(x => { (SROWS[x.sched_id + '|' + x.row_st] || []).forEach(r => srows.push(r)); });
+          srows.sort((a, b2) => String(a.plan_date).localeCompare(String(b2.plan_date)));
+          b += '<div class="r look">'
+            + '<span class="nm"></span>'
+            + '<span class="de">' + tagOf(it) + esc(lbl)
+            + ' · <b class="thr">' + esc(ths.join('→')) + '</b>'
+            + ' · 본인부담금은 아래 계좌입금</span>'
+            + '<span class="ap"></span>'
+            + '<span class="ct"><span class="lookcnt">발 ' + dn + '회</span></span>'
+            + '<span class="up"></span>'
+            + '<span class="am"></span></div>'
+            + (srows.length
+               ? '<div class="sbrow" data-sched="' + it.sched_id + '" data-bst="' + it.row_st + '">'
+                 + srows.map(sbHtml).join('') + '</div>'
+               : '');
+        });
+      }
+    }
+  });
+
+  const ev = sv[9];
+  // 저장한 평가비가 없으면 신규 상담의 평가 금액·종류를 미리 채운다 (2026-09-16)
+  const evRows = EVMON[c.id] || [];
+  const evPre  = ev ? null : evalPreset(c.id);
+  const evT    = ev ? evalTypeOf(ev) : (evPre ? evPre.type : null);
+  const evAmt  = ev ? Number(ev.amount) : (evPre ? evPre.amt : 0);
+  b += '<div class="r gsum narrownm" data-st="9" data-manual="1">'
+    + '<span class="nm">평가비</span>'
+    + '<span class="de">평가 </span><select class="evsel" style="border:1px solid #888;border-radius:4px;padding:2px 4px;background:#fff;color:#000">' + evalOptions(evT) + '</select></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
+    + '<span class="am"><input class="mn evamt" data-won type="text" inputmode="numeric" value="'
+    + (evAmt ? evAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
+    + evalInfoHtml(evRows);
+
+  // 체험 수업 — 저장한 줄이 없으면 그 달 체험 금액(합계)을 채운다 (2026-09-16)
+  //   체험이 없고 저장한 것도 없으면 줄을 그리지 않는다
+  const trRows = TRMON[c.id] || [];
+  const tv = sv[10];
+  if (tv || trRows.length) {
+    // 체험이 모두 취소됐는데 저장 금액이 남아 있으면 0으로 시작하고 알린다 (2026-10-01)
+    const trStale = !!(tv && !trRows.length && Number(tv.amount) > 0);
+    const trAmt = trStale ? 0 : (tv ? Number(tv.amount) : trialSumOf(c.id));
+    b += '<div class="r gsum narrownm" data-st="10" data-manual="1">'
+      + '<span class="nm">체험수업</span>'
+      + '<span class="de">정규 전 1회</span>'
+      + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
+      + '<span class="am"><input class="mn evamt tramt" data-won type="text" inputmode="numeric" value="'
+      + (trAmt ? trAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
+      + trialInfoHtml(trRows)
+      + (trStale ? staleHtml('체험 수업', Number(tv.amount)) : '');
+    if (trStale) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
+  }
+
+  // 추가 수업 — 이 달만 한 번 더 하는 수업 (2026-09-30)
+  //   저장한 줄이 없으면 그 달 추가 수업 금액(합계)을 채운다 · 없으면 줄을 그리지 않는다
+  //   요일 단추(매달 되풀이)와 따로 — 다음 달로 넘어가지 않는다
+  const xlRows = XLMON[c.id] || [];
+  const xv = sv[11];
+  if (xv || xlRows.length) {
+    // 추가 수업이 모두 취소됐는데 저장 금액이 남아 있으면 0으로 시작하고 알린다 (2026-10-01)
+    const xlStale = !!(xv && !xlRows.length && Number(xv.amount) > 0);
+    const xlAmt = xlStale ? 0 : (xv ? Number(xv.amount) : extraSumOf(c.id));
+    b += '<div class="r gsum narrownm" data-st="11" data-manual="1">'
+      + '<span class="nm">추가수업</span>'
+      + '<span class="de">이 달만 1회</span>'
+      + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
+      + '<span class="am"><input class="mn evamt xlamt" data-won type="text" inputmode="numeric" value="'
+      + (xlAmt ? xlAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
+      + extraInfoHtml(xlRows, fixed)
+      + (xlStale ? staleHtml('추가 수업', Number(xv.amount)) : '');
+    if (xlStale) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
+  }
+  if (!fixed) b += '<button type="button" class="xladd" data-xladd="' + c.id + '">＋ 1회 수업 추가</button>';
+
+  // 리뷰 차감 — 수업 없이 평가만 받는 아동에게도 보인다 (2026-09-16)
+  {
+    b += '<div class="r narrownm"><span class="nm">리뷰 차감</span>'
+      + '<span class="de">1건 5,000원 · 4건까지</span>'
+      + '<span class="ap"></span>'
+      + '<span class="ct"><input class="cnt rv" type="text" inputmode="numeric" value="'
+      + savedReview(sv) + '"></span>'
+      + '<span class="up"></span><span class="am rvtxt">0</span></div>';
+  }
+
+  b += '<div class="r tot"><span class="nm"></span><span class="de"></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up">카드 합계</span>'
+    + '<span class="am cardtotal">0원</span></div>';
+
+  const cp = Object.keys(sv).map(k => sv[k])
+    .find(p => Number(p.support_type_id) !== 2 && p.paid_on);
+  const cm = Object.keys(sv).map(k => sv[k])
+    .find(p => Number(p.support_type_id) !== 2 && memoOf(p, false));
+  // 지난달 차액이 저절로 채워졌으면 저장 전으로 보인다 (2026-10-03)
+  const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card);
+  // 승인번호는 이번 달 저장분에서만 가져온다. 지난달 것을 끌어오지 않는다.
+  b += '<div class="pay">'
+    + '<input class="dt pday" type="date" value="' + (cp ? cp.paid_on : '') + '">'
+    + '<input class="tx kmemo" type="text" placeholder="승인번호" value="'
+    + esc(cm ? memoOf(cm, false) : '') + '">'
+    + '<input class="tx knote" type="text" maxlength="500" placeholder="특이사항 (지울 때까지 달마다 그대로)" value="'
+    + esc(PAYNOTE[String(c.id)] || '') + '">'
+    + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
+    + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>';
+
+  const dev = groups.find(g => g.support_type_id === 2);
+  if (dev) {
+    const gr = GRADES[c.id];
+    const pv = gr ? gr.self_pay : null;
+    const ds = sv[2];
+    // 이번 달 금액 — 이번 달 저장분에서만 가져온다. 다음 달로 안 넘어간다 (2026-09-15)
+    const sov = selfOvOf(ds);
+    // 전월 이월 · 환불 메모 — 이번 달 저장분에서만. 다음 달로 안 넘어간다 (2026-09-22)
+    const sco = selfCoOf(ds), srf = refundOf(ds);
+    b += '<div class="sect bank">계좌입금 · 발달재활서비스 본인부담금</div>'
+      + '<div class="bankbody">'
+      + '<div class="r gsum' + (sov ? ' hasov' : '') + '" data-st="2" data-fixed="' + (pv == null ? '' : pv) + '">'
+      + '<span class="nm">발달재활서비스'
+      + (gr ? ' <b>' + gr.grade + '형</b>' : '')
+      + ' <button class="grchg" type="button" style="padding:1px 7px;font-size:11px;'
+      + 'border:1px solid #bcd7ef;background:#f1f7fd;color:#0c447c;border-radius:6px;'
+      + 'cursor:pointer;">등급 바꾸기</button>'
+      + '</span>'
+      + '<span class="de">' + (gr ? '본인부담금'
+          : '<span class="warn">등급이 없습니다. 아동 목록에서 먼저 넣으세요.</span>')
+      + (dev.items.length ? ' · <b class="thr">' + esc(thrName(dev.items[0].therapist_id)) + '</b>' : '')
+      + '</span>'
+      + '<span class="ct"></span>'
+      + '<span class="up" style="flex:0 0 100px;">' + (gr && Number(pv) !== 0
+          ? '<input class="spov" data-won type="text" inputmode="numeric" title="이번 달만 다른 금액을 받을 때 적습니다. 비우면 등급 금액"'
+            + ' placeholder="이번 달 금액" value="' + (sov ? sov.toLocaleString() : '') + '">'
+          : '') + '</span>'
+      + '<span class="up" style="flex:0 0 100px;">' + (gr && Number(pv) !== 0
+          ? '<input class="spov spco" data-won type="text" inputmode="numeric" title="전월에 입원 등으로 못 한 만큼 이번 달 금액에서 뺍니다"'
+            + ' placeholder="전월 이월" value="' + (sco ? sco.toLocaleString() : '') + '">'
+          : '') + '</span>'
+      + '<span class="am gamt">0</span></div>'
+      // 본인부담금이 0원이면(다형 등) 낼 것이 없으므로
+      // 낸날·입금자명 칸을 내놓지 않는다. 줄 자체는 그대로 보인다.
+      + (Number(pv) === 0 ? ''
+         : '<div class="pay">'
+           + '<input class="dt bday" type="date" value="' + (ds && ds.paid_on ? ds.paid_on : '') + '">'
+           + '<input class="tx bmemo" type="text" placeholder="입금자명" value="'
+           + esc(payerOf(c.id)) + '">'
+           + '<button class="ksave2' + (sideSaved(c.id, 'bank') ? ' done' : '') + '" type="button" data-only="bank"'
+           + ' data-ttl="계좌 저장 전">' + (sideSaved(c.id, 'bank') ? '\u2713 저장됨' : '계좌 저장 전') + '</button></div>'
+           + '<div class="pay"><input class="tx brf" type="text" style="flex:1 1 auto;"'
+           + ' placeholder="환불 메모 — 은행 · 예금주 · 끝 4자리 · 금액 · 날짜 (적으면 이번 달 0원)"'
+           + ' value="' + esc(srf) + '"></div>')
+      + '</div>';
+  }
+
+  b += '<div class="kidfoot">'
+    + '<button class="knotice" type="button">납부내역 안내</button>'
+    + '<button class="kdeduct" type="button">소득공제</button></div>';
+
+  return '<div class="kid" data-child="' + c.id + '">' + head + b + '</div>';
+}
+
+// 저장된 메모에서 사람이 적은 부분만 꺼낸다
+// 저장된 납부 메모의 [회기4,4] 에서 회기 합계를 읽는다
+function savedCnt(p) {
+  if (!p || !p.memo) return null;
+  const m = String(p.memo).match(/\[회기([0-9,]+)\]/);
+  if (!m) return null;
+  return m[1].split(',').reduce((a, b) => a + (Number(b) || 0), 0);
+}
+
+function memoOf(p, isBank) {
+  let m = (p && p.memo) ? String(p.memo) : '';
+  if (isBank) {
+    if (m === '계좌입금') return '';
+    if (m.indexOf('계좌입금 ') === 0) return m.slice(5);
+  } else {
+    if (m.indexOf('2026-08-11 자동이관') === 0) return '';
+  }
+  m = m.replace(/\s*\[회기[0-9,]+\]/g, '')
+       .replace(/\s*\[적용단가[0-9,]+\]/g, '')
+       .replace(/\s*\[발추치료사\d+\]/g, '')
+       .replace(/\s*\[발추방식[123]\]/g, '')
+       .replace(/\s*\[본인부담\d+\]/g, '')
+       .replace(/\s*\[본인이월\d+\]/g, '')
+       .replace(/\s*\[환불 [^\]]*\]/g, '')
+       .replace(/\s*\[평가유형\d+\]/g, '').trim();
+  if (m === '카드결제' || m === '자동계산' || m === '화면입력' || m === '계좌입금') return '';
+  return m;
+}
+
+// 치료사 고르는 칸
+function therapistOptions(sel) {
+  let o = '';
+  THERAPISTS.forEach(t => {
+    o += '<option value="' + t.id + '"' + (String(sel) === String(t.id) ? ' selected' : '')
+       + '>' + esc(t.name) + '</option>';
+  });
+  return o;
+}
+// 치료사 이름
+function thrName(tid) {
+  const t = THERAPISTS.find(x => String(x.id) === String(tid));
+  return t ? t.name : ('치료사' + (tid == null ? '?' : tid));
+}
+// 전월 이월 입력 줄 — 그달 한 번만 쓰는 값이라 다음 달로 넘기지 않는다
+function coHtml(st, sv, cid) {
+  // 전월 이월은 아동당 하나. 어느 항목에 저장돼 있든 찾아서 보여준다
+  let v = 0;
+  if (sv) {
+    Object.keys(sv).forEach(k => {
+      const c = Number((sv[k] && sv[k].carry_over) || 0);
+      if (c > v) v = c;
+    });
+  }
+  // 저장한 이월이 없으면 지난달 분 변경 차액을 채운다 (2026-10-03)
+  const cin = (CARRYIN[cid] || []);
+  const cinSum = cin.reduce((t, x) => t + Number(x.amount || 0), 0);
+  const auto = !v && cinSum > 0;
+  if (auto) { v = cinSum; CHANGED[cid] = Object.assign(CHANGED[cid] || {}, { card: true }); }
+  return '<div class="r sub2 corow' + (auto ? ' coauto' : '') + '" data-st="' + st + '">'
+    + '<span class="nm"></span>'
+    + '<span class="de">전월 이월' + (cin.length ? '<small class="cowhy">'
+        + esc(cin.map(x => x.reason).join(' · ')) + '</small>' : '') + '</span>'
+    + '<span class="ap"></span>'
+    + '<span class="ct"><input class="cnt co" data-won type="text" inputmode="numeric" value="'
+    + (v ? v.toLocaleString() : '') + '" placeholder="0"></span>'
+    + '<span class="up"></span>'
+    + '<span class="am cotxt">0</span></div>';
+}
+
+// 그 치료사의 발추 단가
+function feeExtra(tid) {
+  const f = FEES[tid];
+  return f ? (f.fee_extra || 0) : 0;
+}
+// 저장된 발추 메모에서 치료사 번호를 꺼낸다
+// 저장된 줄들 가운데 리뷰 건수가 적힌 것을 찾는다
+function savedReview(sv) {
+  let n = 0;
+  Object.keys(sv || {}).forEach(k => { n = Math.max(n, reviewOf(sv[k])); });
+  return n;
+}
+// 저장된 메모에서 리뷰 건수를 꺼낸다  [리뷰2]
+function reviewOf(p) {
+  const m = String((p && p.memo) || '').match(/\[리뷰([0-9]+)\]/);
+  return m ? Number(m[1]) : 0;
+}
+// 저장된 메모에서 회기 목록을 꺼낸다  [회기2,4,3]
+function countsOf(p) {
+  const m = String((p && p.memo) || '').match(/\[회기([0-9,]+)\]/);
+  return m ? m[1].split(',').map(x => parseInt(x, 10)) : null;
+}
+
+function extraTherapistOf(p) {
+  const m = String((p && p.memo) || '').match(/\[발추치료사(\d+)\]/);
+  return m ? Number(m[1]) : null;
+}
+
+// 저장된 메모에서 본인부담금 이번 달 금액을 꺼낸다  [본인부담45000]  (2026-09-15)
+// 본인부담금 전월 이월  [본인이월30000]  · 환불 메모  [환불 …]  (2026-09-22)
+function selfCoOf(p) {
+  const m = String((p && p.memo) || '').match(/\[본인이월(\d+)\]/);
+  return m ? Number(m[1]) : 0;
+}
+function refundOf(p) {
+  const m = String((p && p.memo) || '').match(/\[환불 ([^\]]*)\]/);
+  return m ? m[1] : '';
+}
+function selfOvOf(p) {
+  const m = String((p && p.memo) || '').match(/\[본인부담(\d+)\]/);
+  return m ? Number(m[1]) : 0;
+}
+// 저장된 메모에서 적용단가 목록을 꺼낸다  [적용단가54000,0,0]
+function unitsOf(p) {
+  const m = String((p && p.memo) || '').match(/\[적용단가([0-9,]+)\]/);
+  return m ? m[1].split(',').map(x => parseInt(x, 10) || 0) : null;
+}
+// 저장된 메모에서 발추 적용방식을 꺼낸다  [발추방식2]
+function xmodeOf(p) {
+  const m = String((p && p.memo) || '').match(/\[발추방식([123])\]/);
+  return m ? Number(m[1]) : null;
+}
+// 저장된 메모에서 평가유형을 꺼낸다  [평가유형5]
+function evalTypeOf(p) {
+  const m = String((p && p.memo) || '').match(/\[평가유형(\d+)\]/);
+  return m ? Number(m[1]) : null;
+}
+
+// 발추 방식에 따른 기본 회기
+function autoXcnt(mode, isFiveWeek) {
+  if (Number(mode) === 1) return 1;
+  if (Number(mode) === 2) return isFiveWeek ? 1 : 0;
+  return 0;
+}
+// 발추 방식 고르는 칸
+function xmodeOptions(sel) {
+  let o = '';
+  [1, 2, 3].forEach(k => {
+    o += '<option value="' + k + '"' + (Number(sel) === k ? ' selected' : '')
+       + '>' + XMODES[k] + '</option>';
+  });
+  return o;
+}
+// 신규 상담 평가 — 그 달 금액 합계 (취소 뺌)
+function evalSumOf(childId) {
+  return (EVMON[childId] || []).reduce((a, v) => a + (Number(v.fee) || 0), 0);
+}
+// 신규 상담 평가 — 미리 채울 금액과 평가 종류
+//   평가가 하나이고 「종류 이름 + 금액」이 맞는 평가비 항목이 있으면 그 항목을 고른다
+function evalPreset(childId) {
+  const rows = EVMON[childId] || [];
+  const amt = evalSumOf(childId);
+  if (!rows.length || amt <= 0) return null;
+  let type = null;
+  if (rows.length === 1) {
+    const w = String(ETYPES[rows[0].eval_type_id] || '').replace(/평가|재활|\s/g, '').slice(0, 2);
+    const hit = EVALFEES.filter(f => Number(f.amount) === amt
+                  && (!w || String(f.name).indexOf(w) >= 0));
+    if (hit.length === 1) type = hit[0].id;
+  }
+  return { amt: amt, type: type };
+}
+// 신규 상담 평가 — 평가비 줄 아래 연보라 줄 (보기만)
+function evalInfoHtml(rows) {
+  if (!rows || !rows.length) return '';
+  const WD = ['일','월','화','수','목','금','토'];
+  return rows.map(v => {
+    const d = v.eval_date ? new Date(v.eval_date + 'T00:00:00') : null;
+    const ds = d ? (d.getMonth() + 1) + '/' + d.getDate() + '(' + WD[d.getDay()] + ')' : '날짜 없음';
+    let ts = '';
+    const m = String(v.eval_time || '').match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const h = Number(m[1]);
+      ts = (h < 12 ? '오전 ' : '오후 ') + ((h % 12) || 12) + ':' + m[2];
+    }
+    const tn = ETYPES[v.eval_type_id] || '평가';
+    const th = v.therapist_id ? (THNAME[v.therapist_id] || (v.therapist_id + '번')) + ' 선생님' : '담당 미정';
+    const done = v.status === '완료';
+    return '<div class="evinfo">'
+      + '<span>📋 신규 상담 평가</span>'
+      + '<span>' + esc(ds) + (ts ? ' ' + ts : '') + '</span>'
+      + '<span>' + esc(tn) + ' ' + (Number(v.item_cnt) || 1) + '개</span>'
+      + '<span>담당 ' + esc(th) + '</span>'
+      + '<span>' + (Number(v.fee) || 0).toLocaleString() + '원</span>'
+      + '<span class="evst ' + (done ? 'ok' : '') + '">' + esc(v.status || '예정') + '</span>'
+      + '</div>';
+  }).join('');
+}
+// 체험 수업 — 그 달 금액 합계 (취소 뺌) (2026-09-16)
+function trialSumOf(childId) {
+  return (TRMON[childId] || []).reduce((a, v) => a + (Number(v.fee) || 0), 0);
+}
+// 추가 수업 — 그 달 금액 합계 (취소 뺌) (2026-09-30)
+// 모두 취소됐는데 저장 금액이 남은 줄 알림 (2026-10-01)
+function staleHtml(nm, amt) {
+  return '<div class="evinfo stale">⚠ ' + nm + '이 모두 취소되었습니다. '
+    + '「카드 저장」을 누르면 저장된 ' + Number(amt).toLocaleString() + '원 줄이 지워집니다.</div>';
+}
+function extraSumOf(childId) {
+  return (XLMON[childId] || []).reduce((a, v) => a + (Number(v.fee) || 0), 0);
+}
+// 추가 수업 — 추가수업 줄 아래 연보라 줄 · 예정인 것은 ✕ 로 지움 (확정 뒤에는 못 지움)
+function extraInfoHtml(rows, fixed) {
+  if (!rows || !rows.length) return '';
+  const WD = ['일','월','화','수','목','금','토'];
+  return rows.map(v => {
+    const d = v.lesson_date ? new Date(v.lesson_date + 'T00:00:00') : null;
+    const ds = d ? (d.getMonth() + 1) + '/' + d.getDate() + '(' + WD[d.getDay()] + ')' : '날짜 없음';
+    let ts = '';
+    const m = String(v.lesson_time || '').match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const h = Number(m[1]);
+      ts = (h < 12 ? '오전 ' : '오후 ') + ((h % 12) || 12) + ':' + m[2];
+    }
+    const tn = TTYPES[v.therapy_type_id] || '';
+    const th = v.therapist_id ? (THNAME[v.therapist_id] || (v.therapist_id + '번')) + ' 선생님' : '담당 미정';
+    const done = v.status === '완료';
+    return '<div class="evinfo xlinfo">'
+      + '<span>＋ 추가 수업</span>'
+      + '<span>' + esc(ds) + (ts ? ' ' + ts : '') + '</span>'
+      + '<span>' + esc(tn) + ' ' + (Number(v.duration_min) || 40) + '분</span>'
+      + '<span>담당 ' + esc(th) + '</span>'
+      + '<span>' + (Number(v.fee) || 0).toLocaleString() + '원</span>'
+      + '<span class="evst ' + (done ? 'ok' : '') + '">' + esc(v.status || '예정') + '</span>'
+      + (v.memo ? '<span>' + esc(v.memo) + '</span>' : '')
+      + (!done && !fixed ? '<button type="button" class="xldel" data-xldel="' + v.id + '" title="이 추가 수업 지우기">✕</button>' : '')
+      + '</div>';
+  }).join('');
+}
+// 체험 수업 — 체험수업 줄 아래 하늘색 줄 (보기만)
+function trialInfoHtml(rows) {
+  if (!rows || !rows.length) return '';
+  const WD = ['일','월','화','수','목','금','토'];
+  return rows.map(v => {
+    const d = v.lesson_date ? new Date(v.lesson_date + 'T00:00:00') : null;
+    const ds = d ? (d.getMonth() + 1) + '/' + d.getDate() + '(' + WD[d.getDay()] + ')' : '날짜 없음';
+    let ts = '';
+    const m = String(v.lesson_time || '').match(/^(\d{1,2}):(\d{2})/);
+    if (m) {
+      const h = Number(m[1]);
+      ts = (h < 12 ? '오전 ' : '오후 ') + ((h % 12) || 12) + ':' + m[2];
+    }
+    const tn = TTYPES[v.therapy_type_id] || '';
+    const th = v.therapist_id ? (THNAME[v.therapist_id] || (v.therapist_id + '번')) + ' 선생님' : '담당 미정';
+    const done = v.status === '완료';
+    return '<div class="evinfo trinfo">'
+      + '<span>🧸 체험 수업</span>'
+      + '<span>' + esc(ds) + (ts ? ' ' + ts : '') + '</span>'
+      + '<span>' + esc(tn) + ' ' + (Number(v.duration_min) || 40) + '분</span>'
+      + '<span>담당 ' + esc(th) + '</span>'
+      + '<span>' + (Number(v.fee) || 0).toLocaleString() + '원</span>'
+      + '<span class="evst ' + (done ? 'ok' : '') + '">' + esc(v.status || '예정') + '</span>'
+      + '</div>';
+  }).join('');
+}
+// 평가 종류 고르는 칸
+function evalOptions(sel) {
+  let o = '<option value="">선택 안 함</option>';
+  EVALFEES.forEach(f => {
+    o += '<option value="' + f.id + '" data-amt="' + f.amount + '"'
+       + (Number(sel) === Number(f.id) ? ' selected' : '') + '>'
+       + esc(f.name) + ' · ' + Number(f.amount).toLocaleString() + '</option>';
+  });
+  return o;
+}
+
+function numOf(v) {
+  const s = String(v == null ? '' : v).replace(/[^0-9]/g, '');
+  return s === '' ? 0 : parseInt(s, 10);
+}
+
+// 한 아동의 금액을 다시 계산한다
+function calcKid(childId) {
+  const box = document.querySelector('.kid[data-child="' + childId + '"]');
+  if (!box) return;
+
+  // 1) 회기계산 줄 — 적용단가가 있으면 그 값이 치료사 단가보다 우선한다
+  box.querySelectorAll('.line').forEach(tr => {
+    if (tr.classList.contains('look')) return;   // 보기만 하는 줄은 안 센다
+    const base = tr.querySelector('.lineamt').dataset.unit;   // 치료사 단가
+    const apEl = tr.querySelector('.apu');
+    const ap   = apEl ? numOf(apEl.value) : 0;
+    const cnt  = numOf(tr.querySelector('.cnt').value);
+
+    const use = ap > 0 ? ap : (base === '' ? null : Number(base));
+    let amt = use == null ? 0 : use * cnt;
+    // 그 날만 분을 바꾼 회기 — 단가 비율로 더하고 뺌 (2026-10-03 분 변경)
+    if (use != null && tr.dataset.adjs) {
+      const th = Number(tr.dataset.th), dur = Number(tr.dataset.dur) || 40;
+      const f0 = xlFee(th, dur);
+      if (f0 > 0) tr.dataset.adjs.split(',').filter(Boolean).forEach(dm => {
+        amt += Math.round(use * xlFee(th, Number(dm)) / f0) - use;
+      });
+    }
+    tr.querySelector('.lineamt').textContent = amt.toLocaleString();
+
+    // 단가 칸 표시 — 할인 중이면 원래 단가에 줄을 긋는다
+    const up = tr.querySelector('.upbox');
+    if (up) {
+      if (base === '') {
+        up.innerHTML = ap > 0 ? ap.toLocaleString() : '<span class="warn">단가없음</span>';
+      } else if (ap > 0) {
+        up.innerHTML = '<span class="oldup">' + Number(base).toLocaleString() + '</span>';
+      } else {
+        up.textContent = Number(base).toLocaleString();
+      }
+    }
+    tr.classList.toggle('hasap', ap > 0);
+  });
+
+  // 2) 유형별 합계
+  const parts = [];   // {st, amt, review}
+  box.querySelectorAll('.gsum').forEach(tr => {
+    const st = Number(tr.dataset.st);
+    let amt = 0;
+    let shown = null;   // 오른쪽 금액 칸에 보일 값 (없으면 amt)
+
+    if (tr.dataset.fixed !== undefined) {
+      amt = tr.dataset.fixed === '' ? 0 : Number(tr.dataset.fixed);
+      // 이번 달 금액을 적었으면 그 금액이 우선 (2026-09-15)
+      const ov = tr.querySelector('.spov:not(.spco)');
+      const ovn = ov ? numOf(ov.value) : 0;
+      // 오른쪽 칸은 늘 등급 금액(고정으로 받는 금액)을 보인다 — 은정님 정함
+      if (ov) shown = amt;
+      if (ovn > 0) amt = ovn;
+      // 전월 이월은 빼고, 환불 메모가 있으면 이번 달 0원 (2026-09-22)
+      const coEl2 = tr.querySelector('.spco');
+      const con = coEl2 ? numOf(coEl2.value) : 0;
+      if (con > 0) amt = Math.max(0, amt - con);
+      const rfEl = tr.closest('.kid') ? tr.closest('.kid').querySelector('.brf') : null;
+      if (rfEl && rfEl.value.trim()) amt = 0;
+      tr.classList.toggle('hasov', ovn > 0 || con > 0 || !!(rfEl && rfEl.value.trim()));
+    } else if (tr.querySelector('.xthr')) {
+      const tid = Number(tr.querySelector('.xthr').value);
+      const unit = feeExtra(tid);
+      tr.querySelector('.xunit').textContent = unit.toLocaleString();
+      amt = unit * numOf(tr.querySelector('.xcnt').value);
+    } else if (tr.dataset.manual !== undefined) {
+      amt = numOf(tr.querySelector('.evamt').value);
+    } else {
+      let base = 0;
+      box.querySelectorAll('.line[data-st="' + st + '"] .lineamt')
+         .forEach(td => base += numOf(td.textContent));
+      // 그룹 1:1 보강 차액 (2026-10-02)
+      box.querySelectorAll('.xdiffrow[data-st="' + st + '"]')
+         .forEach(tr => base += Number(tr.dataset.amt || 0));
+      amt = Math.max(0, base - Number(tr.dataset.ded || 0));
+    }
+
+    if (tr.querySelector('.gamt')) tr.querySelector('.gamt').textContent = (shown == null ? amt : shown).toLocaleString();
+    parts.push({ st: st, amt: amt, review: st !== 2 });
+  });
+
+  // 전월 이월 빼기 — 아동당 한 줄. 카드 항목에서 순서대로 뺀다
+  {
+    const co = box.querySelector('.corow .co');
+    let cv = co ? numOf(co.value) : 0;
+    const tx = box.querySelector('.corow .cotxt');
+    if (tx) tx.textContent = cv ? '−' + cv.toLocaleString() : '0';
+    // 항목 소계 칸은 빼기 전 금액 그대로 둔다 (2026-09-11)
+    //   이월·리뷰는 제 줄에 따로 보이므로, 소계까지 줄이면 두 번 뺀 것처럼 보였다
+    //   저장할 금액(p.amt)만 줄인다 — 항목마다 나눠 저장해야 합계가 맞으므로
+    parts.forEach(p => {
+      if (p.st === 2 || cv <= 0) return;
+      const take = Math.min(p.amt, cv);
+      p.amt -= take; cv -= take;
+    });
+  }
+
+  // 3) 리뷰 차감 — 발달재활(2번) 빼고 나머지에서 순서대로 뺀다
+  const rvEl = box.querySelector('.rv');
+  let rv = rvEl ? Math.min(numOf(rvEl.value), REVIEW_MAX) : 0;
+  let cut = rv * REVIEW_UNIT;
+  if (box.querySelector('.rvtxt')) {
+    box.querySelector('.rvtxt').textContent = cut ? '−' + cut.toLocaleString() : '0';
+  }
+
+  parts.forEach(p => {
+    if (!p.review || cut <= 0) return;
+    const take = Math.min(p.amt, cut);
+    p.amt -= take; cut -= take;
+  });
+
+  const card = parts.filter(p => p.st !== 2).reduce((s, p) => s + p.amt, 0);
+  const bank = parts.filter(p => p.st === 2).reduce((s, p) => s + p.amt, 0);
+  if (box.querySelector('.cardtotal')) {
+    box.querySelector('.cardtotal').textContent = won(card);
+  }
+
+  const total = card + bank;
+  box.querySelector('.ktotal').textContent = won(total);
+  box.dataset.total = total;
+  box.dataset.parts = JSON.stringify(parts);
+  CALC[childId] = {
+    card: parts.filter(p => Number(p.st) !== 2).reduce((a, p) => a + (Number(p.amt) || 0), 0),
+    bank: parts.filter(p => Number(p.st) === 2).reduce((a, p) => a + (Number(p.amt) || 0), 0)
+  };
+  syncX8(box);
+}
+
+function sumAll() {
+  let t = 0, n = 0;
+  document.querySelectorAll('.kid').forEach(b => {
+    const v = Number(b.dataset.total || 0);
+    if (v > 0) { t += v; n++; }
+  });
+  // 이 달 전체 미납 인원도 함께 보여준다
+  const nUnpaid = CHILDREN.filter(c => isUnpaid(c.id)).length;
+  // 전체 금액은 대표(8번)에게만 보인다. 행정·데스크는 인원과 미납만
+  $('allsum').textContent = n + '명'
+    + (ME_ID === 8 ? ' · ' + won(t) : '')
+    + (nUnpaid ? '   ·   미납 ' + nUnpaid + '명' : '   ·   미납 없음');
+}
+
+// ── 주차 고르기 상자 ──────────────────────────────
+// 회기 칸을 누르면 펼쳐진다. 주차를 끄면 그 주 수업을 안 한다는 뜻.
+function wkBoxHtml(it) {
+  if (!it.sched_id) return '';
+  const wdCnt = it.wdCnt || 4;
+  let h = '<div class="wkbox" data-sched="' + it.sched_id + '">주차 ';
+  for (let w = 1; w <= 5; w++) {
+    if (w > wdCnt) break;
+    if (w === 5) {
+      h += '<span class="wkb dim" title="5주차는 회기방식으로 정합니다">5주차</span>';
+    } else {
+      const on = it.wk ? (it.wk[w-1] !== false) : true;
+      h += '<span class="wkb ' + (on ? 'yes' : 'no') + '" data-w="' + w + '">'
+        + w + '주차</span>';
+    }
+  }
+  h += '<span class="wkhint">끄면 그 주는 쉬고, 회기도 줄어듭니다</span></div>';
+  return h;
+}
+
+// 그 줄의 켜진 주차 수를 센다 (5주차는 그대로 두고 1~4만 반영)
+function wkCountOf(boxEl) {
+  let n = 0;
+  boxEl.querySelectorAll('.wkb[data-w]').forEach(b => {
+    if (b.classList.contains('yes')) n++;
+  });
+  return n;
+}
+
+// ── 주차를 실제로 저장한다 ────────────────────────
+// 요일줄의 week1~4 를 고치고, 이 달 회기를 예정 <-> 쉼 으로 맞춘다.
+// 완료·결석·휴무·보강 회기는 건드리지 않는다.
+async function saveWeeks(box) {
+  const boxes = box.querySelectorAll('.wkbox');
+  if (!boxes.length) return '';
+  let chg = 0, made = 0;
+
+  for (const wb of boxes) {
+    const sid = Number(wb.dataset.sched);
+    if (!sid) continue;
+    const on = [true, true, true, true];
+    wb.querySelectorAll('.wkb[data-w]').forEach(b => {
+      on[Number(b.dataset.w) - 1] = b.classList.contains('yes');
+    });
+
+    const before = (WKWAS[sid] || [true, true, true, true]);
+    if (on.every((v, i) => v === before[i])) continue;   // 안 바뀌었으면 건너뛴다
+
+    const { error } = await sb.from('nl_therapy_schedules')
+      .update({ week1: on[0], week2: on[1], week3: on[2], week4: on[3] })
+      .eq('id', sid);
+    if (error) throw error;
+    WKWAS[sid] = on.slice();
+    chg++;
+
+    // 이 달 회기를 바뀐 주차대로 다시 깐다 (완료·결석·보강은 그대로 둔다)
+    const { data: n2, error: e2 } = await sb.rpc('nl_remake_schedule_month', {
+      p_schedule_id: sid, p_month: LOADED_MK
+    });
+    if (e2) throw e2;
+    made += Number(n2 || 0);
+  }
+
+  if (!chg) return '';
+  let m = ' 주차 ' + chg + '줄 저장';
+  if (made) m += ' · 회기 ' + made + '개 다시 깖';
+  return m + '.';
+}
+
+// 「예정 <-> 확정」 을 오간다. 저장과는 상관없이 눌러서 바꾼다
+async function toggleFix(childId, btn) {
+  if (!LOADED_MK) { show($('msg2'), '먼저 [불러오기] 를 눌러주세요.', false); return; }
+  const now = !isFixed(childId);
+  // 바꾸고 저장하지 않은 칸이 있으면 먼저 저장한다 (2026-09-15)
+  //   다시 그릴 때 저장된 값으로 돌아가, 「적용 없음」을 고르고 확정하면 되돌아가던 일
+  const ch = CHANGED[childId];
+  // 확정 = 금액 확정 = 납부할 금액 확정 (2026-09-17 은정님 정함)
+  //   「확정」을 누르면 저장 단추를 따로 누르지 않아도 저장한다
+  //   바꾼 쪽 + 금액이 있는데 아직 저장 줄이 없는 쪽. 낸 날이 비어 있으면 미납으로 저장된다
+  if (now) {
+    const box0 = document.querySelector('.kid[data-child="' + childId + '"]');
+    const cal = CALC[childId] || {};
+    const sv = SAVED[childId] || {};
+    const ks = Object.keys(sv);
+    const need = {
+      card: !!(ch && ch.card) || (cal.card > 0 && !ks.some(k => Number(k) !== 2)),
+      bank: !!(ch && ch.bank) || (cal.bank > 0 && !ks.some(k => Number(k) === 2))
+    };
+    for (const side of ['card', 'bank']) {
+      if (!need[side]) continue;
+      const sb2 = box0 ? box0.querySelector('.ksave2[data-only="' + side + '"]') : null;
+      if (!sb2) continue;
+      const r = await saveKid(childId, sb2, side);
+      if (r === 'empty') continue;
+      if (!sb2.classList.contains('done')) {
+        alert('저장하지 못해 확정을 하지 않았습니다. 위 알림 글을 확인해 주세요.');
+        return;
+      }
+    }
+  }
+  //   확정 → 예정으로 돌릴 때는 바꾼 칸이 있으면 물어보고 저장한다 (28번 9월 승인번호가 저장 안 된 채 사라진 일)
+  else if (ch && (ch.card || ch.bank)) {
+    const what = [ch.card ? '카드' : '', ch.bank ? '계좌' : ''].filter(Boolean).join(' · ');
+    if (!confirm('바꾼 내용(' + what + ')이 아직 저장되지 않았습니다.\n저장하고 '
+        + (now ? '확정할까요?' : '예정으로 돌릴까요?'))) return;
+    const box0 = document.querySelector('.kid[data-child="' + childId + '"]');
+    for (const side of ['card', 'bank']) {
+      if (!ch[side]) continue;
+      const sb2 = box0 ? box0.querySelector('.ksave2[data-only="' + side + '"]') : null;
+      if (!sb2) continue;
+      await saveKid(childId, sb2, side);
+      if (!sb2.classList.contains('done')) {
+        alert('저장하지 못해 ' + (now ? '확정' : '예정으로 돌리기') + '를 하지 않았습니다. 위 알림 글을 확인해 주세요.');
+        return;
+      }
+    }
+  }
+  btn.disabled = true;
+  try {
+    const { error } = await sb.from('nl_pay_fix')
+      .upsert({ child_id: childId, month_key: LOADED_MK,
+                fixed: now, fixed_at: now ? new Date().toISOString() : null },
+              { onConflict: 'child_id,month_key' });
+    if (error) throw error;
+    if (now) FIXED[childId] = true; else delete FIXED[childId];
+    btn.textContent = now ? '확정' : '예정';
+    btn.className = 'kfix ' + (now ? 'yes' : 'no');
+    const nTd = CHILDREN.filter(c => !isFixed(c.id)).length;
+    $('tabTodo').textContent = '예정만 ' + nTd;
+    // 확정하면 「보강 없음·보강 잡기」 단추가 사라지고,
+    //   예정으로 되돌리면 다시 보여야 하므로 그 아동 상자를 다시 그린다
+    const kid = document.querySelector('.kid[data-child="' + childId + '"]');
+    if (kid) {
+      const c = CHILDREN.find(x => x.id === childId);
+      if (c) {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = drawKid(c);
+        const box = wrap.querySelector('.kid');
+        if (box) { kid.replaceWith(box); calcKid(childId); }
+      }
+    }
+  } catch (e) {
+    show($('msg2'), '❌ 바꾸지 못했습니다.\n' + (e.message || e), false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// only — 'card' 면 카드결제만, 'bank' 면 계좌입금(발달재활)만, 없으면 전부
+async function saveKid(childId, btn, only) {
+  const box = document.querySelector('.kid[data-child="' + childId + '"]');
+  const parts = JSON.parse(box.dataset.parts || '[]');
+  const cEl = box.querySelector('.pday'),  cMemo = box.querySelector('.kmemo');
+  const bEl = box.querySelector('.bday'),  bMemo = box.querySelector('.bmemo');
+  const cardDay  = cEl ? cEl.value : '';
+  const cardMemo = cMemo ? cMemo.value.trim() : '';
+  const bankDay  = bEl ? bEl.value : '';
+  const bankMemo = bMemo ? bMemo.value.trim() : '';
+
+  // 금액이 0이어도 남겨야 하는 것 —
+  // 발달추가비용은 「적용 없음」으로 고른 것을 기억해야 다음 달에 안 되살아난다
+  //   고르신 방식을 그대로 남긴다.
+  //   「5주차만 1회」인데 그 달이 4주라 0회인 것과,
+  //   아예 「적용 없음」인 것은 다르다.
+  //   앞의 것은 다음 달이 5주면 다시 1회가 되어야 하므로 2를 그대로 둔다.
+  const x8mode = (() => {
+    const md = box.querySelector('.gsum[data-st="8"] .xmode');
+    return md ? Number(md.value) : 0;
+  })();
+  //   발추는 금액이 0원이어도 줄을 남긴다.
+  //   그래야 고르신 방식이 기억되어 다음 달에 되살아나지 않는다.
+  const rows = parts.filter(p =>
+    (p.amt > 0 || p.st === 2 || (p.st === 8 && x8mode > 0))
+    && (!only || (only === 'bank' ? p.st === 2 : p.st !== 2))
+  ).map(p => {
+    const isBank = (p.st === 2);
+    const day  = isBank ? bankDay  : cardDay;
+    const memo = isBank ? (bankMemo ? '계좌입금 ' + bankMemo : '계좌입금')
+                        : (cardMemo || '카드결제');
+    // 승인번호 칸에 이미 붙어 있는 표시는 지우고 새로 붙인다
+    // (안 그러면 저장할 때마다 [리뷰4]가 계속 쌓인다)
+    let memo2 = String(memo)
+      .replace(/\s*\[(리뷰|회기|적용단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불)[^\]]*\]/g, '')
+      .trim();
+    {
+      const rv0 = box.querySelector('.rv');
+      const rvn = rv0 ? numOf(rv0.value) : 0;
+      if (rvn > 0) memo2 += ' [리뷰' + rvn + ']';
+    }
+    if (p.st === 2) {
+      const ov = box.querySelector('.gsum[data-st="2"] .spov:not(.spco)');
+      const ovn = ov ? numOf(ov.value) : 0;
+      if (ovn > 0) memo2 += ' [본인부담' + ovn + ']';
+      const co2 = box.querySelector('.gsum[data-st="2"] .spco');
+      const con2 = co2 ? numOf(co2.value) : 0;
+      if (con2 > 0) memo2 += ' [본인이월' + con2 + ']';
+      const rf2 = box.querySelector('.brf');
+      const rft = rf2 ? rf2.value.replace(/[\[\]]/g, '').trim() : '';
+      if (rft) memo2 += ' [환불 ' + rft + ']';
+    }
+    if (p.st === 8) {
+      const el = box.querySelector('.gsum[data-st="8"] .xthr');
+      const md = box.querySelector('.gsum[data-st="8"] .xmode');
+      const xc = box.querySelector('.gsum[data-st="8"] .xcnt');
+      if (el) memo2 += ' [발추치료사' + el.value + ']';
+      if (md) memo2 += ' [발추방식' + (x8mode || md.value) + ']';
+      if (xc) memo2 += ' [회기' + numOf(xc.value) + ']';
+    } else if (p.st === 9) {
+      const es = box.querySelector('.evsel');
+      if (es && es.value) memo2 += ' [평가유형' + es.value + ']';
+    } else {
+      const cs = [], us = [];
+      box.querySelectorAll('.line[data-st="' + p.st + '"]').forEach(tr => {
+        cs.push(numOf(tr.querySelector('.cnt').value));
+        const a = tr.querySelector('.apu');
+        us.push(a ? numOf(a.value) : 0);
+      });
+      if (cs.length) memo2 += ' [회기' + cs.join(',') + ']';
+      if (us.some(x => x > 0)) memo2 += ' [적용단가' + us.join(',') + ']';
+    }
+    const coEl = box.querySelector('.corow[data-st="' + p.st + '"] .co');
+    return {
+      child_id: childId,
+      support_type_id: p.st,
+      month_key: LOADED_MK,
+      amount: p.amt,
+      carry_over: coEl ? numOf(coEl.value) : 0,
+      is_paid: !!day,
+      paid_on: day || null,
+      memo: memo2
+    };
+  });
+
+  // 화면에 있는데 0원이 되어 저장에서 빠진 항목은, 옛 줄을 지운다
+  //   (안 지우면 고친 것이 반영되지 않고 옛 금액이 그대로 남는다)
+  //   화면에 아예 없는 항목은 건드리지 않는다
+  const keepSt = rows.map(r => Number(r.support_type_id));
+  const partSt = parts.map(p => Number(p.st));
+  const sv0 = SAVED[childId] || {};
+  const deadSt = Object.keys(sv0).map(Number).filter(st =>
+    partSt.indexOf(st) >= 0 && keepSt.indexOf(st) < 0
+    && (!only || (only === 'bank' ? st === 2 : st !== 2)));
+
+  // 카드 특이사항 — 카드 저장(또는 전부 저장) 때 함께 (2026-10-03)
+  const nEl = (!only || only === 'card') ? box.querySelector('.knote') : null;
+  const noteNew = nEl ? nEl.value.trim() : '';
+  const noteDirty = !!nEl && noteNew !== (PAYNOTE[String(childId)] || '');
+  if (noteDirty && noteNew.length > 500) {
+    alert('특이사항은 500자까지 적을 수 있습니다.'); nEl.focus(); return;
+  }
+
+  if (!rows.length && !deadSt.length && !noteDirty) {
+    show($('msg2'), '저장할 내용이 없습니다.', false); return 'empty';
+  }
+
+  // 지울 것이 있으면 한 번 물어본다
+  if (deadSt.length) {
+    const names = deadSt.map(st => TYPES[st] || ('유형' + st)).join(' · ');
+    if (!confirm(names + ' 이(가) 0원이 되었습니다.\n\n'
+      + '저장된 줄 ' + deadSt.length + '건을 지웁니다.\n'
+      + '지운 뒤에는 되돌릴 수 없습니다.\n\n계속할까요?')) return;
+  }
+
+  // 환불 메모에 계좌번호 전체를 적지 않게 (2026-09-22 은정님 — 끝 4자리만)
+  {
+    const rf0 = box.querySelector('.brf');
+    if (rf0 && (!only || only === 'bank') && /\d{7,}|\d+-\d+-\d+/.test(rf0.value)) {
+      alert('환불 메모에 계좌번호 전체가 있는 것 같습니다.\n\n은행 · 예금주 · 끝 4자리만 적어 주세요.');
+      rf0.focus(); return;
+    }
+  }
+
+  SAVING = true;
+  btn.disabled = true; btn.textContent = '저장 중...';
+  btn.classList.remove('done');
+  try {
+    if (rows.length) {
+      const { error } = await sb.from('nl_payments')
+        .upsert(rows, { onConflict: 'child_id,support_type_id,month_key' });
+      if (error) throw error;
+    }
+    if (deadSt.length) {
+      const { error: eD } = await sb.from('nl_payments').delete()
+        .eq('child_id', childId).eq('month_key', LOADED_MK)
+        .in('support_type_id', deadSt);
+      if (eD) throw eD;
+      deadSt.forEach(st => { delete SAVED[childId][st]; });
+    }
+    if (noteDirty) {
+      // 비우면 줄을 지운다 · 돌려받은 줄 수로 실제로 됐는지 본다
+      const q = noteNew
+        ? sb.from('nl_pay_notes').upsert({ child_id: Number(childId), card_note: noteNew,
+            updated_at: new Date().toISOString() }, { onConflict: 'child_id' }).select('child_id')
+        : sb.from('nl_pay_notes').delete().eq('child_id', Number(childId)).select('child_id');
+      const { data: nd, error: eNt } = await q;
+      if (eNt) throw eNt;
+      if (noteNew && !(nd && nd.length)) throw new Error('특이사항이 저장되지 않았습니다.');
+      if (noteNew) PAYNOTE[String(childId)] = noteNew; else delete PAYNOTE[String(childId)];
+    }
+    rows.forEach(r => {
+      (SAVED[childId] = SAVED[childId] || {})[r.support_type_id] = r;
+    });
+    const wkMsg = await saveWeeks(box);
+    const evMsg = await markEvalPaid(childId, rows) + await markTrialPaid(childId, rows, 10, '체험')
+                  + await markTrialPaid(childId, rows, 11, '추가');
+    // 회기를 늘려 저장할 때 「보강 없음」을 풀지 묻던 것은 뺐다 (2026-09-11 회기 단추)
+    //   이제 날짜 단추를 켜면 바로 풀린다
+    const nmMsg = '';
+    const unpaid = rows.filter(r => !r.paid_on).length;
+    show($('msg2'), '✅ ' + rows.length + '건 저장했습니다.'
+      + (deadSt.length ? ' (0원이 된 ' + deadSt.length + '건은 지웠습니다)' : '')
+      + (unpaid ? ' (그중 ' + unpaid + '건은 날짜가 없어 미납으로 저장)' : '')
+      + (noteDirty ? (noteNew ? ' · 특이사항 저장' : ' · 특이사항 지움') : '')
+      + wkMsg + evMsg + nmMsg, true);
+    if (/풀었습니다/.test(nmMsg)) setTimeout(() => load(), 900);   // 시간표 회수로 다시 그린다
+    delete TYPED[String(childId)];
+    if (CHANGED[childId]) {
+      if (!only) delete CHANGED[childId];
+      else { delete CHANGED[childId][only]; if (!Object.keys(CHANGED[childId]).length) delete CHANGED[childId]; }
+    }
+    btn.textContent = '\u2713 저장됨';
+    btn.classList.add('done');
+    btn.disabled = false;
+    setTimeout(() => { SAVING = false; }, 800);
+  } catch (e) {
+    show($('msg2'), '❌ 저장하지 못했습니다.\n' + e.message, false);
+    btn.disabled = false;
+    btn.textContent = btn.dataset.ttl || '저장 전';
+    btn.classList.remove('done');
+    SAVING = false;
+  }
+}
+
+// 회기를 늘려 저장했는데 그 수업에 「보강 없음」 날이 남아 있으면 풀지 묻는다 (2026-09-11)
+//   숫자만 늘리고 「보강 없음」이 그대로 남아, 나중에 회기를 줄일 때 헷갈리던 일을 막는다
+//   발달재활(2)·발추(8)·평가(9)는 「보강 없음」을 안 쓰므로 빼고 본다
+async function releaseNoMakeup(childId, box, only) {
+  if (only === 'bank') return '';
+  const sts = Array.from(new Set(Array.from(box.querySelectorAll('.line[data-st]'))
+    .map(tr => Number(tr.dataset.st))))
+    .filter(st => st && st !== 2 && st !== 8 && st !== 9);
+  const free = [];
+  sts.forEach(st => {
+    const g = SHORTCNT[childId + '|' + st];
+    if (!g) return;
+    const nms = (g.miss || []).filter(m => m.nm)
+      .sort((a, b) => String(a.d).localeCompare(String(b.d)));
+    if (!nms.length) return;
+    let typed = 0;
+    box.querySelectorAll('.line[data-st="' + st + '"] .cnt')
+      .forEach(el => { typed += numOf(el.value); });
+    const extra = Math.floor(typed - (g.cnt || 0) + 0.001);
+    if (extra <= 0) return;
+    nms.slice(0, extra).forEach(m => free.push({ st: st, id: m.id, d: m.d, why: m.why }));
+  });
+  if (!free.length) return '';
+  if (!confirm('회기를 늘려 저장했습니다.\n\n'
+      + '「보강 없음」으로 둔 날이 남아 있습니다.\n'
+      + free.map(f => '  · ' + (TYPES[f.st] || '') + ' ' + dayOnly(f.d) + '일'
+                     + ' (사유: ' + (f.why || '없음') + ')').join('\n')
+      + '\n\n이 날의 「보강 없음」을 풀까요?\n'
+      + '풀면 시간표에 다시 나오고, 보강을 잡을 수 있습니다.\n\n'
+      + '확인 = 풂 / 취소 = 그대로 둠')) {
+    return '\n(「보강 없음」은 그대로 두었습니다)';
+  }
+  const { error } = await sb.from('nl_sessions')
+    .update({ no_makeup: false, no_makeup_why: null })
+    .in('id', free.map(f => f.id));
+  if (error) return '\n❌ 「보강 없음」을 풀지 못했습니다: ' + error.message;
+  return '\n「보강 없음」 ' + free.length + '건을 풀었습니다.';
+}
+
+// 평가비를 받았으면 평가 관리 쪽 상태도 「완료」로 바꾼다
+// (금액이 0원이면 안 바꾼다)
+async function markEvalPaid(childId, rows){
+  const ev = rows.find(r => Number(r.support_type_id) === 9);
+  if (!ev) return '\n(평가비 줄이 없어 평가 상태는 그대로)';
+  if (!ev.amount || Number(ev.amount) <= 0)
+    return '\n(평가비가 0원이라 평가 상태는 그대로)';
+  try {
+    const { data, error } = await sb.from('nl_evaluations')
+      .select('id, status, eval_date, paid_on')
+      .eq('child_id', childId)
+      .gte('eval_date', LOADED_MK + '-01')
+      .lte('eval_date', monEndDay(LOADED_MK));
+    if (error) return '\n⚠️ 평가를 읽지 못했습니다. ' + error.message;
+    if (!data || !data.length)
+      return '\n(' + LOADED_MK + ' 에 잡힌 평가가 없어 상태는 그대로)';
+    // 상태가 아직 완료가 아니거나, 완료인데 납부일이 비어 있으면 손본다
+    const todo = data.filter(v => v.status !== '취소'
+                    && (v.status !== '완료' || !v.paid_on));
+    if (!todo.length) return '\n(평가가 이미 완료·취소라 그대로)';
+    const upd = { status: '완료' };
+    if (ev.paid_on) upd.paid_on = ev.paid_on;      // 납부일도 함께 채운다
+    const { error: e2 } = await sb.from('nl_evaluations')
+      .update(upd).in('id', todo.map(v => v.id));
+    if (e2) return '\n⚠️ 평가 상태는 바꾸지 못했습니다. ' + e2.message;
+    return '\n평가 ' + todo.length + '건을 「완료」로 바꿨습니다.'
+      + (ev.paid_on ? ' (납부일 ' + ev.paid_on + ')' : '');
+  } catch (e) { return '\n⚠️ 평가 처리 중 문제. ' + (e.message || e); }
+}
+
+// 체험수업을 받았으면 그 달 체험 줄에 납부일을 채운다 (2026-09-16)
+//   체험 날이 오늘이거나 지난 날이면 「완료」로도 바꾼다 (앞날은 수업 뒤에 완료)
+async function markTrialPaid(childId, rows, st, kind){
+  st = st || 10; kind = kind || '체험';
+  const lbl = kind === '추가' ? '추가 수업' : '체험 수업';
+  const tr = rows.find(r => Number(r.support_type_id) === st);
+  if (!tr || !tr.amount || Number(tr.amount) <= 0) return '';
+  try {
+    const { data, error } = await sb.from('nl_trial_lessons')
+      .select('id, status, lesson_date, paid_on')
+      .eq('child_id', childId)
+      .eq('kind', kind)
+      .gte('lesson_date', LOADED_MK + '-01')
+      .lte('lesson_date', monEndDay(LOADED_MK));
+    if (error) return '\n⚠️ ' + lbl + '을 읽지 못했습니다. ' + error.message;
+    const todo = (data || []).filter(v => v.status !== '취소');
+    if (!todo.length) return '';
+    const d = new Date();
+    const td = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+             + '-' + String(d.getDate()).padStart(2, '0');
+    let nDone = 0;
+    for (const v of todo) {
+      const upd = {};
+      if (tr.paid_on && !v.paid_on) upd.paid_on = tr.paid_on;
+      if (v.status !== '완료' && String(v.lesson_date) <= td) { upd.status = '완료'; nDone++; }
+      if (!Object.keys(upd).length) continue;
+      const { error: e2 } = await sb.from('nl_trial_lessons').update(upd).eq('id', v.id);
+      if (e2) return '\n⚠️ ' + lbl + ' 상태는 바꾸지 못했습니다. ' + e2.message;
+    }
+    return nDone ? '\n' + lbl + ' ' + nDone + '건을 「완료」로 바꿨습니다.' : '';
+  } catch (e) { return '\n⚠️ ' + lbl + ' 처리 중 문제. ' + (e.message || e); }
+}
+
+// 그 달 마지막 날 (YYYY-MM-DD)
+function monEndDay(mk){
+  const p = String(mk).split('-');
+  const d = new Date(Number(p[0]), Number(p[1]), 0);
+  return p[0] + '-' + p[1] + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 숫자 고치면 바로 다시 계산
+$('kids').addEventListener('input', e => {
+  const t = e.target;
+  if (t.classList.contains('brf')) {
+    calcKid(Number(t.closest('.kid').dataset.child));
+    sumAll();
+    return;
+  }
+  if (t.classList.contains('cnt') || t.classList.contains('evamt')
+      || t.classList.contains('apu') || t.classList.contains('spov')) {
+    const box = t.closest('.kid');
+    if (t.classList.contains('evamt') || t.classList.contains('apu') || t.classList.contains('spov')
+        || t.classList.contains('co')) {
+      const v = numOf(t.value);
+      t.value = v === 0 ? '' : v.toLocaleString();
+    }
+    // 발추 회기를 0으로 고치면 방식도 「적용 없음」으로 맞춘다
+    // (방식만 남아 있으면 그 줄이 저장에서 빠져 옛 금액이 그대로 남는다)
+    if (t.classList.contains('xcnt')) {
+      const md = box.querySelector('.gsum[data-st="8"] .xmode');
+      if (md) {
+        const n = numOf(t.value);
+        if (n === 0) md.value = '3';
+        else if (Number(md.value) === 3) md.value = '1';
+      }
+    }
+    calcKid(Number(box.dataset.child));
+    sumAll();
+  }
+});
+$('kids').addEventListener('change', e => {
+  const t = e.target;
+  const box = t.closest('.kid');
+  if (!box) return;
+
+  // 평가 종류를 고르면 금액이 자동으로 채워진다
+  if (t.classList.contains('evsel')) {
+    const amtEl = box.querySelector('.evamt');
+    const opt = t.options[t.selectedIndex];
+    const amt = opt ? numOf(opt.dataset.amt) : 0;
+    if (amtEl) amtEl.value = amt ? amt.toLocaleString() : '';
+  }
+
+  // 발추 방식을 고치면 회기가 자동으로 바뀐다
+  if (t.classList.contains('xmode')) {
+    const row = box.querySelector('.gsum[data-st="8"]');
+    const xc  = row ? row.querySelector('.xcnt') : null;
+    const five = row && row.dataset.five === '1';
+    if (xc) xc.value = autoXcnt(t.value, five);
+  }
+
+  if (t.classList.contains('xthr') || t.classList.contains('evsel')
+      || t.classList.contains('xmode')) {
+    calcKid(Number(box.dataset.child));
+    sumAll();
+  }
+});
+// 「이대로 청구」 — 그 유형의 빠진 회기에 표시를 남긴다
+// 「보강 잡기」 — 회기를 원래 수로 채우고 저장한다
+//   그러면 시간표의 「회기가 모자란 수업」에 떠서 자리를 잡을 수 있다
+async function markMakeup(btn) {
+  const line = btn.closest('.shortline');
+  if (!line) return;
+  const st  = Number(line.dataset.nmst);
+  const box = btn.closest('.kid');
+  if (!box) return;
+
+  // 회기를 기준 회수로 맞춘다 (보강을 잡으면 기준대로 다 하게 된다)
+  const rows = box.querySelectorAll('.line[data-st="' + st + '"]');
+  if (!rows.length) { alert('회기 칸을 찾지 못했습니다.'); return; }
+  const need = Number(line.dataset.nmneed || 0);
+  if (!need) { alert('기준 회수를 알 수 없습니다.'); return; }
+
+  // 「보강 없음」으로 뺀 날을 되돌린다 (2026-09-09)
+  //   되돌리지 않으면 시간표에서 그 날 줄이 계속 안 보인다
+  let undone = 0;
+  try {
+    const { data: back } = await sb.from('nl_sessions')
+      .update({ no_makeup: false, no_makeup_why: null })
+      .eq('child_id', Number(box.dataset.child))
+      .eq('month_key', LOADED_MK || $('mk').value)
+      .eq('support_type_id', st)
+      .eq('no_makeup', true)
+      .select('id');
+    undone = (back || []).length;
+  } catch (e) {}
+
+  // 지금 적힌 회수 합계
+  let now = 0;
+  rows.forEach(tr => {
+    const el = tr.querySelector('.cnt');
+    if (el) now += (parseInt(String(el.value).replace(/[^0-9]/g,''), 10) || 0);
+  });
+  if (now >= need) {
+    if (undone) {
+      alert('「보강 없음」을 되돌렸습니다.\n\n'
+        + '시간표에 그 날이 다시 나옵니다.\n'
+        + '「회기가 모자란 수업」에서 보강 자리를 잡아 주세요.');
+      await load();
+    } else {
+      alert('이미 ' + now + '회로 되어 있습니다.');
+    }
+    return;
+  }
+
+  const msg = '회기를 ' + now + '회 → ' + need + '회로 맞추고 저장합니다.\n\n'
+    + '저장한 뒤 시간표의 「회기가 모자란 수업」에서\n'
+    + '보강 자리를 잡아 주세요.'
+    + '\n\n계속할까요?';
+  if (!confirm(msg)) return;
+
+  // 수업 줄이 여럿이면 어느 줄에 더할지 고르게 한다 (2026-09-09)
+  //   전에는 말없이 첫 줄에 더해 어느 수업이 늘었는지 알 수 없었다
+  let target = rows[0];
+  if (rows.length > 1) {
+    const menu = Array.prototype.map.call(rows, (tr, i) => {
+      const de = tr.querySelector('.de');
+      const el = tr.querySelector('.cnt');
+      const v  = el ? (parseInt(String(el.value).replace(/[^0-9]/g,''), 10) || 0) : 0;
+      return (i + 1) + ') ' + (de ? de.textContent.trim() : '수업') + ' — 지금 ' + v + '회';
+    }).join('\n');
+    const v2 = prompt('어느 수업을 ' + (need - now) + '회 늘릴까요?\n\n' + menu
+      + '\n\n번호를 넣으세요.', '');
+    if (v2 === null) return;
+    const nPick = Number(String(v2).replace(/[^0-9]/g, ''));
+    if (!nPick || nPick < 1 || nPick > rows.length) {
+      alert('번호를 다시 골라주세요.'); return;
+    }
+    target = rows[nPick - 1];
+  }
+
+  // 고른 줄에 모자란 만큼 더한다
+  const first = target.querySelector('.cnt');
+  if (first) {
+    const v = parseInt(String(first.value).replace(/[^0-9]/g,''), 10) || 0;
+    first.value = v + (need - now);
+  }
+
+  // 금액을 다시 셈하고 저장한다
+  calcKid(Number(box.dataset.child));
+  const sbtn = box.querySelector('.ksave2[data-only="card"]')
+            || box.querySelector('.ksave2');
+  if (sbtn) sbtn.click();
+  alert('회기를 ' + need + '회로 맞췄습니다.\n\n'
+    + '시간표의 「회기가 모자란 수업」에서 보강 자리를 잡아 주세요.\n\n'
+    + '다시 바꾸시려면 「보강 없음」을 누르세요.\n'
+    + '다 정하시면 이름 옆 「예정」을 눌러 확정으로 바꾸세요.');
+}
+
+// 저장된 [회기…] 표시를 지운다 (2026-09-08)
+//   회기 칸은 저장값을 먼저 쓰므로, 지워야 시간표 회수로 다시 그려진다
+async function clearSavedCnt(cid, st) {
+  try {
+    const { data: prow } = await sb.from('nl_payments')
+      .select('id, memo')
+      .eq('child_id', cid).eq('month_key', LOADED_MK || $('mk').value)
+      .eq('support_type_id', st).maybeSingle();
+    if (prow && prow.memo && /\[회기[0-9,]+\]/.test(prow.memo)) {
+      const m2 = String(prow.memo).replace(/\s*\[회기[0-9,]+\]/g, '').trim();
+      await sb.from('nl_payments').update({ memo: m2 }).eq('id', prow.id);
+    }
+  } catch (e) {}
+}
+
+async function markNoMakeup(btn) {
+  const line = btn.closest('.shortline');
+  if (!line) return;
+  // 어느 날을 뺄지 늘 고르게 한다 (2026-09-08)
+  //   결석·휴무 줄뿐 아니라 아직 안 한 예정 줄도 고를 수 있다
+  const cand = String(line.dataset.nmplan || '').split(',')
+    .filter(Boolean).map(v => {
+      const p = v.split(':');
+      return { id: Number(p[0]), d: p[1], s: p[2] || '' };
+    });
+  if (!cand.length) {
+    alert('뺄 수 있는 날이 없습니다.\n'
+      + '이미 「보강 없음」으로 정해 두었거나, 그 달 수업이 없습니다.');
+    return;
+  }
+  const menu = cand.map((m, i) =>
+    (i + 1) + ') ' + dayOnly(m.d) + '일 · ' + m.s).join('\n');
+  const v = prompt('어느 날을 보강 없이 뺄까요?\n\n' + menu
+    + '\n\n번호를 넣으세요.', '');
+  if (v === null) return;
+  const nPick = Number(String(v).replace(/[^0-9]/g, ''));
+  if (!nPick || nPick < 1 || nPick > cand.length) {
+    alert('번호를 다시 골라주세요.'); return;
+  }
+  const pick = cand[nPick - 1];
+  if (String(pick.s).indexOf('보강 없음') >= 0) {
+    // 이미 정해 둔 날이면 저장값만 지워 회기 칸을 바로잡는다 (2026-09-08)
+    await clearSavedCnt(Number(btn.closest('.kid').dataset.child),
+                        Number(line.dataset.nmst));
+    alert('그 날은 이미 「보강 없음」으로 정해 두었습니다.\n\n'
+      + '회기 칸을 시간표에 맞춰 다시 그립니다.\n'
+      + '금액을 확인하시고 「카드 저장」을 눌러 저장하세요.');
+    await load();
+    return;
+  }
+  let ids = [pick.id];
+  // 발달재활은 여기서 막는다 — 결석으로 바꾸기 전에 (2026-09-11 순서 바로잡음)
+  if (Number(line.dataset.nmst) === 2) {
+    alert('발달재활은 반드시 그 달에 4회를 채워야 합니다.\n'
+      + '이대로 청구할 수 없습니다. 보강을 잡아 주세요.');
+    return;
+  }
+  // 사유를 먼저 받는다 — 결석으로 바꾸기 전에 (2026-09-11)
+  //   전에는 사유 칸 첫 칸이 「치료사 휴가」라, 안 고르고 누르면 아동 결석에도
+  //   「치료사 휴가」로 저장됐다 (85번 9/5)
+  const sel = line.querySelector('.nmwhy');
+  let why = sel ? sel.value : '';
+  if (!why) { alert('사유를 먼저 고르세요.\n(「보강 없음」 왼쪽 칸)'); return; }
+  if (why === '기타') {
+    why = (prompt('사유를 적어주세요.', '') || '').trim();
+    if (!why) return;
+  }
+  // 고른 날의 상태와 사유가 어긋나면 한 번 더 묻는다
+  //   결석 · 예정 · 완료 줄 = 아동 쪽 사정 / 휴무 줄 = 공휴일·선생님 휴가
+  const _st = String(pick.s || '');
+  const _isOff = _st.indexOf('휴무') >= 0 || _st.indexOf('공휴일') >= 0 || _st.indexOf('휴가') >= 0;
+  const _whyOff = (why === '치료사 휴가' || why === '공휴일');
+  if (_isOff !== _whyOff) {
+    if (!confirm(dayOnly(pick.d) + '일은 「' + _st + '」인데 사유가 「' + why + '」입니다.\n\n'
+        + (_isOff ? '쉬는 날(공휴일·선생님 휴가)인데 아동 쪽 사유를 고르셨습니다.'
+                  : '아동이 결석한 날인데 공휴일·선생님 휴가를 고르셨습니다.')
+        + '\n\n그래도 이 사유로 정할까요?')) return;
+  }
+  if (!confirm(dayOnly(pick.d) + '일 수업을 보강하지 않고 이대로 청구합니다.\n\n'
+    + '사유 — ' + why + '\n\n계속할까요?')) return;
+
+  // 예정 줄을 골랐으면 결석으로도 바꾼다 (사유를 다 받은 뒤에)
+  if (pick.s === '예정' || pick.s === '완료') {
+    const up = await sb.from('nl_sessions')
+      .update({ status: '결석' }).eq('id', pick.id);
+    if (up.error) { alert('바꾸지 못했습니다.\n' + up.error.message); return; }
+  }
+
+  btn.disabled = true;
+  const { error } = await sb.from('nl_sessions')
+    .update({ no_makeup: true, no_makeup_why: why })
+    .in('id', ids);
+  if (error) {
+    btn.disabled = false;
+    alert('저장하지 못했습니다.\n' + error.message);
+    return;
+  }
+
+  // 저장된 회기 값을 지운다 — 회기 칸이 시간표 회수로 다시 그려지게 한다
+  await clearSavedCnt(Number(btn.closest('.kid').dataset.child),
+                      Number(line.dataset.nmst));
+
+  // 예정인 동안은 다시 바꿀 수 있어야 하므로 아동 상자를 새로 그린다
+  //   (전에는 그 줄을 글자로 바꿔 「보강 잡기」를 다시 못 눌렀다)
+  alert('보강 없음으로 정했습니다.\n\n'
+    + '사유 — ' + why + '\n\n'
+    + '금액을 확인하시고 「카드 저장」을 눌러 저장하세요.\n'
+    + '다시 바꾸시려면 「보강 잡기」를 누르세요.');
+  await load();
+}
+
+// ── 등급 바꾸기 (2026-09-15) — 단추로 고른다. 적용 달도 고른다 ──
+const GRLIST = [['1', '가', 20000], ['2', '나', 40000], ['3', '다', 0],
+                ['4', '라', 60000], ['5', '마', 80000]];
+
+function nextMonthOf(mk) {
+  const p = String(mk).split('-');
+  const d = new Date(Number(p[0]), Number(p[1]), 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function openGrade(cid) {
+  const mk  = LOADED_MK || $('mk').value;
+  const nx  = nextMonthOf(mk);
+  const now = GRADES[cid];
+
+  const w = document.createElement('div');
+  w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;'
+    + 'align-items:center;justify-content:center;z-index:200;padding:20px;';
+  w.innerHTML =
+      '<div style="background:#fff;border-radius:14px;padding:20px;max-width:420px;width:100%;">'
+    + '<div style="font-size:16px;font-weight:700;margin-bottom:6px;">'
+    + cid + '번 아동 · 발달재활 등급</div>'
+    + '<div style="font-size:13px;color:#666;margin-bottom:14px;">지금 등급 — '
+    + (now ? now.grade + '형 · ' + Number(now.self_pay).toLocaleString() + '원 ('
+             + now.from_month + ' 부터)' : '없음') + '</div>'
+    + '<div style="font-size:12.5px;font-weight:700;color:#2c5c37;margin-bottom:6px;">등급</div>'
+    + '<div id="grPick" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
+    + GRLIST.map(g =>
+        '<button type="button" class="grOne" data-g="' + g[1] + '" data-p="' + g[2] + '"'
+        + ' style="flex:1;min-width:70px;padding:10px 4px;border:1px solid #d5dad2;'
+        + 'background:#fff;border-radius:8px;cursor:pointer;font-size:13px;">'
+        + g[0] + '. ' + g[1] + '<br><b style="font-size:12px;color:#666;">'
+        + (g[2] ? (g[2] / 10000) + '만' : '0') + '</b></button>').join('')
+    + '</div>'
+    + '<div style="font-size:12.5px;font-weight:700;color:#2c5c37;margin-bottom:6px;">언제부터</div>'
+    + '<div id="grWhen" style="display:flex;gap:6px;margin-bottom:16px;">'
+    + '<button type="button" class="grMk on" data-mk="' + mk + '"'
+    + ' style="flex:1;padding:10px;border:1px solid #2e7d32;background:#2e7d32;color:#fff;'
+    + 'border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">'
+    + Number(mk.slice(5)) + '월 (이번 달)</button>'
+    + '<button type="button" class="grMk" data-mk="' + nx + '"'
+    + ' style="flex:1;padding:10px;border:1px solid #d5dad2;background:#fff;'
+    + 'border-radius:8px;cursor:pointer;font-size:13px;">'
+    + Number(nx.slice(5)) + '월 (다음 달)</button>'
+    + '</div>'
+    + '<div id="grMsg" style="font-size:12.5px;color:#c62828;margin-bottom:8px;"></div>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<button type="button" id="grSave" style="flex:1;padding:11px;border:none;'
+    + 'background:#2e7d32;color:#fff;border-radius:8px;font-weight:700;cursor:pointer;">저장</button>'
+    + '<button type="button" id="grX" style="flex:1;padding:11px;border:1px solid #d5dad2;'
+    + 'background:#fff;border-radius:8px;cursor:pointer;">닫기</button></div></div>';
+  document.body.appendChild(w);
+
+  let pickG = null, pickP = null, pickMk = mk;
+  if (now) {
+    const b = w.querySelector('.grOne[data-g="' + now.grade + '"]');
+    if (b) { b.style.background = '#2e7d32'; b.style.color = '#fff'; b.style.borderColor = '#2e7d32';
+             pickG = now.grade; pickP = Number(b.dataset.p); }
+  }
+  w.querySelectorAll('.grOne').forEach(b => b.onclick = () => {
+    w.querySelectorAll('.grOne').forEach(x => {
+      x.style.background = '#fff'; x.style.color = '#3b403d'; x.style.borderColor = '#d5dad2';
+    });
+    b.style.background = '#2e7d32'; b.style.color = '#fff'; b.style.borderColor = '#2e7d32';
+    pickG = b.dataset.g; pickP = Number(b.dataset.p);
+  });
+  w.querySelectorAll('.grMk').forEach(b => b.onclick = () => {
+    w.querySelectorAll('.grMk').forEach(x => {
+      x.style.background = '#fff'; x.style.color = '#3b403d'; x.style.borderColor = '#d5dad2';
+      x.style.fontWeight = 'normal';
+    });
+    b.style.background = '#2e7d32'; b.style.color = '#fff'; b.style.borderColor = '#2e7d32';
+    b.style.fontWeight = '700';
+    pickMk = b.dataset.mk;
+  });
+
+  const close = () => w.remove();
+  w.querySelector('#grX').onclick = close;
+  w.onclick = ev => { if (ev.target === w) close(); };
+
+  w.querySelector('#grSave').onclick = async () => {
+    if (!pickG) { w.querySelector('#grMsg').textContent = '등급을 고르세요.'; return; }
+    const btn = w.querySelector('#grSave');
+    btn.disabled = true; btn.textContent = '저장 중...';
+    const { error } = await sb.from('nl_child_grades')
+      .upsert({ child_id: cid, grade: pickG, self_pay: pickP, from_month: pickMk },
+              { onConflict: 'child_id,from_month' });
+    if (error) {
+      w.querySelector('#grMsg').textContent = '저장하지 못했습니다. ' + error.message;
+      btn.disabled = false; btn.textContent = '저장';
+      return;
+    }
+    if (pickMk === mk) GRADES[cid] = { child_id: cid, grade: pickG, self_pay: pickP, from_month: mk };
+    close();
+    alert('✅ ' + pickG + '형 · ' + pickP.toLocaleString() + '원 · '
+        + Number(pickMk.slice(5)) + '월부터 저장했습니다.'
+        + (pickMk === mk ? '\n금액을 다시 셈하려면 위 「불러오기」를 누르세요.'
+                         : '\n다음 달 화면에서 보입니다.'));
+  };
+}
+
+$('kids').addEventListener('click', e => {
+  // 추가 수업 (2026-09-30)
+  const xa = e.target.closest ? e.target.closest('[data-xladd]') : null;
+  if (xa) { openExtra(Number(xa.dataset.xladd)); return; }
+  const xd = e.target.closest ? e.target.closest('[data-xldel]') : null;
+  if (xd) { delExtra(Number(xd.dataset.xldel), xd); return; }
+  // 날짜 단추 (2026-09-11)
+  const sbEl = e.target.closest ? e.target.closest('.sb') : null;
+  if (sbEl) { toggleSb(sbEl); return; }
+  const durEl = e.target.closest ? e.target.closest('.durbtn') : null;
+  if (durEl) { changeDur(durEl); return; }
+  // 저장 회기와 단추 수가 다를 때 — 눌러서 단추 수로 맞춘다
+  if (e.target.classList.contains('cntwarn')) {
+    const line = e.target.closest('.r.line');
+    const inp  = line ? line.querySelector('.cnt') : null;
+    if (inp) {
+      inp.value = e.target.dataset.n;
+      e.target.remove();
+      unDone(line);
+      calcKid(Number(line.closest('.kid').dataset.child));
+      sumAll();
+    }
+    return;
+  }
+  if (e.target.classList.contains('nmbtn')) { markNoMakeup(e.target); return; }
+  if (e.target.classList.contains('mkbtn')) { markMakeup(e.target); return; }
+
+  // 「예정 / 확정」 단추 — 눌러서 오간다
+  if (e.target.classList.contains('kfix')) {
+    toggleFix(Number(e.target.closest('.kid').dataset.child), e.target);
+    return;
+  }
+
+  if (e.target.classList.contains('ksave')) {
+    saveKid(Number(e.target.closest('.kid').dataset.child), e.target);
+    return;
+  }
+
+  // 카드 저장 · 계좌 저장 — 그 쪽만 저장한다
+  if (e.target.classList.contains('ksave2')) {
+    saveKid(Number(e.target.closest('.kid').dataset.child),
+            e.target, e.target.dataset.only);
+    return;
+  }
+
+  // 「안내문」 단추 — 미리보기 창을 띄운다
+  // 「소득공제」 단추 — 교육비 납입증명서
+  if (e.target.classList.contains('kdeduct')) {
+    openDeduct(Number(e.target.closest('.kid').dataset.child));
+    return;
+  }
+
+  if (e.target.classList.contains('grchg')) {
+    openGrade(Number(e.target.closest('.kid').dataset.child));
+    return;
+  }
+
+  if (e.target.classList.contains('knotice')) {
+    openNotice(Number(e.target.closest('.kid').dataset.child));
+    return;
+  }
+
+  // 「주차」 단추를 누르면 주차 상자가 펼쳐진다
+  if (e.target.classList.contains('wkopen')) {
+    const line = e.target.closest('.r.line');
+    let box = line ? line.nextElementSibling : null;
+    while (box && box.classList.contains('tmemo')) box = box.nextElementSibling;
+    if (box && box.classList.contains('wkbox')) {
+      const on = box.classList.toggle('on');
+      e.target.classList.toggle('on', on);
+    }
+    return;
+  }
+
+  // 주차 단추를 누르면 켜고 끈다. 회기 숫자도 따라 바뀐다
+  if (e.target.classList.contains('wkb') && e.target.dataset.w) {
+    const b   = e.target;
+    const box = b.closest('.wkbox');
+    const kid = b.closest('.kid');
+    const on  = b.classList.contains('yes');
+
+    // 마지막 하나까지 끄지는 못하게 한다
+    if (on && wkCountOf(box) <= 1) {
+      alert('주차를 모두 끌 수는 없습니다.\n수업을 아예 쉬려면 시간표에서 정하세요.');
+      return;
+    }
+    b.classList.toggle('yes', !on);
+    b.classList.toggle('no', on);
+
+    // 회기 칸을 켜진 주차 수에 맞춘다 (5주차가 있으면 더한다)
+    //   같은 요일줄의 줄이 둘로 나뉜 아동(발4+센1 등)은
+    //   「5주차」 줄은 늘 1회이고, 본래 줄만 켜진 주차 수를 따른다
+    let line = box.previousElementSibling;
+    while (line && line.classList.contains('tmemo')) line = line.previousElementSibling;
+    const sid  = line ? line.dataset.sched : '';
+    const five = box.querySelector('.wkb.dim') ? 1 : 0;
+    const wk   = wkCountOf(box);
+    let done = false;
+    if (sid) {
+      kid.querySelectorAll('.r.line[data-sched="' + sid + '"]').forEach(ln => {
+        const c = ln.querySelector('.cnt'); if (!c) return;
+        c.value = (ln.dataset.five === '1') ? five : wk;
+        done = true;
+      });
+    }
+    if (!done) {
+      const cEl = line ? line.querySelector('.cnt') : null;
+      if (cEl) cEl.value = wk + five;
+    }
+    calcKid(Number(kid.dataset.child));
+    sumAll();
+    return;
+  }
+});
+// ── 1회 수업 추가 (2026-09-30) ─────────────────────────────
+//   체험 표(nl_trial_lessons)에 갈래 「추가」로 넣는다 → 시간표 · 알림 · 빈 자리 · 급여가 체험과 같은 길로 돈다
+//   납부는 지원유형 11 「추가수업」 줄 (카드 저장 때 함께 저장)
+// ── 분 변경 (2026-10-03) ─────────────────────────────
+//   그 날만 수업 시간을 바꾼다 (회기 줄 dur_min · 비우면 요일줄 시간)
+//   예정 — 이 달 금액이 바로 다시 셈됨
+//   확정 — 이 달 금액은 그대로 · 차액을 다음 달 「전월 이월」로 (nl_carry)
+async function changeDur(btn) {
+  const kid = btn.closest('.kid');
+  if (!kid) return;
+  const cid = Number(kid.dataset.child);
+  const ch = CHANGED[cid];
+  if (ch && (ch.card || ch.bank)) {
+    alert('이 아동에 저장하지 않은 칸이 있습니다.\n먼저 「카드 저장」 · 「계좌 저장」을 눌러 주세요.');
+    return;
+  }
+  const sched = btn.dataset.sched, bst = btn.dataset.bst;
+  const dur0 = Number(btn.dataset.dur) || 40, th = Number(btn.dataset.th);
+  const rows = (SROWS[sched + '|' + bst] || []).filter(x => sessOn(x));
+  if (!rows.length) { alert('분을 바꿀 수 있는 날이 없습니다 (청구하는 날만 바꿀 수 있습니다).'); return; }
+  const fixed = isFixed(cid);
+
+  // 날짜마다 40 · 50 · 60 단추 — 고른 뒤 「저장」 (2026-10-03 은정님: 날짜와 분을 한 창에서)
+  let wrap = document.getElementById('durBox');
+  if (!wrap) { wrap = document.createElement('div'); wrap.id = 'durBox'; wrap.className = 'durbg'; document.body.appendChild(wrap); }
+  const pickV = {};
+  rows.forEach(x => { pickV[x.id] = Number(x.dur_min || dur0); });
+  const draw = () => {
+    wrap.innerHTML = '<div class="durpop"><div class="durhd">분 변경 · 요일줄 수업 시간 ' + dur0 + '분'
+      + (fixed ? '<br><small>확정한 달 — 이번 달 금액은 그대로, 차액은 다음 달 「전월 이월」로 넘어갑니다</small>' : '') + '</div>'
+      + '<div class="durbd">' + rows.map(x => '<div class="durrow"><span class="durd">' + dayOnly(x.plan_date) + '일</span>'
+          + [40, 50, 60].map(m => '<button type="button" class="durm' + (pickV[x.id] === m ? ' on' : '') + '" data-id="' + x.id + '" data-m="' + m + '">' + m + '분</button>').join('')
+          + (pickV[x.id] !== Number(x.dur_min || dur0) ? '<span class="durchg">바뀜</span>' : '')
+          + '</div>').join('') + '</div>'
+      + '<div class="durft"><button type="button" class="durx">닫기</button><button type="button" class="durgo">저장</button></div></div>';
+    wrap.style.display = 'flex';
+  };
+  draw();
+  wrap.onclick = async ev => {
+    const m = ev.target.closest('.durm');
+    if (m) { pickV[m.dataset.id] = Number(m.dataset.m); draw(); return; }
+    if (ev.target.closest('.durx')) { wrap.style.display = 'none'; return; }
+    if (!ev.target.closest('.durgo')) return;
+    const todo = rows.filter(x => pickV[x.id] !== Number(x.dur_min || dur0));
+    if (!todo.length) { wrap.style.display = 'none'; return; }
+    const go = ev.target.closest('.durgo'); go.disabled = true; go.textContent = '저장 중…';
+    const msgs = [];
+    for (const x of todo) {
+      const r = await saveDurOne(kid, cid, x, pickV[x.id], dur0, th, sched, bst, fixed);
+      msgs.push(r);
+      if (/^❌/.test(r)) break;
+    }
+    wrap.style.display = 'none';
+    redrawKid(cid);
+    if (!fixed) { const nb = document.querySelector('.kid[data-child="' + cid + '"] .kmemo'); if (nb) unDone(nb); }
+    const bad = msgs.some(t => /^❌/.test(t));
+    show($('msg2'), msgs.join('\n') + (!fixed && !bad ? '\n이 달 금액에 반영했습니다. 「카드 저장」을 눌러 주세요.' : ''), !bad);
+  };
+}
+// 한 날 분 바꾸기 — 글을 돌려준다 (❌ 로 시작하면 실패)
+async function saveDurOne(kid, cid, x, nv, dur0, th, sched, bst, fixed) {
+  const cur = Number(x.dur_min || dur0);
+  const tr = kid.querySelector('.line[data-sched="' + sched + '"][data-st="' + bst + '"]');
+  const apEl = tr ? tr.querySelector('.apu') : null;
+  const ap = apEl ? numOf(apEl.value) : 0;
+  const base = tr ? Number(tr.querySelector('.lineamt').dataset.unit || 0) : 0;
+  const use = ap > 0 ? ap : base;
+  const f0 = xlFee(th, dur0);
+  const amtOf = d => (!f0 || !use) ? 0 : Math.round(use * xlFee(th, d) / f0);
+  const newDm = (nv === dur0) ? null : nv;
+  const old = CARRYOUT[x.id] || null;
+  const dd = dayOnly(x.plan_date) + '일 ' + cur + '→' + nv + '분';
+  let diff = 0, toM = null;
+  if (fixed) {
+    if (!use || !f0) return '❌ ' + dd + ' · 단가를 찾지 못해 바꾸지 않았습니다';
+    diff = amtOf(cur) + (old ? Number(old.amount) : 0) - amtOf(nv);
+    toM = nextMonthOf(LOADED_MK);
+  }
+  try {
+    const { data: up, error: eU } = await sb.from('nl_sessions').update({ dur_min: newDm }).eq('id', x.id).select('id');
+    if (eU) throw eU;
+    if (!up || !up.length) throw new Error('회기 줄이 바뀌지 않았습니다.');
+    try {
+      if (fixed && diff !== 0) {
+        const reason = Number(String(x.plan_date).slice(5, 7)) + '/' + dayOnly(x.plan_date) + ' ' + dur0 + '→' + nv + '분 차액';
+        const q = old
+          ? sb.from('nl_carry').update({ amount: diff, reason: reason, to_month: toM }).eq('id', old.id).select('id, amount, reason, to_month')
+          : sb.from('nl_carry').insert({ child_id: cid, support_type_id: Number(bst), from_month: LOADED_MK, to_month: toM,
+              session_id: x.id, amount: diff, reason: reason }).select('id, amount, reason, to_month');
+        const { data: cr, error: eC } = await q;
+        if (eC) throw eC;
+        if (!cr || !cr.length) throw new Error('이월이 저장되지 않았습니다.');
+        CARRYOUT[x.id] = Object.assign({}, old || {}, cr[0], { session_id: x.id });
+      } else if (old) {
+        const { error: eD } = await sb.from('nl_carry').delete().eq('id', old.id);
+        if (eD) throw eD;
+        delete CARRYOUT[x.id];
+      }
+    } catch (e2) {
+      await sb.from('nl_sessions').update({ dur_min: x.dur_min || null }).eq('id', x.id);
+      throw e2;
+    }
+    x.dur_min = newDm;
+    return '✅ ' + dd + (fixed ? (diff > 0 ? ' · 차액 ' + diff.toLocaleString() + '원 다음 달 이월'
+                                : diff < 0 ? ' · 더 받을 ' + (-diff).toLocaleString() + '원 다음 달로 (직접 더해 주세요)' : '') : '');
+  } catch (e) {
+    return '❌ ' + dd + ' · ' + (e.message || e);
+  }
+}
+
+function redrawKid(childId) {
+  const kid = document.querySelector('.kid[data-child="' + childId + '"]');
+  const c = CHILDREN.find(x => x.id === childId);
+  if (!kid || !c) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = drawKid(c);
+  const box = wrap.querySelector('.kid');
+  if (box) { kid.replaceWith(box); calcKid(childId); sumAll(); }
+}
+function xlFee(tid, dur) {
+  const f = FEES[tid];
+  if (!f) return 0;
+  return Number(dur === 60 ? f.fee_60 : dur === 50 ? f.fee_50 : f.fee_40) || 0;
+}
+function openExtra(childId) {
+  const ch = CHANGED[childId];
+  if (ch && (ch.card || ch.bank)) {
+    alert('이 아동에 저장하지 않은 칸이 있습니다.\n먼저 「카드 저장」 · 「계좌 저장」을 눌러 주세요.');
+    return;
+  }
+  const c = CHILDREN.find(x => x.id === childId);
+  const ths = THERAPISTS.filter(t => !t.role || t.role === '치료사');
+  // 날짜는 늘 한국(이 컴퓨터) 날짜로 — toISOString 은 세계표준시라 쓰지 않는다
+  const _n = new Date();
+  const _mk = _n.getFullYear() + '-' + String(_n.getMonth() + 1).padStart(2, '0');
+  const d0 = LOADED_MK + '-' + (LOADED_MK === _mk ? String(_n.getDate()).padStart(2, '0') : '01');
+  let hs = ''; for (let h = 9; h <= 20; h++) hs += '<option value="' + String(h).padStart(2, '0') + '">' + h + '시</option>';
+  let ms = ''; for (let m = 0; m < 60; m += 10) ms += '<option value="' + String(m).padStart(2, '0') + '">' + String(m).padStart(2, '0') + '분</option>';
+  let to = '<option value="">선생님 고르기</option>';
+  ths.forEach(t => { to += '<option value="' + t.id + '">' + t.id + '번 ' + esc(t.name) + '</option>'; });
+  let yo = '<option value="">치료 고르기</option>';
+  Object.keys(TTYPES).forEach(k => { yo += '<option value="' + k + '">' + esc(TTYPES[k]) + '</option>'; });
+  const w = document.createElement('div');
+  w.className = 'xlpop';
+  w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + '</h3>'
+    + '<div class="rw"><label>날짜</label><input type="date" id="xlD" value="' + d0 + '" min="' + LOADED_MK + '-01" max="' + monEndDay(LOADED_MK) + '"></div>'
+    + '<div class="rw"><label>시각</label><select id="xlH">' + hs + '</select><select id="xlM">' + ms + '</select>'
+    + '<select id="xlN"><option value="40">40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'
+    + '<div class="rw"><label>선생님</label><select id="xlT">' + to + '</select></div>'
+    + '<div class="rw"><label>치료</label><select id="xlY">' + yo + '</select></div>'
+    + '<div class="rw"><label>금액</label><input id="xlF" data-won type="text" inputmode="numeric" placeholder="0" style="width:110px"> 원'
+    + ' <span style="color:#999;font-size:12px">선생님 · 분 정규 1회 단가</span></div>'
+    + '<div class="rw"><label>메모</label><input id="xlO" type="text" maxlength="60" placeholder="예) 추석 대신 한 번 더" style="flex:1"></div>'
+    + '<div style="font-size:12px;color:#777;margin-top:6px">이 달만 하는 수업입니다. 매달 되풀이하는 수업은 시간표 「수업 넣기」로 넣어 주세요.</div>'
+    + '<div class="bt"><button type="button" id="xlNo">닫기</button><button type="button" class="go" id="xlGo">저장</button></div></div>';
+  document.body.appendChild(w);
+  const $w = id => w.querySelector('#' + id);
+  $w('xlH').value = '16';
+  let feeTouched = false;
+  const fillFee = () => {
+    if (feeTouched) return;
+    const f = xlFee(Number($w('xlT').value), Number($w('xlN').value));
+    $w('xlF').value = f ? f.toLocaleString() : '';
+  };
+  $w('xlT').onchange = fillFee; $w('xlN').onchange = fillFee;
+  $w('xlF').oninput = () => { feeTouched = true; const raw = String($w('xlF').value).replace(/[^0-9]/g, ''); $w('xlF').value = raw === '' ? '' : Number(raw).toLocaleString(); };
+  $w('xlNo').onclick = () => w.remove();
+  $w('xlGo').onclick = async () => {
+    const dt = $w('xlD').value, tid = Number($w('xlT').value), ty = Number($w('xlY').value);
+    const dur = Number($w('xlN').value), fee = numOf($w('xlF').value);
+    // 금액 칸이 비면 빈칸(null) → 서버가 수업료로 채움 / 「0」을 적으면 무료(0원) 그대로 (2026-10-05)
+    const feeBlank = String($w('xlF').value).replace(/[^0-9]/g, '') === '';
+    if (!dt || dt.slice(0, 7) !== LOADED_MK) { alert(Number(LOADED_MK.slice(5)) + '월 안의 날짜를 골라 주세요.'); return; }
+    if (!tid) { alert('선생님을 골라 주세요.'); return; }
+    if (!ty)  { alert('치료를 골라 주세요.'); return; }
+    const go = $w('xlGo'); go.disabled = true; go.textContent = '저장 중…';
+    try {
+      const { data, error } = await sb.from('nl_trial_lessons').insert({
+        child_id: childId, kind: '추가', status: '예정',
+        lesson_date: dt, lesson_time: $w('xlH').value + ':' + $w('xlM').value,
+        duration_min: dur, therapist_id: tid, therapy_type_id: ty,
+        fee: feeBlank ? null : fee, memo: $w('xlO').value.trim() || null
+      }).select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo');
+      if (error || !data || data.length !== 1) throw (error || new Error('표에 들어가지 않았습니다 (권한)'));
+      (XLMON[childId] = XLMON[childId] || []).push(data[0]);
+      w.remove();
+      redrawKid(childId);
+      // 금액이 바뀌었으니 저장이 필요하다 — 저장 단추를 「저장 전」으로
+      const kid = document.querySelector('.kid[data-child="' + childId + '"]');
+      const inp = kid ? kid.querySelector('.gsum[data-st="11"] .xlamt') : null;
+      if (inp) { const t = extraSumOf(childId); inp.value = t ? t.toLocaleString() : ''; unDone(inp); calcKid(childId); sumAll(); }
+      alert('추가 수업을 넣었습니다.\n시간표에 나오고 담당 선생님께 알림이 갑니다.\n\n금액은 「카드 저장」을 눌러야 납부에 들어갑니다.');
+    } catch (err) {
+      go.disabled = false; go.textContent = '저장';
+      alert('넣지 못했습니다.\n' + (err.message || err));
+    }
+  };
+}
+async function delExtra(id, btn) {
+  let childId = null, v = null;
+  Object.keys(XLMON).forEach(k => { const x = XLMON[k].find(r => r.id === id); if (x) { childId = Number(k); v = x; } });
+  if (!v) return;
+  const ch = CHANGED[childId];
+  if (ch && (ch.card || ch.bank)) {
+    alert('이 아동에 저장하지 않은 칸이 있습니다.\n먼저 저장한 뒤 지워 주세요.');
+    return;
+  }
+  if (!confirm(v.lesson_date + ' 추가 수업을 지울까요?\n시간표에서도 빠지고 담당 선생님께 알림이 갑니다.')) return;
+  if (btn) btn.disabled = true;
+  try {
+    // 지우지 않고 「취소」로 — 알림 장치가 선생님께 알리고 기록이 남는다
+    const { data, error } = await sb.from('nl_trial_lessons')
+      .update({ status: '취소' }).eq('id', id).neq('status', '완료').select('id');
+    if (error || !data || data.length !== 1) throw (error || new Error('이미 완료되었거나 권한이 없습니다'));
+    XLMON[childId] = (XLMON[childId] || []).filter(r => r.id !== id);
+    redrawKid(childId);
+    const kid = document.querySelector('.kid[data-child="' + childId + '"]');
+    const inp = kid ? kid.querySelector('.gsum[data-st="11"] .xlamt') : null;
+    if (inp) { const t = extraSumOf(childId); inp.value = t ? t.toLocaleString() : ''; unDone(inp); calcKid(childId); sumAll(); }
+    alert('지웠습니다. 금액이 바뀌었으면 「카드 저장」을 눌러 주세요.');
+  } catch (err) {
+    if (btn) btn.disabled = false;
+    alert('지우지 못했습니다.\n' + (err.message || err));
+  }
+}
+
+// 칸을 고치면 그 아동의 저장 단추가 다시 「저장 전」으로 돌아간다
+let SAVING = false;   // 저장하는 동안에는 되돌리지 않는다
+let CHANGED = {};    // 아동 번호 -> { card:true, bank:true } 저장 안 한 바꾼 칸 (2026-09-15)
+function unDone(el){
+  if (SAVING) return;
+  const kid = el.closest ? el.closest('.kid') : null;
+  if (!kid) return;
+  const stEl = el.closest('[data-st]');
+  const bank = (el.classList && (el.classList.contains('bday') || el.classList.contains('bmemo')
+                                 || el.classList.contains('brf')))
+            || (stEl && stEl.dataset.st === '2');
+  const ch = CHANGED[kid.dataset.child] = CHANGED[kid.dataset.child] || {};
+  ch[bank ? 'bank' : 'card'] = true;
+  kid.querySelectorAll('.ksave, .ksave2').forEach(b => {
+    if (!b.classList.contains('done')) return;
+    b.classList.remove('done');
+    b.textContent = b.dataset.ttl || '저장 전';
+  });
+}
+$('kids').addEventListener('input',  e => unDone(e.target));
+$('kids').addEventListener('change', e => unDone(e.target));
+
+$('q').addEventListener('input', () => { if (LOADED_MK) drawAll(); });
+
+// 전체 / 미납만 / 완납만 단추
+document.querySelectorAll('.ptab').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.ptab').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    PAYFILTER = b.dataset.pay;
+    if (LOADED_MK) drawAll();
+    else show($('msg2'), '먼저 [불러오기] 를 눌러주세요.', false);
+  };
+});
+$('mk').addEventListener('change', () => {
+  // 저장 안 한 칸이 있으면 먼저 묻는다 (2026-09-15) — 취소하면 달을 되돌린다
+  if (LOADED_MK && !askLeaveChanged('달을 바꾸면')) { $('mk').value = LOADED_MK; return; }
+  CHANGED = {}; TYPED = {};
+  $('kids').innerHTML = ''; $('allsum').textContent = '';
+  LOADED_MK = null; $('empty').style.display = 'block';
+  show($('msg2'), '달이 바뀌었습니다. [불러오기] 를 눌러주세요.', true);
+});
+
+// 마우스 휠로 칸 값이 바뀌지 않게
+document.addEventListener('wheel', () => {
+  const a = document.activeElement;
+  if (a && a.tagName === 'INPUT') a.blur();
+}, true);
+
+// 저장 안 한 칸이 있는 아동 (2026-09-15)
+function changedKids() {
+  return Object.keys(CHANGED).filter(k => CHANGED[k] && (CHANGED[k].card || CHANGED[k].bank));
+}
+function askLeaveChanged(doing) {
+  const ks = changedKids();
+  if (!ks.length) return true;
+  return confirm('저장하지 않은 칸이 있습니다 — ' + ks.map(k => k + '번').join(', ') + '\n\n'
+    + doing + ' 적어 두신 내용이 사라질 수 있습니다.\n그래도 할까요?\n\n'
+    + '저장하시려면 「취소」를 누르고 그 아동의 저장 단추를 누르세요.');
+}
+$('load').onclick = () => {
+  if ($('mk').value !== LOADED_MK && !askLeaveChanged('다른 달을 불러오면')) return;
+  load();
+};
+// 탭을 닫거나 새로고침할 때 — 브라우저가 「사이트에서 나가시겠습니까?」를 띄운다
+window.addEventListener('beforeunload', e => {
+  if (!changedKids().length) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+// 지난번에 보던 달이 있으면 그 달로 맞춰 둔다
+try {
+  const _km = localStorage.getItem('nl_bill_mon');
+  if (_km) $('mk').value = _km;
+} catch (e) {}
+
+// 엔터를 치면 불러오기 (아동 목록의 입력 칸 안에서는 안 되게 — 적은 것이 날아가지 않도록)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+  if (!$('mainBox') || $('mainBox').style.display === 'none') return;
+  const a = e.target;
+  if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+  if (a && a.tagName === 'INPUT' && a.id !== 'mk' && a.id !== 'q') return;
+  if ($('load').disabled) return;
+  e.preventDefault();
+  if ($('mk').value !== LOADED_MK && !askLeaveChanged('다른 달을 불러오면')) return;
+  load();
+});
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true; $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false; $('btn').textContent = '로그인';
+  }
+};
+$('out').onclick = async () => {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+  else {
+    // 로그인이 없으면 첫 화면으로 보낸다 (빈 화면이 열리는 것을 막기 위함)
+    location.replace('index.html');
+  }
+})();
+</script>
+</body>
+</html>

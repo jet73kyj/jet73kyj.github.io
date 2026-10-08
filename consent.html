@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>알림 동의 기록 - 나무링크</title>
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --sage:#4F7A5C; --coral:#C2553A; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg); margin:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .who { font-size:12px; color:var(--dim); }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:1000px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 13px; font-size:13px; background:var(--sf); color:var(--tx); border:1px solid #E4E0DA; cursor:pointer; }
+  button:hover { background:var(--camL); }
+  button.grey { border-color:#D9C3A7; color:#7E5530; }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .tools { display:flex; gap:14px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:10px; }
+  .tab { border:none; border-bottom:2px solid transparent; border-radius:0; padding:4px 2px; color:var(--dim); background:none; }
+  .tab.on { color:#7E5530; border-bottom-color:var(--cam); }
+  .tab:hover { background:none; color:#7E5530; }
+  input.q { font:inherit; font-size:13px; padding:6px 10px; border:1px solid #E4E0DA; border-radius:8px; min-width:200px; }
+  .tw { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--camL); color:#7E5530; text-align:left; font-weight:500; padding:7px 9px; border-bottom:1px solid var(--camB); white-space:nowrap; }
+  td { padding:7px 9px; border-bottom:1px solid #F0EEEA; vertical-align:top; }
+  .a-동의 { color:var(--sage); font-weight:600; } .a-거절 { color:var(--dim); font-weight:600; } .a-철회 { color:var(--coral); font-weight:600; }
+  .lnk { color:#7E5530; text-decoration:underline; cursor:pointer; white-space:nowrap; }
+  .note { font-size:12px; color:var(--dim); margin-top:10px; line-height:1.7; }
+  .err { background:var(--sf); border-left:3px solid var(--coral); padding:14px 16px; color:var(--coral); white-space:pre-wrap; }
+  .load { text-align:center; padding:30px; color:var(--dim); }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span>
+  <h1>알림 동의 기록</h1>
+  <span class="who" id="who"></span>
+  <span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+<div class="wrap">
+  <div id="body"><div class="load">불러오는 중…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// 알림 동의 기록 (2026-10-05) — 대표(8번)만 · 고치기 · 지우기 단추 없음 (서버도 막음)
+let ROWS = [], TAB = 'all';
+function dev(ua) {
+  ua = String(ua || '');
+  if (/iPhone|iPad|iPod/i.test(ua)) return '아이폰';
+  if (/Android/i.test(ua)) return '안드로이드';
+  if (/Windows/i.test(ua)) return '윈도우';
+  if (/Macintosh|Mac OS/i.test(ua)) return '맥';
+  return '기타';
+}
+function maskId(id) { id = String(id || ''); return /^\d{11}$/.test(id) ? id.slice(0, 3) + '****' + id.slice(7) : id; }
+function when(t) {
+  const d = new Date(t), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '.' + p(d.getMonth() + 1) + '.' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+async function readAll(q) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await q().range(from, from + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+async function load() {
+  const cons = await readAll(() => sb.from('nl_push_consent')
+    .select('id, kind, staff_id, account_id, action, text_ver, text_body, permission, ua, created_at').order('created_at', { ascending: false }));
+  const [acc, pcs, kids, ths] = await Promise.all([
+    readAll(() => sb.from('nl_parent_accounts').select('id, login_id').order('id')),
+    readAll(() => sb.from('nl_parent_children').select('account_id, child_id').order('id')),
+    readAll(() => sb.from('nl_children').select('id, name').order('id')),
+    readAll(() => sb.from('nl_therapists').select('id, name').order('id'))
+  ]);
+  const ACC = {}, KID = {}, TH = {}, AK = {};
+  acc.forEach(a => ACC[a.id] = a.login_id);
+  kids.forEach(k => KID[k.id] = k.name);
+  ths.forEach(t => TH[t.id] = t.name);
+  pcs.forEach(p => (AK[p.account_id] = AK[p.account_id] || []).push(p.child_id));
+  ROWS = cons.map(r => {
+    let who, whoFull;
+    if (r.kind === 'staff') { who = '직원 ' + r.staff_id + '번 ' + (TH[r.staff_id] || ''); whoFull = who; }
+    else {
+      const ks = (AK[r.account_id] || []).map(c => c + '번 ' + (KID[c] || '')).join(', ');
+      who = '학부모 ' + maskId(ACC[r.account_id]) + (ks ? ' · ' + ks : '');
+      whoFull = '학부모 ' + (ACC[r.account_id] || '(계정 ' + r.account_id + ')') + (ks ? ' · ' + ks : '');
+    }
+    return Object.assign({}, r, { who, whoFull, dev: dev(r.ua) });
+  });
+  draw();
+}
+function shown() {
+  const q = ($('q') ? $('q').value : '').trim();
+  return ROWS.filter(r => (TAB === 'all' || r.kind === TAB) && (!q || (r.whoFull + ' ' + r.who).indexOf(q) >= 0));
+}
+function draw() {
+  const q = $('q') ? $('q').value : '';
+  const n = k => ROWS.filter(r => k === 'all' || r.kind === k).length;
+  const rs = shown();
+  $('body').innerHTML = '<div class="card">'
+    + '<div class="tools">'
+    + ['all:전체', 'parent:학부모', 'staff:직원'].map(x => { const [k, t] = x.split(':');
+        return '<button class="tab' + (TAB === k ? ' on' : '') + '" data-t="' + k + '">' + t + ' ' + n(k) + '</button>'; }).join('')
+    + '<span style="flex:1"></span><input class="q" id="q" placeholder="아동 번호 · 아이디 · 이름" value="' + esc(q) + '">'
+    + '<button id="xls">엑셀로 저장</button></div>'
+    + '<div class="tw"><table><thead><tr><th>때</th><th>누구</th><th>결정</th><th>판</th><th>알림 허용</th><th>기기</th><th>안내문</th></tr></thead><tbody>'
+    + (rs.length ? rs.map(r => '<tr><td style="white-space:nowrap;">' + when(r.created_at) + '</td><td>' + esc(r.who) + '</td>'
+        + '<td class="a-' + esc(r.action) + '">' + esc(r.action) + '</td><td>' + esc(r.text_ver) + '</td>'
+        + '<td>' + esc({ granted: '허용', denied: '차단', 'default': '안 고름' }[r.permission] || r.permission || '') + '</td>'
+        + '<td title="' + esc(r.ua) + '">' + esc(r.dev) + '</td><td><span class="lnk" data-v="' + r.id + '">보기</span></td></tr>').join('')
+      : '<tr><td colspan="7" style="text-align:center;color:#A39C95;padding:24px;">기록이 없습니다.</td></tr>')
+    + '</tbody></table></div>'
+    + '<div class="note">기록은 고치거나 지울 수 없습니다 · 「보기」 = 그때 보여 드린 안내문 전문 · 엑셀에는 아이디 전체 · 기기 전체 글 · 안내문까지 담깁니다.</div></div>';
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { TAB = b.dataset.t; draw(); });
+  $('q').oninput = () => { const pos = $('q').selectionStart; draw(); $('q').focus(); try { $('q').setSelectionRange(pos, pos); } catch (e) {} };
+  $('xls').onclick = saveXls;
+  document.querySelectorAll('.lnk').forEach(a => a.onclick = () => showText(Number(a.dataset.v)));
+}
+function showText(id) {
+  const r = ROWS.find(x => x.id === id); if (!r) return;
+  const bg = document.createElement('div');
+  bg.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(47,41,38,.45);display:flex;align-items:center;justify-content:center;padding:16px;';
+  bg.innerHTML = '<div style="background:#fff;border-radius:12px;max-width:480px;width:100%;overflow:hidden;">'
+    + '<div style="background:#F8F1E8;border-bottom:2px solid #C9A27E;padding:10px 14px;display:flex;align-items:center;">'
+    + '<b style="font-size:14px;">' + esc(r.action) + ' · ' + when(r.created_at) + ' · ' + esc(r.text_ver) + '</b>'
+    + '<button id="tx" style="margin-left:auto;">닫기</button></div>'
+    + '<div style="padding:14px;font-size:13.5px;line-height:1.75;white-space:pre-wrap;">' + esc(r.text_body) + '</div>'
+    + '<div style="padding:0 14px 14px;font-size:11.5px;color:#A39C95;word-break:break-all;">' + esc(r.whoFull) + '<br>' + esc(r.ua) + '</div></div>';
+  document.body.appendChild(bg);
+  bg.querySelector('#tx').onclick = () => bg.remove();
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+}
+function saveXls() {
+  if (!window.XLSX) { alert('엑셀 도구를 불러오지 못했습니다. 새로고침 뒤 다시 눌러 주세요.'); return; }
+  const rs = shown().map(r => ({ '때': when(r.created_at), '갈래': r.kind === 'staff' ? '직원' : '학부모', '누구': r.whoFull,
+    '결정': r.action, '안내문 판': r.text_ver, '알림 허용': r.permission || '', '기기': r.dev, '기기 전체 글': r.ua || '', '안내문 전문': r.text_body }));
+  const ws = XLSX.utils.json_to_sheet(rs);
+  ws['!cols'] = [{ wch: 17 }, { wch: 7 }, { wch: 34 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 9 }, { wch: 60 }, { wch: 80 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '알림 동의 기록');
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  XLSX.writeFile(wb, '알림동의기록_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.xlsx');
+}
+
+$('home').onclick = () => { location.href = 'index.html'; };
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name, role')
+    .eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="err">직원 표에 이 이메일이 없습니다.</div>'; return; }
+  nlKeep(me.id);
+  if (Number(me.id) !== 8) { $('body').innerHTML = '<div class="err">대표님만 볼 수 있는 화면입니다.</div>'; return; }
+  $('who').textContent = me.name + ' 님으로 로그인됨';
+  try { await load(); } catch (e) { $('body').innerHTML = '<div class="err">기록을 불러오지 못했습니다.\n' + esc(e.message || e) + '</div>'; }
+})();
+</script>
+</body>
+</html>

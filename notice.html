@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공지사항 - 나무링크</title>
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camBg:#FBF5EE; }
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex;
+        align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar0 { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; color:var(--tx); }
+  .hd .sp { flex:1 1 auto; }
+  .box { max-width:420px; margin:60px auto; background:var(--sf);
+         border:1px solid var(--line); border-radius:12px; padding:28px; }
+  .box img.lg { height:26px; display:block; margin:0 auto 14px; }
+  .wide { max-width:900px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; color:var(--tx); margin:0 0 4px; font-weight:600; }
+  .sub { font-size:13px; color:var(--dim); margin-bottom:20px; text-align:center; }
+  label { display:block; font-size:12.5px; font-weight:500; margin:12px 0 5px;
+          color:#5F5E5A; }
+  input, textarea, select { width:100%; padding:9px 11px; border:1px solid var(--line);
+          border-radius:8px; font-size:14px; box-sizing:border-box;
+          font-family:inherit; background:var(--sf); color:var(--tx); }
+  textarea { min-height:110px; resize:vertical; line-height:1.6; }
+  button { width:100%; padding:11px; margin-top:18px; background:var(--sf); color:var(--tx);
+           border:1px solid var(--dim); border-radius:8px; font-size:14px;
+           font-weight:500; cursor:pointer; }
+  button:hover { background:var(--camL); }
+  button:disabled { background:#f2f1ee; color:var(--dim); border-color:var(--line);
+                    cursor:default; }
+  .out { margin-top:18px; padding:13px; border-radius:8px; font-size:14px;
+         line-height:1.7; display:none; white-space:pre-wrap; }
+  .ok  { background:var(--sf); border-left:3px solid #5E9A6E; color:var(--tx); display:block; }
+  .err { background:var(--sf); border-left:3px solid #D8684A; color:#993C1D; display:block; }
+
+  .who { font-size:12px; color:var(--dim); }
+  .btn-out { width:auto; margin:0; padding:5px 12px; font-size:13px;
+             border-color:var(--line); }
+  .btn-home { display:inline-block; padding:5px 12px; background:var(--sf); color:var(--cam);
+              font-size:13px; border:1px solid var(--line); border-radius:8px;
+              text-decoration:none; margin-right:8px; }
+  .btn-home:hover { background:var(--camL); }
+
+  .addbox { background:var(--camBg); border:1px solid var(--line); border-radius:12px;
+            padding:16px 18px; margin-bottom:16px; }
+  .addtitle { font-size:14px; font-weight:600; color:var(--tx); margin-bottom:5px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+  .chk { display:flex; align-items:center; gap:8px; margin-top:16px;
+         font-size:13.5px; font-weight:500; color:#993C1D; }
+  .chk input { width:18px; height:18px; padding:0; }
+  .hint { font-size:12px; color:var(--dim); margin-top:4px; line-height:1.5; }
+  .addbtns { display:flex; gap:8px; margin-top:16px; }
+  .addbtns button { margin-top:0; width:auto; padding:7px 18px; }
+  .btn-gray { border-color:var(--line); }
+
+  .nt { background:var(--sf); border:1px solid var(--line); border-radius:12px;
+        padding:14px 16px; margin-bottom:10px; }
+  .nt.pop { border-radius:0; border-left:3px solid #D29A3C; }
+  .nt.old { opacity:.55; }
+  .nthead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .nttitle { font-size:14.5px; font-weight:500; color:var(--tx); }
+  .tag { font-size:11.5px; padding:1px 9px; border-radius:11px; }
+  .t-pop { background:#FAEEDA; color:#854F0B; }
+  .t-all { background:#E6F1FB; color:#185FA5; }
+  .t-thr { background:#EEEDFE; color:#3C3489; }
+  .t-old { background:#F1EFE8; color:#5F5E5A; }
+  .ntbody { font-size:13.5px; color:#5F5E5A; line-height:1.65; margin:8px 0 0;
+            white-space:pre-wrap; }
+  .ntfoot { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+            font-size:12.5px; color:var(--dim); margin-top:10px; }
+  .del { margin:0; width:auto; padding:4px 12px; font-size:12px;
+         background:var(--sf); color:#993C1D; border:1px solid var(--line);
+         font-weight:400; }
+  .del:hover { background:#FCEFEA; }
+  .readn { color:#3B6D11; font-weight:500; }
+  .empty { padding:40px; text-align:center; color:var(--dim); font-size:14px; }
+  @media (max-width:640px) { .row2 { grid-template-columns:1fr; } }
+  .t-pin { background:#F8F1E8; color:#B07A4A; font-weight:700; }
+  .pinbtn { margin-right:6px; }
+</style>
+</head>
+<body>
+
+<div class="box" id="loginBox">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <h1 style="text-align:center">공지사항</h1>
+  <div class="sub">나무링크 · 학부모께 보낼 공지를 올립니다</div>
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username">
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password">
+  <button id="btn">로그인</button>
+  <div class="out" id="msg"></div>
+</div>
+
+<div id="mainBox" style="display:none">
+  <div class="hd">
+    <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+    <span class="bar0"></span>
+    <h1>공지사항</h1>
+    <span class="who" id="who"></span>
+    <span class="sp"></span>
+    <button class="btn-out" id="out" style="display:inline-block">로그아웃</button>
+    <a class="btn-home" href="index.html" style="margin-right:0">처음으로</a>
+  </div>
+  <div class="wide">
+
+  <div class="addbox">
+    <div class="addtitle">＋ 새 공지 올리기</div>
+    <div class="hint">올린 날부터 한 달 동안 학부모께 보입니다. 한 달이 지나면 저절로 사라집니다.</div>
+
+    <label for="ttl">제목</label>
+    <input id="ttl" type="text" placeholder="예) 추석 연휴 휴무 안내">
+
+    <label for="bdy">내용</label>
+    <textarea id="bdy" placeholder="학부모께 보일 내용을 적어주세요."></textarea>
+
+    <div class="row2">
+      <div>
+        <label for="thr">누구에게</label>
+        <select id="thr">
+          <option value="">모든 학부모</option>
+        </select>
+      </div>
+      <div>
+        <label for="eon">언제까지 보일지</label>
+        <input id="eon" type="date">
+      </div>
+    </div>
+
+    <div class="chk">
+      <input id="pop" type="checkbox">
+      <label for="pop" style="margin:0">중요 — 학부모가 들어오면 창을 띄워 보여줍니다</label>
+    </div>
+    <div class="chk">
+      <input id="pin" type="checkbox">
+      <label for="pin" style="margin:0">맨 위 고정 — 기간이 지나도 사라지지 않고 학부모 공지 맨 위에 늘 보입니다</label>
+    </div>
+    <div class="hint">체크하지 않으면 공지 목록에 빨간 점만 붙습니다.<br>
+      명절 휴무·수업료 변경처럼 꼭 봐야 하는 것만 체크하세요.</div>
+
+    <div class="addbtns">
+      <button id="save">올리기</button>
+      <button id="clr" class="btn-gray">지우고 새로</button>
+    </div>
+    <div class="out" id="msg2"></div>
+  </div>
+
+  <div id="list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $ = id => document.getElementById(id);
+
+let ME = null;          // 로그인한 직원
+let THRS = {};          // 치료사 번호 -> 이름
+let NOTICES = [];       // 공지 목록
+let READS = {};         // 공지 번호 -> 읽은 사람 수
+
+function show(el, t, ok) {
+  el.textContent = t;
+  el.className = 'out ' + (ok ? 'ok' : 'err');
+}
+function hide(el) { el.className = 'out'; el.textContent = ''; }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+// 오늘부터 한 달 뒤 날짜
+function monthLater() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return d.getFullYear() + '-'
+       + String(d.getMonth() + 1).padStart(2, '0') + '-'
+       + String(d.getDate()).padStart(2, '0');
+}
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-'
+       + String(d.getMonth() + 1).padStart(2, '0') + '-'
+       + String(d.getDate()).padStart(2, '0');
+}
+
+// ── 공지 목록 그리기 ─────────────────────────────
+function draw() {
+  if (!NOTICES.length) {
+    $('list').innerHTML = '<div class="empty">아직 올린 공지가 없습니다.</div>';
+    return;
+  }
+  const tdy = today();
+  let h = '';
+  NOTICES.forEach(n => {
+    const over = !n.is_pinned && n.end_on < tdy;   // 기간이 지난 것 (고정은 안 지남)
+    const who  = n.therapist_id
+      ? (THRS[n.therapist_id] || '치료사') + ' 선생님 아동'
+      : '모든 학부모';
+    const rn = READS[n.id] || 0;
+
+    h += '<div class="nt' + (n.is_popup ? ' pop' : '') + (over ? ' old' : '') + '">'
+      + '<div class="nthead">'
+      + '<span class="nttitle">' + esc(n.title) + '</span>'
+      + (n.is_pinned ? '<span class="tag t-pin">📌 맨 위 고정</span>' : '')
+      + (n.is_popup ? '<span class="tag t-pop">중요 · 창 띄움</span>' : '')
+      + '<span class="tag ' + (n.therapist_id ? 't-thr' : 't-all') + '">' + esc(who) + '</span>'
+      + (over ? '<span class="tag t-old">기간 지남</span>' : '')
+      + '</div>'
+      + '<div class="ntbody">' + esc(n.body) + '</div>'
+      + '<div class="ntfoot">'
+      + '<span>' + esc(n.start_on) + (n.is_pinned ? ' ~ (고정)' : ' ~ ' + esc(n.end_on)) + '</span>'
+      + '<span class="readn">읽음 ' + rn + '집</span>'
+      + '<button class="del pinbtn" data-pin="' + n.id + '">' + (n.is_pinned ? '고정 풀기' : '맨 위 고정') + '</button>'
+      + '<button class="del" data-del="' + n.id + '">지우기</button>'
+      + '</div></div>';
+  });
+  $('list').innerHTML = h;
+
+  document.querySelectorAll('button[data-del]').forEach(b => {
+    b.onclick = () => delNotice(Number(b.dataset.del));
+  });
+  document.querySelectorAll('button[data-pin]').forEach(b => {
+    b.onclick = () => togglePin(Number(b.dataset.pin));
+  });
+}
+
+// ── 공지 불러오기 ────────────────────────────────
+async function loadNotices() {
+  const { data, error } = await sb
+    .from('nl_notices')
+    .select('id, title, body, therapist_id, start_on, end_on, is_popup, is_pinned, created_at')
+    .order('id', { ascending: false });
+  if (error) { show($('msg2'), '❌ 공지를 불러오지 못했습니다.\n' + error.message, false); return; }
+  // 고정 공지가 맨 위 (2026-10-06)
+  NOTICES = (data || []).slice().sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || b.id - a.id);
+
+  // 읽은 집 수 세기
+  READS = {};
+  try {
+    const { data: rd } = await sb.from('nl_notice_reads').select('notice_id');
+    (rd || []).forEach(r => { READS[r.notice_id] = (READS[r.notice_id] || 0) + 1; });
+  } catch (e) {}
+
+  draw();
+}
+
+// ── 공지 올리기 ──────────────────────────────────
+async function saveNotice() {
+  hide($('msg2'));
+  const title = $('ttl').value.trim();
+  const body  = $('bdy').value.trim();
+  const thr   = $('thr').value ? Number($('thr').value) : null;
+  const eon   = $('eon').value;
+
+  if (!title) { show($('msg2'), '제목을 적어주세요.', false); $('ttl').focus(); return; }
+  if (!body)  { show($('msg2'), '내용을 적어주세요.', false); $('bdy').focus(); return; }
+  if (!eon)   { show($('msg2'), '언제까지 보일지 날짜를 골라주세요.', false); return; }
+  if (eon < today()) { show($('msg2'), '끝나는 날이 오늘보다 앞설 수 없습니다.', false); return; }
+
+  const pop = $('pop').checked;
+  const pin = $('pin').checked;
+  const okMsg = pop
+    ? '이 공지는 학부모가 들어올 때 창으로 떠서 보입니다.' + (pin ? '\n맨 위에 고정되어 기간이 지나도 사라지지 않습니다.' : '') + '\n올릴까요?'
+    : (pin ? '이 공지는 맨 위에 고정되어 기간이 지나도 사라지지 않습니다.\n올릴까요?' : '이 공지를 올릴까요?');
+  if (!confirm(okMsg)) return;
+
+  $('save').disabled = true;
+  $('save').textContent = '올리는 중…';
+  try {
+    const { error } = await sb.from('nl_notices').insert({
+      title: title,
+      body: body,
+      therapist_id: thr,
+      start_on: today(),
+      end_on: eon,
+      is_popup: pop,
+      is_pinned: pin,
+      created_by: ME.id
+    });
+    if (error) throw error;
+    clearForm();
+    show($('msg2'), '올렸습니다.', true);
+    await loadNotices();
+  } catch (e) {
+    show($('msg2'), '❌ 올리지 못했습니다.\n' + (e.message || e), false);
+  } finally {
+    $('save').disabled = false;
+    $('save').textContent = '올리기';
+  }
+}
+
+// ── 맨 위 고정 · 풀기 (2026-10-06) ──────────────────
+async function togglePin(id) {
+  const n = NOTICES.find(x => x.id === id);
+  if (!n) return;
+  const to = !n.is_pinned;
+  if (!confirm('「' + n.title + '」\n\n' + (to ? '맨 위에 고정할까요? 기간이 지나도 학부모 화면에서 사라지지 않습니다.'
+                                              : '고정을 풀까요? 기간(' + n.end_on + ')이 지났으면 학부모 화면에서 바로 사라집니다.'))) return;
+  const { data, error } = await sb.from('nl_notices').update({ is_pinned: to }).eq('id', id).select('id');
+  if (error || !(data && data.length)) { show($('msg2'), '❌ 바꾸지 못했습니다.\n' + (error ? error.message : '권한 없음'), false); return; }
+  show($('msg2'), to ? '맨 위에 고정했습니다.' : '고정을 풀었습니다.', true);
+  await loadNotices();
+}
+
+// ── 공지 지우기 ──────────────────────────────────
+async function delNotice(id) {
+  const n = NOTICES.find(x => x.id === id);
+  if (!n) return;
+  if (!confirm('「' + n.title + '」\n\n이 공지를 지울까요?\n학부모 화면에서도 바로 사라집니다.')) return;
+  try {
+    const { error } = await sb.from('nl_notices').delete().eq('id', id);
+    if (error) throw error;
+    show($('msg2'), '지웠습니다.', true);
+    await loadNotices();
+  } catch (e) {
+    show($('msg2'), '❌ 지우지 못했습니다.\n' + (e.message || e), false);
+  }
+}
+
+function clearForm() {
+  $('ttl').value = '';
+  $('bdy').value = '';
+  $('thr').value = '';
+  $('pop').checked = false;
+  $('pin').checked = false;
+  $('eon').value = monthLater();
+}
+
+// ── 로그인 뒤 ────────────────────────────────────
+async function afterLogin(user) {
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists')
+    .select('id, name, role, active')
+    .eq('login_email', user.email.toLowerCase())
+    .maybeSingle();
+
+  if (e1)  { show($('msg'), '❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) { show($('msg'), '⚠️ 직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.', false); return; }
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+
+  const can = [8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || '');
+  if (!can) {
+    show($('msg'), '⚠️ 공지는 관리자·행정 선생님만 올릴 수 있습니다.', false);
+    nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+    return;
+  }
+  ME = me;
+
+  // 치료사 목록
+  try {
+    const { data: th } = await sb.from('nl_therapists')
+      .select('id, name').lte('id', 7).order('id');
+    (th || []).forEach(t => {
+      THRS[t.id] = t.name;
+      const o = document.createElement('option');
+      o.value = t.id;
+      o.textContent = t.name + ' 선생님 아동에게만';
+      $('thr').appendChild(o);
+    });
+  } catch (e) {}
+
+  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨';
+  $('loginBox').style.display = 'none';
+  $('mainBox').style.display  = 'block';
+  clearForm();
+  await loadNotices();
+}
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show($('msg'), '이메일과 비밀번호를 모두 입력하세요.', false); return; }
+  $('btn').disabled = true;
+  $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show($('msg'), '❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false;
+    $('btn').textContent = '로그인';
+  }
+};
+
+$('out').onclick = async () => {
+  if (!leaveOk()) return;
+  LEAVING = true;
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+
+$('save').onclick = saveNotice;
+$('clr').onclick  = () => {
+  if (!leaveOk()) return;
+  clearForm(); hide($('msg2'));
+};
+
+// ── 올리지 않은 글이 있으면 나갈 때 묻는다 (2026-09-16) ──
+//   공지는 올리면 칸이 비워지므로 「제목·내용에 글자가 있음」 = 아직 안 올린 글
+let LEAVING = false;   // 한 번 물었으면 탭 닫기 창을 또 띄우지 않는다
+function hasDraft() {
+  return !!($('ttl').value.trim() || $('bdy').value.trim());
+}
+function leaveOk() {
+  if (!hasDraft()) return true;
+  return confirm('올리지 않은 공지가 있습니다.\n\n그래도 나갈까요? (적어 둔 글은 사라집니다)');
+}
+document.querySelector('.btn-home').addEventListener('click', e => {
+  if (!leaveOk()) { e.preventDefault(); return; }
+  LEAVING = true;
+});
+window.addEventListener('beforeunload', e => {
+  if (LEAVING || !hasDraft()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// 로그인 칸에서 엔터
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+$('em').addEventListener('keydown', e => { if (e.key === 'Enter') $('pw').focus(); });
+
+// 이미 로그인돼 있으면 바로 들어간다
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session && data.session.user) {
+    await afterLogin(data.session.user);
+  }
+})();
+</script>
+</body>
+</html>

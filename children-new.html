@@ -1,0 +1,2576 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아동 목록 - 나무링크</title>
+<style>
+  body { font-family: -apple-system, "Malgun Gothic", sans-serif; background:#f5f9f0;
+         margin:0; padding:24px; color:#333; }
+  .box { max-width:460px; margin:40px auto; background:#fff; border-radius:12px;
+         padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .wide { max-width:1500px; width:96%; margin:20px auto; background:#fff; border-radius:12px;
+          padding:24px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  h1 { font-size:20px; color:#2e7d32; margin:0 0 4px; }
+  .sub { font-size:13px; color:#888; margin-bottom:22px; }
+  label { display:block; font-size:13px; font-weight:bold; margin:14px 0 5px; }
+  input { width:100%; padding:11px; border:1px solid #ddd; border-radius:7px;
+          font-size:15px; box-sizing:border-box; }
+  button { width:100%; padding:13px; margin-top:20px; background:#2e7d32; color:#fff;
+           border:none; border-radius:7px; font-size:15px; font-weight:bold; cursor:pointer; }
+  button:disabled { background:#bbb; cursor:default; }
+  .out { margin-top:20px; padding:14px; border-radius:8px; font-size:14px;
+         line-height:1.7; display:none; white-space:pre-wrap; word-break:break-all; }
+  .ok  { background:#e8f5e9; color:#1b5e20; display:block; }
+  .err { background:#ffebee; color:#b71c1c; display:block; }
+
+  /* 목록 화면 */
+  .top { display:flex; justify-content:space-between; align-items:center;
+         flex-wrap:wrap; gap:10px; margin-bottom:16px; }
+  .who { font-size:13px; color:#666; }
+  .btn-out { width:auto; margin:0; padding:8px 16px; background:#757575; font-size:13px; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .tab { width:auto; margin:0; padding:8px 14px; background:#eee; color:#555;
+         font-size:13px; font-weight:normal; }
+  .tab.on { background:#2e7d32; color:#fff; font-weight:bold; }
+  .search { width:200px; padding:8px 11px; font-size:14px; }
+  .count { font-size:13px; color:#666; margin-left:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { background:#f1f8e9; color:#33691e; padding:10px 8px; text-align:left;
+       border-bottom:2px solid #c5e1a5; font-size:13px; white-space:nowrap; }
+  td { padding:10px 8px; border-bottom:1px solid #eee; white-space:nowrap; }
+  .badge { white-space:nowrap; }
+  tr:hover td { background:#fafdf7; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:11px; font-size:12px; }
+  /* 회기방식 — 매주가 아닌 것만 붙는다 */
+  .cmcell { white-space:nowrap; }
+  .cmtag { display:inline-block; padding:2px 8px; border-radius:10px;
+           font-size:12px; background:#e8f0e2; color:#2f5620;
+           border:1px solid #c6d9b8; }
+  .b-ing  { background:#e8f5e9; color:#1b5e20; }
+  .b-end  { background:#eceff1; color:#546e7a; }
+  .b-wait { background:#fff8e1; color:#e65100; }
+  .b-etc  { background:#f5f5f5; color:#777; }
+  .empty { padding:40px; text-align:center; color:#999; font-size:14px; }
+  .flag { color:#e65100; font-size:12px; }
+  .idcell { color:#8d6e63; font-weight:bold; white-space:nowrap; width:50px; }
+  .addbox { background:#f1f8e9; border:1px solid #c5e1a5; border-radius:10px;
+            padding:18px; margin-bottom:18px; }
+  .addtitle { font-size:15px; font-weight:bold; color:#33691e; margin-bottom:12px; }
+  .addgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+             gap:10px 14px; }
+  .addgrid label { font-size:12.5px; font-weight:bold; margin:0 0 4px; color:#555; }
+  .addgrid input, .addgrid select { width:100%; padding:8px 10px; font-size:14px;
+             border:1px solid #ddd; border-radius:6px; box-sizing:border-box; }
+  .addbtns { margin-top:14px; display:flex; gap:8px; }
+  .editbox { background:#e8f0fe; border:1px solid #a8c7fa; border-radius:10px;
+             padding:18px; margin-bottom:18px; }
+  .edittitle { font-size:15px; font-weight:bold; color:#1a468f; margin-bottom:12px; }
+  tbody tr { cursor:pointer; }
+  table.readonly tbody tr { cursor:default; }
+  .edmark { color:#1565c0; font-size:11.5px; font-weight:bold; }
+  .thview { width:auto; margin:0; padding:5px 10px; background:#e3f0fb; color:#0c447c;
+           border:1px solid #85b7eb; border-radius:7px; font-size:12.5px; font-weight:600;
+           cursor:pointer; white-space:nowrap; }
+  .tel { font-size:12.5px; color:#00695c; margin-top:3px; white-space:nowrap; }
+  /* 관리번호는 글자를 줄여서라도 한 줄로 */
+  .mncell { white-space:nowrap; font-size:12.5px; color:#555; }
+  /* 연락처 — 보호자가 여럿이면 위아래로 */
+  .telcell { white-space:nowrap; font-size:12.5px; color:#00695c; min-width:170px; }
+  .telwrap { display:inline-block; vertical-align:middle; }
+  .acctag { display:inline-block; margin-left:8px; font-size:11.5px; font-weight:600;
+            vertical-align:middle; }
+  .acctag.on   { color:#2e7d32; }
+  .acctag.wait { color:#9aa19c; }
+  .acctag.none { color:#c25e00; }
+  .telcell div { padding:1px 0; }
+  /* 메모 — 폭 220 · 두 줄까지 (마우스를 올리면 전체) (2026-09-16) */
+  .memocell { font-size:13px; color:#444; line-height:1.5; white-space:pre-wrap;
+              max-width:220px; word-break:break-all; }
+  .memoclip { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+              overflow:hidden; }
+  /* 발달재활 본인부담 (2026-09-16) */
+  .paycell { white-space:nowrap; font-size:12.5px; background:#fffaf2; }
+  .paycell b { color:#8a4b00; }
+  .paycell .nogr { color:#c62828; font-weight:600; }
+  .notel { color:#bbb; }
+
+  .btn-home { display:inline-block; padding:8px 16px; background:#2e7d32; color:#fff;
+              font-size:13px; border-radius:8px; text-decoration:none;
+              white-space:nowrap; margin-right:8px; }
+  .btn-home:hover { filter:brightness(1.08); }
+  /* 발달재활 등급 단추 */
+  .grb { font:inherit; font-size:11.5px; line-height:1; padding:5px 8px; cursor:pointer;
+         white-space:nowrap; background:#fff; color:#5a6156;
+         border:1px solid #ddd; border-radius:6px; }
+  .grb:hover { border-color:#3c7a4a; }
+  .grb.on { background:#3c7a4a; color:#fff; border-color:#3c7a4a; font-weight:600; }
+  .grb-non.on { background:#8a8f86; border-color:#8a8f86; }
+  /* 신규 등록 — 수업 줄 */
+  .lsn { display:flex; gap:5px; flex-wrap:wrap; align-items:flex-end;
+         background:#f7f8f5; border:1px solid #e8ebe4; border-radius:8px;
+         padding:8px 10px; margin-bottom:6px; }
+  .lsn > div { display:flex; flex-direction:column; }
+  .lsn label { font-size:11px; color:#5a6156; margin-bottom:2px; }
+  .lsn select, .lsn input { font:inherit; font-size:12.5px; padding:4px 6px;
+         border:1px solid #ddd; border-radius:5px; background:#fff; }
+  .lsn .del { font:inherit; font-size:11.5px; padding:5px 8px; cursor:pointer;
+         background:#fff; color:#9c2b2b; border:1px solid #e0bcbc; border-radius:5px; }
+  /* 지원 카드번호 칸 저장 단추 (2026-09-16) */
+  .cardsave { width:auto; margin:0; padding:6px 14px; font-size:13px; font-weight:700;
+              border-radius:7px; cursor:pointer;
+              background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
+  .cardsave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .cardsave:disabled { background:#bbb; color:#fff; border-color:#bbb; cursor:default; }
+
+  /* ===== 꾸밈 B (2026-09-17) — 목록 화면 + 고치기 창 바탕·제목·저장 =====
+     되돌리려면 이 묶음(꾸밈 B ~ 꾸밈 B 끝)만 지우면 된다 */
+  body { background:#F5F4F2; color:#2F2926; }
+  .box { box-shadow:none; border:1px solid #ECE8E3; }
+  .loginlogo { display:block; height:52px; width:auto; margin:0 0 12px; }
+  #loginBox h1 { color:#2F2926; }
+  #loginBox button { background:#B07A4A; }
+  .wide { background:transparent; box-shadow:none; padding:0 0 24px; }
+  .top { background:#fff; border:1px solid #ECE8E3; border-radius:12px; padding:12px 16px; }
+  .toptitle { display:flex; align-items:center; gap:14px; }
+  .toptitle > div { border-left:1px solid #ECE8E3; padding-left:14px; }
+  .toplogo { height:48px; width:auto; display:block; }
+  .toprt { display:flex; align-items:center; gap:6px; }
+  .top h1 { color:#2F2926; }
+  .who { color:#A39C95; }
+  .btn-out { background:#fff; color:#4A433F; border:1px solid #E4E0DA; font-weight:500; }
+  .btn-home { background:#fff; color:#7E5530; border:1px solid #D9C3A7; font-weight:600; margin-right:0; }
+  .btn-home:hover { filter:none; background:#FBF5EE; }
+  /* 단추 — 기본은 흰 테두리 */
+  .tab { background:#fff; color:#4A433F; border:1px solid #E4E0DA; }
+  .tab:hover { background:#F7F6F4; }
+  /* 전체 · 치료중 · 종결 · 대기중 — 밑줄 모양 */
+  .tools { gap:14px; }
+  .tab[data-st] { background:transparent; border:none; border-bottom:2px solid transparent;
+                  border-radius:0; color:#A39C95; padding:6px 2px; }
+  .tab[data-st]:hover { background:transparent; color:#2F2926; }
+  .tab[data-st].on { background:transparent; color:#2F2926; border-bottom-color:#2F2926; font-weight:700; }
+  .search { border:1px solid #E4E0DA; border-radius:6px; }
+  #addBtn { background:#fff !important; color:#7E5530 !important; border:1px solid #D9C3A7 !important; }
+  #addBtn:hover { background:#FBF5EE !important; }
+  .count { color:#A39C95; }
+  /* 표 */
+  table { background:#fff; border:1px solid #ECE8E3; border-radius:8px; overflow:hidden;
+          border-collapse:separate; border-spacing:0; }
+  th { background:#F8F1E8; color:#4A433F; border-bottom:2px solid #C9A27E; }
+  td { border-bottom:1px solid #F0EDE9; }
+  tr:hover td { background:#FAF9F7; }
+  .idcell { color:#7E5530; }
+  .b-ing  { background:#EEF5EF; color:#3F6B4B; }
+  .b-end  { background:#F4F2EF; color:#A39C95; }
+  .b-wait { background:#FBF3E4; color:#9A6E20; }
+  .cmtag { background:#F7F6F4; color:#4A433F; border-color:#E4E0DA; }
+  .mncell { color:#7D7670; }
+  .telcell { color:#3E7A6E; }
+  .memocell { color:#4A433F; }
+  .paycell { background:transparent; }
+  .paycell b { color:#7E5530; }
+  .flag { color:#C2553A; }
+  .thview { background:#fff; color:#4A433F; border-color:#E4E0DA; }
+  /* 신규 등록 창 · 고치기 창 */
+  .addbox { background:#fff; border:1px solid #ECE8E3; }
+  .addtitle { color:#2F2926; }
+  .editbox { background:#fff; border:1px solid #ECE8E3; padding-top:0; overflow:hidden; }
+  .editbox > div:first-child { background:#F8F1E8; border-bottom:2px solid #C9A27E;
+    margin:0 -18px 14px; padding:10px 18px; }
+  .edittitle { color:#2F2926; margin-bottom:0; }
+  .edmark { color:#7E5530; }
+  #saveNew, #saveEdit { background:#B07A4A !important; color:#fff !important; border-color:#B07A4A !important; }
+  #saveNew:hover, #saveEdit:hover { background:#98663A !important; }
+  .grb:hover { border-color:#B07A4A; }
+  .grb.on { background:#B07A4A; border-color:#B07A4A; }
+  .lsn { background:#FAF9F7; border-color:#ECE8E3; }
+  .ok { background:#F8F1E8; color:#7E5530; }
+  /* 지원 카드번호 상자 — 주황 면 대신 옅은 회백 (2026-09-17) */
+  #e_cardView, #e_cards { background:#FAF9F7 !important; border-color:#ECE8E3 !important; }
+  /* ===== 꾸밈 B 끝 ===== */
+</style>
+</head>
+<body>
+
+<!-- 로그인 전 화면 -->
+<div class="box" id="loginBox">
+  <img src="img/nl-logo.png" alt="자라는나무" class="loginlogo" onerror="this.style.display='none'">
+  <h1>나무링크</h1>
+  <div class="sub">아동 목록을 보려면 로그인하세요.</div>
+
+  <label for="em">이메일</label>
+  <input id="em" type="email" autocomplete="username" placeholder="you@example.com">
+
+  <label for="pw">비밀번호</label>
+  <input id="pw" type="password" autocomplete="current-password" placeholder="비밀번호">
+
+  <button id="btn">로그인</button>
+  <div id="msg" class="out"></div>
+</div>
+
+<!-- 로그인 후 화면 -->
+<div class="wide" id="listBox" style="display:none;">
+  <div class="top">
+    <div class="toptitle">
+      <img src="img/nl-logo.png" alt="자라는나무" class="toplogo" onerror="this.style.display='none'">
+      <div>
+      <h1>아동 목록</h1>
+      <div class="who" id="who"></div>
+      </div>
+    </div>
+    <div class="toprt">
+    <button id="out" class="btn-out">로그아웃</button>
+    <a href="index.html" class="btn-home">처음으로</a>
+    </div>
+  </div>
+
+  <div class="tools">
+    <button class="tab on" data-st="전체">전체</button>
+    <button class="tab" data-st="치료중">치료중</button>
+    <button class="tab" data-st="종결">종결</button>
+    <button class="tab" data-st="대기중">대기중</button>
+    <button class="tab" data-st="타기관이용">타기관이용</button>
+    <input class="search" id="q" type="text" placeholder="이름 검색">
+    <button id="addBtn" class="tab" style="background:#8bc34a;color:#fff;font-weight:bold;">＋ 신규 등록</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <!-- 신규 등록 창 -->
+  <div id="addBox" class="addbox" style="display:none;">
+    <div class="addtitle">신규 아동 등록</div>
+    <div class="addgrid">
+      <div>
+        <label for="f_no">관리번호 (자동)</label>
+        <input id="f_no" type="text" readonly style="background:#f5f5f5;">
+      </div>
+      <div>
+        <label for="f_name">이름 <span style="color:#c62828;">*</span></label>
+        <input id="f_name" type="text" placeholder="아동 이름">
+      </div>
+      <div>
+        <label for="f_birth">생년월일 <span style="color:#c62828;">*</span></label>
+        <input id="f_birth" type="date">
+      </div>
+      <div>
+        <label for="f_status">상태 <span style="color:#c62828;">*</span></label>
+        <select id="f_status">
+          <option value="대기중">대기중</option>
+          <option value="치료중">치료중</option>
+          <option value="종결">종결</option>
+          <option value="타기관이용">타기관이용</option>
+        </select>
+      </div>
+      <div>
+        <label for="f_gender">성별</label>
+        <select id="f_gender">
+          <option value="">-- 선택 --</option>
+          <option value="남">남</option>
+          <option value="여">여</option>
+        </select>
+      </div>
+      <div>
+        <label for="f_phone">연락처</label>
+        <input id="f_phone" type="tel" data-tel inputmode="numeric" maxlength="13" autocomplete="off" placeholder="010-0000-0000">
+      </div>
+      <div>
+        <label for="f_guardian">보호자</label>
+        <input id="f_guardian" type="text" placeholder="보호자 이름">
+      </div>
+      <div>
+        <label for="f_diagnosis">진단명</label>
+        <input id="f_diagnosis" type="text">
+      </div>
+      <div>
+        <label for="f_disability">장애구분</label>
+        <input id="f_disability" type="text">
+      </div>
+      <div>
+        <label for="f_school">학교</label>
+        <input id="f_school" type="text">
+      </div>
+      <div>
+        <label for="f_grade">학년</label>
+        <input id="f_grade" type="text">
+      </div>
+      <div style="grid-column:1 / -1;">
+        <label for="f_memo">메모</label>
+        <textarea id="f_memo" rows="6" style="font:inherit;font-size:14px;padding:9px 11px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.6;"></textarea>
+      </div>
+
+      <div style="grid-column:1 / -1; border-top:1px solid #e8ebe4; margin-top:6px; padding-top:12px;">
+        <label style="font-weight:600;">발달재활서비스 등급</label>
+        <div style="font-size:12px;color:#888;margin:2px 0 8px;">
+          발달재활서비스를 받는 아동만 고르세요. 아니면 「없음」으로 두세요.
+        </div>
+        <div id="fgrbtns" style="display:flex; gap:4px; margin-bottom:10px;">
+          <button type="button" class="grb" data-g="가">가 2만</button>
+          <button type="button" class="grb" data-g="나">나 4만</button>
+          <button type="button" class="grb" data-g="다">다 0</button>
+          <button type="button" class="grb" data-g="라">라 6만</button>
+          <button type="button" class="grb" data-g="마">마 8만</button>
+          <button type="button" class="grb grb-non on" data-g="">없음</button>
+        </div>
+        <input id="f_gr" type="hidden">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+          <div style="min-width:120px;">
+            <label for="f_gr_pay" style="font-size:12px;">본인부담금</label>
+            <input id="f_gr_pay" type="text" inputmode="numeric" placeholder="0">
+          </div>
+          <div style="min-width:130px;">
+            <label for="f_gr_from" style="font-size:12px;">언제부터</label>
+            <input id="f_gr_from" type="month">
+          </div>
+        </div>
+      </div>
+
+      <div style="grid-column:1 / -1; border-top:1px solid #e8ebe4; margin-top:6px; padding-top:12px;">
+        <label style="font-weight:600;">수업</label>
+        <div style="font-size:12px;color:#888;margin:2px 0 8px;">
+          수업이 여러 개면 「＋ 줄 추가」로 늘리세요. 없으면 비워 두셔도 됩니다.<br>
+          <b>시작 날짜</b>를 넣으면 그 날부터 회기가 깔립니다. 비우면 그 달 처음부터입니다.
+        </div>
+        <div id="lessons"></div>
+        <button type="button" id="addLesson" style="margin-top:8px;font:inherit;font-size:14px;font-weight:700;padding:9px 16px;cursor:pointer;background:#ffd400;color:#000;border:1px solid #d4b000;border-radius:8px;">＋ 수업 시간 등록</button>
+      </div>
+    </div>
+    <div class="addbtns">
+      <button id="saveNew" class="tab" style="background:#2e7d32;color:#fff;font-weight:bold;">저장</button>
+      <button id="cancelNew" class="tab">취소</button>
+    </div>
+    <div id="msg3" class="out"></div>
+  </div>
+
+  <!-- 고치기 창 -->
+  <div id="edBox" class="editbox" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="edittitle" id="edTitle" style="flex:1;"></div>
+      <button type="button" id="e_backList" class="tab"
+              style="padding:5px 12px; white-space:nowrap;">← 아동 목록으로</button>
+    </div>
+
+    <!-- ① 기본 -->
+    <div style="background:#fff; border:1px solid #d5dad2; border-radius:10px;
+         padding:12px 14px; margin-bottom:12px;">
+      <div id="e_view" style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+        <div id="e_basic" style="flex:1; min-width:260px; font-size:13.5px; line-height:1.9;"></div>
+        <!-- 지원 카드번호 보기 — 8·9번만 (2026-09-16) -->
+        <div id="e_cardView" style="display:none; width:280px; max-width:100%; box-sizing:border-box;
+             background:#fff8ec; border:1px solid #f0d5a8; border-radius:8px;
+             padding:8px 12px; font-size:13px; line-height:1.8;"></div>
+        <button type="button" id="e_editBtn" class="tab"
+                style="padding:5px 12px; white-space:nowrap;">✏️ 수정</button>
+      </div>
+
+      <div id="e_form" style="display:none; margin-top:10px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+          <b style="font-size:13px; color:#1565c0;">수정 중</b>
+          <button type="button" id="e_backTop" class="tab"
+                  style="margin-left:auto; padding:5px 12px;">← 돌아가기</button>
+        </div>
+        <div class="addgrid">
+          <div>
+            <label for="e_no">관리번호</label>
+            <input id="e_no" type="text">
+          </div>
+          <div>
+            <label for="e_name">이름 <span style="color:#c62828;">*</span></label>
+            <input id="e_name" type="text">
+          </div>
+          <div>
+            <label for="e_birth">생년월일 <span id="e_age" style="color:#2e7d32;font-weight:700;"></span></label>
+            <input id="e_birth" type="date">
+          </div>
+          <div>
+            <label for="e_status">상태 <span style="color:#c62828;">*</span></label>
+            <select id="e_status">
+              <option value="치료중">치료중</option>
+              <option value="대기중">대기중</option>
+              <option value="종결">종결</option>
+              <option value="타기관이용">타기관이용</option>
+            </select>
+          </div>
+          <div>
+            <label for="e_gender">성별</label>
+            <select id="e_gender">
+              <option value="">-- 선택 --</option>
+              <option value="남">남</option>
+              <option value="여">여</option>
+            </select>
+          </div>
+          <div>
+            <label for="e_diagnosis">진단명</label>
+            <input id="e_diagnosis" type="text">
+          </div>
+          <div>
+            <label for="e_disability">장애구분</label>
+            <input id="e_disability" type="text">
+          </div>
+          <div>
+            <label for="e_school">학교</label>
+            <input id="e_school" type="text">
+          </div>
+          <div>
+            <label for="e_grade">학년</label>
+            <input id="e_grade" type="text">
+          </div>
+          <input id="e_phone" type="hidden">
+          <input id="e_guardian" type="hidden">
+          <input id="e_gr" type="hidden">
+          <input id="e_gr_pay" type="hidden">
+          <input id="e_gr_from" type="hidden">
+          <div style="grid-column:1 / -1;">
+            <label>연락처 <span style="font-weight:normal;color:#888;font-size:12px;">
+              — 관계를 고르고 번호를 적습니다. 여러 개 넣을 수 있습니다</span></label>
+            <div id="e_gwrap"></div>
+            <button type="button" id="e_gadd"
+              style="width:auto;margin:8px 0 0;padding:7px 14px;background:#eef3ec;
+                     color:#2c5c37;font-size:13px;font-weight:600;">＋ 연락처 한 줄 더</button>
+          </div>
+        </div>
+        <div style="border:1px solid #cfd8cc; border-radius:10px; background:#f4f7f2;
+             padding:10px 12px; margin-top:10px;">
+          <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">👪 학부모 계정</div>
+          <div id="e_acc" style="font-size:12.5px; color:#5a6156;">불러오는 중...</div>
+        </div>
+        <!-- 지원 카드번호 — 8·9번만 (2026-09-16) -->
+        <div id="e_cards" style="display:none; border:1px solid #f0d5a8; border-radius:10px;
+             background:#fff8ec; padding:10px 12px; margin-top:10px;"></div>
+        <div class="addbtns">
+          <button id="saveEdit" class="tab" style="background:#1565c0;color:#fff;font-weight:bold;">저장</button>
+          <button type="button" id="e_formX" class="tab">취소</button>
+        </div>
+        <div id="e_gr_hist" style="display:none;"></div>
+        <div id="grbtns" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ② 초기 상담 -->
+    <div style="background:#fff; border:1px solid #d5dad2; border-radius:10px;
+         padding:12px 14px; margin-bottom:12px;">
+      <div style="display:flex; align-items:flex-start; gap:10px;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">
+            📝 초기 상담 <span id="emDate" style="font-weight:normal;color:#999;"></span></div>
+          <div id="emView" style="font-size:14px; line-height:1.7; white-space:pre-line;"></div>
+          <textarea id="e_memo" rows="7" style="display:none; font:inherit; font-size:14px;
+            padding:9px 11px; width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
+          <div id="emBtns" style="display:none; margin-top:8px;">
+            <button type="button" id="emSave" class="tab"
+              style="background:#2e7d32;color:#fff;font-weight:bold;padding:5px 14px;">저장</button>
+            <button type="button" id="emCancel" class="tab" style="padding:5px 14px;">취소</button>
+          </div>
+        </div>
+        <button type="button" id="emBtn" class="tab"
+                style="padding:5px 12px; white-space:nowrap;">✏️ 수정</button>
+      </div>
+      <div id="emMsg" style="font-size:12.5px; margin-top:6px;"></div>
+    </div>
+
+    <!-- ③ 평가 · 상담 메모 -->
+    <div style="background:#fff; border:1px solid #d5dad2; border-radius:10px;
+         padding:12px 14px; margin-bottom:12px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <div style="font-size:12.5px; font-weight:700; color:#0c447c;">📎 평가보고서</div>
+        <span id="e_docOther"></span>
+      </div>
+      <div id="e_docs" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
+
+      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:12.5px; font-weight:700; color:#0c447c; margin-bottom:6px;">
+              🧾 평가 요약 <span id="esNext" style="font-weight:normal;color:#888;"></span></div>
+            <div id="esView" style="font-size:14px; line-height:1.7; white-space:pre-line;"></div>
+            <textarea id="esEdit" rows="4" style="display:none; font:inherit; font-size:14px;
+              padding:9px 11px; width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
+            <div id="esBtns" style="display:none; margin-top:8px;">
+              <button type="button" id="esSave" class="tab"
+                style="background:#2e7d32;color:#fff;font-weight:bold;padding:5px 14px;">저장</button>
+              <button type="button" id="esCancel" class="tab" style="padding:5px 14px;">취소</button>
+            </div>
+          </div>
+          <button type="button" id="esBtn" class="tab"
+                  style="padding:5px 12px; white-space:nowrap;">✏️ 수정</button>
+        </div>
+        <div id="esMsg" style="font-size:12.5px; margin-top:6px;"></div>
+      </div>
+
+      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
+        <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">
+          💬 상담 메모 <span style="font-weight:normal;color:#888;">— 치료 중 어머님 말씀·바라시는 것</span></div>
+        <div id="cnRows" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
+        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:10px; flex-wrap:wrap;">
+          <div style="width:170px;">
+            <label for="cn_date" style="font-size:12px;">날짜</label>
+            <input id="cn_date" type="date">
+          </div>
+          <div style="flex:1; min-width:240px;">
+            <label for="cn_text" style="font-size:12px;">내용</label>
+            <input id="cn_text" type="text" placeholder="예: 어머님 — 주 2회로 늘리고 싶어 하심">
+          </div>
+          <button type="button" id="cnAdd" class="tab"
+            style="background:#8bc34a;color:#fff;font-weight:bold;padding:7px 14px;">메모 추가</button>
+        </div>
+        <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <!-- ④ 수업 진행 상황 (히스토리 포함) -->
+    <div style="background:#fff; border:1px solid #d5dad2; border-radius:10px;
+         padding:12px 14px; margin-bottom:12px;">
+      <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">📚 수업 진행 상황</div>
+      <div id="e_ths" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
+      <div id="e_thMsg" style="font-size:12.5px; margin-top:6px;"></div>
+      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
+        <div style="font-size:12.5px; font-weight:700; color:#6b5b2e; margin-bottom:6px;">
+          🕓 히스토리 <span style="font-weight:normal;color:#999;">— 시작·종결·담당·요일·시각이 바뀐 자취</span></div>
+        <div id="e_hist" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
+      </div>
+      <!-- 체험 수업 — 공용 칸 nl-trials.js · 8·9·11번만 (2026-09-16) -->
+      <div id="e_trials" style="display:none; margin-top:10px;"></div>
+    </div>
+
+    <div class="addbtns">
+      <button id="cancelEdit" class="tab">닫기</button>
+    </div>
+    <div id="msg4" class="out"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>번호</th>
+        <th>관리번호</th>
+        <th>이름</th>
+        <th>생년월일</th>
+        <th>나이</th>
+        <th>성별</th>
+        <th>회기방식</th>
+        <th id="thPay" style="display:none;">본인부담</th>
+        <th>상태</th>
+        <th>연락처</th>
+        <th>메모</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;">해당하는 아동이 없습니다.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script src="nl-evaldocs.js"></script>
+<script src="nl-trials.js"></script>
+<script>
+
+// ===== 연락처 칸 (2026-10-08) — 숫자만 · 자리 수만큼 · 줄표 저절로 =====
+//   data-tel 이 붙은 칸 모두 (나중에 그려지는 칸도) · 신규 아동 관리와 같은 규칙
+//   010 휴대폰 11자리 · 02 서울 9~10자리 · 그 밖 지역번호 10~11자리 · 1588 같은 대표번호 8자리
+function telDigits(v){ return String(v || '').replace(/\D/g, ''); }
+function telMax(d){ return d.startsWith('02') ? 10 : /^1[5-9]\d{2}/.test(d) ? 8 : 11; }
+function telFmt(v){
+  let d = telDigits(v);
+  d = d.slice(0, telMax(d));
+  if (/^1[5-9]\d{2}/.test(d)) return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d;
+  const a = d.startsWith('02') ? 2 : 3;
+  if (d.length <= a) return d;
+  const rest = d.length - a;
+  const mid = rest <= 7 ? Math.min(3, rest) : 4;
+  if (rest <= 3) return d.slice(0, a) + '-' + d.slice(a);
+  if (rest <= 7 && d.length < (a === 2 ? 10 : 11) && rest - 3 <= 4)
+    return d.slice(0, a) + '-' + d.slice(a, a + 3) + '-' + d.slice(a + 3);
+  return d.slice(0, a) + '-' + d.slice(a, a + mid) + '-' + d.slice(a + mid);
+}
+function telOk(v){
+  const d = telDigits(v);
+  if (/^1[5-9]\d{2}/.test(d)) return d.length === 8;
+  if (d.startsWith('010')) return d.length === 11;
+  if (d.startsWith('02')) return d.length === 9 || d.length === 10;
+  return d.startsWith('0') && (d.length === 10 || d.length === 11);   // 지역번호는 0으로 시작 (2026-10-08)
+}
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (!el || !el.matches || !el.matches('input[data-tel]')) return;
+  const f = telFmt(el.value); if (f !== el.value) el.value = f;
+}, true);   // 먼저 고쳐 둔 뒤 칸의 다른 일이 돌게 (capture)
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+
+// 로그인을 창(탭) 안에서만 유지한다. 창을 닫으면 자동으로 끊긴다.
+const sb  = window.supabase.createClient(URL_, KEY_, {
+  auth: {
+    storage: nlStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  }
+});
+const $   = id => document.getElementById(id);
+const msg = $('msg');
+
+let ALL = [];        // 불러온 아동 전체
+let GUARD = {};      // 아동번호 -> 보호자 여럿
+let PACC  = {};      // 아동번호 -> 학부모 계정
+let stFilter = '전체';  // 지금 고른 상태
+let MEID = null;        // 로그인한 직원 번호
+let CAN_EDIT = false;   // 8번 관리자 · 9번 행정만 true
+let CAN_TH   = false;   // 치료사(1~7번) — 담당 아동의 초기 상담·평가보고서 보기 (2026-09-15)
+let DOCN     = {};      // 아동 번호 -> 평가보고서 파일 수 (치료사 계정만 셈)
+let CAN_TEL  = false;   // 연락처 보기 — 위에 더해 11번 데스크도 true (2026-09-13)
+
+function show(text, ok) {
+  msg.textContent = text;
+  msg.className = 'out ' + (ok ? 'ok' : 'err');
+}
+
+// 생년월일 -> 만 나이
+function age(birth) {
+  if (!birth) return '';
+  const b = new Date(birth);
+  if (isNaN(b)) return '';
+  const t = new Date();
+  let a = t.getFullYear() - b.getFullYear();
+  const m = t.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && t.getDate() < b.getDate())) a--;
+  return a + '세';
+}
+
+function badge(st) {
+  const c = st === '치료중' ? 'b-ing'
+          : (st === '종결' || st === '타기관이용') ? 'b-end'
+          : st === '대기중' ? 'b-wait' : 'b-etc';
+  return '<span class="badge ' + c + '">' + (st || '미지정') + '</span>';
+}
+
+// 화면에 글자 그대로 넣기 (따옴표 등 안전 처리)
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// 학부모 계정 표식 — 있는 것만 적는다
+function accTag(cid) {
+  const a = PACC[cid];
+  if (!a) return '<span class="acctag none">계정 없음</span>';
+  if (a.last_login) {
+    const d = String(a.last_login).slice(5, 10).split('-');
+    return '<span class="acctag on">🟢 들어옴 ' + (+d[0]) + '/' + (+d[1]) + '</span>';
+  }
+  return '<span class="acctag wait">⚪ 아직 안 들어옴</span>';
+}
+
+function draw() {
+  const q = $('q').value.trim();
+  const list = ALL.filter(c => {
+    const okSt = (stFilter === '전체') || (c.status === stFilter);
+    const okQ  = !q || (c.name || '').includes(q);
+    return okSt && okQ;
+  });
+
+  // 대기중만 볼 때는 최근 접수한 아동이 위로 (번호가 큰 쪽이 나중에 온 아동)
+  if (stFilter === '대기중') list.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+  $('count').textContent = list.length + '명 / 전체 ' + ALL.length + '명';
+  $('empty').style.display = list.length ? 'none' : 'block';
+
+  // 본인부담 칸 — 8·9·11번 화면에서만 (2026-09-16)
+  const SHOWPAY = CAN_TEL;
+  if ($('thPay')) $('thPay').style.display = SHOWPAY ? '' : 'none';
+
+  $('rows').innerHTML = list.map(c => {
+    const flag = (c.memo || '').includes('[확인필요]')
+      ? ' <span class="flag">[확인필요]</span>' : '';
+
+    // 연락처 칸 (8번 관리자 · 9번 행정 · 11번 데스크만 보임)
+    //   아동 표의 연락처 + 보호자 표의 연락처를 위아래로 모두 적는다
+    let tel = '';
+    if (CAN_TEL) {
+      const seen = new Set();
+      const lines = [];
+      if (c.phone) {
+        seen.add(String(c.phone).replace(/[^0-9]/g,''));
+        lines.push('📞 ' + (c.guardian ? esc(c.guardian) + ' ' : '') + esc(c.phone));
+      }
+      (GUARD[c.id] || []).forEach(g => {
+        const key = String(g.phone || '').replace(/[^0-9]/g,'');
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        const who = [g.relation && g.relation !== '미상' ? g.relation : '', g.name || '']
+          .filter(Boolean).join(' ');
+        lines.push('📞 ' + (who ? esc(who) + ' ' : '') + esc(g.phone));
+      });
+      tel = lines.length
+        ? lines.map(x => '<div>' + x + '</div>').join('')
+        : '<span class="notel">연락처 없음</span>';
+    }
+
+    return '<tr' + (CAN_EDIT ? ' data-ed="' + c.id + '"' : '') + '>'
+      + '<td class="idcell">' + c.id + '</td>'
+      + '<td class="mncell">' + esc(c.manager_no) + '</td>'
+      + '<td>' + esc(c.name) + '</td>'
+      + '<td>' + esc(c.birth) + '</td>'
+      + '<td>' + age(c.birth) + '</td>'
+      + '<td>' + esc(c.gender) + '</td>'
+      + '<td class="cmcell">' + cmodeTxt(c.id) + '</td>'
+      + (SHOWPAY ? '<td class="paycell">' + payTxt(c.id) + '</td>' : '')
+      + '<td>' + badge(c.status) + '</td>'
+      + '<td class="telcell"><span class="telwrap">' + tel + '</span>'
+        + accTag(c.id) + '</td>'
+      + '<td class="memocell" title="' + esc(String(c.memo == null ? '' : c.memo)).replace(/"/g, '&quot;') + '">'
+        + '<div class="memoclip">' + esc(String(c.memo == null ? '' : c.memo)) + '</div>' + flag + '</td>'
+      + '<td class="edmark">' + (CAN_EDIT ? '고치기' : thBtn(c)) + '</td>'
+      + '</tr>';
+  }).join('');
+
+  document.querySelectorAll('tr[data-ed]').forEach(tr => {
+    tr.onclick = () => openEdit(Number(tr.dataset.ed));
+  });
+}
+
+let DEVKID = {};   // 아동 번호 -> 진행 중인 발달재활 수업이 있음 (2026-09-16)
+let LGRADE = {};   // 아동 번호 -> 이번 달 발달재활 등급 줄
+// 본인부담 칸 글 — 가형 20,000
+function payTxt(cid) {
+  if (!DEVKID[cid]) return '';
+  const g = LGRADE[cid];
+  if (!g || !g.grade) return '<span class="nogr">등급 없음</span>';
+  return '<b>' + esc(g.grade) + '형</b> ' + Number(g.self_pay || 0).toLocaleString();
+}
+let CMODE = {};   // 아동 번호 -> 회기방식 목록 (매주 뺀 것)
+function cmodeTxt(cid){
+  const a = CMODE[cid];
+  if (!a || !a.length) return '';
+  return a.map(function (m) {
+    return '<span class="cmtag">' + esc(m) + '</span>';
+  }).join(' ');
+}
+
+async function afterLogin(user) {
+  // 1) 직원 확인
+  const { data: me, error: e1 } = await sb
+    .from('nl_therapists')
+    .select('id, name, role, active')
+    .eq('login_email', user.email.toLowerCase())
+    .maybeSingle();
+
+  if (e1)  { show('❌ 직원 조회 실패\n' + e1.message, false); return; }
+  if (!me) { show('⚠️ 직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.', false); return; }
+  MEID = Number(me.id);
+  nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
+  NLDocs.init(sb, me.id);   // 평가보고서 창구 준비 (8·9번만 올리고 봄)
+  if (window.NLTrials) NLTrials.init(sb, me.id);   // 체험 수업 칸 준비
+
+  // 2) 아동 불러오기
+  const { data, error } = await sb
+    .from('nl_children')
+    .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+    .order('id');
+
+  if (error) { show('❌ 아동 목록 조회 실패\n' + error.message, false); return; }
+
+  ALL = data || [];
+
+  // 2-1) 보호자 연락처 — 한 아동에 여럿일 수 있다 (1,000줄씩 나눠 가져온다)
+  GUARD = {};
+  try {
+    let from = 0;
+    for (;;) {
+      const g = await sb.from('nl_guardians')
+        .select('child_id, relation, name, phone, is_primary')
+        .order('child_id').range(from, from + 999);
+      if (g.error) break;
+      const rows = g.data || [];
+      rows.forEach(r => {
+        if (!r.phone) return;
+        (GUARD[r.child_id] = GUARD[r.child_id] || []).push(r);
+      });
+      if (rows.length < 1000) break;
+      from += 1000;
+    }
+    Object.keys(GUARD).forEach(k => GUARD[k].sort(
+      (a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)));
+  } catch (e) { GUARD = {}; }
+
+  // 2-2) 학부모 계정 — 아동마다 계정이 있는지, 들어온 적이 있는지
+  PACC = {};
+  try {
+    const { data: pc } = await sb.from('nl_parent_children')
+      .select('child_id, account_id');
+    const { data: pa } = await sb.from('nl_parent_accounts')
+      .select('id, login_id, last_login, active');
+    const A = {};
+    (pa || []).forEach(a => { A[a.id] = a; });
+    (pc || []).forEach(r => {
+      const a = A[r.account_id];
+      if (!a) return;
+      const now = PACC[r.child_id];
+      if (!now || (a.last_login && !now.last_login)) PACC[r.child_id] = a;
+    });
+  } catch (e) { PACC = {}; }
+
+  // 수업 줄에 쓸 목록 — 치료사·이미 찬 자리
+  try {
+    const [th, sc] = await Promise.all([
+      sb.from('nl_therapists').select('id, name').lte('id', 7).order('id'),
+      sb.from('nl_therapy_schedules')
+        .select('weekday, start_time, therapist_id, nl_therapies!inner(ended_on)')
+    ]);
+    THS = th.data || [];
+    TAKEN = {};
+    (sc.data || []).forEach(function (r) {
+      if (r.nl_therapies && r.nl_therapies.ended_on) return;   // 끝난 수업은 뺀다
+      TAKEN[r.weekday + '|' + String(r.start_time).slice(0,5) + '|' + r.therapist_id] = true;
+    });
+  } catch (e) { THS = []; TAKEN = {}; }
+
+  // 아동별 회기방식 — 「매주」가 아닌 것만 모은다
+  try {
+    const { data: tp } = await sb.from('nl_therapies')
+      .select('child_id, count_mode, ended_on, support_type_id, group_id, nl_therapy_schedules(week1, week2, week3, week4, to_month, to_date)');
+    CMODE = {};
+    DEVKID = {};
+    (tp || []).forEach(function (r) {
+      if (r.ended_on) return;                       // 끝난 수업은 뺀다
+      if (Number(r.support_type_id) === 2) DEVKID[r.child_id] = true;
+      // 그룹 수업 — 회기방식 칸에 「그룹」 (2026-10-09)
+      if (r.group_id) { CMODE[r.child_id] = CMODE[r.child_id] || []; if (CMODE[r.child_id].indexOf('그룹') < 0) CMODE[r.child_id].push('그룹'); }
+      const m = String(r.count_mode || '').trim();
+      const k = r.child_id;
+      // 오는 주가 일부만인 요일줄 — 「1·3주 (월 2회)」 (2026-09-17)
+      const nowMk2 = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+      (r.nl_therapy_schedules || []).forEach(function (sc) {
+        if (sc.to_month && sc.to_month < nowMk2) return;   // 끝난 요일줄은 뺀다
+        const on = [sc.week1, sc.week2, sc.week3, sc.week4]
+          .map(function (v, i) { return v !== false ? i + 1 : 0; }).filter(Boolean);
+        if (!on.length || on.length === 4) return;
+        const w = on.join('·') + '주 (월 ' + on.length + '회)';
+        CMODE[k] = CMODE[k] || [];
+        if (CMODE[k].indexOf(w) < 0) CMODE[k].push(w);
+      });
+      // 「매주」와 「발추대체」는 안 적는다 (발추대체는 세부 표기라 목록에서는 뺌)
+      if (!m || m === '매주' || m === '발추대체') return;
+      CMODE[k] = CMODE[k] || [];
+      if (CMODE[k].indexOf(m) < 0) CMODE[k].push(m);
+    });
+  } catch (e) { CMODE = {}; }
+
+  // 발달재활 등급 — 이번 달에 적용되는 것 (2026-09-16)
+  LGRADE = {};
+  try {
+    const nowMk = new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0');
+    const { data: gr } = await sb.from('nl_child_grades')
+      .select('child_id, from_month, grade, self_pay').order('from_month');
+    (gr || []).forEach(function (r) {
+      if (String(r.from_month || '') > nowMk) return;   // 다음 달부터 바뀌는 것은 뺀다
+      LGRADE[r.child_id] = r;                          // 차례대로 덮어써 가장 늦은 것이 남는다
+    });
+  } catch (e) { LGRADE = {}; }
+
+  // 3) 권한 정하기 — 8번 관리자, 9번 행정만 고치기·등록
+  //    11번 데스크는 보기 전용 + 연락처까지 (전화 응대 자리)
+  CAN_EDIT = [8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || '');
+  CAN_TEL  = CAN_EDIT || Number(me.id) === 11;
+  CAN_TH   = !CAN_EDIT && Number(me.id) >= 1 && Number(me.id) <= 7;
+  DOCN = {};
+  if (CAN_TH) {
+    // 표 잠금이 담당 아동 것만 내려준다
+    try {
+      // 1,000줄씩 나눠 끝까지 (2026-09-21) — 보고서는 쪽마다 한 줄이라 금방 1,000을 넘는다
+      for (let f = 0; ; f += 1000) {
+        const dc = await sb.from('nl_eval_docs').select('child_id').order('id').range(f, f + 999);
+        if (dc.error || !dc.data) break;
+        dc.data.forEach(r => { DOCN[r.child_id] = (DOCN[r.child_id] || 0) + 1; });
+        if (dc.data.length < 1000) break;
+      }
+    } catch (e) { DOCN = {}; }
+  }
+
+  if (!CAN_EDIT) {
+    $('addBtn').style.display = 'none';          // ＋ 신규 등록 감추기
+    $('addBox').style.display = 'none';
+    $('edBox').style.display  = 'none';
+    document.querySelector('table').classList.add('readonly');
+  }
+
+  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨'
+                       + (CAN_EDIT ? '' : ' · 보기 전용');
+  $('loginBox').style.display = 'none';
+  $('listBox').style.display  = 'block';
+  draw();
+}
+
+$('btn').onclick = async () => {
+  const email = $('em').value.trim().toLowerCase();
+  const pw    = $('pw').value;
+  if (!email || !pw) { show('이메일과 비밀번호를 모두 입력하세요.', false); return; }
+
+  $('btn').disabled = true;
+  $('btn').textContent = '로그인 중...';
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw error;
+    await afterLogin(data.user);
+  } catch (e) {
+    show('❌ 로그인 실패\n' + e.message, false);
+  } finally {
+    $('btn').disabled = false;
+    $('btn').textContent = '로그인';
+  }
+};
+
+$('out').onclick = async () => {
+  nlKeepOff();
+  try { await sb.auth.signOut(); } catch (e) {}
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('index.html');
+};
+
+// 상태 단추
+document.querySelectorAll('.tab[data-st]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('.tab[data-st]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    stFilter = b.dataset.st;
+    draw();
+  };
+});
+
+// ===== 신규 아동 등록 =====
+
+// 올해 마지막 관리번호 다음 번호를 만든다
+function nextManagerNo() {
+  const yr = new Date().getFullYear();
+  const pre = String(yr) + '01-자라는 ';
+  let max = 0;
+  ALL.forEach(c => {
+    const s = c.manager_no || '';
+    if (s.startsWith(pre)) {
+      const n = parseInt(s.slice(pre.length).trim(), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return pre + String(max + 1).padStart(3, '0');
+}
+
+function show3(text, ok) {
+  $('msg3').textContent = text;
+  $('msg3').className = 'out ' + (ok ? 'ok' : 'err');
+}
+
+// ── 신규 등록: 등급 ─────────────────────────
+const FGRADE_PAY = { '가':20000, '나':40000, '다':0, '라':60000, '마':80000 };
+
+document.addEventListener('click', function (e) {
+  const b = e.target.closest ? e.target.closest('#fgrbtns .grb') : null;
+  if (!b) return;
+  const g = b.dataset.g || '';
+  $('f_gr').value = g;
+  $('f_gr_pay').value = (g && FGRADE_PAY[g] !== undefined) ? String(FGRADE_PAY[g]) : '';
+  document.querySelectorAll('#fgrbtns .grb').forEach(function (x) {
+    x.classList.toggle('on', x.dataset.g === g);
+  });
+});
+
+// ── 신규 등록: 수업 줄 ──────────────────────
+let THS = [], TAKEN = {};
+
+const SLOTS = [
+  { hm:'09:00', t:'9:00'  }, { hm:'09:50', t:'9:50'  },
+  { hm:'10:40', t:'10:40' }, { hm:'11:30', t:'11:30' },
+  { hm:'12:20', t:'12:20' }, { hm:'13:30', t:'13:30' },
+  { hm:'14:20', t:'14:20' }, { hm:'15:10', t:'15:10' },
+  { hm:'16:00', t:'16:00' }, { hm:'16:50', t:'16:50' },
+  { hm:'17:40', t:'17:40' }, { hm:'18:30', t:'18:30' },
+  { hm:'19:20', t:'19:20' }
+];
+const STYPES = { 1:'센터비용', 2:'발달재활', 3:'치료지원(언어)', 4:'치료지원(작업)',
+                 5:'방과후활동비', 6:'방과후치료(언어)', 7:'방과후치료(작업)' };
+const TTYPES = { 1:'언어', 2:'작업', 3:'전산화인지', 4:'감각통합', 5:'음악', 6:'일상자립' };
+const MODES  = [
+  { v:'매주',      t:'매주 (5주차 있으면 5회)' },
+  { v:'4회만',     t:'매달 4회 (5주차 있어도 4회)' },
+  { v:'주차선택',  t:'3주 이하 — 오는 주차만' },
+  { v:'발4+발추1', t:'매달 4회 + 발추 1회' },
+  { v:'발4+센1',   t:'매달 4회 + 5주차는 센터비용 1회' },
+  { v:'발추대체',  t:'4주인 달만 1주차 발추 (5주면 전부)' },
+  { v:'발4+5주발추', t:'발추5/5' }
+];
+
+function opts(obj, sel) {
+  return Object.keys(obj).map(function (k) {
+    return '<option value="' + k + '"' + (String(k) === String(sel) ? ' selected' : '')
+         + '>' + obj[k] + '</option>';
+  }).join('');
+}
+
+function lessonRow() {
+  const d = document.createElement('div');
+  d.className = 'lsn';
+  d.innerHTML =
+      '<div><label>지원유형</label><select class="l_st">' + opts(STYPES, 1) + '</select></div>'
+    + '<div><label>치료종류</label><select class="l_tt">' + opts(TTYPES, 1) + '</select></div>'
+    + '<div><label>요일</label><select class="l_wd">'
+      + ['월','화','수','목','금','토'].map(function (w) {
+          return '<option value="' + w + '">' + w + '</option>'; }).join('')
+      + '</select></div>'
+    + '<div><label>시간</label><select class="l_hm">'
+      + SLOTS.map(function (x) {
+          return '<option value="' + x.hm + '">' + x.t + '</option>'; }).join('')
+      + '</select></div>'
+    + '<div><label>치료사</label><select class="l_th">'
+      + THS.map(function (t) {
+          return '<option value="' + t.id + '">' + esc(t.name) + '</option>'; }).join('')
+      + '</select></div>'
+    + '<div><label>시간(분)</label><select class="l_du">'
+      + [40,50,60].map(function (n) {
+          return '<option value="' + n + '">' + n + '</option>'; }).join('')
+      + '</select></div>'
+    + '<div><label>회기 방식</label><select class="l_md">'
+      + MODES.map(function (m) {
+          return '<option value="' + m.v + '">' + m.t + '</option>'; }).join('')
+      + '</select></div>'
+    + '<div><label>시작 날짜</label><input class="l_from" type="date"></div>'
+    + '<div><label>마지막 날짜</label><input class="l_to" type="date"></div>'
+    + '<button type="button" class="del">빼기</button>';
+  return d;
+}
+
+$('addLesson').onclick = function () { $('lessons').appendChild(lessonRow()); };
+document.addEventListener('click', function (e) {
+  if (e.target && e.target.classList.contains('del')) {
+    const r = e.target.closest('.lsn');
+    if (r) r.remove();
+  }
+});
+
+function clearForm() {
+  ['f_name','f_birth','f_phone','f_guardian','f_diagnosis','f_disability',
+   'f_school','f_grade','f_memo']
+    .forEach(k => $(k).value = '');
+  $('f_gender').value = '';
+  $('f_status').value = '대기중';
+  $('msg3').className = 'out';
+  $('msg3').textContent = '';
+  // 등급
+  $('f_gr').value = '';
+  $('f_gr_pay').value = '';
+  const _d = new Date();
+  $('f_gr_from').value = _d.getFullYear() + '-'
+    + String(_d.getMonth() + 1).padStart(2, '0');
+  document.querySelectorAll('#fgrbtns .grb').forEach(function (x) {
+    x.classList.toggle('on', x.dataset.g === '');
+  });
+  // 수업 줄
+  $('lessons').innerHTML = '';
+}
+
+$('addBtn').onclick = () => {
+  const open = $('addBox').style.display !== 'none';
+  if (open) { $('addBox').style.display = 'none'; return; }
+  clearForm();
+  $('f_no').value = nextManagerNo();
+  $('addBox').style.display = 'block';
+  $('f_name').focus();
+};
+
+$('cancelNew').onclick = () => { $('addBox').style.display = 'none'; };
+
+$('saveNew').onclick = async () => {
+  const name  = $('f_name').value.trim();
+  const birth = $('f_birth').value;
+  const st    = $('f_status').value;
+
+  if (!name)  { show3('이름을 입력하세요.', false); return; }
+  if (!birth) { show3('생년월일을 입력하세요.', false); return; }
+  if (!st)    { show3('상태를 고르세요.', false); return; }
+  if ($('f_phone').value.trim() && !telOk($('f_phone').value)) {
+    show3('연락처 숫자 자리 수가 맞지 않습니다. (휴대폰 11자리 · 일반 전화 9~11자리)', false); return; }
+
+  // 같은 이름 + 같은 생년월일이 이미 있으면 막는다
+  const dup = ALL.find(c => (c.name || '') === name && (c.birth || '') === birth);
+  if (dup) {
+    show3('⚠️ 같은 이름 · 같은 생년월일 아동이 이미 있습니다.\n번호 ' + dup.id +
+          ' (' + (dup.manager_no || '관리번호 없음') + ')\n중복 등록이 아닌지 확인하세요.', false);
+    return;
+  }
+
+  const row = {
+    manager_no: $('f_no').value,
+    name: name,
+    birth: birth,
+    status: st,
+    gender:     $('f_gender').value || null,
+    phone:      $('f_phone').value.trim() || null,
+    guardian:   $('f_guardian').value.trim() || null,
+    diagnosis:  $('f_diagnosis').value.trim() || null,
+    disability: $('f_disability').value.trim() || null,
+    school:     $('f_school').value.trim() || null,
+    grade_year: $('f_grade').value.trim() || null,
+    memo:       $('f_memo').value.trim() || null
+  };
+
+  // ── 수업 줄 모으기 ──
+  const lsns = [];
+  let bad = '';
+  document.querySelectorAll('#lessons .lsn').forEach(function (r, i) {
+    const g = function (c) { return r.querySelector('.' + c).value; };
+    const wd = g('l_wd'), hm = g('l_hm'), thId = Number(g('l_th'));
+    if (!thId) { bad = (i + 1) + '번째 줄 — 치료사를 고르세요.'; return; }
+    // 그 시간 그 치료사가 이미 차 있는지
+    if (TAKEN[wd + '|' + hm + '|' + thId]) {
+      const tn = (THS.find(function (t) { return t.id === thId; }) || {}).name || thId;
+      bad = (i + 1) + '번째 줄 — ' + wd + '요일 ' + hm + ' 은 '
+          + tn + ' 치료사가 이미 차 있습니다.\n시간이나 치료사를 바꾸세요.';
+      return;
+    }
+    lsns.push({
+      st: Number(g('l_st')), tt: Number(g('l_tt')),
+      wd: wd, hm: hm, th: thId, du: Number(g('l_du')),
+      md: g('l_md'), from: g('l_from') || null, to: g('l_to') || null
+    });
+  });
+  if (bad) { show3('⚠️ ' + bad, false); return; }
+
+  // 같은 등록 안에서 서로 겹치는지
+  const seen = {};
+  for (const L of lsns) {
+    const k = L.wd + '|' + L.hm + '|' + L.th;
+    if (seen[k]) { show3('⚠️ 같은 요일·시간·치료사 줄이 두 개 있습니다.', false); return; }
+    seen[k] = true;
+  }
+
+  $('saveNew').disabled = true;
+  $('saveNew').textContent = '저장 중...';
+  let made = null;
+  try {
+    const { data, error } = await sb.from('nl_children')
+      .insert(row)
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .single();
+    if (error) throw error;
+    made = data;
+
+    ALL.push(data);
+    ALL.sort((a, b) => (a.id || 0) - (b.id || 0));
+    draw();
+
+    let extra = '';
+
+    // ── 등급 ──
+    const grade = $('f_gr').value;
+    if (grade) {
+      const fm = $('f_gr_from').value;
+      const pay = Number(String($('f_gr_pay').value).replace(/[^0-9]/g, '')) || 0;
+      if (!fm) {
+        extra += '\n⚠️ 등급의 「언제부터」가 비어 있어 등급은 넣지 못했습니다.';
+      } else {
+        const { error: ge } = await sb.from('nl_child_grades')
+          .insert({ child_id: data.id, grade: grade, self_pay: pay, from_month: fm });
+        extra += ge ? ('\n⚠️ 등급을 넣지 못했습니다. ' + ge.message)
+                    : ('\n등급 ' + grade + '형 · ' + pay.toLocaleString() + '원');
+      }
+    }
+
+    // ── 수업 ──
+    let ok = 0;
+    const months = {};
+    for (const L of lsns) {
+      const { data: th, error: te } = await sb.from('nl_therapies').insert({
+        child_id: data.id, therapy_type_id: L.tt, support_type_id: L.st,
+        duration_min: L.du, started_on: L.from,
+        count_mode: L.md,
+        monthly_count: (L.md === '4회만' || L.md === '주차선택') ? 4 : 5
+      }).select('id').single();
+      if (te) { extra += '\n⚠️ 수업을 넣지 못했습니다. ' + te.message; continue; }
+
+      const { error: se } = await sb.from('nl_therapy_schedules').insert({
+        therapy_id: th.id, weekday: L.wd, start_time: L.hm + ':00',
+        therapist_id: L.th, duration: L.du,
+        week1: true, week2: true, week3: true, week4: true,
+        from_date: L.from, to_date: L.to
+      });
+      if (se) { extra += '\n⚠️ 수업요일을 넣지 못했습니다. ' + se.message; continue; }
+
+      TAKEN[L.wd + '|' + L.hm + '|' + L.th] = true;
+      ok++;
+      const mk = (L.from || '').slice(0, 7);
+      if (mk) months[mk] = true;
+    }
+    if (ok) extra += '\n수업 ' + ok + '개';
+
+    // ── 회기 깔기 ──
+    if (ok && data.status === '치료중') {
+      const now = new Date();
+      months[now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')] = true;
+      for (const mk of Object.keys(months)) {
+        try { await sb.rpc('nl_make_sessions', { p_month: mk }); } catch (me) {}
+      }
+      extra += '\n회기도 깔았습니다.';
+    } else if (ok) {
+      extra += '\n⚠️ 상태가 「치료중」이 아니라 회기는 아직 안 깔립니다.';
+    }
+
+    show3('✅ 등록했습니다. 번호 ' + data.id + ' / ' + data.manager_no + extra, true);
+    clearForm();
+    $('f_no').value = nextManagerNo();
+    $('f_name').focus();
+  } catch (e) {
+    show3((made ? '⚠️ 아동 ' + made.id + '번은 만들어졌으나 뒤가 막혔습니다.\n'
+                : '❌ 등록하지 못했습니다.\n') + e.message, false);
+  } finally {
+    $('saveNew').disabled = false;
+    $('saveNew').textContent = '저장';
+  }
+};
+
+// ===== 아동 정보 고치기 =====
+let edId = null;
+
+function show4(text, ok) {
+  $('msg4').textContent = text;
+  $('msg4').className = 'out ' + (ok ? 'ok' : 'err');
+}
+
+// ===== 보호자 연락처 여러 줄 =====
+const RELS = ['부','모','조모','조부','활동보조','기타'];
+let GROWS = [];   // [{relation, name, phone}]
+
+function drawGRows(){
+  const wrap = $('e_gwrap');
+  if (!wrap) return;
+  if (!GROWS.length) GROWS = [{ relation:'', name:'', phone:'' }];
+  wrap.innerHTML = GROWS.map((g, i) =>
+      '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
+    + '<select data-gi="' + i + '" data-gk="relation" style="width:110px;padding:9px;'
+    +   'border:1px solid #ddd;border-radius:7px;font-size:14px">'
+    +   '<option value="">-- 관계 --</option>'
+    +   RELS.map(r => '<option value="' + r + '"'
+    +       (g.relation === r ? ' selected' : '') + '>' + r + '</option>').join('')
+    + '</select>'
+    + '<input data-gi="' + i + '" data-gk="name" type="text" placeholder="이름"'
+    +   ' value="' + esc(g.name || '') + '" style="width:130px">'
+    + '<input data-gi="' + i + '" data-gk="phone" type="tel" data-tel inputmode="numeric" maxlength="13" autocomplete="off" placeholder="010-0000-0000"'
+    +   ' value="' + esc(g.phone || '') + '" style="width:180px">'
+    + '<button type="button" data-gdel="' + i + '" style="width:auto;margin:0;'
+    +   'padding:8px 12px;background:#f3e6e6;color:#a33;font-size:13px">지우기</button>'
+    + '</div>').join('');
+
+  wrap.querySelectorAll('[data-gi]').forEach(el => {
+    el.onchange = el.oninput = () => {
+      GROWS[Number(el.dataset.gi)][el.dataset.gk] = el.value;
+    };
+  });
+  wrap.querySelectorAll('[data-gdel]').forEach(el => {
+    el.onclick = () => { GROWS.splice(Number(el.dataset.gdel), 1); drawGRows(); };
+  });
+}
+
+function openEdit(id) {
+  if (!CAN_EDIT) return;
+  const c = ALL.find(x => x.id === id);
+  if (!c) return;
+  if (!cardLeaveOk()) return;
+  edId = id;
+  $('addBox').style.display = 'none';
+  $('edTitle').textContent = '아동 ' + c.id + '번 고치기';
+  $('e_no').value         = c.manager_no || '';
+  $('e_name').value       = c.name || '';
+  $('e_birth').value      = c.birth || '';
+  $('e_status').value     = c.status || '치료중';
+  $('e_gender').value     = c.gender || '';
+  $('e_phone').value      = c.phone || '';
+  $('e_guardian').value   = c.guardian || '';
+  $('e_diagnosis').value  = c.diagnosis || '';
+  $('e_disability').value = c.disability || '';
+  $('e_school').value     = c.school || '';
+  $('e_grade').value      = c.grade_year || '';
+  emShow(c.memo || '', c.memo_at || null);
+
+  // 보호자 연락처 — 보호자 표 것을 그대로. 없으면 아동 표 것을 첫 줄로
+  GROWS = (GUARD[c.id] || []).map(g => ({
+    relation: (g.relation && g.relation !== '미상') ? g.relation : '',
+    name: g.name || '', phone: g.phone || ''
+  }));
+  if (!GROWS.length && c.phone)
+    GROWS = [{ relation:'', name: c.guardian || '', phone: c.phone }];
+  drawGRows();
+  $('msg4').className = 'out';
+  $('msg4').textContent = '';
+  $('edBox').style.display = 'block';
+  $('edBox').scrollIntoView({ behavior:'smooth', block:'start' });
+  loadGrade(id);
+  drawAcc(id);
+  drawCards(id);
+  drawTrials(id);
+  drawDocs(id);
+  loadNotes(id);
+  drawBasic(c);
+  drawMobile(id);
+  openBasicForm(false);
+  esShow(c.eval_summary || '');
+  drawNextEval(id);
+  loadTherapies(id);
+  loadHistory(id);
+}
+
+// ── 기본 묶음 — 평소에는 글자, 「수정」을 눌러야 칸이 열린다 (2026-09-15) ──
+function drawBasic(c) {
+  const g = (GUARD[c.id] || []);
+  const tel = g.length
+    ? g.map(x => (x.relation && x.relation !== '미상' ? x.relation + ' ' : '')
+                 + (x.name ? x.name + ' ' : '') + (x.phone || '')).join('<br>')
+    : (c.phone ? esc(c.phone) : '<span style="color:#999;">연락처 없음</span>');
+  $('e_basic').innerHTML =
+      '<b style="font-size:15px;">' + esc(c.name || '') + '</b>'
+    + ' <span style="color:#8d6e63;">' + c.id + '번</span>'
+    + ' <span style="color:#888;">' + esc(c.manager_no || '') + '</span><br>'
+    + esc(c.birth || '생년월일 없음')
+    + (ageOf(c.birth) ? ' <span style="color:#2e7d32;font-weight:700;">' + ageOf(c.birth) + '</span>' : '')
+    + ' · ' + esc(c.gender || '성별 없음') + ' · ' + esc(c.status || '')
+    + (c.diagnosis ? ' · ' + esc(c.diagnosis) : '')
+    + (c.school ? ' · ' + esc(c.school) + (c.grade_year ? ' ' + esc(c.grade_year) : '') : '')
+    + '<br><span style="color:#5a6156;">' + tel + '</span>'
+    + '<div id="e_mob" style="color:#5a6156; margin-top:4px;">📱 학부모 계정 — 보는 중...</div>'
+    + (cmodeTxt(c.id) ? '<div style="margin-top:2px;">회기방식 ' + cmodeTxt(c.id) + '</div>' : '');
+}
+
+// 모바일 연결 현황 — 계정이 있는지·마지막으로 들어온 날
+async function drawMobile(cid) {
+  const box = $('e_mob');
+  if (!box) return;
+  try {
+    const { data: pc } = await sb.from('nl_parent_children')
+      .select('account_id').eq('child_id', cid);
+    if (!pc || !pc.length) { box.innerHTML = '📱 학부모 계정 없음'; return; }
+    const { data: acc } = await sb.from('nl_parent_accounts')
+      .select('login_id, last_login, active').in('id', pc.map(x => x.account_id));
+    if (!acc || !acc.length) { box.innerHTML = '📱 학부모 계정 없음'; return; }
+    box.innerHTML = acc.map(a => '📱 ' + esc(a.login_id)
+      + (a.active === false ? ' · 꺼짐'
+         : (a.last_login
+            ? ' · 마지막 접속 ' + String(a.last_login).slice(5, 10).replace('-', '월 ') + '일'
+            : ' · 아직 들어온 적 없음'))).join('<br>');
+  } catch (e) { box.innerHTML = '📱 학부모 계정 — 알 수 없음'; }
+}
+
+function openBasicForm(on) {
+  $('e_form').style.display = on ? 'block' : 'none';
+  $('e_view').style.display = on ? 'none'  : 'flex';
+  if (on) drawAgeEd();
+}
+$('e_editBtn').onclick = () => openBasicForm(true);
+$('e_formX').onclick   = () => openBasicForm(false);
+$('e_backTop').onclick = () => openBasicForm(false);
+
+// ── 평가 요약 (2026-09-15) ──
+function esShow(text) {
+  const t = (text || '').trim();
+  $('esView').innerHTML = t ? esc(t)
+    : '<span style="color:#999;">아직 적은 요약이 없습니다. 「✏️ 수정」을 눌러 적으세요.</span>';
+  $('esView').style.display = 'block';
+  $('esEdit').style.display = 'none';
+  $('esBtns').style.display = 'none';
+  $('esBtn').style.display  = 'inline-block';
+  $('esEdit').value = t;
+  $('esEdit').dataset.orig = t;
+  $('esMsg').textContent = '';
+}
+$('esBtn').onclick = () => {
+  $('esView').style.display = 'none';
+  $('esBtn').style.display  = 'none';
+  $('esEdit').style.display = 'block';
+  $('esBtns').style.display = 'block';
+  $('esEdit').focus();
+};
+$('esCancel').onclick = () => esShow($('esEdit').dataset.orig || '');
+$('esSave').onclick = async () => {
+  if (!edId) return;
+  const v = $('esEdit').value.trim();
+  $('esSave').disabled = true; $('esSave').textContent = '저장 중...';
+  try {
+    const { error } = await sb.from('nl_children')
+      .update({ eval_summary: v || null, updated_at: new Date().toISOString() })
+      .eq('id', edId);
+    if (error) throw error;
+    const c = ALL.find(x => x.id === edId);
+    if (c) c.eval_summary = v || null;
+    esShow(v);
+    $('esMsg').style.color = '#2e7d32';
+    $('esMsg').textContent = '✅ 저장했습니다.';
+  } catch (e) {
+    $('esMsg').style.color = '#c62828';
+    $('esMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
+  } finally {
+    $('esSave').disabled = false; $('esSave').textContent = '저장';
+  }
+};
+
+// 다음 재평가 — 취소가 아닌 평가 중 가장 늦은 날짜 + 12개월
+async function drawNextEval(cid) {
+  $('esNext').textContent = '';
+  try {
+    const { data } = await sb.from('nl_evaluations')
+      .select('eval_date, status').eq('child_id', cid);
+    const ds = (data || []).filter(e => e.eval_date && e.status !== '취소')
+                 .map(e => String(e.eval_date)).sort();
+    if (!ds.length) return;
+    const last = ds[ds.length - 1];
+    $('esNext').textContent = '· 다음 재평가 ' + (Number(last.slice(0, 4)) + 1)
+      + '년 ' + Number(last.slice(5, 7)) + '월';
+  } catch (e) {}
+}
+
+// ── 생년월일 → 만 ○년 ○개월 (고치기 창) ──
+function ageOf(b) {
+  if (!b) return '';
+  const d = new Date(String(b) + 'T00:00:00');
+  if (isNaN(d)) return '';
+  const n = new Date();
+  let m = (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth());
+  if (n.getDate() < d.getDate()) m--;
+  if (m < 0) return '';
+  return '만 ' + Math.floor(m / 12) + '년 ' + (m % 12) + '개월';
+}
+function drawAgeEd() { $('e_age').textContent = ageOf($('e_birth').value); }
+$('e_birth').addEventListener('change', drawAgeEd);
+$('e_birth').addEventListener('input',  drawAgeEd);
+
+// ── 수업 진행 상황 (2026-09-15) ──
+const STNM = { 1:'센터비용', 2:'발달재활', 3:'치료지원(언어)', 4:'치료지원(작업)',
+               5:'방과후활동비', 6:'방과후치료지원(언어)', 7:'방과후치료지원(작업)',
+               8:'발달추가비용', 9:'평가비' };
+const TTNM = { 1:'언어', 2:'작업', 3:'전산화인지', 4:'감각통합', 5:'음악', 6:'일상자립', 7:'심리' };
+const STCL = { 1:'#e6f1fb;#0c447c', 2:'#eaf3de;#27500a', 3:'#fbeaf0;#993556', 4:'#fbeaf0;#993556',
+               5:'#faeeda;#854f0b', 6:'#faeeda;#854f0b', 7:'#faeeda;#854f0b',
+               8:'#eeedfe;#3c3489', 9:'#f1efe8;#444441' };
+let THLIST = [];
+let KIDEND = null;   // 아동 종결 사유 (수업 없이 끝난 아동 · 2026-10-08)
+
+async function loadTherapies(cid) {
+  $('e_ths').innerHTML = '불러오는 중...';
+  $('e_thMsg').textContent = '';
+  const [t, sc, th] = await Promise.all([
+    sb.from('nl_therapies')
+      .select('id, support_type_id, therapy_type_id, duration_min, monthly_count, started_on, ended_on, end_reason, end_cat, group_id')
+      .eq('child_id', cid).order('id'),
+    sb.from('nl_therapy_schedules')
+      .select('id, therapy_id, weekday, start_time, therapist_id, to_date, to_month'),
+    sb.from('nl_therapists').select('id, name')
+  ]);
+  if (t.error) { $('e_ths').innerHTML = '불러오지 못했습니다. ' + esc(t.error.message); return; }
+  THLIST = t.data || [];
+  // 아동 종결 사유 — 따로 읽는다 (못 읽어도 수업 목록은 그대로 그림)
+  KIDEND = null;
+  try {
+    const ke = await sb.from('nl_children').select('id, status, ended_on, end_cat, end_reason').eq('id', cid).maybeSingle();
+    if (!ke.error) KIDEND = ke.data;
+  } catch (e) { KIDEND = null; }
+  const SC = {}; (sc.data || []).forEach(x => { (SC[x.therapy_id] = SC[x.therapy_id] || []).push(x); });
+  const TH = {}; (th.data || []).forEach(x => { TH[x.id] = x.name; });
+  drawTherapies(SC, TH);
+}
+
+// 종결 사유 묶음 — 시간표 · 서버 규칙(chk_therapy_end_cat)과 같은 글자 (2026-10-07)
+const END_CATS = ['수업 종료','이사','타기관 이동','보호자 사정','아동 적응 어려움','지원 사업 변동','치료사 관련','결석 잦음','자료 정리','기타'];
+function drawTherapies(SC, TH) {
+  if (!THLIST.length) {
+    $('e_ths').innerHTML = '<span style="color:#999;">수업이 없습니다.</span>' + kidEndHtml();
+    bindKidEnd(); return;
+  }
+  const live = THLIST.filter(t => !t.ended_on);
+  const done = THLIST.filter(t => t.ended_on);
+  const one = (t, over) => {
+    const c = (STCL[t.support_type_id] || '#f1efe8;#444441').split(';');
+    const rows = (SC[t.id] || []).filter(x => !over ? !x.to_date : true)
+      .map(x => (x.weekday || '') + ' ' + String(x.start_time || '').slice(0, 5)
+              + ' · ' + (TH[x.therapist_id] || (x.therapist_id ? x.therapist_id + '번' : '담당 없음')))
+      .join(' / ');
+    return '<div style="display:flex; align-items:flex-start; gap:8px; padding:7px 0;'
+      + ' border-top:1px solid #eceee9;' + (over ? ' color:#999;' : '') + '">'
+      + '<span style="font-size:12px; background:' + c[0] + '; color:' + c[1]
+      + '; padding:2px 8px; border-radius:10px; white-space:nowrap;">'
+      + esc(STNM[t.support_type_id] || '?') + (over ? ' · 종결' : '') + '</span>'
+      + (t.group_id ? '<span style="font-size:12px; background:#EDE7F6; color:#5E35B1; padding:2px 8px; border-radius:10px; white-space:nowrap;">그룹</span>' : '')
+      + '<span style="flex:1; min-width:0; line-height:1.7;">'
+      + esc(TTNM[t.therapy_type_id] || '') + (t.duration_min ? ' ' + t.duration_min + '분' : '')
+      + (rows ? ' · ' + esc(rows) : '')
+      + (t.monthly_count ? ' · 월 ' + t.monthly_count + '회' : '')
+      + '<br><span style="color:#888;">' + esc(t.started_on || '시작일 없음')
+      + ' ~ ' + (t.ended_on ? esc(t.ended_on) : '') + '</span>'
+      + ((t.end_cat || t.end_reason) ? '<span style="color:#888;"> · 사유: '
+           + (t.end_cat ? '<b style="color:#6b5a4a;">' + esc(t.end_cat) + '</b>' : '')
+           + (t.end_reason && t.end_reason !== t.end_cat ? (t.end_cat ? ' (' : '') + esc(t.end_reason) + (t.end_cat ? ')' : '') : '')
+           + '</span>' : '')
+      + ((CAN_EDIT && over) ? '<div class="thRsBox" id="thRsBox' + t.id + '" style="display:none;margin-top:8px;padding:10px;background:#FBF5EE;border:1px solid #F0E4D6;border-radius:8px;">'
+           + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
+           + '<label style="font-size:13px;color:#6b5a4a;min-width:64px;">종결 사유</label>'
+           + '<select class="thRsCat" style="width:auto !important;min-width:200px;height:36px;padding:5px 9px;margin:0 !important;font-size:14px;border:1px solid #DDD6CE;border-radius:8px;background:#fff;">'
+           + '<option value="">— 고르세요 —</option>'
+           + END_CATS.map(c => '<option' + (t.end_cat === c ? ' selected' : '') + '>' + c + '</option>').join('')
+           + '</select></div>'
+           + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+           + '<label style="font-size:13px;color:#6b5a4a;min-width:64px;">세부 (선택)</label>'
+           + '<input class="thRsWhy" type="text" placeholder="이름 · 진단명은 적지 마세요" value="' + esc(t.end_reason && t.end_reason !== t.end_cat ? t.end_reason : '') + '"'
+           + ' style="flex:1 1 220px;min-width:200px;height:36px;padding:5px 9px;margin:0 !important;font-size:14px;border:1px solid #DDD6CE;border-radius:8px;">'
+           + '</div>'
+           + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">'
+           + '<button type="button" class="thRsNo" data-id="' + t.id + '" style="width:auto !important;margin:0 !important;padding:6px 14px;font-size:13px;background:#fff;color:#2F2926;border:1px solid #CFC8C0;border-radius:8px;">취소</button>'
+           + '<button type="button" class="thRsOk" data-id="' + t.id + '" style="width:auto !important;margin:0 !important;padding:6px 14px;font-size:13px;background:#B07A4A;color:#fff;border:none;border-radius:8px;">저장</button>'
+           + '</div></div>' : '')
+      + '</span>'
+      + ((CAN_EDIT && over) ? '<button type="button" class="tab thRs" data-id="' + t.id
+         + '" style="padding:2px 8px; font-size:12px;">' + (t.end_cat ? '사유 고치기' : '사유 적기') + '</button>' : '')
+      + '</div>';
+  };
+  $('e_ths').innerHTML = live.map(t => one(t, false)).join('') + done.map(t => one(t, true)).join('')
+    + (done.length ? '' : kidEndHtml());
+  bindKidEnd();
+
+  // 사유 적기 — 시간표 「수업 끝내기」와 같은 고르는 칸 (2026-10-07 은정님)
+  //   종결 사유 묶음(end_cat)은 반드시 · 세부 글은 비우면 묶음 이름이 사유 글로
+  $('e_ths').querySelectorAll('.thRs').forEach(b => b.onclick = () => {
+    const box = document.getElementById('thRsBox' + b.dataset.id);
+    if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
+  });
+  $('e_ths').querySelectorAll('.thRsNo').forEach(b => b.onclick = () => {
+    const box = document.getElementById('thRsBox' + b.dataset.id);
+    if (box) box.style.display = 'none';
+  });
+  $('e_ths').querySelectorAll('.thRsOk').forEach(b => b.onclick = async () => {
+    const t = THLIST.find(x => x.id === Number(b.dataset.id));
+    const box = document.getElementById('thRsBox' + b.dataset.id);
+    if (!t || !box) return;
+    const cat = box.querySelector('.thRsCat').value;
+    const why = box.querySelector('.thRsWhy').value.trim();
+    if (!cat) { $('e_thMsg').style.color = '#c62828'; $('e_thMsg').textContent = '종결 사유를 골라 주세요.'; return; }
+    b.disabled = true; b.textContent = '저장 중…';
+    const { data: upd, error } = await sb.from('nl_therapies')
+      .update({ end_cat: cat, end_reason: why || cat, updated_at: new Date().toISOString() })
+      .eq('id', t.id).select('id');
+    if (!error && (!upd || !upd.length)) { b.disabled = false; b.textContent = '저장';
+      $('e_thMsg').style.color = '#c62828'; $('e_thMsg').textContent = '❌ 저장되지 않았습니다 (권한을 확인해 주세요).'; return; }
+    if (error) { b.disabled = false; b.textContent = '저장'; $('e_thMsg').style.color = '#c62828';
+                 $('e_thMsg').textContent = '❌ 저장하지 못했습니다: ' + error.message; return; }
+    // 사유 없는 다른 종결 수업에도 같게 (2026-10-08 은정님) — 이미 사유가 있는 줄은 건드리지 않음
+    let more = '';
+    const others = THLIST.filter(x => x.id !== t.id && x.ended_on && !x.end_cat);
+    if (others.length && confirm('이 아동의 사유 없는 다른 종결 수업이 ' + others.length + '개 있습니다.\n'
+        + others.map(x => '· ' + (STNM[x.support_type_id] || '') + ' ~ ' + x.ended_on).join('\n')
+        + '\n\n같은 사유(' + cat + ')로 함께 적을까요?')) {
+      const { data: u2, error: e2 } = await sb.from('nl_therapies')
+        .update({ end_cat: cat, end_reason: why || cat, updated_at: new Date().toISOString() })
+        .in('id', others.map(x => x.id)).is('end_cat', null).select('id');
+      more = e2 ? ' (다른 수업은 저장하지 못했습니다: ' + e2.message + ')'
+           : ' 다른 수업 ' + ((u2 || []).length) + '개에도 함께 적었습니다.';
+    }
+    $('e_thMsg').style.color = '#2e7d32';
+    $('e_thMsg').textContent = '✅ 사유를 적었습니다.' + more;
+    await loadTherapies(edId);
+    loadHistory(edId);
+  });
+}
+
+// ── 아동 종결 사유 (2026-10-08 은정님) ──
+//   시스템을 쓰기 전에 끝나 종결된 수업 줄이 없는 아동 — 아동에게 바로 적는다
+//   아동 상태가 종결 · 타기관이용이고, 종결된 수업이 하나도 없을 때만 보인다
+function kidEndHtml(){
+  const k = KIDEND;
+  if (!k || (k.status !== '종결' && k.status !== '타기관이용')) return '';
+  const st = 'height:36px;padding:5px 9px;margin:0 !important;font-size:14px;border:1px solid #DDD6CE;border-radius:8px;background:#fff;';
+  const view = k.end_cat
+    ? '<b style="color:#6b5a4a;">' + esc(k.end_cat) + '</b>'
+      + (k.end_reason && k.end_reason !== k.end_cat ? ' (' + esc(k.end_reason) + ')' : '')
+      + (k.ended_on ? ' · 종결일 ' + esc(k.ended_on) : '')
+    : '<span style="color:#c62828;">아직 안 적음</span>';
+  return '<div style="margin-top:8px;padding:10px;background:#FBF5EE;border:1px solid #F0E4D6;border-radius:8px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<span><b style="color:#6b5a4a;">아동 종결 사유</b> <span style="color:#A39C95;font-size:12px;">— 수업 기록 없이 끝난 아동</span><br>' + view + '</span>'
+    + (CAN_EDIT ? '<button type="button" class="tab" id="keOpen" style="padding:2px 8px;font-size:12px;">'
+        + (k.end_cat ? '사유 고치기' : '사유 적기') + '</button>' : '')
+    + '</div>'
+    + (CAN_EDIT ? '<div id="keBox" style="display:none;margin-top:10px;">'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
+      + '<label style="font-size:13px;color:#6b5a4a;min-width:64px;">종결일</label>'
+      + '<input id="keDate" type="date" value="' + esc(k.ended_on || '') + '" style="width:auto !important;' + st + '">'
+      + '<span style="font-size:12px;color:#A39C95;">모르면 비워 두세요</span></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'
+      + '<label style="font-size:13px;color:#6b5a4a;min-width:64px;">종결 사유</label>'
+      + '<select id="keCat" style="width:auto !important;min-width:200px;' + st + '"><option value="">— 고르세요 —</option>'
+      + END_CATS.map(c => '<option' + (k.end_cat === c ? ' selected' : '') + '>' + c + '</option>').join('')
+      + '</select></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<label style="font-size:13px;color:#6b5a4a;min-width:64px;">세부 (선택)</label>'
+      + '<input id="keWhy" type="text" placeholder="이름 · 진단명은 적지 마세요" value="'
+      + esc(k.end_reason && k.end_reason !== k.end_cat ? k.end_reason : '') + '" style="flex:1 1 220px;min-width:200px;' + st + '"></div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">'
+      + '<button type="button" id="keNo" style="width:auto !important;margin:0 !important;padding:6px 14px;font-size:13px;background:#fff;color:#2F2926;border:1px solid #CFC8C0;border-radius:8px;">취소</button>'
+      + '<button type="button" id="keOk" style="width:auto !important;margin:0 !important;padding:6px 14px;font-size:13px;background:#B07A4A;color:#fff;border:none;border-radius:8px;">저장</button>'
+      + '</div></div>' : '')
+    + '</div>';
+}
+function bindKidEnd(){
+  if (!$('keOpen')) return;
+  $('keOpen').onclick = () => { $('keBox').style.display = $('keBox').style.display === 'none' ? '' : 'none'; };
+  $('keNo').onclick = () => { $('keBox').style.display = 'none'; };
+  $('keOk').onclick = async () => {
+    const cat = $('keCat').value, why = $('keWhy').value.trim(), d = $('keDate').value || null;
+    const msg = $('e_thMsg');
+    if (!cat) { msg.style.color = '#c62828'; msg.textContent = '종결 사유를 골라 주세요.'; return; }
+    const b = $('keOk'); b.disabled = true; b.textContent = '저장 중…';
+    const { data: upd, error } = await sb.from('nl_children')
+      .update({ ended_on: d, end_cat: cat, end_reason: why || cat, updated_at: new Date().toISOString() })
+      .eq('id', KIDEND.id).select('id');
+    if (error || !upd || !upd.length) {
+      b.disabled = false; b.textContent = '저장'; msg.style.color = '#c62828';
+      msg.textContent = '❌ 저장하지 못했습니다' + (error ? ': ' + error.message : ' (권한을 확인해 주세요).'); return;
+    }
+    msg.style.color = '#2e7d32'; msg.textContent = '✅ 아동 종결 사유를 적었습니다.';
+    await loadTherapies(KIDEND.id);
+  };
+}
+
+// ── 히스토리 (2026-09-15) ──
+async function loadHistory(cid) {
+  $('e_hist').innerHTML = '불러오는 중...';
+  const { data, error } = await sb.from('nl_therapy_events')
+    .select('on_date, kind, detail, reason')
+    .eq('child_id', cid)
+    .order('on_date', { ascending: false })
+    .order('id', { ascending: false });
+  if (error) { $('e_hist').innerHTML = '불러오지 못했습니다. ' + esc(error.message); return; }
+  if (!data || !data.length) {
+    $('e_hist').innerHTML = '<span style="color:#999;">아직 남은 자취가 없습니다.</span>'; return;
+  }
+  $('e_hist').innerHTML = data.map(e =>
+    '<div style="display:flex; gap:8px; padding:5px 0; border-top:1px solid #efece0;">'
+    + '<span style="color:#888; min-width:82px; white-space:nowrap;">' + esc(e.on_date) + '</span>'
+    + '<span style="min-width:74px; white-space:nowrap; color:#6b5b2e;">' + esc(e.kind) + '</span>'
+    + '<span style="flex:1; min-width:0;">' + esc(e.detail || '')
+    + (e.reason ? ' <span style="color:#999;">· ' + esc(e.reason) + '</span>' : '')
+    + '</span></div>').join('');
+}
+
+// ── 메모 — 평소에는 글자, 「수정」을 눌렀을 때만 메모창 (2026-09-15) ──
+function tdy() {
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0')
+       + '-' + String(n.getDate()).padStart(2, '0');
+}
+
+function emShow(text, at) {
+  const t = (text || '').trim();
+  $('emView').innerHTML = t ? esc(t)
+    : '<span style="color:#999;">아직 적은 메모가 없습니다. 「✏️ 수정」을 눌러 적으세요.</span>';
+  $('emDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
+  $('emView').style.display = 'block';
+  $('e_memo').style.display = 'none';
+  $('emBtns').style.display = 'none';
+  $('emBtn').style.display  = 'inline-block';
+  $('e_memo').value = t;
+  $('e_memo').dataset.orig = t;
+  $('emMsg').textContent = '';
+}
+
+$('emBtn').onclick = () => {
+  $('emView').style.display = 'none';
+  $('emBtn').style.display  = 'none';
+  $('e_memo').style.display = 'block';
+  $('emBtns').style.display = 'block';
+  $('emMsg').textContent = '';
+  $('e_memo').focus();
+};
+
+$('emCancel').onclick = () => {
+  const c = ALL.find(x => x.id === edId);
+  emShow($('e_memo').dataset.orig || '', c ? c.memo_at : null);
+};
+
+$('emSave').onclick = async () => {
+  if (!edId) return;
+  const v = $('e_memo').value.trim();
+  $('emSave').disabled = true;
+  $('emSave').textContent = '저장 중...';
+  try {
+    const { error } = await sb.from('nl_children')
+      .update({ memo: v || null, memo_at: tdy(), updated_at: new Date().toISOString() })
+      .eq('id', edId);
+    if (error) throw error;
+    const c = ALL.find(x => x.id === edId);
+    if (c) { c.memo = v || null; c.memo_at = tdy(); }
+    emShow(v, tdy());
+    draw();
+    $('emMsg').style.color = '#2e7d32';
+    $('emMsg').textContent = '✅ 저장했습니다.';
+  } catch (e) {
+    $('emMsg').style.color = '#c62828';
+    $('emMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
+  } finally {
+    $('emSave').disabled = false;
+    $('emSave').textContent = '저장';
+  }
+};
+
+// ── 상담 메모 (2026-09-15) — 날짜별로 쌓인다 ──
+let NOTES = [];
+
+async function loadNotes(cid) {
+  $('cnRows').innerHTML = '불러오는 중...';
+  $('cn_date').value = tdy();
+  $('cn_text').value = '';
+  delete $('cnAdd').dataset.editId;
+  $('cnAdd').textContent = '메모 추가';
+  $('cnMsg').textContent = '';
+  const { data, error } = await sb.from('nl_child_notes')
+    .select('id, note_date, content, staff_id')
+    .eq('child_id', cid)
+    .order('note_date', { ascending: false })
+    .order('id', { ascending: false });
+  if (error) { $('cnRows').innerHTML = '메모를 불러오지 못했습니다. ' + esc(error.message); return; }
+  NOTES = data || [];
+  drawNotes();
+}
+
+function drawNotes() {
+  if (!NOTES.length) {
+    $('cnRows').innerHTML = '<span style="color:#999;">아직 상담 메모가 없습니다.</span>';
+    return;
+  }
+  $('cnRows').innerHTML = NOTES.map(n =>
+    '<div style="display:flex; align-items:flex-start; gap:8px; padding:7px 0;'
+    + ' border-bottom:1px solid #e3ebe1;">'
+    + '<span style="color:#666; min-width:82px; white-space:nowrap;">' + esc(n.note_date) + '</span>'
+    + '<span style="flex:1; min-width:0; color:#1c1f1a; line-height:1.6;'
+    + ' white-space:pre-line;">' + esc(n.content) + '</span>'
+    + (n.staff_id ? '<span style="color:#aaa; white-space:nowrap;">' + n.staff_id + '번</span>' : '')
+    + '<button type="button" class="tab cnEd" data-id="' + n.id
+    + '" style="padding:2px 8px; font-size:12px;">수정</button>'
+    + '<button type="button" class="tab cnDel" data-id="' + n.id
+    + '" style="padding:2px 8px; font-size:12px; color:#c62828;">지우기</button>'
+    + '</div>').join('');
+
+  $('cnRows').querySelectorAll('.cnEd').forEach(b => b.onclick = () => {
+    const n = NOTES.find(x => x.id === Number(b.dataset.id));
+    if (!n) return;
+    $('cn_date').value = n.note_date;
+    $('cn_text').value = n.content;
+    $('cnAdd').dataset.editId = String(n.id);
+    $('cnAdd').textContent = '고쳐 저장';
+    $('cn_text').focus();
+  });
+
+  $('cnRows').querySelectorAll('.cnDel').forEach(b => b.onclick = async () => {
+    if (!confirm('이 상담 메모를 지울까요?')) return;
+    const { error } = await sb.from('nl_child_notes').delete().eq('id', Number(b.dataset.id));
+    if (error) { $('cnMsg').style.color = '#c62828';
+                 $('cnMsg').textContent = '❌ 지우지 못했습니다: ' + error.message; return; }
+    await loadNotes(edId);
+    $('cnMsg').style.color = '#2e7d32';
+    $('cnMsg').textContent = '✅ 지웠습니다.';
+  });
+}
+
+$('cnAdd').onclick = async () => {
+  if (!edId) return;
+  const txt = $('cn_text').value.trim();
+  if (!txt) { $('cnMsg').style.color = '#c62828';
+              $('cnMsg').textContent = '내용을 적으세요.'; return; }
+  const eid = $('cnAdd').dataset.editId ? Number($('cnAdd').dataset.editId) : null;
+  $('cnAdd').disabled = true;
+  const wasEdit = !!eid;
+  $('cnAdd').textContent = '저장 중...';
+  try {
+    let error;
+    if (eid) {
+      ({ error } = await sb.from('nl_child_notes')
+        .update({ note_date: $('cn_date').value || tdy(), content: txt,
+                  updated_at: new Date().toISOString() }).eq('id', eid));
+    } else {
+      ({ error } = await sb.from('nl_child_notes')
+        .insert({ child_id: edId, note_date: $('cn_date').value || tdy(),
+                  content: txt, staff_id: MEID }));
+    }
+    if (error) throw error;
+    await loadNotes(edId);
+    $('cnMsg').style.color = '#2e7d32';
+    $('cnMsg').textContent = wasEdit ? '✅ 고쳤습니다.' : '✅ 메모를 넣었습니다.';
+  } catch (e) {
+    $('cnMsg').style.color = '#c62828';
+    $('cnMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
+  } finally {
+    $('cnAdd').disabled = false;
+    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = '메모 추가';
+  }
+};
+
+// ── 치료사 계정 — 초기 상담·평가보고서 보기 전용 창 (2026-09-15) ──
+// 선생님 목록의 맨 오른쪽 칸에 단추. 초기 상담이나 보고서가 있는 아동에만 붙는다
+function thBtn(c) {
+  if (!CAN_TH) return '';
+  const n = DOCN[c.id] || 0;
+  const memo = String(c.memo == null ? '' : c.memo).trim();
+  if (!memo && !n) return '';
+  return '<button type="button" class="thview" data-thv="' + c.id + '">📋 상담 · 보고서'
+       + (n ? ' ' + n : '') + '</button>';
+}
+
+function thClose() {
+  const w = document.getElementById('thvWrap');
+  if (w) w.remove();
+}
+
+async function thOpen(cid) {
+  thClose();
+  const c = ALL.find(x => x.id === cid);
+  if (!c) return;
+  const kid = cid + '번 ' + (c.name || '');
+  const memo = String(c.memo == null ? '' : c.memo).trim();
+  const wrap = document.createElement('div');
+  wrap.id = 'thvWrap';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;'
+    + 'display:flex;align-items:flex-start;justify-content:center;overflow:auto;'
+    + 'padding:30px 12px;box-sizing:border-box;';
+  const ag = c.birth ? ageOf(c.birth) : '';
+  wrap.innerHTML =
+    '<div style="background:#fff;border-radius:12px;max-width:720px;width:100%;'
+    + 'padding:18px 20px;box-sizing:border-box;font-size:14px;color:#333;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+    +   '<div style="font-size:16px;font-weight:bold;color:#1a468f;">' + esc(kid)
+    +     (ag ? ' <span style="font-weight:normal;color:#777;font-size:13px;">· ' + esc(ag) + '</span>' : '')
+    +   '</div>'
+    +   '<button type="button" data-x="1" class="thview" style="background:#fff;color:#444;border-color:#cfd6cc;">닫기</button>'
+    + '</div>'
+    + '<div style="margin-top:14px;font-weight:bold;">초기 상담'
+    +   (c.memo_at ? ' <span style="font-weight:normal;color:#777;font-size:12.5px;">· ' + esc(c.memo_at) + ' 적음</span>' : '')
+    + '</div>'
+    + '<div style="background:#f5f7f4;border-radius:8px;padding:10px 12px;margin-top:5px;'
+    +   'white-space:pre-wrap;word-break:break-all;line-height:1.6;">'
+    +   (memo ? esc(memo) : '<span style="color:#999;">적힌 내용이 없습니다.</span>')
+    + '</div>'
+    + '<div style="margin-top:16px;font-weight:bold;">평가보고서</div>'
+    + '<div id="thvDocs" style="margin-top:4px;">불러오는 중...</div>'
+    + '<div style="margin-top:12px;color:#999;font-size:12px;">보기 전용입니다. 고칠 내용은 행정실에 말씀해 주세요.</div>'
+    + '</div>';
+  document.body.appendChild(wrap);
+  wrap.addEventListener('click', ev => {
+    if (ev.target === wrap || ev.target.closest('[data-x]')) thClose();
+  });
+
+  const box = wrap.querySelector('#thvDocs');
+  const { data, error } = await sb.from('nl_eval_docs')
+    .select('eval_id, source, title, doc_date').eq('child_id', cid);
+  if (!document.getElementById('thvWrap')) return;
+  if (error) { box.textContent = '❌ 보고서를 불러오지 못했습니다. ' + error.message; return; }
+  // 우리 센터 것은 평가마다, 타기관 것은 한 묶음
+  const G = {};
+  (data || []).forEach(r => {
+    const k = r.source === '타기관' ? 'other' : 'ev' + r.eval_id;
+    if (!G[k]) G[k] = { src: r.source === '타기관' ? '타기관' : '센터', ev: r.eval_id,
+                       title: r.title || '', date: r.doc_date || '', n: 0 };
+    G[k].n++;
+    if ((r.doc_date || '') > G[k].date) { G[k].date = r.doc_date || ''; G[k].title = r.title || G[k].title; }
+  });
+  const keys = Object.keys(G).sort((a, b) => (G[b].date || '').localeCompare(G[a].date || ''));
+  if (!keys.length) { box.innerHTML = '<div style="color:#999;padding:4px 0;">올린 보고서가 없습니다.</div>'; return; }
+  box.innerHTML = keys.map(k => {
+    const g = G[k];
+    const nm = g.src === '타기관' ? '타기관 평가보고서' : (g.title || '우리 센터 평가보고서');
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eee;">'
+      + '<span style="flex:1;">' + esc(g.date || '날짜 없음') + ' · ' + esc(nm) + ' · 파일 ' + g.n + '개</span>'
+      + '<button type="button" class="thview" data-k="' + k + '">보기</button></div>';
+  }).join('');
+  box.querySelectorAll('[data-k]').forEach(b => {
+    const g = G[b.dataset.k];
+    b.onclick = () => NLDocs.open(g.src === '타기관'
+      ? { cid: cid, kid: kid, source: '타기관' }
+      : { cid: cid, kid: kid, source: '센터', evalId: Number(g.ev), title: g.title, date: g.date });
+  });
+}
+
+// 목록의 단추 — 줄 전체에 묶지 않고 단추만 받는다
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-thv]');
+  if (!b) return;
+  ev.stopPropagation();
+  thOpen(Number(b.dataset.thv));
+});
+
+// ── 평가보고서 (2026-09-11) ──────────────────
+// 우리 센터 평가마다 「평가보고서」 단추, 맨 아래 「타기관 평가보고서」 단추.
+// 올리기·보기 창은 신규 아동 관리와 같은 것(nl-evaldocs.js)을 쓴다
+// 흰 테두리 단추 (2026-09-17 꾸밈 B — 전에는 하늘색 면)
+const DOCBTN = 'width:auto;margin:0;padding:4px 11px;background:#fff;color:#4A433F;'
+             + 'border:1px solid #E4E0DA;border-radius:6px;font-size:12.5px;font-weight:500;';
+async function drawDocs(cid) {
+  const box = $('e_docs');
+  if (!box) return;
+  if (!window.NLDocs || !NLDocs.canUse()) {
+    box.textContent = '평가보고서는 관리자(8·9번)만 볼 수 있습니다.'; return;
+  }
+  box.innerHTML = '불러오는 중...';
+  if ($('e_docOther')) $('e_docOther').innerHTML = '';
+  const [ev, ty, cnt] = await Promise.all([
+    sb.from('nl_evaluations').select('id, eval_date, eval_type_id, status')
+      .eq('child_id', cid).order('eval_date'),
+    sb.from('nl_eval_types').select('id, name'),
+    NLDocs.count(cid)
+  ]);
+  if (edId !== cid) return;   // 그 사이 다른 아동을 열었으면 그리지 않는다
+  if (ev.error) { box.textContent = '❌ 평가를 불러오지 못했습니다. ' + ev.error.message; return; }
+  const tn = {}; (ty.data || []).forEach(t => { tn[t.id] = t.name; });
+  const c  = ALL.find(x => x.id === cid);
+  const kid = cid + '번 ' + (c ? c.name : '');
+  const evs = ev.data || [];
+  let h = '';
+  evs.forEach(e => {
+    const nm = tn[e.eval_type_id] || '평가';
+    const n  = cnt.byEval[e.id] || 0;
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;'
+       +   'border-bottom:1px solid #e3ecf5;' + (e.status === '취소' ? 'color:#9a9a9a;' : '') + '">'
+       + '<span style="flex:1;">' + esc(e.eval_date || '날짜 없음') + ' · ' + esc(nm)
+       +   ' · ' + esc(e.status || '예정') + '</span>'
+       + '<button type="button" data-ev="' + e.id + '" data-t="' + esc(nm + ' 결과보고서') + '"'
+       +   ' data-d="' + esc(e.eval_date || '') + '" style="' + DOCBTN + '">평가보고서 '
+       +   (n || '') + '</button></div>';
+  });
+  if (!evs.length) h += '<div style="color:#888;padding:4px 0;">우리 센터 평가 기록이 없습니다.</div>';
+  box.innerHTML = h;
+  // 「타기관 평가보고서」는 「평가보고서」 제목 옆에 둔다 (2026-09-17)
+  const oth = $('e_docOther');
+  if (oth) oth.innerHTML = '<button type="button" data-other="1" style="' + DOCBTN + '">'
+     + '타기관 평가보고서 ' + (cnt.other || '') + '</button>';
+
+  box.querySelectorAll('[data-ev]').forEach(b => {
+    b.onclick = () => NLDocs.open({
+      cid: cid, kid: kid, source: '센터', evalId: Number(b.dataset.ev),
+      title: b.dataset.t, date: b.dataset.d, onChange: () => drawDocs(cid)
+    });
+  });
+  const othBtn = oth ? oth.querySelector('[data-other]') : null;
+  if (othBtn) othBtn.onclick = () => NLDocs.open({
+    cid: cid, kid: kid, source: '타기관', onChange: () => drawDocs(cid)
+  });
+}
+
+// ── 체험 수업 칸 (2026-09-16) — 8·9·11번만. 치료중 아동도 잡을 수 있다 ──
+function drawTrials(cid) {
+  const box = $('e_trials');
+  if (!box) return;
+  if (!window.NLTrials || ![8, 19, 11].includes(MEID)) {
+    box.style.display = 'none'; box.innerHTML = ''; return;
+  }
+  box.style.display = 'block';
+  NLTrials.mount(box, cid);
+}
+
+// ── 지원 카드번호 (2026-09-16) ──────────────────
+//   표 nl_child_cards (아동·갈래마다 한 줄) · 8·9번만 보고 적음 (표 잠금도 8·9번)
+//   칸마다 따로 저장. 수정 전 글자 화면·목록에는 보이지 않는다
+const CARD_KINDS = ['치료지원', '방과후'];
+let CARD_ORIG = {};   // 갈래 -> 저장된 메모
+function cardCan() { return MEID === 8 || MEID === 19; }
+async function drawCards(cid) {
+  const box = $('e_cards');
+  if (!box) return;
+  CARD_ORIG = {};
+  if (!cardCan()) {
+    box.style.display = 'none'; box.innerHTML = '';
+    if ($('e_cardView')) { $('e_cardView').style.display = 'none'; $('e_cardView').innerHTML = ''; }
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = '불러오는 중...';
+  if ($('e_cardView')) { $('e_cardView').style.display = 'block'; $('e_cardView').textContent = '💳 불러오는 중...'; }
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('nl_child_cards')
+      .select('kind, memo, updated_by, updated_at').eq('child_id', cid);
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    box.innerHTML = '카드번호를 가져오지 못했습니다. ' + esc(e.message || e);
+    return;
+  }
+  if (edId !== cid) return;
+  const by = {}; rows.forEach(r => { by[r.kind] = r; });
+  box.innerHTML = '<div style="font-size:12.5px; font-weight:700; color:#8a4b00; margin-bottom:8px;">'
+    + '💳 지원 카드번호 <span style="font-weight:normal;color:#a07a4a;font-size:12px;">'
+    + '— 대표 · 행정만 보입니다</span></div>'
+    + CARD_KINDS.map(k => {
+        const r = by[k] || {};
+        CARD_ORIG[k] = String(r.memo || '');
+        const who = r.updated_at
+          ? String(r.updated_at).slice(0, 10) + ' · ' + (r.updated_by ? r.updated_by + '번' : '')
+          : '';
+        return '<div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">'
+          + '<span style="width:92px; font-size:13px;">' + k + ' 카드</span>'
+          + '<input class="cardin" data-kind="' + k + '" type="text" autocomplete="off"'
+          + ' value="' + esc(r.memo || '').replace(/"/g, '&quot;') + '"'
+          + ' placeholder="카드번호 · 카드사 · 재발급 등" style="flex:1; min-width:200px; margin:0;">'
+          + '<button type="button" class="cardsave' + (r.memo ? ' done' : '') + '" data-kind="' + k + '">'
+          + (r.memo ? '\u2713 저장됨' : '💾 저장 전') + '</button>'
+          + '</div>'
+          + '<div style="font-size:11.5px; color:#a07a4a; margin:0 0 8px 100px;" data-who="' + k + '">'
+          + (who ? '고친 날 ' + esc(who) : '') + '</div>';
+      }).join('');
+  box.querySelectorAll('.cardin').forEach(el => {
+    el.addEventListener('input', () => {
+      const b = box.querySelector('.cardsave[data-kind="' + el.dataset.kind + '"]');
+      if (b) { b.classList.remove('done'); b.textContent = '💾 저장 전'; }
+    });
+  });
+  box.querySelectorAll('.cardsave').forEach(b => {
+    b.onclick = () => saveCard(cid, b.dataset.kind, b);
+  });
+  drawCardView();
+}
+// 수정 전 글자 화면 오른쪽 — 저장된 카드번호 그대로
+function drawCardView() {
+  const v = $('e_cardView');
+  if (!v) return;
+  if (!cardCan()) { v.style.display = 'none'; v.innerHTML = ''; return; }
+  v.style.display = 'block';
+  v.innerHTML = '<div style="font-weight:700; color:#8a4b00;">💳 지원 카드번호</div>'
+    + CARD_KINDS.map(k => {
+        const m = String(CARD_ORIG[k] || '').trim();
+        return '<div><span style="display:inline-block; width:60px; color:#a07a4a;">' + k + '</span>'
+          + (m ? esc(m) : '<span style="color:#bbb;">없음</span>') + '</div>';
+      }).join('');
+}
+async function saveCard(cid, kind, btn) {
+  const box = $('e_cards');
+  const el = box.querySelector('.cardin[data-kind="' + kind + '"]');
+  if (!el) return;
+  const v = el.value.trim();
+  btn.disabled = true; btn.classList.remove('done'); btn.textContent = '저장 중…';
+  try {
+    const now = new Date().toISOString();
+    const { error } = await sb.from('nl_child_cards')
+      .upsert({ child_id: cid, kind: kind, memo: v || null,
+                updated_by: MEID, updated_at: now },
+              { onConflict: 'child_id,kind' });
+    if (error) throw error;
+    CARD_ORIG[kind] = v;
+    el.value = v;
+    drawCardView();
+    btn.classList.add('done'); btn.textContent = '\u2713 저장됨';
+    const w = box.querySelector('[data-who="' + kind + '"]');
+    if (w) w.textContent = '고친 날 ' + now.slice(0, 10) + ' · ' + MEID + '번';
+  } catch (e) {
+    alert('카드번호를 저장하지 못했습니다.\n' + (e.message || e));
+    btn.textContent = '💾 저장 전';
+  } finally {
+    btn.disabled = false;
+  }
+}
+// 적고 저장을 안 누른 카드 칸
+function cardPendingN() {
+  const box = $('e_cards');
+  if (!box || box.style.display === 'none') return 0;
+  if ($('edBox').style.display === 'none') return 0;
+  return Array.from(box.querySelectorAll('.cardin'))
+    .filter(el => el.value.trim() !== String(CARD_ORIG[el.dataset.kind] || '').trim()).length;
+}
+function trialPendingN() {
+  if ($('edBox').style.display === 'none') return 0;
+  return window.NLTrials ? NLTrials.pendingN() : 0;
+}
+function cardLeaveOk() {
+  const n = cardPendingN(), t = trialPendingN();
+  if (!n && !t) return true;
+  const what = [];
+  if (n) what.push('카드번호 칸 ' + n + '개');
+  if (t) what.push('체험 수업 ' + t + '줄');
+  return confirm(what.join(' · ') + '을(를) 아직 저장하지 않았습니다.\n\n그래도 나갈까요? (적어 둔 것은 사라집니다)');
+}
+window.addEventListener('beforeunload', e => {
+  if (!cardPendingN() && !trialPendingN()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+// ── 학부모 계정 ──────────────────────────────
+// 번호가 바뀌면 표의 아이디만 고친다. 계정과 비밀번호는 그대로 둔다
+async function drawAcc(cid) {
+  const box = $('e_acc');
+  if (!box) return;
+  box.innerHTML = '불러오는 중...';
+  try {
+    const { data: pc } = await sb.from('nl_parent_children')
+      .select('account_id').eq('child_id', cid);
+    if (!pc || !pc.length) { drawNoAcc(box, cid); return; }
+    const ids = pc.map(x => x.account_id);
+    const { data: acc } = await sb.from('nl_parent_accounts')
+      .select('id, login_id, last_login, active, must_change, phone').in('id', ids);
+    if (!acc || !acc.length) { drawNoAcc(box, cid); return; }
+    // 임시 비번 — 8·9번만 보인다 (표 잠금). 학부모가 바꾸면 저절로 지워짐 (2026-09-22)
+    const TPW = {}, TPWAT = {};
+    try {
+      const { data: tp } = await sb.from('nl_parent_temp_pw')
+        .select('account_id, temp_pw, updated_by, updated_at').in('account_id', ids);
+      (tp || []).forEach(r => { TPW[r.account_id] = r.temp_pw; TPWAT[r.account_id] = r; });
+    } catch (e) {}
+    box.innerHTML = acc.map(a =>
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">'
+      + '<b style="font-size:17px;color:#2e3d2c;letter-spacing:0.5px;">'
+      + esc(a.login_id) + '</b>'
+      + '<span style="font-size:12px;color:#9aa19c;">'
+      + (a.last_login
+          ? '마지막 로그인 ' + String(a.last_login).slice(5,10).replace('-','월 ') + '일'
+          : '아직 들어온 적 없음')
+      + (a.active === false ? ' · 꺼짐' : '') + '</span>'
+      + '<button type="button" class="accchg" data-acc="' + a.id + '"'
+      + ' data-lid="' + esc(a.login_id) + '"'
+      + ' data-ph="' + esc(a.phone || '') + '"'
+      + ' data-mc="' + (a.must_change === false ? '0' : '1') + '"'
+      + ' style="width:auto;margin:0;padding:8px 16px;background:#2c5c37;'
+      + 'color:#fff;font-size:13px;font-weight:700;border:none;border-radius:8px;'
+      + 'cursor:pointer;">' + (/^p[0-9]{4}$/.test(String(a.login_id)) ? '휴대폰 번호로 바꾸기' : '번호 바꾸기') + '</button>'
+      + ([8, 19].includes(Number(MEID)) && a.active !== false
+          ? '<button type="button" class="accreset" data-acc="' + a.id + '"'
+            + ' data-cid="' + cid + '" data-lid="' + esc(a.login_id) + '"'
+            + ' style="width:auto;margin:0;padding:8px 16px;background:#fff;'
+            + 'color:#2c5c37;font-size:13px;font-weight:700;border:1px solid #cfd8cc;'
+            + 'border-radius:8px;cursor:pointer;">비밀번호 초기화</button>'
+          : '')
+      + '</div>'
+      + tpwLine(a, TPW[a.id], TPWAT[a.id])).join('')
+      + '<div style="font-size:12px;color:#9aa19c;">'
+      + '한 계정으로 형제·자매를 함께 봅니다. 번호를 바꾸면 그 집 전체에 적용됩니다.<br>'
+      + '비밀번호는 그대로입니다. 새 번호와 쓰시던 비밀번호로 들어오십니다.'
+      + ([8, 19].includes(Number(MEID))
+          ? '<br>비밀번호를 잊으셨을 때 — 등록된 보호자 번호에서 온 연락인지 확인한 뒤 「비밀번호 초기화」.'
+            + ' 다른 번호로 요청하시면 등록된 번호로 다시 걸어 확인합니다.'
+          : '')
+      + '</div>';
+    box.querySelectorAll('.accchg').forEach(b => { b.onclick = () => changeAcc(b); });
+    box.querySelectorAll('.accreset').forEach(b => { b.onclick = () => resetAcc(b); });
+    box.querySelectorAll('.acccopy').forEach(b => { b.onclick = () => copyAccGuide(b); });
+  } catch (e) {
+    box.innerHTML = '계정을 가져오지 못했습니다.';
+  }
+}
+
+// 임시 비번 줄 (2026-09-22)
+function tpwLine(a, pw, at) {
+  if (![8, 19].includes(Number(MEID))) return '';
+  let h = '<div style="margin:0 0 8px;font-size:13px;color:#5a6156;">';
+  if (a.must_change === false) {
+    h += '학부모가 비밀번호를 바꾸셨습니다.';
+  } else if (pw) {
+    h += '임시 비밀번호 <b style="font-size:16px;color:#2e3d2c;letter-spacing:1px;">'
+       + esc(pw) + '</b>'
+       + ' <button type="button" class="acccopy" data-lid="' + esc(a.login_id) + '"'
+       + ' data-pw="' + esc(pw) + '"'
+       + ' style="width:auto;margin:0 0 0 8px;padding:6px 12px;background:#fff;'
+       + 'color:#2c5c37;border:1px solid #cfd8cc;border-radius:8px;font-size:12.5px;'
+       + 'cursor:pointer;">안내 문구 복사</button>'
+       + (at && at.updated_at
+           ? ' <span style="font-size:12px;color:#9aa19c;margin-left:6px;">('
+             + Number(String(at.updated_at).slice(5, 7)) + '월 '
+             + Number(String(at.updated_at).slice(8, 10)) + '일'
+             + (at.updated_by ? ' · ' + at.updated_by + '번' : '') + ')</span>'
+           : '');
+  } else {
+    h += '임시 비밀번호 — 이 화면에 없음 (네이버 클라우드 목록을 보세요)';
+  }
+  return h + '</div>';
+}
+
+// 문자에 붙일 안내 글 (2026-09-22)
+async function copyAccGuide(btn) {
+  const t = '자라는나무 학부모 앱 안내\n'
+    + '주소 https://jet73kyj.github.io/namu-link/parent.html\n'
+    + '아이디 ' + btn.dataset.lid + ' / 비밀번호 ' + btn.dataset.pw + '\n'
+    + '처음 들어오시면 비밀번호를 새로 정해 주세요.';
+  try {
+    await navigator.clipboard.writeText(t);
+    btn.textContent = '✓ 복사됨';
+    setTimeout(() => { btn.textContent = '안내 문구 복사'; }, 2000);
+  } catch (e) {
+    prompt('아래 글을 복사하세요 (Ctrl+C)', t);
+  }
+}
+
+// 계정이 없는 아동 — 계정 만들기 (8·9번만 · 2026-09-26)
+//   서버 함수 parent-create 가 아이디(p 번호)·임시 비번을 만든다
+//   같은 보호자 번호 계정이 있으면 형제로 묶을지 묻는다
+async function drawNoAcc(box, cid) {
+  let h = '이 아동에게 이어진 계정이 없습니다.';
+  if ([8, 19].includes(Number(MEID))) {
+    h += '<div style="margin-top:8px;"><button type="button" id="accAttach"'
+       + ' style="width:auto;margin:0;padding:8px 16px;background:#2c5c37;color:#fff;'
+       + 'font-size:13px;font-weight:700;border:none;border-radius:8px;cursor:pointer;">'
+       + '계정 만들기</button>'
+       + '<span style="font-size:12px;color:#9aa19c;margin-left:8px;">'
+       + '아이디(p 번호)와 임시 비밀번호가 저절로 생깁니다 · 같은 번호의 형제·자매가 있으면 여쭙니다</span></div>';
+  }
+  box.innerHTML = h;
+  const b = $('accAttach');
+  if (b) b.onclick = () => attachAcc(cid);
+}
+
+async function callParentFn(body) {
+  const { data: s } = await sb.auth.getSession();
+  const tok = (s && s.session) ? s.session.access_token : '';
+  const r = await fetch(URL_ + '/functions/v1/parent-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok, 'apikey': KEY_ },
+    body: JSON.stringify(body)
+  });
+  let j = {};
+  try { j = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, data: j || {} };
+}
+
+async function attachAcc(cid) {
+  let guess = '';
+  try {
+    const { data: c } = await sb.from('nl_children').select('phone').eq('id', cid).maybeSingle();
+    guess = String((c && c.phone) || '').replace(/[^0-9]/g, '').slice(0, 11);
+  } catch (e) {}
+  const v = prompt('보호자 휴대폰 번호를 넣으세요 (숫자만)\n'
+    + '모르면 비워 두고 확인 — 아이디는 p 번호로 저절로 생깁니다.\n'
+    + '같은 번호의 형제·자매 계정이 있으면 묶을지 여쭙니다.', guess);
+  if (v === null) return;
+  const ph = String(v).replace(/[^0-9]/g, '');
+  if (ph && (ph.length < 10 || ph.length > 11)) { alert('휴대폰 번호를 다시 넣어주세요.'); return; }
+
+  const btn = $('accAttach');
+  if (btn) { btn.disabled = true; btn.textContent = '만드는 중...'; }
+  try {
+    let res = await callParentFn({ child_id: Number(cid), phone: ph, mode: 'check' });
+    if (res.ok && res.data.need_confirm) {
+      const kids = (res.data.kids || []).join(', ');
+      if (confirm('이 번호로 이미 학부모 계정이 있습니다.\n'
+          + '아이디 ' + res.data.login_id + ' · 자녀 ' + kids + '번\n\n'
+          + '형제·자매로 한 계정에 묶을까요?\n[확인] 묶기   [취소] 묶지 않기')) {
+        res = await callParentFn({ child_id: Number(cid), mode: 'join', account_id: res.data.account_id });
+      } else {
+        if (!confirm('묶지 않고 이 아동만의 새 계정을 따로 만들까요?')) return;
+        res = await callParentFn({ child_id: Number(cid), phone: ph, mode: 'new' });
+      }
+    }
+    if (!res.ok) {
+      alert('만들지 못했습니다.\n' + (res.data.message || ('오류 ' + res.status)));
+      return;
+    }
+    if (res.data.joined) {
+      alert('형제·자매 계정(' + res.data.login_id + ')에 묶었습니다.\n'
+        + '쓰시던 아이디·비밀번호 그대로 이 아동도 보입니다.');
+    } else {
+      alert('학부모 계정을 만들었습니다.\n\n'
+        + '아이디 ' + res.data.login_id + '\n'
+        + '임시 비밀번호 ' + res.data.temp_pin + '\n\n'
+        + '다음 차례 — 「휴대폰 번호로 바꾸기」로 아이디를 학부모 번호로 바꾼 뒤\n'
+        + '「안내 문구 복사」로 보내 드리세요.');
+    }
+    drawAcc(cid);
+    if (typeof drawMobile === 'function') drawMobile(cid);
+  } catch (e) {
+    alert('만들지 못했습니다.\n' + (e && e.message ? e.message : e));
+  } finally {
+    const b2 = $('accAttach');
+    if (b2) { b2.disabled = false; b2.textContent = '계정 만들기'; }
+  }
+}
+
+// 비밀번호 초기화 (8·9번만 · 2026-09-29)
+//   서버 함수 parent-reset — 새 임시 4자리 · 비번 바꿔야 함 · 잠금 풂 · 임시 비번 표에 적음
+//   화면은 그 상자의 계정 번호를 함께 보낸다 (한 아동에 계정이 둘일 때 엉뚱한 계정을 막음)
+async function resetAcc(btn) {
+  const lid = String(btn.dataset.lid || '');
+  if (!confirm('학부모 계정 ' + lid + ' 의 비밀번호를 초기화합니다.\n\n'
+      + '형제·자매가 함께 쓰는 계정이면 모두 같은 비밀번호가 바뀝니다.\n'
+      + '쓰시던 비밀번호로는 더 이상 들어오실 수 없습니다.\n\n'
+      + '등록된 보호자 번호로 본인 확인을 하셨나요?')) return;
+  btn.disabled = true; btn.textContent = '초기화 중...';
+  try {
+    const { data: s } = await sb.auth.getSession();
+    const tok = (s && s.session) ? s.session.access_token : '';
+    const r = await fetch(URL_ + '/functions/v1/parent-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok, 'apikey': KEY_ },
+      body: JSON.stringify({ child_id: Number(btn.dataset.cid), account_id: Number(btn.dataset.acc) })
+    });
+    let j = {};
+    try { j = await r.json(); } catch (e) {}
+    if (!r.ok || !j || !j.temp_pin) {
+      alert('초기화하지 못했습니다.\n' + ((j && j.message) || ('오류 ' + r.status)));
+      return;
+    }
+    alert('초기화했습니다. (아이디 ' + j.login_id + ')\n\n'
+      + '상자에 새 임시 비밀번호가 보입니다.\n'
+      + '「안내 문구 복사」로 등록된 번호에만 보내 주세요.\n'
+      + '학부모가 들어오시면 새 비밀번호를 정하는 창이 먼저 뜹니다.');
+    drawAcc(Number(btn.dataset.cid));
+    if (typeof drawMobile === 'function') drawMobile(Number(btn.dataset.cid));
+  } catch (e) {
+    alert('초기화하지 못했습니다.\n' + (e && e.message ? e.message : e));
+  } finally {
+    if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = '비밀번호 초기화'; }
+  }
+}
+
+async function changeAcc(btn) {
+  const old = String(btn.dataset.lid || '');
+  const isP = /^p[0-9]{4}$/.test(old);
+  const v = prompt((isP
+      ? '학부모 휴대폰 번호를 넣으세요 (숫자만)\n이 번호가 새 아이디가 됩니다.'
+      : '새 휴대폰 번호를 넣으세요 (숫자만)')
+    + '\n\n지금 아이디 : ' + old, isP ? String(btn.dataset.ph || '') : '');
+  if (v === null) return;
+  const nw = String(v).replace(/[^0-9]/g, '');
+  if (nw.length < 10 || nw.length > 11) { alert('휴대폰 번호를 다시 넣어주세요.'); return; }
+  if (nw === old) { alert('지금 번호와 같습니다.'); return; }
+
+  try {
+    const { data: dup } = await sb.from('nl_parent_accounts')
+      .select('id').eq('login_id', nw).maybeSingle();
+    if (dup) { alert('그 번호를 쓰는 계정이 이미 있습니다.\n다른 번호를 넣어주세요.'); return; }
+  } catch (e) {}
+
+  if (!confirm('아이디를 ' + old + ' → ' + nw + ' 로 바꿀까요?\n\n'
+    + '비밀번호는 그대로입니다.\n형제·자매가 있으면 함께 적용됩니다.')) return;
+
+  // 돌려받은 줄 수로 실제로 바뀌었는지 본다 (0줄이면 오류가 없어도 실패)
+  const { data: upd, error } = await sb.from('nl_parent_accounts')
+    .update({ login_id: nw, phone: nw }).eq('id', Number(btn.dataset.acc)).select('id, login_id');
+  if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
+  if (!upd || upd.length !== 1 || upd[0].login_id !== nw) {
+    alert('바꾸지 못했습니다.\n(바뀐 줄 ' + (upd ? upd.length : 0) + '개 · 계정 ' + btn.dataset.acc + ')');
+    return;
+  }
+  const note = '자라는나무 학부모 앱 아이디가 바뀌었습니다.\n'
+    + '새 아이디 ' + nw + ' (휴대폰 번호)\n'
+    + '비밀번호는 쓰시던 그대로입니다.\n'
+    + '주소 https://jet73kyj.github.io/namu-link/parent.html';
+  if (btn.dataset.mc === '1') {
+    alert('바꿨습니다. 새 아이디 ' + nw + '\n\n'
+      + '아직 첫 로그인 전입니다.\n'
+      + '아래 「안내 문구 복사」로 새 아이디와 임시 비밀번호를 보내 드리세요.');
+  } else if (confirm('바꿨습니다.\n\n새 번호 ' + nw + ' 와 쓰시던 비밀번호로 들어오시면 됩니다.\n\n'
+      + '학부모께 보낼 안내 문구를 복사할까요?')) {
+    try { await navigator.clipboard.writeText(note); alert('복사했습니다. 문자에 붙여 보내 주세요.'); }
+    catch (e) { prompt('아래 글을 복사하세요 (Ctrl+C)', note); }
+  }
+  drawAcc(edId);
+}
+
+// ── 발달재활 등급 ────────────────────────────
+// 등급은 달마다 따로 둘 수 있다 (도중에 바뀔 수 있으므로)
+const GRADE_PAY = { '가':20000, '나':40000, '다':0, '라':60000, '마':80000 };
+
+function thisMonth() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+// 고른 등급 단추에 색을 입힌다
+function markGrade(g) {
+  document.querySelectorAll('#grbtns .grb').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.g === (g || ''));
+  });
+}
+
+// 등급 단추를 누르면 본인부담금이 자동으로 채워진다
+document.addEventListener('click', function (e) {
+  const b = e.target.closest ? e.target.closest('#grbtns .grb') : null;
+  if (!b) return;
+  const g = b.dataset.g || '';
+  $('e_gr').value = g;
+  $('e_gr_pay').value = (g && GRADE_PAY[g] !== undefined)
+    ? String(GRADE_PAY[g]) : '';
+  markGrade(g);
+});
+
+async function loadGrade(id) {
+  $('e_gr').value = '';
+  $('e_gr_pay').value = '';
+  $('e_gr_from').value = thisMonth();
+  $('e_gr_hist').textContent = '';
+  markGrade('');
+  try {
+    const { data, error } = await sb.from('nl_child_grades')
+      .select('grade, self_pay, from_month')
+      .eq('child_id', id)
+      .order('from_month', { ascending: false });
+    if (error) throw error;
+    if (!data || !data.length) {
+      $('e_gr_hist').textContent = '아직 등급이 없습니다.';
+      return;
+    }
+    const last = data[0];
+    $('e_gr').value      = last.grade || '';
+    $('e_gr_pay').value  = (last.self_pay == null ? '' : String(last.self_pay));
+    $('e_gr_from').value = last.from_month || thisMonth();
+    markGrade(last.grade || '');
+    $('e_gr_hist').textContent = '지난 등급 — '
+      + data.map(function (r) {
+          return r.from_month + ' 부터 ' + r.grade + '형 '
+               + Number(r.self_pay || 0).toLocaleString() + '원';
+        }).join(' · ');
+  } catch (e) {
+    $('e_gr_hist').textContent = '등급을 읽지 못했습니다. ' + e.message;
+  }
+}
+
+// 등급을 저장한다. 같은 달 것이 있으면 고치고, 없으면 새로 넣는다
+async function saveGrade(id) {
+  return '';   // 등급은 납부 계산 화면에서 고친다 (2026-09-15)
+  // eslint-disable-next-line
+  const fm = $('e_gr_from').value;
+  if (!fm) throw new Error('등급의 「언제부터」를 정하세요.');
+  const pay = Number(String($('e_gr_pay').value).replace(/[^0-9]/g, ''));
+  if (isNaN(pay)) throw new Error('본인부담금이 숫자가 아닙니다.');
+  const { error } = await sb.from('nl_child_grades')
+    .upsert({ child_id: id, grade: g, self_pay: pay, from_month: fm },
+            { onConflict: 'child_id,from_month' });
+  if (error) throw error;
+  return '\n등급 ' + g + '형 · ' + pay.toLocaleString() + '원 (' + fm + ' 부터) 저장했습니다.';
+}
+
+$('e_gadd').onclick = () => {
+  GROWS.push({ relation:'', name:'', phone:'' });
+  drawGRows();
+};
+
+// 보호자 연락처를 표에 갈아끼운다 (그 아동 것만 지우고 새로 넣는다)
+async function saveGuards(id){
+  const rows = GROWS
+    .filter(g => String(g.phone || '').trim())
+    .map((g, i) => ({
+      child_id: id,
+      relation: g.relation || '미상',
+      name: (g.name || '').trim() || null,
+      phone: String(g.phone).trim(),
+      is_primary: i === 0
+    }));
+  // 옛 줄을 들고 있다가, 새로 넣다 실패하면 되돌린다 (2026-09-21)
+  //   전에는 지운 뒤 넣다가 실패하면 보호자 번호가 모두 사라졌다
+  const old = await sb.from('nl_guardians').select('*').eq('child_id', id);
+  if (old.error) throw old.error;
+  const del = await sb.from('nl_guardians').delete().eq('child_id', id);
+  if (del.error) throw del.error;
+  if (rows.length) {
+    const ins = await sb.from('nl_guardians').insert(rows);
+    if (ins.error) {
+      const back = (old.data || []).map(r => { const c = Object.assign({}, r); delete c.id; return c; });
+      if (back.length) await sb.from('nl_guardians').insert(back);
+      throw new Error('연락처를 저장하지 못해 전 내용으로 되돌렸습니다.\n' + ins.error.message);
+    }
+  }
+  GUARD[id] = rows;
+  return rows;
+}
+
+$('cancelEdit').onclick = () => { if (!cardLeaveOk()) return; $('edBox').style.display = 'none'; edId = null; };
+$('e_backList').onclick = () => {
+  if (!cardLeaveOk()) return;
+  $('edBox').style.display = 'none'; edId = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+$('saveEdit').onclick = async () => {
+  if (!edId) return;
+  const name = $('e_name').value.trim();
+  if (!name) { show4('이름을 입력하세요.', false); return; }
+  const badTel = GROWS.findIndex(g => String(g.phone || '').trim() && !telOk(g.phone));
+  if (badTel >= 0) { show4((badTel + 1) + '번째 연락처 숫자 자리 수가 맞지 않습니다. (휴대폰 11자리 · 일반 전화 9~11자리)', false); return; }
+
+  const before = ALL.find(x => x.id === edId);
+  const newSt  = $('e_status').value;
+  if (before && before.status !== newSt) {
+    if (!confirm('상태를 ' + before.status + ' → ' + newSt + ' 로 바꿉니다.\n계속할까요?')) return;
+  }
+
+  const up = {
+    manager_no: $('e_no').value.trim() || null,
+    name:       name,
+    birth:      $('e_birth').value || null,
+    status:     newSt,
+    gender:     $('e_gender').value || null,
+    phone:      (GROWS.find(g => String(g.phone || '').trim()) || {}).phone || null,
+    guardian:   ((GROWS.find(g => String(g.phone || '').trim()) || {}).name || '').trim() || null,
+    diagnosis:  $('e_diagnosis').value.trim() || null,
+    disability: $('e_disability').value.trim() || null,
+    school:     $('e_school').value.trim() || null,
+    grade_year: $('e_grade').value.trim() || null,
+    memo:       $('e_memo').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+
+  $('saveEdit').disabled = true;
+  $('saveEdit').textContent = '저장 중...';
+  try {
+    const { data, error } = await sb.from('nl_children')
+      .update(up).eq('id', edId)
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .single();
+    if (error) throw error;
+
+    const i = ALL.findIndex(x => x.id === edId);
+    if (i >= 0) ALL[i] = data;
+    ALL.sort((a, b) => (a.id || 0) - (b.id || 0));
+    draw();
+
+    let gmsg = '';
+    try {
+      const gr = await saveGuards(edId);
+      gmsg += '\n연락처 ' + gr.length + '개를 저장했습니다.';
+      draw();
+    } catch (ge) { gmsg += '\n⚠️ 연락처는 저장하지 못했습니다. ' + ge.message; }
+    try { gmsg += await saveGrade(edId); await loadGrade(edId); }
+    catch (ge) { gmsg += '\n⚠️ 등급은 저장하지 못했습니다. ' + ge.message; }
+
+    const cNow = ALL.find(x => x.id === edId);
+    if (cNow) drawBasic(cNow);
+    drawMobile(edId);
+    openBasicForm(false);   // 저장하면 글자 화면으로 돌아간다
+    show4('✅ 저장했습니다.'
+      + (before && before.status !== newSt
+         ? '\n상태를 ' + newSt + ' 로 바꿨습니다. 시간표와 납부 내역에도 반영됩니다.' : '')
+      + gmsg, true);
+
+    // 종결·대기중이던 아동을 다시 「치료중」으로 바꾼 경우
+    //   옛 수업은 종결된 채 남아 있으므로 시간표에서 새로 넣어야 한다
+    if (before && before.status !== '치료중' && newSt === '치료중') {
+      if (confirm(name + ' 아동을 「치료중」으로 바꿨습니다.\n\n'
+        + '옛 수업은 종결된 채로 남아 있습니다.\n'
+        + '지난 기록은 그대로 두고, 시간표에서 수업을 새로 넣어 주세요.\n\n'
+        + '확인 = 시간표로 가기\n'
+        + '취소 = 아동 목록에 머물기')) {
+        location.href = 'schedule.html';
+      }
+    }
+  } catch (e) {
+    show4('❌ 저장하지 못했습니다.\n' + e.message, false);
+  } finally {
+    $('saveEdit').disabled = false;
+    $('saveEdit').textContent = '저장';
+  }
+};
+
+$('q').addEventListener('input', () => {
+  // 고치기 창이 열려 있으면 목록이 아래로 밀려 안 보인다. 닫아준다 (2026-09-09)
+  if ($('edBox') && $('edBox').style.display !== 'none') {
+    $('edBox').style.display = 'none';
+    edId = null;
+  }
+  draw();
+});
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click(); });
+
+// 이미 로그인되어 있으면 바로 목록 표시
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) { await afterLogin(data.session.user); }
+  else {
+    // 로그인이 없으면 첫 화면으로 보낸다 (빈 화면이 열리는 것을 막기 위함)
+    location.replace('index.html');
+  }
+})();
+</script>
+</body>
+</html>
