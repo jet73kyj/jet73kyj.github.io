@@ -2047,7 +2047,8 @@ function drawKid(c) {
           + ' data-adjs="' + (it.group ? '' : durAdjs(it).join(',')) + '"'
           + ' data-five="' + (/5주차/.test(it.label) ? '1' : '0') + '">'
           + '<span class="nm">' + (i === 0 ? sd : '') + '</span>'
-          + '<span class="de">' + (it.group ? '<span class="gtag">그룹</span>' : '') + tagOf(it) + esc(it.label)
+          // 발달재활 아동의 그룹 5주차 센터 줄은 딱지 「그룹」 하나 (2026-10-09 은정님)
+          + '<span class="de">' + (it.group ? '<span class="gtag">그룹</span>' : '') + ((it.group && Number(it.base_st) === 2) ? '' : tagOf(it)) + esc(it.label)
           + ' · <b class="thr">' + esc(it.therapist_name) + '</b></span>'
           + '<span class="ap"><input class="apu" data-won type="text" inputmode="numeric" placeholder="적용단가" value="'
           + (ap ? ap.toLocaleString() : '') + '"></span>'
@@ -2110,7 +2111,13 @@ function drawKid(c) {
         cnt = autoXcnt(mode, five);
       }
 
-      b += '<div class="r gsum narrownm" data-st="8" data-five="' + (five ? 1 : 0) + '">'
+      // 발추를 받는 아동만 보인다 (2026-10-09 은정님 — 신규 아동은 발추를 적용하지 않음)
+      //   회기방식 발4+발추1 · 발추5/5 / 이번 달·지난달 「매월 1회 · 5주차만 1회」로 저장 / 이번 달 금액이 있음
+      //   감춰도 줄은 그대로 있어 저장 · 셈은 전과 같다
+      const x8show = !!(X8NEED[c.id] || X8FIVE[c.id]
+        || (sv[8] && ([1, 2].includes(xmodeOf(sv[8])) || Number(sv[8].amount) > 0))
+        || [1, 2].includes(xmodeOf(lastM[8])));
+      b += '<div class="r gsum narrownm" data-st="8" data-five="' + (five ? 1 : 0) + '"' + (x8show ? '' : ' style="display:none"') + '>'
         + '<span class="nm" title="' + esc(tn) + '">발추' + sd + '</span>'
         + '<span class="de">담당 <select class="xthr">' + therapistOptions(curT) + '</select>'
         + '<select class="xmode">' + xmodeOptions(mode) + '</select>'
@@ -2127,8 +2134,10 @@ function drawKid(c) {
         //   달 중간에 시각·요일을 바꾸면 요일줄이 둘로 나뉘어 두 층으로 보이던 것
         //   글은 「목 14:00→14:20」, 날짜 단추는 날짜 차례로 한 줄에. 회기 수는 더한다
         const bag = [];
+        // 그룹 수업이 끼면 1:1 · 그룹 수업이 나뉘어도 한 줄 (단추 1~4 · 2026-10-09 은정님)
+        const devGrp = devG.items.some(x => x.group);
         devG.items.forEach(it => {
-          const key = (it.therapy_id || it.sched_id) + '|' + it.row_st;
+          const key = (devGrp ? 'dev' : (it.therapy_id || it.sched_id)) + '|' + it.row_st;
           let g2 = bag.find(x => x.key === key);
           if (!g2) { g2 = { key: key, list: [] }; bag.push(g2); }
           g2.list.push(it);
@@ -2148,7 +2157,7 @@ function drawKid(c) {
           srows.sort((a, b2) => String(a.plan_date).localeCompare(String(b2.plan_date)));
           b += '<div class="r look">'
             + '<span class="nm"></span>'
-            + '<span class="de">' + tagOf(it) + esc(lbl)
+            + '<span class="de">' + (devGrp ? '<span class="sttag dev">발달재활서비스</span>' : tagOf(it)) + esc(lbl)
             + ' · <b class="thr">' + esc(ths.join('→')) + '</b>'
             + ' · 본인부담금은 아래 계좌입금</span>'
             + '<span class="ap"></span>'
