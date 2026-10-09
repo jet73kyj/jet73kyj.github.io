@@ -94,6 +94,11 @@
   .gmchk { cursor:pointer; user-select:none; }
   .gml .gpr { display:none; white-space:pre-wrap; }
   .dsheet.gsheet { page-break-after:always; }
+  .gmtabs { display:flex; gap:0; margin:0 auto 10px; max-width:780px; border-bottom:2px solid #ECE8E3; }
+  .gmtabs button { border:none !important; border-radius:0 !important; background:none !important; padding:8px 14px !important;
+                   color:#8a8178; font-weight:500; border-bottom:2px solid transparent !important; margin-bottom:-2px; }
+  .gmtabs button.on { color:#7E5530; font-weight:700; border-bottom-color:#B07A4A !important; }
+  @media screen { .gsheet.gm-off { display:none; } }
   .dsheet .foot { font-size:11px; margin-top:4px; line-height:1.6; }
   @media print {
     @page { size:A4 portrait; margin:10mm 12mm; }
@@ -762,7 +767,7 @@ function infoBind() {
 //   의뢰서 · 결과서 · 진단서는 빈 서식 (아동을 고르면 성명 · 생년월일만 채움 · 저장하지 않음)
 // ═════════════════════════════════════════════
 let GM = null;            // {id, year, no, date, child}
-let GM_BASE = {}, GM_KIDS = [], GM_DIRTY = false;
+let GM_BASE = {}, GM_KIDS = [], GM_DIRTY = false, GM_TAB = 'letter';
 const GM_TT = { 1:'심리', 2:'발달', 3:'언어발달' };
 function gmNoText() {
   if (GM && GM.no) return '대가 ' + GM.year + ' - ' + String(GM.no).padStart(3, '0') + '호';
@@ -897,9 +902,18 @@ function gmKidOf(label) {
 }
 function gmRender(d) {
   const kid = GM && GM.child ? GM.child : {};
-  $('dvBody').innerHTML = gmCtl(d) + gmLetter(d) + gmRefer(kid) + gmDetail(kid) + gmDiag(kid);
+  const tabs = '<div class="gmtabs">' + [['letter', '공문'], ['refer', '발달재활서비스 의뢰서'], ['detail', '세부영역 검사결과서'], ['diag', '진단서']]
+    .map(([k, l]) => '<button type="button" data-gtab="' + k + '"' + (GM_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
+  $('dvBody').innerHTML = gmCtl(d) + tabs + gmLetter(d) + gmRefer(kid) + gmDetail(kid) + gmDiag(kid);
+  gmTab(GM_TAB);
   gmStamp();
   gmBindRefer();
+}
+// 서식별로 하나씩 보기 (2026-10-09 은정님) — 화면은 고른 갈래만, 인쇄는 「인쇄할 것」 체크대로
+function gmTab(k) {
+  GM_TAB = k;
+  document.querySelectorAll('.gsheet').forEach(sh => sh.classList.toggle('gm-off', sh.dataset.sheet !== k));
+  document.querySelectorAll('[data-gtab]').forEach(b => b.classList.toggle('on', b.dataset.gtab === k));
 }
 function gmRead() {
   const d = {};
@@ -919,6 +933,7 @@ async function gmStamp() {
 }
 function gmBindRefer() {
   const body = $('dvBody');
+  body.querySelectorAll('[data-gtab]').forEach(b => b.onclick = () => gmTab(b.dataset.gtab));
   body.querySelectorAll('.gmchk').forEach(el => el.onclick = () => {
     el.textContent = el.textContent.startsWith('☐') ? el.textContent.replace('☐', '☑') : el.textContent.replace('☑', '☐');
   });
