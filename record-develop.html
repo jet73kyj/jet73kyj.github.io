@@ -149,6 +149,42 @@
   .ok { background:#F8F1E8; color:#7E5530; }
   /* ===== 꾸밈 B 끝 ===== */
 </style>
+<style>
+/* ===== 변경 계약서 [서식 10호] (2026-10-09) ===== */
+#chgBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
+#chgBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
+#chgBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#chgBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
+                 border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
+.chgsheet .chg-lead { font-size:12.5px; margin:0 0 10px; }
+.chgsheet .chg-tbl { border-collapse:collapse; width:100%; font-size:12.5px; margin-bottom:10px; }
+.chgsheet .chg-tbl th, .chgsheet .chg-tbl td { border:1px solid #333; padding:6px 8px; vertical-align:middle; }
+.chgsheet .chg-tbl th { background:#f5f5f5; font-weight:bold; text-align:center; }
+.chgsheet .chg-tbl textarea { min-height:70px; }
+.chgsheet .chg-apply { font-size:13px; text-align:center; margin:16px 0 6px; }
+.chgsheet .chg-apply input, .chgsheet .chg-date input { width:150px; text-align:center; display:inline-block; }
+.chgsheet .chg-date { text-align:center; font-size:13px; margin:14px 0 18px; }
+.chgsheet .chg-sign { width:100%; border-collapse:collapse; font-size:13px; }
+.chgsheet .chg-sign td { padding:10px 6px; }
+.chgsheet .chg-act { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:14px;
+                     padding-top:10px; border-top:1px dashed #ccc; font-size:12.5px; }
+.chgsheet .chg-act button { padding:6px 14px; border-radius:6px; font-size:12.5px; cursor:pointer;
+                            border:1px solid #D9C3A7; background:#fff; color:#4a4a4a; }
+.chgsheet .chg-act .chg-save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+.chgsheet .chg-act label { display:flex; gap:4px; align-items:center; cursor:pointer; }
+.chgsheet .chg-act input[type=checkbox] { width:auto; }
+.chgsheet .chg-signed { display:inline-block; padding:1px 8px; border-radius:10px; background:#EAF4EC; color:#2E6B3E; font-size:11.5px; }
+@media print {
+  #chgWrap { display:none !important; }
+  .chgsheet .chg-iso { display:none !important; }
+  body.print-chg .container:not(#chgWrap) { display:none !important; }
+  body.print-chg #chgWrap { display:block !important; }
+  body.print-chg #chgWrap .chgsheet { display:none !important; }
+  body.print-chg #chgWrap .chgsheet.on { display:block !important; page-break-after:auto; }
+  .chgsheet .chg-tbl, .chgsheet .chg-apply, .chgsheet .chg-date, .chgsheet .chg-sign { font-size:12px !important; }
+  .chgsheet input, .chgsheet textarea { border:none !important; background:transparent !important; font-size:12px !important; resize:none; }
+}
+</style>
 </head>
 <body>
 
@@ -194,6 +230,8 @@
   </div>
   <!-- 이 아동 이 달 기록지 점검 결과 (nl_record_check · 2026-10-02) -->
   <div id="rcBox" class="no-print" style="display:none;margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.7;"></div>
+  <!-- 변경 계약서 서명 알림 [서식 10호] (2026-10-09) — 셈은 서버 nl_change_need 한 곳 -->
+  <div id="chgBox" class="no-print" style="display:none;"></div>
 
   <!-- ==================== 1. 서비스 일정표, 제공기록지 ==================== -->
   <div class="sheet" id="sheet1">
@@ -353,6 +391,9 @@
     <div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
   </div>
 </div>
+
+<!-- 변경 계약서 [서식 10호] — 기록지 저장과 따로 저장 · 따로 인쇄 (2026-10-09) -->
+<div class="container" id="chgWrap" style="display:none;"></div>
 
 <!-- 인쇄할 때 종이마다 아래에 붙는 로고 (2026-09-10) -->
 <div class="printlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
@@ -606,12 +647,14 @@ function drawChildSelect() {
 // ─────────────────────────────────────────────
 async function loadOne() {
   if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n그래도 다른 기록지를 불러올까요?\n(적어 둔 내용은 사라집니다)')) return;
+  if (typeof chgPendingN === 'function' && chgPendingN() && !confirm('변경 계약서에 저장하지 않은 글이 있습니다.\n\n그래도 다른 기록지를 불러올까요?')) return;
   const cid = $('pChild').value;
   const mv  = $('pMonth').value;
   if (!cid) { alert('아동을 고르세요.'); return; }
   if (!mv)  { alert('달을 고르세요.'); return; }
 
   childId = cid;
+  chgReset();
   year  = parseInt(mv.split('-')[0], 10);
   month = parseInt(mv.split('-')[1], 10);
   const mk = mkNow();
@@ -637,6 +680,7 @@ async function loadOne() {
     child   = CHILDREN.find(c => String(c.id) === String(cid));
     // 그 달에 살아 있던 발달재활 수업을 고른다 (치료가 둘인 아동 — 66번 등)
     const tl = t.data || [];
+    TL = tl;                         // 변경 계약서 — 선생님 → 치료 영역 (2026-10-09)
     //   한 달에 수업이 둘로 나뉜 아동(52번 9월 — 9/18까지 언어 · 9/19부터 감통 · 2026-10-08)은
     //   두 수업의 요일줄을 함께 써서 그 달 수업일이 빠지지 않게 한다. 제공영역은 나중에 시작한 수업 것
     const _act = tl.filter(x => schedActive(x.nl_therapy_schedules).length);
@@ -694,6 +738,7 @@ async function loadOne() {
     $('pInfo').textContent = mk + ' · 바우처 ' + VOUCHER.length + '건'
       + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
     loadRcBox(cid, mk);
+    loadChg(cid, mk);
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -1166,6 +1211,217 @@ function _statusRows() {
     };
   });
 }
+
+
+// ═════════════════════════════════════════════
+// 변경 계약서 [서식 10호] (2026-10-09 은정님)
+//   본인부담금 등급이 바뀌거나 담당 선생님이 바뀌면 (다른 선생님이 보강 한 번 해도) 서명을 받는다
+//   이번 달 + 다음 달 1~7일 변경까지 · 셈은 서버 nl_change_need 한 곳
+//   한 변경 = 한 장 · 열쇠 「종류:적용일」 → 이번 달 · 다음 달 기록지에 같은 장이 뜨고 서명은 한 번
+//   자동으로 채운 글을 고치면 고친 글이 앞섬 (nl_dev_docs.data)
+// ═════════════════════════════════════════════
+let TL = [];               // 그 아동 발달재활 수업 (치료 종류 · 요일줄)
+let CHG = [];              // [{key, kind, auto:{...}, doc, dirty}]
+let CHG_REQ = 0;
+const CHG_ORG = '자라는나무 아동발달센터';
+function chgReset() {
+  CHG = []; CHG_REQ++;
+  const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+  const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
+function chgArea(tid) {      // 그 선생님이 맡은 발달재활 수업의 영역 (나중에 시작한 것)
+  let best = null, bd = '';
+  (TL || []).forEach(t => (t.nl_therapy_schedules || []).forEach(sc => {
+    if (String(sc.therapist_id) !== String(tid)) return;
+    const d = String(sc.from_date || sc.from_month || '');
+    if (!best || d > bd) { best = t; bd = d; }
+  }));
+  return best ? (AREA_MAP[best.therapy_type_id] || '') : '';
+}
+function chgThId(txt) {      // 「○○○ 선생님」 → 선생님 번호 (영역을 붙이려고)
+  const nm = String(txt || '').replace(/\s*선생님$/, '').trim();
+  const hit = Object.keys(THERAPISTS).find(k => THERAPISTS[k] === nm);
+  return hit || (/^\d+$/.test(nm) ? nm : null);
+}
+function chgGrade(txt) {     // 「나 40,000원」 → 「본인부담금 나형 40,000원」
+  const m = String(txt || '').match(/^(\S+)\s+(.*)$/);
+  if (!m || m[1] === '-') return '본인부담금 ' + String(txt || '');
+  return '본인부담금 ' + (m[1].endsWith('형') ? m[1] : m[1] + '형') + ' ' + m[2];
+}
+function chgTh(txt) {
+  const id = chgThId(txt), area = id ? chgArea(id) : '';
+  return (area ? area + ' ' : '') + String(txt || '');
+}
+function chgKor(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[1] + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : '';
+}
+async function loadChg(cid, mk) {
+  const req = CHG_REQ;
+  try {
+    const { data, error } = await sb.rpc('nl_change_need', { p_child: Number(cid), p_month: mk });
+    if (error) throw error;
+    if (req !== CHG_REQ) return;
+    const rows = data || [];
+    if (!rows.length) { chgDraw(); return; }
+    const keys = rows.map(r => r.kind + ':' + String(r.apply_on).slice(0, 10));
+    const { data: docs, error: e2 } = await sb.from('nl_dev_docs')
+      .select('id, doc_key, data, done, done_on, updated_at')
+      .eq('child_id', Number(cid)).eq('doc_type', '변경계약').in('doc_key', keys);
+    if (e2) throw e2;
+    if (req !== CHG_REQ) return;
+    const dm = {}; (docs || []).forEach(d => { dm[d.doc_key] = d; });
+    CHG = rows.map((r, i) => {
+      const iso = String(r.apply_on).slice(0, 10);
+      const isG = r.kind === '본인부담금';
+      return {
+        key: keys[i], kind: r.kind,
+        auto: {
+          child: r.child_name || (child && child.name) || '',
+          birth: child && child.birth ? String(child.birth).slice(0, 10).replace(/-/g, '.') : '',
+          guardian: r.guardian_name || '', relation: '',
+          before: isG ? chgGrade(r.before_text) : chgTh(r.before_text),
+          after:  isG ? chgGrade(r.after_text)  : chgTh(r.after_text),
+          reason: isG ? '본인부담금 등급 변경' : '담당 치료사 변경',
+          apply_on: iso, written_on: iso
+        },
+        doc: dm[keys[i]] || null, dirty: false
+      };
+    });
+    chgDraw();
+  } catch (e) {
+    if (req !== CHG_REQ) return;
+    const b = $('chgBox');
+    b.className = 'need'; b.style.display = 'block';
+    b.textContent = '변경 계약서 확인을 불러오지 못했습니다. (' + (e.message || e) + ')';
+  }
+}
+function chgVal(c, f) {      // 저장된 글이 앞섬
+  const d = c.doc && c.doc.data;
+  return d && d[f] != null ? d[f] : c.auto[f];
+}
+function chgDraw() {
+  const b = $('chgBox'), w = $('chgWrap');
+  if (!CHG.length) { b.style.display = 'none'; w.style.display = 'none'; w.innerHTML = ''; return; }
+  const left = CHG.filter(c => !(c.doc && c.doc.done));
+  const line = c => esc(c.kind === '담당' ? '담당 선생님 변경' : '본인부담금 변경')
+    + ' (' + Number(c.auto.apply_on.slice(5, 7)) + '월 ' + Number(c.auto.apply_on.slice(8, 10)) + '일부터)';
+  if (left.length) {
+    b.className = 'need';
+    b.innerHTML = '<b>변경 계약서에 서명해 주세요 — ' + left.length + '건</b>'
+      + left.map(c => '<div>· ' + line(c) + '</div>').join('')
+      + '<div style="margin-top:4px;"><button type="button" onclick="chgOpen()">변경 계약서 열기</button></div>';
+  } else {
+    b.className = 'ok';
+    b.innerHTML = '변경 계약서 — ' + CHG.length + '건 모두 서명 받음'
+      + ' <button type="button" onclick="chgOpen()">보기</button>';
+  }
+  b.style.display = 'block';
+  w.innerHTML = CHG.map((c, i) => chgSheetHtml(c, i)).join('');
+  w.querySelectorAll('.chgsheet').forEach(sh => {
+    const i = Number(sh.dataset.i);
+    sh.addEventListener('input', () => chgDirty(i));
+    sh.addEventListener('change', e => { if (!e.target.classList.contains('chg-done')) chgDirty(i); });
+  });
+}
+function chgSheetHtml(c, i) {
+  const v = f => esc(chgVal(c, f) || '');
+  const done = !!(c.doc && c.doc.done);
+  return '<div class="sheet chgsheet" id="chg_' + i + '" data-i="' + i + '">'
+    + '<h2 class="title">변 경 계 약 서</h2>'
+    + '<p class="chg-lead">발달재활서비스 이용자(갑)와 제공기관(을)은 서비스 이용 계약 내용 중 아래 사항을 변경한다.</p>'
+    + '<table class="chg-tbl">'
+    + '<tr><th rowspan="2" style="width:14%;">이용자(갑)</th><th style="width:14%;">성명</th>'
+    +   '<td><input type="text" data-f="child" value="' + v('child') + '"></td>'
+    +   '<th style="width:14%;">생년월일</th><td><input type="text" data-f="birth" value="' + v('birth') + '"></td></tr>'
+    + '<tr><th>대리인(보호자)</th><td><input type="text" data-f="guardian" value="' + v('guardian') + '"></td>'
+    +   '<th>관계</th><td><input type="text" data-f="relation" value="' + v('relation') + '"></td></tr>'
+    + '<tr><th>제공기관(을)</th><th>기관명</th><td colspan="3">' + esc(CHG_ORG) + '</td></tr>'
+    + '</table>'
+    + '<table class="chg-tbl">'
+    + '<tr><th style="width:14%;">구분</th><th>기존 내역</th><th>변경 내역</th></tr>'
+    + '<tr><td style="text-align:center;">' + esc(c.kind === '담당' ? '담당 치료사' : '본인부담금') + '</td>'
+    +   '<td><input type="text" data-f="before" value="' + v('before') + '"></td>'
+    +   '<td><input type="text" data-f="after" value="' + v('after') + '"></td></tr>'
+    + '<tr><th>변경 사유</th><td colspan="2"><textarea data-f="reason">' + v('reason') + '</textarea></td></tr>'
+    + '</table>'
+    + '<div class="chg-apply">상기 사항을 <span class="chg-iso"><input type="text" data-f="apply_on" value="' + v('apply_on') + '"> (</span>'
+    +   esc(chgKor(chgVal(c, 'apply_on'))) + '<span class="chg-iso">)</span>부터 변경하여 적용함.</div>'
+    + '<div class="chg-date">작성일 <input type="text" data-f="written_on" value="' + v('written_on') + '"></div>'
+    + '<table class="chg-sign">'
+    + '<tr><td style="width:50%;">이용자(갑) 대리인 : ' + v('guardian') + ' &nbsp;&nbsp;&nbsp;&nbsp; (서명 또는 인)</td>'
+    +   '<td>제공기관(을) : ' + esc(CHG_ORG) + ' &nbsp;&nbsp;&nbsp;&nbsp; (인)</td></tr>'
+    + '</table>'
+    + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>'
+    + '<div class="chg-act no-print">'
+    +   '<button type="button" class="chg-save' + (c.doc ? ' done' : '') + '" onclick="chgSave(' + i + ')">'
+    +     (c.doc ? '✓ 저장됨' : '저장 전') + '</button>'
+    +   '<label><input type="checkbox" class="chg-done"' + (done ? ' checked' : '') + ' onchange="chgSave(' + i + ', this.checked)"> 서명 받음</label>'
+    +   (done && c.doc.done_on ? '<span class="chg-signed">' + esc(String(c.doc.done_on).slice(0, 10)) + ' 서명 받음</span>' : '')
+    +   '<button type="button" onclick="chgPrint(' + i + ')">이 계약서 인쇄</button>'
+    +   '<span style="color:#888;">자동으로 채운 글을 고치면 고친 글이 남습니다 · 기록지 저장과 따로 저장</span>'
+    + '</div>'
+    + '</div>';
+}
+function chgDirty(i) {
+  const c = CHG[i]; if (!c) return;
+  c.dirty = true;
+  const bt = document.querySelector('#chg_' + i + ' .chg-save');
+  if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
+}
+function chgOpen() {
+  const w = $('chgWrap');
+  w.style.display = 'block';
+  w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function chgRead(i) {
+  const out = {};
+  document.querySelectorAll('#chg_' + i + ' [data-f]').forEach(el => { out[el.dataset.f] = el.value.trim(); });
+  return out;
+}
+async function chgSave(i, doneVal) {
+  const c = CHG[i]; if (!c) return;
+  const bt = document.querySelector('#chg_' + i + ' .chg-save');
+  const cb = document.querySelector('#chg_' + i + ' .chg-done');
+  const d = chgRead(i);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.apply_on || '')) { alert('적용일을 2026-09-18 처럼 넣어 주세요.'); if (cb && doneVal !== undefined) cb.checked = !doneVal; return; }
+  const done = doneVal !== undefined ? !!doneVal : !!(c.doc && c.doc.done);
+  if (doneVal === true && c.dirty === false && !c.doc) { /* 처음 저장하면서 서명 표시 */ }
+  if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 한국 날짜
+  const row = { child_id: Number(childId), doc_type: '변경계약', doc_key: c.key, data: d,
+                done: done, done_on: done ? ((c.doc && c.doc.done && c.doc.done_on) || today) : null,
+                updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
+    c.doc = data[0]; c.dirty = false;
+    const keepOpen = $('chgWrap').style.display === 'block';
+    chgDraw();
+    if (keepOpen) $('chgWrap').style.display = 'block';
+  } catch (e) {
+    alert('변경 계약서를 저장하지 못했습니다.\n' + (e.message || e));
+    if (bt) { bt.disabled = false; bt.textContent = '저장 전'; bt.classList.remove('done'); }
+    if (cb && doneVal !== undefined) cb.checked = !doneVal;
+  }
+}
+function chgPrint(i) {
+  if (CHG[i] && CHG[i].dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
+  document.querySelectorAll('#chgWrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'chg_' + i));
+  document.body.classList.add('print-chg');
+  const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
+function chgPendingN() { return CHG.filter(c => c.dirty).length; }
+window.addEventListener('beforeunload', e => {
+  if (!chgPendingN()) return;
+  e.preventDefault(); e.returnValue = '';
+});
 
 // ── 이 아동 이 달 기록지 점검 결과 (2026-10-02) — 셈은 서버 nl_record_check 한 곳 ──
 const RC_ITEM = {
