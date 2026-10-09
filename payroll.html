@@ -726,7 +726,11 @@ function calc(){
     const tt  = sc ? sc._tt : null;
     const stid = s.support_type_id || (sc ? sc.support_type_id : null);
     // 그룹 수업 원래 줄 — 출석 아동 1명마다 그룹 1인당 단가 (1:1 보강은 보통 단가 · 2026-10-02)
-    const isGrp = !!(sc && sc._grp && !s.makeup_for);
+    //   그룹 요일 · 그룹 시각에 한 수업만 (4주인 달 1:1 발추처럼 다른 때 잡은 줄은 보통 단가 · 2026-10-09)
+    const grpSlot = !!(sc && sc._grp && s.plan_date && s.start_time && sc.start_time
+      && String(s.start_time).slice(0,5) === String(sc.start_time).slice(0,5)
+      && (!sc.weekday || '일월화수목금토'[new Date(String(s.plan_date).slice(0,10) + 'T00:00:00').getDay()] === sc.weekday));
+    const isGrp = !!(sc && sc._grp && !s.makeup_for && grpSlot);
     // 아동 번호를 이름 앞에 (2026-10-03 은정님)
     const nm  = (isGrp ? '[그룹] ' : '') + s.child_id + '번 ' + (KIDS[s.child_id] || '')
               + (stid ? ' · ' + (STYPE[stid] || ('유형'+stid)) : '');
@@ -1195,7 +1199,7 @@ async function loadMonth(){
   SESS = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await sb.from('nl_sessions')
-      .select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
+      .select('id, child_id, schedule_id, plan_date, start_time, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
       .gte('plan_date', mon + '-01').lte('plan_date', monEnd(mon))
       .order('id').range(from, from + 999);
     if (error || !data) break;
@@ -1211,7 +1215,7 @@ async function loadMonth(){
   SESS = SESS.filter(x => !(x.month_key && String(x.month_key) > mon));
   {
     const { data: pre, error: ePre } = await sb.from('nl_sessions')
-      .select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
+      .select('id, child_id, schedule_id, plan_date, start_time, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id')
       .eq('month_key', mon).lt('plan_date', mon + '-01');
     if (ePre) { alert('선보강 회기를 읽지 못했습니다. 새로고침 해 주세요.\n' + ePre.message); }
     else (pre || []).forEach(x => { x._pre = true; SESS.push(x); });
@@ -1317,7 +1321,7 @@ async function loadDeadAndFuel(){
       const part = oids.slice(i, i + 200);
       const [{ data: mks }, { data: ors }] = await Promise.all([
         sb.from('nl_sessions').select('makeup_for, plan_date, status, minutes').in('makeup_for', part),
-        sb.from('nl_sessions').select('id, child_id, schedule_id, plan_date, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id').in('id', part)
+        sb.from('nl_sessions').select('id, child_id, schedule_id, plan_date, start_time, status, therapist_id, memo, support_type_id, month_key, minutes, makeup_for, dur_min, therapy_id').in('id', part)
       ]);
       const byO = {};
       (mks || []).forEach(m => {
@@ -1386,7 +1390,7 @@ async function afterLogin(user){
 
   // 수업 · 아동
   const { data: sc } = await sb.from('nl_therapy_schedules')
-    .select('id, therapy_id, duration, therapist_id');
+    .select('id, therapy_id, duration, therapist_id, weekday, start_time');
   const { data: tp } = await sb.from('nl_therapies')
     .select('id, child_id, therapy_type_id, support_type_id, group_id');
   const { data: kids } = await sb.from('nl_children').select('id, name');

@@ -1791,6 +1791,7 @@
       <div id="eg_body" style="display:none;">
         <div style="font-size:12px;color:#6b5a86;font-weight:600;margin-top:8px;">구성 아동</div>
         <div id="eg_list" style="padding:6px 10px;margin-top:3px;line-height:1.9;font-size:14px;background:#fff;border:1px solid #E2D8F0;border-radius:8px;"></div>
+        <div id="eg_dmrow" style="display:none;margin-top:6px;font-size:13px;color:#5B3A8C;"><b>발달재활 회기방식</b> <select id="eg_dmode" style="width:auto !important;margin:0 4px !important;display:inline-block;"><option value="발4+센1">발4+센1 (5주면 센터 1회)</option><option value="4회만">4회만 (5주여도 4회)</option><option value="발4+발추1">발4+발추1 (매달 발추)</option><option value="발4+5주발추">발추5/5 (5주면 발추)</option></select> <span id="eg_dmnote" style="color:#6E6660;font-size:12px;"></span></div>
         <div class="egg">
           <div><label for="eg_kid">함께 들어올 아동</label><input id="eg_kid" list="egKids" placeholder="번호 · 이름" autocomplete="off"></div>
           <div><label for="eg_st">사업</label><select id="eg_st"></select></div>
@@ -5916,7 +5917,7 @@ function egSetup(r){
   $('edGrpLock').style.display = isGrp ? '' : 'none';
   const can = CAN_EDIT && r && !isGrp && !r.to_date;
   $('edGrp').style.display = can ? '' : 'none';
-  EG_KIDS = []; $('eg_list').innerHTML = ''; egmsg('', true); $('eg_msg').className = 'out';
+  EG_KIDS = []; EG_DMKEY = ''; $('eg_list').innerHTML = ''; egmsg('', true); $('eg_msg').className = 'out';
   egMode(false);
   if (!can) return;
   egDrawList();
@@ -5964,7 +5965,27 @@ function egDrawList(){
   const kOf = c => KIDS.find(k => Number(k.id) === Number(c)) || {};
   $('eg_list').innerHTML = egKidLine(r.support_type_id, r._cid, String(r._name || '').replace(/^\[그룹\] /, ''), egB6(r._birth || kOf(r._cid).birth))
     + EG_KIDS.map((k, i) => egKidLine(k.st, k.cid, gKidName(k.cid), egB6(kOf(k.cid).birth), i)).join('');
+  egDmSync();
 }
+// 발달재활 아동이 그룹으로 가면 회기방식 (2026-10-09 은정님)
+//   다른 아동과 함께 하므로 「4회만」은 「발4+센1」(5주면 센터 1회)로 저절로 · 고를 수 있음
+//   「발4+발추1」 · 「발추5/5」는 그대로 (4주인 달 발추는 모자란 상자 → 1:1)
+let EG_DMKEY = '';
+function egDmSync(){
+  const r = edRow, row = $('eg_dmrow'); if (!row) return;
+  let key = '', cur = '';
+  if (r && Number(r.support_type_id) === 2) { key = 'r' + r._cid; cur = r._mode || '4회만'; }
+  else { const k = EG_KIDS.find(x => x.st === 2); if (k) { key = 'k' + k.cid; cur = '4회만'; } }
+  if (!key) { row.style.display = 'none'; EG_DMKEY = ''; return; }
+  row.style.display = '';
+  if (key !== EG_DMKEY) {
+    EG_DMKEY = key;
+    const ok = Array.from($('eg_dmode').options).some(o => o.value === cur);
+    $('eg_dmode').value = (cur === '4회만' || !ok) ? '발4+센1' : cur;
+    $('eg_dmnote').textContent = key[0] === 'r' ? '(지금 ' + cur + ')' : '(새로 들어오는 발달재활 아동)';
+  }
+}
+function egDm(fb){ return ($('eg_dmrow') && $('eg_dmrow').style.display !== 'none' && $('eg_dmode').value) || fb; }
 $('eg_list').addEventListener('click', e => {
   const b = e.target.closest('button[data-egdel]'); if (!b) return;
   EG_KIDS.splice(Number(b.dataset.egdel), 1); egDrawList();
@@ -6075,7 +6096,8 @@ $('eg_go').onclick = async () => {
     const names = [r._cid + '번 ' + String(r._name || '').replace(/^\[그룹\] /, '')].concat(EG_KIDS.map(k => k.cid + '번 ' + gKidName(k.cid)));
     if (!confirm('그룹으로 바꿉니다.\n\n' + r.weekday + ' ' + hm + ' · ' + dur + '분 · ' + thName(r.therapist_id) + '\n'
       + '그룹반 「' + name + '」 · 정원 ' + cap + '명 · 1회 ' + fee.toLocaleString() + '원\n'
-      + '아동 ' + names.join(', ') + '\n\n'
+      + '아동 ' + names.join(', ') + '\n'
+      + (egDm('') ? '발달재활 회기방식 ' + egDm('') + '\n' : '') + '\n'
       + '· ' + r._cid + '번 지금 1:1 수업은 ' + dayAdd(d, -1) + '까지 (사유 「그룹으로 옮김」)\n'
       + '· ' + d + '부터 그룹반 수업 · 회기를 깝니다')) { egmsg('', true); $('eg_msg').className = 'out'; return; }
     egmsg('만드는 중… 창을 닫지 마세요.', true);
@@ -6090,9 +6112,9 @@ $('eg_go').onclick = async () => {
     if (g.error || !g.data) { egmsg('❌ 그룹반을 만들지 못했습니다 — ' + (g.error ? g.error.message : '권한 없음') + '\n바뀐 것은 없습니다.', false); return; }
     made.gid = g.data.id;
     // 그룹 아동은 모두 「매주」 · 발달재활 아동만 그 방식 그대로 (2026-10-08 은정님 · 구멍 A3)
-    const mem = [{ cid: Number(r._cid), st: Number(r.support_type_id), tt: Number(r._tt), mode: Number(r.support_type_id) === 2 ? r._mode : '매주' }]
+    const mem = [{ cid: Number(r._cid), st: Number(r.support_type_id), tt: Number(r._tt), mode: Number(r.support_type_id) === 2 ? egDm(r._mode || '발4+센1') : '매주' }]
       .concat(EG_KIDS.map(k => ({ cid: k.cid, st: k.st, tt: k.tt,
-        mode: k.st === 2 ? (Number(r.support_type_id) === 2 ? r._mode : '4회만') : '매주' })));
+        mode: k.st === 2 ? egDm('발4+센1') : '매주' })));
     for (const k of mem) {
       const t = await sb.from('nl_therapies').insert({ child_id: k.cid, therapy_type_id: k.tt, support_type_id: k.st,
         duration_min: dur, started_on: d, monthly_count: (k.st === 2 || k.mode === '4회만') ? 4 : 5, count_mode: k.mode,
@@ -11025,7 +11047,7 @@ $('grpList').addEventListener('click', async e => {
     try {
       const ins = await sb.from('nl_therapies').insert({
         child_id: cid, therapy_type_id: tt, support_type_id: st, duration_min: g.duration,
-        started_on: from, monthly_count: st === 2 ? 4 : 5, count_mode: st === 2 ? '4회만' : '매주',
+        started_on: from, monthly_count: st === 2 ? 4 : 5, count_mode: st === 2 ? '발4+센1' : '매주',   // 그룹 발달재활 = 발4+센1 (2026-10-09)
         group_id: gid, group_signed_on: sign
       }).select().single();
       if (ins.error) { grpmsg('❌ 넣지 못했습니다 — ' + ins.error.message, false); return; }

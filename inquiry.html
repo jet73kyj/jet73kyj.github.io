@@ -3034,7 +3034,7 @@ async function gbMakeGroup(sid){
       for (const r of rows) {
         const t = await gbRun(sb.from('nl_therapies').insert({
           child_id: r.cid, therapy_type_id: r.tt, support_type_id: r.st, duration_min: dur,
-          started_on: null, monthly_count: r.st === 2 ? 4 : 5, count_mode: r.st === 2 ? '4회만' : '매주',
+          started_on: null, monthly_count: r.st === 2 ? 4 : 5, count_mode: r.st === 2 ? '발4+센1' : '매주',   // 그룹 발달재활 = 발4+센1 (2026-10-09)
           group_id: gid, group_signed_on: sign }).select('id'), r.cid + '번 그룹 수업 넣기');
         made.push(t[0].id);
       }
