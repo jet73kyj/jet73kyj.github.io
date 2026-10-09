@@ -173,6 +173,10 @@
 .chgsheet .chg-act .chg-save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
 .chgsheet .chg-act label { display:flex; gap:4px; align-items:center; cursor:pointer; }
 .chgsheet .chg-act input[type=checkbox] { width:auto; }
+.chgsheet .chg-ins { position:relative; display:inline-block; }
+.chgsheet .chg-ins img { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
+                         width:48px; height:auto; opacity:0.92; display:none;
+                         -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .chgsheet .chg-signed { display:inline-block; padding:1px 8px; border-radius:10px; background:#EAF4EC; color:#2E6B3E; font-size:11.5px; }
 @media print {
   #chgWrap { display:none !important; }
@@ -1224,6 +1228,16 @@ let TL = [];               // 그 아동 발달재활 수업 (치료 종류 · �
 let CHG = [];              // [{key, kind, auto:{...}, doc, dirty}]
 let CHG_REQ = 0;
 const CHG_ORG = '자라는나무 아동발달센터';
+let CHG_STAMP = '';        // 직인 — 비공개 자리(nl-private)에서 한 번만 받아 둔다 (누가기록지와 같은 그림)
+async function chgStamp() {
+  if (CHG_STAMP) return;
+  try {
+    const { data, error } = await sb.storage.from('nl-private').download('stamp.png');
+    if (error || !data) return;
+    CHG_STAMP = URL.createObjectURL(data);
+    document.querySelectorAll('#chgWrap .chg-stamp').forEach(im => { im.src = CHG_STAMP; im.style.display = 'inline'; });
+  } catch (e) {}
+}
 function chgReset() {
   CHG = []; CHG_REQ++;
   const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
@@ -1264,6 +1278,7 @@ async function loadChg(cid, mk) {
     if (req !== CHG_REQ) return;
     const rows = data || [];
     if (!rows.length) { chgDraw(); return; }
+    chgStamp();
     const keys = rows.map(r => r.kind + ':' + String(r.apply_on).slice(0, 10));
     const { data: docs, error: e2 } = await sb.from('nl_dev_docs')
       .select('id, doc_key, data, done, done_on, updated_at')
@@ -1350,7 +1365,8 @@ function chgSheetHtml(c, i) {
     + '<div class="chg-date">작성일 <input type="text" data-f="written_on" value="' + v('written_on') + '"></div>'
     + '<table class="chg-sign">'
     + '<tr><td style="width:50%;">이용자(갑) 대리인 : ' + v('guardian') + ' &nbsp;&nbsp;&nbsp;&nbsp; (서명 또는 인)</td>'
-    +   '<td>제공기관(을) : ' + esc(CHG_ORG) + ' &nbsp;&nbsp;&nbsp;&nbsp; (인)</td></tr>'
+    +   '<td>제공기관(을) : ' + esc(CHG_ORG) + ' &nbsp;&nbsp;&nbsp;&nbsp; <span class="chg-ins">(인)<img class="chg-stamp" alt=""'
+    +     (CHG_STAMP ? ' src="' + CHG_STAMP + '" style="display:inline"' : '') + '></span></td></tr>'
     + '</table>'
     + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>'
     + '<div class="chg-act no-print">'
