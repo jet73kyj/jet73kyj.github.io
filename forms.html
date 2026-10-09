@@ -60,6 +60,29 @@
   /* ===== 서식 바로 쓰기 — [15호] 신규인력등록 · [19호] 기관정보 (2026-10-09) ===== */
   .docbtns { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
   .docbtns button { background:#fff; border-color:#D9C3A7; color:#7E5530; font-weight:600; }
+  .docbtns button.on { background:#B07A4A !important; border-color:#B07A4A !important; color:#fff !important; }
+  .catbtns { margin-top:-6px; }
+  .catbtns button { font-weight:500; }
+  .lw-title { font-size:16px; font-weight:700; color:#7E5530; margin:4px 0 12px; }
+  /* 용지 안 단추 (2026-10-09 은정님) — 저장 · 수정 · 인쇄 · 취소 · 인쇄에는 안 나옴 */
+  #dvSave { display:none !important; }
+  .dsheet { position:relative; }
+  .ptools { position:absolute; top:6px; right:8px; display:flex; gap:6px; z-index:3; }
+  .ptools button { width:auto !important; margin:0 !important; padding:4px 14px !important; font-size:12.5px; border-radius:7px;
+                   border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; cursor:pointer; box-shadow:none !important; }
+  .ptools button.main { background:#B07A4A !important; border-color:#B07A4A !important; color:#fff !important; font-weight:700; }
+  .ptools button:disabled { opacity:.6; cursor:default; }
+  .dsheet.locked .dv-del, .dsheet.locked .dv-back { display:none !important; }
+  .gml.locked textarea { display:none !important; }
+  .gml.locked .gpr { display:block !important; }
+  .dsheet.locked input[data-k], .dsheet.locked input[data-g], .dsheet.locked textarea[data-g] { background:transparent !important; border-color:transparent !important; }
+  .gmlist { width:100%; box-sizing:border-box; max-width:850px; margin:4px auto 20px; background:#fff; border:1px solid #ECE8E3; border-radius:10px; overflow:hidden; font-size:13px; }
+  .gmlist .gl-h { padding:9px 12px; background:#F8F1E8; color:#7E5530; font-weight:600; border-bottom:1px solid #ECE8E3; }
+  .gmlist .gl-h span { font-weight:400; color:#9a8b7c; font-size:12px; margin-left:6px; }
+  .gmlist .gl-r { padding:7px 12px; border-bottom:1px solid #f3efe9; cursor:pointer; }
+  .gmlist .gl-r:hover { background:#FBF5EE; }
+  .gmlist .gl-r.on { background:#F3ECE3; font-weight:700; color:#7E5530; }
+  .gmlist .gl-e { padding:10px 12px; color:#999; }
   #docView { display:none; }
   #docView .dv-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 12px; }
   .dsheet { background:#fff; border:1px solid #ddd; padding:28px 34px; max-width:780px; margin:0 auto 20px; font-size:12.5px; color:#111; }
@@ -105,17 +128,19 @@
   .gmtabs button.on { background:#fff !important; color:#7E5530 !important; font-weight:700;
                       border-color:#B07A4A !important; border-top:4px solid #B07A4A !important;
                       border-bottom:2px solid #fff !important; padding-top:6px !important; }
-  /* 넓은 화면 — 책갈피를 서식 오른쪽 옆면에 세로로 (2026-10-09 은정님) · 좁은 화면은 위에 가로로 */
+  /* 넓은 화면(1000픽셀 이상) — 책갈피를 서식 오른쪽 옆면에 세로로 (2026-10-09 은정님) · 좁으면 위에 가로로 */
   #dvBody { display:grid; grid-template-columns:minmax(0,1fr); }
   #dvBody > * { min-width:0; }
-  @media screen and (min-width:701px) {
-    #docView { grid-template-columns:minmax(0,850px) auto; justify-content:center; align-items:start; }
+  @media screen and (min-width:1000px) {
+    #docView { grid-template-columns:minmax(0,850px) 46px; justify-content:center; align-items:start; }
     #docView:has(#dvTabs[style*="none"]) #dvBody { grid-column:1 / -1; }
     #docView .dv-bar { grid-column:1 / -1; }
     #docView #dvBody { grid-column:1; grid-row:2; grid-template-columns:minmax(0,850px) auto; justify-content:center; align-items:start; }
     #docView #dvTabs { grid-column:2; grid-row:2; }
     #dvBody > * { grid-column:1; }
     #docView #dvBody > .gmtabs { grid-column:2; grid-row:1 / span 30; }
+    #docView #dvBody > .dsheet { width:100%; justify-self:center; }
+    #docView .gmtabs { justify-self:start; width:max-content !important; }
     #docView .gmtabs { flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:4px; margin:24px 0 0 0;
               padding:6px 0; border-bottom:none; border-left:2px solid #B07A4A; max-width:none;
               position:sticky; top:12px; width:auto; margin-left:-1px !important; }
@@ -137,7 +162,7 @@
     body.print-doc #docView { position:absolute; left:0; top:0; right:0; width:auto; box-sizing:border-box; }
     body.print-doc .dsheet, body.print-doc .dsheet > div { box-sizing:border-box; width:100%; }
     body.print-doc .dsheet table { table-layout:fixed; }
-    body.print-doc .dv-bar, body.print-doc .dv-hint, body.print-doc .dv-del, body.print-doc .gmctl, body.print-doc .gskip, body.print-doc .gmtabs { display:none !important; }
+    body.print-doc .dv-bar, body.print-doc .dv-hint, body.print-doc .dv-del, body.print-doc .gmctl, body.print-doc .gskip, body.print-doc .gmtabs, body.print-doc .ptools, body.print-doc .gmlist { display:none !important; }
     body.print-doc .gml input { border:none !important; background:transparent !important; }
     body.print-doc .gml textarea { display:none !important; }
     body.print-doc .gml input::placeholder { color:transparent !important; }
@@ -183,19 +208,25 @@
 
 <div class="container">
   <div class="page-title">서식</div>
-  <div class="sub">정부지원 서식처럼 해마다 새로 나오는 문서를 여기에 담아 둡니다.</div>
+  <div class="sub">정부지원 서식처럼 해마다 새로 나오는 문서를 여기에 담아 둡니다. 아래 갈래 단추를 누르면 그 갈래에 올려 둔 서식이 나옵니다.</div>
 
   <!-- 서식 바로 쓰기 (2026-10-09) — 화면에서 채워 바로 인쇄 -->
   <div class="docbtns" id="docBtns" style="display:none;">
-    <button type="button" onclick="openDoc('hire')">신규인력등록 · 개인정보 동의서 [15호]</button>
-    <button type="button" onclick="openDoc('info')">기관정보 · 제공기관 정보 · 예외지급 · 내용 요약서 [19호]</button>
-    <button type="button" onclick="openDoc('refer')">발달의뢰서 모음 · 공문</button>
+    <button type="button" data-doc="hire" onclick="openDoc('hire')">신규인력등록 · 개인정보 동의서 [15호]</button>
+    <button type="button" data-doc="org" onclick="openDoc('info')">기관정보 · 제공기관 정보 · 예외지급 · 내용 요약서 [19호]</button>
+    <button type="button" data-doc="refer" onclick="openDoc('refer')">발달의뢰서 모음 · 공문</button>
+  </div>
+  <!-- 올려 둔 서식 — 갈래마다 단추 (2026-10-09 은정님) -->
+  <div class="docbtns catbtns" id="catBtns">
+    <button type="button" data-cat="발달재활서비스" onclick="openCat('발달재활서비스')">발달재활 서식</button>
+    <button type="button" data-cat="치료지원" onclick="openCat('치료지원')">치료지원 서식</button>
+    <button type="button" data-cat="방과후" onclick="openCat('방과후')">방과후 서식</button>
+    <button type="button" data-cat="etc" onclick="openCat('etc')">세무 · 인사 · 그 밖</button>
   </div>
   <div id="docView">
     <div class="dv-bar">
       <b id="dvTitle"></b>
       <button type="button" id="dvSave" onclick="saveOrg()" style="display:none;">저장 전</button>
-      <button type="button" onclick="printDoc()">인쇄</button>
       <button type="button" onclick="closeDoc()">닫기</button>
       <span class="dv-hint" id="dvHint" style="font-size:12px;color:#888;"></span>
     </div>
@@ -207,6 +238,8 @@
     <div id="dvBody"></div>
   </div>
 
+  <div id="listWrap" style="display:none;">
+  <div class="lw-title" id="listTitle"></div>
   <!-- 올리기 (관리자만) -->
   <div class="card" id="upCard" style="display:none;">
     <h3>＋ 서식 올리기</h3>
@@ -241,7 +274,7 @@
   <!-- 걸러보기 -->
   <div class="row" style="margin-bottom:12px;">
     <select id="f_year"></select>
-    <select id="f_cat">
+    <select id="f_cat" style="display:none;">
       <option value="">-- 갈래 전체 --</option>
       <option value="발달재활서비스">발달재활서비스</option>
       <option value="치료지원">치료지원</option>
@@ -266,6 +299,7 @@
     <tbody id="rows"></tbody>
   </table>
   <div class="empty" id="empty" style="display:none;">담긴 서식이 없습니다.</div>
+  </div>
 </div>
 </div>
 
@@ -320,7 +354,8 @@ function draw() {
   const fy = $('f_year').value;
   const fc = $('f_cat').value;
   const list = ALL.filter(x =>
-    (!fy || String(x.year) === String(fy)) && (!fc || x.category === fc));
+    (!fy || String(x.year) === String(fy)) && (!fc || x.category === fc)
+    && (!CUR_CAT || (CUR_CAT === 'etc' ? CAT_ETC.includes(x.category || '그 밖') : x.category === CUR_CAT)));
 
   $('cnt').textContent = list.length + '개';
   $('empty').style.display = list.length ? 'none' : 'block';
@@ -484,6 +519,7 @@ $('u_go').onclick = async () => {
     show($('msg2'), '\u2705 올렸습니다. 빈 서식 ' + blanks.length
       + '개 · 작성 견본 ' + samples.length + '개', true);
     $('u_title').value = ''; $('u_blank').value = ''; $('u_sample').value = '';
+    { const uc = $('u_cat').value; setCat(CAT_ETC.includes(uc) ? 'etc' : uc); }
     await loadList();
   } catch (e) {
     show($('msg2'), '\u274c 올리지 못했습니다.\n' + e.message, false);
@@ -493,6 +529,28 @@ $('u_go').onclick = async () => {
 };
 
 $('f_year').onchange = draw;
+// 갈래 단추 (2026-10-09 은정님) — 누르면 그 갈래에 올려 둔 서식만 · 바로 쓰는 서식 창은 닫힘
+let CUR_CAT = '';
+const CAT_ETC = ['세무', '인사', '그 밖'];
+function catTitle(c) { return c === 'etc' ? '세무 · 인사 · 그 밖 서식' : (c === '발달재활서비스' ? '발달재활' : c) + ' 서식'; }
+function setCat(c) {
+  CUR_CAT = c || '';
+  $('listWrap').style.display = CUR_CAT ? '' : 'none';
+  $('listTitle').textContent = CUR_CAT ? catTitle(CUR_CAT) : '';
+  if (CUR_CAT && $('u_cat')) $('u_cat').value = CUR_CAT === 'etc' ? '세무' : CUR_CAT;
+  markBtns();
+}
+function openCat(c) {
+  if ($('docView').style.display === 'grid' && !closeDoc()) return;
+  setCat(c); draw();
+  $('listWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function docGroup(k) { return (k === 'hire' || k === 'staffgm') ? 'hire' : (k === 'refer') ? 'refer' : k ? 'org' : ''; }
+function markBtns() {
+  const g = docGroup(DOC_KIND);
+  document.querySelectorAll('#docBtns [data-doc]').forEach(b => b.classList.toggle('on', !!g && b.dataset.doc === g));
+  document.querySelectorAll('#catBtns [data-cat]').forEach(b => b.classList.toggle('on', !!CUR_CAT && b.dataset.cat === CUR_CAT));
+}
 $('f_cat').onchange = draw;
 
 // ═════════════════════════════════════════════
@@ -502,6 +560,8 @@ $('f_cat').onchange = draw;
 // ═════════════════════════════════════════════
 const ORG_NAME = '자라는나무 아동발달센터';
 let DOC_KIND = '', ORG_DIRTY = false, ORG_KEY = '';
+let ORG_SAVED = false, ORG_EDIT = true, ORG_ST = 'before';
+const GM_KINDS = ['refer', 'staffgm', 'claimgm'];
 function docHire() {
   const c = '☐';
   return '<div class="dsheet" id="dsHire"><div class="dno">[서식 15호]</div>'
@@ -583,12 +643,14 @@ function orgBind() {
     orgBind();
     ORG_DIRTY = true; setOrgBtn('before');
   });
+  placeTools();
 }
 async function openDoc(kind) {
-  if (DOC_KIND === 'claimgm' && kind !== 'claim' && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 넘어갈까요?')) return;
+  if (GM_KINDS.includes(DOC_KIND) && GM_DIRTY && !confirm('저장하지 않은 공문이 있습니다. 넘어갈까요?')) return;
   if ((DOC_KIND === 'org' || DOC_KIND === 'info') && DOC_KIND !== kind && ORG_DIRTY
       && !confirm('저장하지 않은 내용이 있습니다. 다른 서식으로 넘어갈까요?')) return;
-  DOC_KIND = kind; ORG_DIRTY = false;
+  DOC_KIND = kind; ORG_DIRTY = false; GM_DIRTY = false; GM_EDIT = false;
+  setCat(''); markBtns();
   $('docView').style.display = 'grid';
   $('dvSave').style.display = kind === 'hire' ? 'none' : '';
   $('dvTabs').style.display = kind === 'hire' ? 'none' : '';
@@ -603,7 +665,7 @@ async function openDoc(kind) {
     $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 화면에 적은 글은 저장되지 않습니다 · 주민등록번호 칸은 늘 빈칸';
     HIRE_TAB = 'consent';
     $('dvBody').innerHTML = hireTabs() + docHire();
-    hireBind();
+    hireBind(); placeTools();
   } else {
     const y = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
     ORG_KEY = y + ':19호';
@@ -623,6 +685,7 @@ async function openDoc(kind) {
     if (!d.org) d.org = ORG_NAME;
     $('dvBody').innerHTML = docOrg(d);
     ORG_DIRTY = !!(from && from !== ORG_KEY);   // 지난해 것을 이어받았으면 올해 것으로 저장해야 함
+    ORG_SAVED = from === ORG_KEY; ORG_EDIT = !ORG_SAVED;
     setOrgBtn(from === ORG_KEY ? 'done' : 'before');
     if (from && from !== ORG_KEY) $('dvHint').textContent = Number(from.slice(0, 4)) + '년 요약서를 이어받았습니다 · 확인 후 「저장」하면 올해 것으로 남습니다';
     orgBind();
@@ -630,11 +693,13 @@ async function openDoc(kind) {
   $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function setOrgBtn(st) {
+  ORG_ST = st;
   const b = $('dvSave');
   b.disabled = st === 'saving';
   b.textContent = st === 'saving' ? '저장 중…' : st === 'done' ? '✓ 저장됨' : '저장 전';
   b.style.background = st === 'done' ? '#2e7d32' : '#fff';
   b.style.color = st === 'done' ? '#fff' : '';
+  placeTools();
 }
 async function saveOrg() {
   if (DOC_KIND !== 'org' && DOC_KIND !== 'info') return;
@@ -646,8 +711,8 @@ async function saveOrg() {
       .select('doc_key');
     if (error) throw error;
     if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
-    ORG_DIRTY = false; setOrgBtn('done');
-    $('dvHint').textContent = '저장했습니다 · ' + ORG_KEY.slice(0, 4) + '년 ' + (DOC_KIND === 'info' ? '제공기관 정보 안내' : '요약서');
+    ORG_DIRTY = false; ORG_SAVED = true; ORG_EDIT = false; setOrgBtn('done');
+    $('dvHint').textContent = '저장했습니다 · 고치려면 「수정」 · ' + ORG_KEY.slice(0, 4) + '년 ' + (DOC_KIND === 'info' ? '제공기관 정보 안내' : '요약서');
   } catch (e) {
     setOrgBtn('before');
     alert('저장하지 못했습니다.\n' + (e.message || e));
@@ -762,6 +827,7 @@ async function openInfo() {
   }
   $('dvBody').innerHTML = infoSheet(d);
   ORG_DIRTY = from !== ORG_KEY;
+  ORG_SAVED = from === ORG_KEY; ORG_EDIT = !ORG_SAVED;
   setOrgBtn(from === ORG_KEY ? 'done' : 'before');
   if (from && from !== ORG_KEY) $('dvHint').textContent = Number(from.slice(0, 4)) + '년 것을 이어받았습니다 · 확인 후 「저장」하면 올해 것으로 남습니다';
   infoBind();
@@ -795,6 +861,7 @@ function infoBind() {
     infoBind();
     ORG_DIRTY = true; setOrgBtn('before');
   });
+  placeTools();
 }
 
 // ═════════════════════════════════════════════
@@ -826,14 +893,15 @@ function hireTabs() {
 }
 function hireBind() {
   document.querySelectorAll('[data-htab]').forEach(b => b.onclick = async () => {
-    if (b.dataset.htab === HIRE_TAB) return;
-    if (HIRE_TAB !== 'consent' && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 넘어갈까요?')) return;
+    if (b.dataset.htab === HIRE_TAB && HIRE_TAB === 'consent') return;
+    if (HIRE_TAB !== 'consent' && GM_DIRTY && !confirm('저장하지 않은 공문이 있습니다. 넘어갈까요?')) return;
+    GM_DIRTY = false; GM_EDIT = false;
     HIRE_TAB = b.dataset.htab;
     if (HIRE_TAB === 'consent') {
       DOC_KIND = 'hire'; GM_MODE = 'refer'; GM_DIRTY = false;
       $('dvTitle').textContent = '신규인력등록 — 개인정보 수집 및 이용 동의서 [서식 15호]';
       $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 화면에 적은 글은 저장되지 않습니다 · 주민등록번호 칸은 늘 빈칸';
-      $('dvBody').innerHTML = hireTabs() + docHire(); hireBind();
+      $('dvBody').innerHTML = hireTabs() + docHire(); hireBind(); placeTools();
     } else { await openStaffLetter(false, HIRE_TAB === 'staff' ? 'join' : HIRE_TAB); }
   });
 }
@@ -903,11 +971,10 @@ function gmStaffCtl(d) {
         + GM_STAFF.filter(t => t.left_on).map(t => '<option value="' + t.id + '"' + (GM && String(GM.staff2) === String(t.id) ? ' selected' : '') + '>' + t.id + '번 ' + esc(t.name || '') + ' · ' + esc(String(t.left_on).slice(0, 10)) + ' 퇴사</option>').join('')
         + '</select> <span style="color:#888;font-size:12px;">자리를 바꿔 들어온 경우 — 고르면 본문 위에 퇴사 줄이 붙습니다</span></div>' : '')
     + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
-    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '발행 전') + '</span>'
-    +   (issued ? ' <button type="button" id="gmSave">✓ 저장됨</button>' : ' <button type="button" id="gmIssue">공문 번호 받기 (발행)</button>')
-    +   ' <button type="button" id="gmNew">새 공문</button> <button type="button" id="gmList">올해 발행한 공문</button>'
+    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '<span style="color:#9a8b7c;font-weight:400;">저장하면 자동으로 매겨집니다</span>') + '</span>'
+
     +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button></div>'
-    + '<div id="gmListBox"></div></div>';
+    + '</div>';
 }
 async function openStaffLetter(keep, sub) {
   DOC_KIND = 'staffgm'; GM_MODE = 'staff';
@@ -927,7 +994,7 @@ async function openStaffLetter(keep, sub) {
       && (GM_SUB === 'join' ? (!x.left_on || String(x.left_on) >= today0) : (!x.left_on || String(x.left_on) >= yAgo)));
   } catch (e) { $('dvHint').textContent = '불러오지 못한 것이 있습니다 (' + (e.message || e) + ')'; }
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  if (!keep) GM = null;
+  if (!keep) { GM = null; GM_EDIT = false; GM_DIRTY = false; }
   const d = keep && GM && GM.data ? GM.data : gmStaffDefaults(today);
   gmRender(d);
 }
@@ -986,12 +1053,11 @@ function gmClaimCtl(d) {
   const issued = !!(GM && GM.no);
   return '<div class="gmctl">'
     + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
-    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '발행 전') + '</span>'
-    +   (issued ? ' <button type="button" id="gmSave">✓ 저장됨</button>' : ' <button type="button" id="gmIssue">공문 번호 받기 (발행)</button>')
-    +   ' <button type="button" id="gmNew">새 공문</button> <button type="button" id="gmList">올해 발행한 공문</button>'
+    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '<span style="color:#9a8b7c;font-weight:400;">저장하면 자동으로 매겨집니다</span>') + '</span>'
+
     +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button></div>'
     + '<div class="r" style="color:#888;font-size:12px;">주민번호 칸은 인쇄 전에 적는 칸이라 저장되지 않습니다 · 다시 열면 비어 있습니다</div>'
-    + '<div id="gmListBox"></div></div>';
+    + '</div>';
 }
 async function openClaim(keep) {
   DOC_KIND = 'claimgm'; GM_MODE = 'claim';
@@ -1002,7 +1068,7 @@ async function openClaim(keep) {
     GM_BASE = (b && b.data && b.data[0] && b.data[0].data) || {};
   } catch (e) {}
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  if (!keep) GM = null;
+  if (!keep) { GM = null; GM_EDIT = false; GM_DIRTY = false; }
   const d = keep && GM && GM.data ? GM.data : gmClaimDefaults(today);
   gmRender(d);
 }
@@ -1100,14 +1166,13 @@ function gmCtl(d) {
     +   '<datalist id="gmKidList">' + GM_KIDS.map(k => '<option value="' + k.id + '번 ' + esc(k.name || '') + '">').join('') + '</datalist>'
     +   ' <span style="color:#888;font-size:12px;">고르면 의뢰서 · 결과서 · 진단서 성명 · 생년월일과 공문 평가 날짜 · 평가자가 채워집니다</span></div>'
     + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
-    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '발행 전') + '</span>'
-    +   (issued ? ' <button type="button" id="gmSave">✓ 저장됨</button>' : ' <button type="button" id="gmIssue">공문 번호 받기 (발행)</button>')
-    +   ' <button type="button" id="gmNew">새 공문</button> <button type="button" id="gmList">올해 발행한 공문</button></div>'
+    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '<span style="color:#9a8b7c;font-weight:400;">저장하면 자동으로 매겨집니다</span>') + '</span>'
+    +   '</div>'
     + '<div class="r"><b>인쇄할 것</b> '
     +   ['letter:공문', 'refer:의뢰서', 'detail:세부영역 검사결과서', 'diag:진단서'].map(x => { const [k, l] = x.split(':');
           return '<label><input type="checkbox" class="gmpr" value="' + k + '" checked> ' + l + '</label>'; }).join(' ')
     +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button> <span style="color:#888;font-size:12px;">(센터장 · 주소 · 전화 · 전송 · E-mail 은 한 번 저장하면 다음 공문에 자동)</span></div>'
-    + '<div id="gmListBox"></div></div>';
+    + '</div>';
 }
 async function openRefer(keep) {
   GM_MODE = 'refer';
@@ -1124,7 +1189,7 @@ async function openRefer(keep) {
     GM_KIDS = (k && k.data) || [];
   } catch (e) { $('dvHint').textContent = '불러오지 못한 것이 있습니다 (' + (e.message || e) + ')'; }
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  if (!keep) GM = null;
+  if (!keep) { GM = null; GM_EDIT = false; GM_DIRTY = false; }
   const d = keep && GM && GM.data ? GM.data : gmDefaults(today);
   gmRender(d);
 }
@@ -1132,7 +1197,8 @@ function gmKidOf(label) {
   const m = String(label || '').match(/^(\d+)/);
   return m ? GM_KIDS.find(k => String(k.id) === m[1]) || null : null;
 }
-function gmRender(d) {
+function gmRender(d) { gmRender0(d); placeTools(); gmLoadList(); }
+function gmRender0(d) {
   if (GM_MODE === 'claim') {
     // 주민번호 칸은 저장하지 않지만, 번호 받기 등으로 다시 그려도 화면에서는 남게 (탭을 닫으면 사라짐)
     const rrn = [...document.querySelectorAll('#gmLetter [data-x=rrn]')].map(el => el.value);
@@ -1190,7 +1256,6 @@ function gmBindRefer() {
     const pr = f ? L.querySelector('.gpr[data-p="' + f + '"]') : null;
     if (pr) pr.textContent = e.target.value;
     GM_DIRTY = true;
-    const sv = $('gmSave'); if (sv) { sv.textContent = '고쳐 저장'; }
   });
   $('gmDate').onchange = () => {
     const d = gmRead(); d.when = d.when || gmKor(d.date);
@@ -1246,10 +1311,6 @@ function gmBindRefer() {
     }
     GM_DIRTY = true; gmRender(d);
   };
-  if ($('gmIssue')) $('gmIssue').onclick = gmIssue;
-  if ($('gmSave')) $('gmSave').onclick = gmUpdate;
-  $('gmNew').onclick = () => { if (GM_DIRTY && GM && GM.no && !confirm('고친 내용을 저장하지 않았습니다. 새 공문을 열까요?')) return; GM_DIRTY = false; if (GM_MODE === 'staff') openStaffLetter(false, GM_SUB); else if (GM_MODE === 'claim') openClaim(false); else openRefer(false); };
-  $('gmList').onclick = gmShowList;
   $('gmBaseBtn').onclick = gmSaveBase;
 }
 async function gmIssue() {
@@ -1258,8 +1319,9 @@ async function gmIssue() {
   if (!String(d.title || '').trim()) { alert('제목을 적어 주세요.'); return; }
   let nx = '';
   try { const r = await sb.rpc('nl_gongmun_next', { p_year: Number(d.date.slice(0, 4)) }); nx = r && r.data != null ? String(r.data).padStart(3, '0') : ''; } catch (e) {}
-  if (!confirm('공문 번호를 받을까요?\n\n대가 ' + d.date.slice(0, 4) + ' - ' + (nx || '○○○') + '호 (' + gmDot(d.date) + ')\n\n번호와 작성일은 발행 뒤 바꿀 수 없습니다.')) return;
-  const b = $('gmIssue'); b.disabled = true; b.textContent = '발행 중…';
+  if (!confirm('이 공문을 저장할까요?\n\n번호 : 대가 ' + d.date.slice(0, 4) + ' - ' + (nx || '○○○') + '호 (' + gmDot(d.date) + ')\n\n번호와 작성일은 저장한 뒤 바꿀 수 없습니다.')) return;
+  if (GM_SAVING) return;
+  GM_SAVING = true; placeTools();
   try {
     const { data, error } = await sb.rpc('nl_gongmun_issue', { p_date: d.date, p_title: d.title.trim(), p_recipient: (d.to || '').trim() || null,
       p_child: GM && GM.child && GM.child.id ? Number(GM.child.id) : null, p_data: d });
@@ -1267,26 +1329,28 @@ async function gmIssue() {
     const r = data && data[0];
     if (!r) throw new Error('번호를 돌려받지 못했습니다');
     GM = Object.assign(GM || {}, { id: r.id, year: r.year, no: r.no, data: d });
-    GM_DIRTY = false;
+    GM_DIRTY = false; GM_EDIT = false; GM_SAVING = false;
     gmRender(d);
-    $('dvHint').textContent = '발행했습니다 · ' + gmNoText() + ' · 고친 뒤에는 「고쳐 저장」';
+    $('dvHint').textContent = '저장했습니다 · ' + gmNoText() + ' · 고치려면 용지 안 「수정」';
   } catch (e) {
-    b.disabled = false; b.textContent = '공문 번호 받기 (발행)';
-    alert('공문을 발행하지 못했습니다.\n' + (e.message || e));
+    GM_SAVING = false; placeTools();
+    alert('공문을 저장하지 못했습니다.\n' + (e.message || e));
   }
 }
 async function gmUpdate() {
   if (!GM || !GM.id) return;
   const d = gmRead(); d.date = GM.data ? GM.data.date : d.date;
-  const b = $('gmSave'); b.disabled = true; b.textContent = '저장 중…';
+  if (GM_SAVING) return;
+  GM_SAVING = true; placeTools();
   try {
     const { data, error } = await sb.from('nl_gongmun').update({ title: d.title.trim(), recipient: (d.to || '').trim() || null, data: d })
       .eq('id', GM.id).select('id');
     if (error) throw error;
     if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
-    GM.data = d; GM_DIRTY = false; b.textContent = '✓ 저장됨';
-  } catch (e) { b.textContent = '고쳐 저장'; alert('저장하지 못했습니다.\n' + (e.message || e)); }
-  b.disabled = false;
+    GM.data = d; GM_DIRTY = false; GM_EDIT = false; GM_SAVING = false;
+    gmRender(d);
+    $('dvHint').textContent = '저장했습니다 · ' + gmNoText();
+  } catch (e) { GM_SAVING = false; placeTools(); alert('저장하지 못했습니다.\n' + (e.message || e)); }
 }
 async function gmSaveBase() {
   const d = gmRead();
@@ -1298,38 +1362,96 @@ async function gmSaveBase() {
     GM_BASE = base; $('dvHint').textContent = '기관 공문 정보를 저장했습니다 · 다음 공문부터 자동으로 들어갑니다';
   } catch (e) { alert('저장하지 못했습니다.\n' + (e.message || e)); }
 }
-async function gmShowList() {
-  const box = $('gmListBox');
-  if (box.innerHTML) { box.innerHTML = ''; return; }
-  const y = Number(($('gmDate').value || '').slice(0, 4)) || new Date().getFullYear();
+// 올해 저장한 공문 — 용지 아래에 번호 차례로 (2026-10-09 은정님) · 줄을 누르면 위에 열림
+async function gmLoadList() {
+  const body = $('dvBody'); if (!body) return;
+  let box = $('gmListBox');
+  if (!box) { box = document.createElement('div'); box.id = 'gmListBox'; box.className = 'gmlist no-print'; body.appendChild(box); }
+  const y = Number((($('gmDate') || {}).value || '').slice(0, 4)) || new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+  const mode = GM_MODE, sub = GM_SUB;
+  const head = n => '<div class="gl-h">' + y + '년 저장한 공문' + (n == null ? '' : ' (' + n + '건)')
+    + '<span>줄을 누르면 위에 열립니다 · 새로 쓰려면 책갈피(또는 위 단추)를 다시 누르세요</span></div>';
+  box.innerHTML = head(null) + '<div class="gl-e">불러오는 중…</div>';
   try {
     const { data, error } = await sb.from('nl_gongmun').select('id, year, no, issued_on, title, recipient, child_id, data')
-      .eq('year', y).order('no', { ascending: false });
+      .eq('year', y).order('no', { ascending: true });
     if (error) throw error;
+    if (mode !== GM_MODE || sub !== GM_SUB || !document.body.contains(box)) return;
     const kindOf = g => (g.data && g.data.kind) || 'refer';
     const rows = (data || []).filter(g => GM_MODE === 'staff'
       ? (kindOf(g) === 'staff' && ((g.data.sub || 'join') === GM_SUB))
       : kindOf(g) === GM_MODE);
-    box.innerHTML = '<div style="margin-top:6px;max-height:220px;overflow:auto;background:#fff;border:1px solid #eee;border-radius:6px;">'
-      + (rows.map(g => '<div style="padding:5px 8px;border-bottom:1px solid #f2f2f2;cursor:pointer;" data-gid="' + g.id + '">대가 ' + g.year + ' - '
-          + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</div>').join('')
-         || '<div style="padding:8px;color:#888;">올해 발행한 공문이 없습니다</div>') + '</div>';
+    box.innerHTML = head(rows.length) + (rows.map(g => '<div class="gl-r' + (GM && String(GM.id) === String(g.id) ? ' on' : '') + '" data-gid="' + g.id + '">대가 ' + g.year + ' - '
+        + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</div>').join('')
+      || '<div class="gl-e">아직 저장한 공문이 없습니다</div>');
     box.querySelectorAll('[data-gid]').forEach(el => el.onclick = () => {
       const g = rows.find(x => String(x.id) === el.dataset.gid); if (!g) return;
+      if (GM && String(GM.id) === String(g.id) && !GM_EDIT) return;
+      if (GM_DIRTY && !confirm('저장하지 않은 공문이 있습니다. 넘어갈까요?')) return;
       const k = GM_KIDS.find(x => String(x.id) === String(g.child_id));
       GM = { id: g.id, year: g.year, no: g.no, data: Object.assign({}, g.data, { date: String(g.issued_on).slice(0, 10) }),
              child: k ? { id: k.id, name: k.name, birth: String(k.birth || '').slice(0, 10).replace(/-/g, '.') } : {},
              childLabel: k ? k.id + '번 ' + (k.name || '') : '' };
-      GM_DIRTY = false; gmRender(GM.data);
+      GM_DIRTY = false; GM_EDIT = false; gmRender(GM.data);
+      $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-  } catch (e) { box.innerHTML = '<div style="color:#c62828;">불러오지 못했습니다 (' + esc(e.message || e) + ')</div>'; }
+  } catch (e) { box.innerHTML = head(null) + '<div class="gl-e" style="color:#c62828;">불러오지 못했습니다 (' + esc(e.message || e) + ')</div>'; }
+}
+// 용지 안 단추 (2026-10-09 은정님)
+//   공문 — 처음 「저장」 때 번호가 자동으로 매겨짐 → 그 뒤 「수정」 「인쇄」 → 고칠 때 「저장」 「취소」
+//   19호 · 제공기관 정보 — 저장하면 잠기고 「수정」 「인쇄」 → 고칠 때 「저장」 (「취소」는 저장한 것이 있을 때만)
+//   15호 동의서 — 「인쇄」 만
+let GM_EDIT = false, GM_SAVING = false;
+function placeTools() {
+  const body = $('dvBody'); if (!body) return;
+  body.querySelectorAll('.ptools').forEach(x => x.remove());
+  let html = '';
+  const B = (a, t, main, dis) => '<button type="button" data-pt="' + a + '"' + (main ? ' class="main"' : '') + (dis ? ' disabled' : '') + '>' + t + '</button>';
+  if (DOC_KIND === 'hire') html = B('print', '인쇄');
+  else if (GM_KINDS.includes(DOC_KIND)) {
+    const issued = !!(GM && GM.no), lock = issued && !GM_EDIT;
+    if (GM_SAVING) html = B('save', '저장 중…', true, true);
+    else if (!issued) html = B('save', '저장', true);
+    else if (GM_EDIT) html = B('save', '저장', true) + B('cancel', '취소');
+    else html = B('edit', '수정') + B('print', '인쇄');
+    const L = $('gmLetter');
+    if (L) { L.classList.toggle('locked', lock); L.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); }
+    ['gmKid', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
+  } else if (DOC_KIND === 'org' || DOC_KIND === 'info') {
+    const sh = $(DOC_KIND === 'info' ? 'dsInfo' : 'dsOrg');
+    if (!sh) return;
+    if (ORG_ST === 'saving') html = B('save', '저장 중…', true, true);
+    else if (ORG_EDIT) html = B('save', '저장', true) + (ORG_SAVED ? B('cancel', '취소') : '');
+    else html = B('edit', '수정') + B('print', '인쇄');
+    sh.classList.toggle('locked', !ORG_EDIT);
+    sh.querySelectorAll('input[data-k]').forEach(el => { el.readOnly = !ORG_EDIT; });
+  }
+  if (!html) return;
+  body.querySelectorAll('.dsheet').forEach(sh => {
+    const d = document.createElement('div'); d.className = 'ptools no-print'; d.innerHTML = html; sh.prepend(d);
+  });
+  body.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => ptool(b.dataset.pt));
+}
+async function ptool(a) {
+  if (a === 'print') { printDoc(); return; }
+  if (GM_KINDS.includes(DOC_KIND)) {
+    if (a === 'save') { if (GM && GM.no) await gmUpdate(); else await gmIssue(); return; }
+    if (a === 'edit') { GM_EDIT = true; placeTools(); $('dvHint').textContent = '고친 뒤 용지 안 「저장」을 누르세요 · 번호와 작성일은 그대로입니다'; return; }
+    if (a === 'cancel') { if (GM_DIRTY && !confirm('고친 내용을 버릴까요?')) return; GM_EDIT = false; GM_DIRTY = false; gmRender(GM.data); return; }
+  } else if (DOC_KIND === 'org' || DOC_KIND === 'info') {
+    if (a === 'save') { await saveOrg(); return; }
+    if (a === 'edit') { ORG_EDIT = true; placeTools(); $('dvHint').textContent = '고친 뒤 용지 안 「저장」을 누르세요'; return; }
+    if (a === 'cancel') { if (ORG_DIRTY && !confirm('고친 내용을 버릴까요?')) return; ORG_DIRTY = false; openDoc(DOC_KIND); return; }
+  }
 }
 function closeDoc() {
-  if ((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY && !confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return;
-  if ((DOC_KIND === 'refer' || DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 닫을까요?')) return;
+  if ((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY && !confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return false;
+  if (GM_KINDS.includes(DOC_KIND) && GM_DIRTY && !confirm('저장하지 않은 공문이 있습니다. 닫을까요?')) return false;
   GM_MODE = 'refer';
-  GM_DIRTY = false;
+  GM_DIRTY = false; GM_EDIT = false;
   $('docView').style.display = 'none'; $('dvBody').innerHTML = ''; DOC_KIND = ''; ORG_DIRTY = false;
+  markBtns();
+  return true;
 }
 function printDoc() {
   if ((DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && !(GM && GM.no) && !confirm('공문 번호를 아직 받지 않았습니다. 번호 없이 인쇄할까요?')) return;
@@ -1345,7 +1467,7 @@ function printDoc() {
   window.print();
   setTimeout(off, 1500);
 }
-window.addEventListener('beforeunload', e => { if ((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY) || (GM_KINDS.includes(DOC_KIND) && GM_DIRTY)) { e.preventDefault(); e.returnValue = ''; } });
 
 async function afterLogin(user) {
   const { data: me, error: e1 } = await sb
