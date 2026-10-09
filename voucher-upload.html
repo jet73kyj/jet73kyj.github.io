@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>발달 결제내역 올리기 - 나무링크</title>
+<title>결제내역 올리기 - 나무링크</title>
 <style>
   :root {
     --ink:#1c1f1a; --ink2:#5a6156; --ink3:#9aa294;
@@ -206,6 +206,14 @@
   button#save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   button#save:disabled { background:#f2f1ee; color:var(--ink3); border-color:var(--line); }
   @media print { .hd { display:none !important; } }
+  /* 결제내역 올리기 — 세 갈래 (2026-10-09 · 발달 올리기 · 지원 결제 올리기를 한 곳으로) */
+  .paytabs { max-width:900px; margin:14px auto 0; padding:0 16px; display:flex; gap:0;
+             border-bottom:1px solid #ECE8E3; }
+  .paytabs a { padding:9px 18px; font-size:14px; color:#5F5E5A; text-decoration:none;
+               border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .paytabs a.on { color:#7E5530; border-bottom-color:#B07A4A; font-weight:600; }
+  .paytabs a:hover { color:#2F2926; }
+  @media print { .paytabs { display:none !important; } }
 </style>
 </head>
 <body>
@@ -213,7 +221,7 @@
 <!-- 로그인 전 -->
 <div class="box" id="loginBox">
   <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
-  <h1 style="text-align:center">발달 결제내역 올리기</h1>
+  <h1 style="text-align:center">결제내역 올리기</h1>
   <div class="sub" style="text-align:center">나무링크</div>
   <label for="em">이메일</label>
   <input id="em" type="email" autocomplete="username" placeholder="you@example.com">
@@ -228,12 +236,13 @@
   <div class="hd noprint">
     <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
     <span class="bar0"></span>
-    <h1>발달 결제내역 올리기</h1>
+    <h1>결제내역 올리기</h1>
     <span class="who" id="who"></span>
     <span class="sp"></span>
     <button id="out" class="ghost">로그아웃</button>
     <a href="index.html" class="btn-home">처음으로</a>
   </div>
+  <nav class="paytabs"><a href="voucher-upload.html" data-k="dev" class="on">발달재활 바우처</a><a href="card-upload.html?st=3" data-k="tr">치료지원</a><a href="card-upload.html?st=5" data-k="af">방과후</a></nav>
   <div class="wide">
 
   <div class="note">
@@ -1091,6 +1100,12 @@ document.querySelector('.btn-home').addEventListener('click', e => {
   if (!upLeaveOk(true)) { e.preventDefault(); return; }
   UP_LEAVING = true;
 });
+// 결제내역 올리기 갈래 줄 — 치료지원 · 방과후는 지원 결제 화면으로 (2026-10-09)
+document.querySelectorAll('.paytabs a').forEach(a => a.addEventListener('click', e => {
+  if (a.dataset.k === 'dev') { e.preventDefault(); return; }
+  if (!upLeaveOk(true)) { e.preventDefault(); return; }
+  UP_LEAVING = true;
+}));
 window.addEventListener('beforeunload', e => {
   if (UP_LEAVING || !upPending(true).length) return;
   e.preventDefault();

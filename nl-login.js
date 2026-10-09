@@ -349,7 +349,7 @@
           return '<div><div style="font-size:12px;font-weight:600;color:' + c[1] + ';border-left:3px solid ' + c[0] + ';padding-left:7px;margin-bottom:4px;">' + g.grp + '</div>'
             + g.items.map(function (it) {
                 var f = it.f.split('#')[0], hh = it.f.indexOf('#') >= 0 ? '#' + it.f.split('#')[1] : '';
-                var on = (f === file) && (hh === hash);
+                var on = (f === file || (it.also || []).indexOf(file) >= 0) && (hh === hash);
                 return '<a href="' + it.f + '" class="nlmi" style="display:block;padding:6px 8px;border-radius:7px;text-decoration:none;'
                   + (on ? 'background:#FBF5EE;' : '') + '">'
                   + '<div style="font-size:13.5px;' + (on ? 'color:' + c[1] + ';font-weight:600;' : 'color:#2F2926;font-weight:500;') + '">' + (on ? '● ' : '') + it.nm + '</div>'

@@ -62,6 +62,60 @@
                    padding:8px 16px; font-size:13px; font-weight:bold; cursor:pointer; }
   .picker #pInfo { font-size:12.5px; color:#777; margin-left:4px; }
 
+  /* 치료지원 시간표 · 결제 내역 변경 관리 (2026-10-09) */
+  .ttsheet h2.title, .pcsheet h2.title { font-size:18px; letter-spacing:1px; }
+  .tt-cal { border-collapse:collapse; width:100%; table-layout:fixed; font-size:11.5px; margin-top:-1px; }
+  .tt-cal th { border:1px solid #333; background:#f5f5f5; padding:4px; }
+  .tt-cal td { border:1px solid #333; height:72px; vertical-align:top; padding:3px 4px; }
+  .tt-cal .dn { display:inline-block; min-width:18px; border:1px solid #555; padding:0 3px; font-size:10.5px; }
+  .tt-cal .tm { margin-top:6px; text-align:center; font-size:12px; font-weight:bold; line-height:1.5; }
+  .tt-th { margin-top:22px; font-weight:bold; font-size:13px; }
+  .pc-sub { text-align:right; font-weight:bold; font-size:14px; margin:-6px 0 8px; }
+  .pc-tbl td { vertical-align:middle; }
+  .pc-cat { font-size:10.5px; line-height:1.45; text-align:center; color:#555; }
+  .pc-cat span.on { color:#000; font-weight:bold; border:1.5px solid #c62828; border-radius:10px; padding:0 4px; }
+  .pc-area span.on { font-weight:bold; border:1.5px solid #c62828; border-radius:10px; padding:0 5px; }
+  .pc-note { font-size:11px; margin-top:6px; color:#555; }
+  .pc-edit { margin:14px 0 30px; background:#fff; border:1px solid #ECE8E3; border-radius:10px; padding:14px 16px; }
+  .pc-edit h3 { margin:0 0 8px; font-size:14px; }
+  .pc-edit table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  .pc-edit td, .pc-edit th { border-bottom:1px solid #F0EEEA; padding:5px 6px; text-align:left; vertical-align:middle; }
+  .pc-edit input[type=text], .pc-edit select { padding:4px 6px; font-size:12.5px; border:1px solid #E4E0DA; border-radius:6px; }
+  .pc-edit button { padding:4px 10px; font-size:12px; border:1px solid #E4E0DA; background:#fff; border-radius:6px; cursor:pointer; }
+  .pc-edit tr.hid td { color:#bbb; text-decoration:line-through; }
+  .pc-edit .pcmsg { font-size:12px; margin-top:6px; }
+  @media print {
+    .ttsheet { page-break-after:always; }
+    body:not(.print-pc) #pcSheet { display:none !important; }
+    body.print-pc .sheet:not(#pcSheet) { display:none !important; }
+    .tt-cal td { height:64px; }
+    .pc-cat span.on, .pc-area span.on { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+  .pc-tbl .pcnote { width:100%; margin-top:4px; border:1px dashed #D9C3A7; border-radius:4px; padding:3px 5px; font-size:11.5px; background:#FFFDF8; }
+  .pc-tbl .pcbtns { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
+  .pc-tbl .pcbtns button { padding:3px 8px; font-size:11.5px; border:1px solid #E4E0DA; background:#fff; border-radius:6px; cursor:pointer; width:auto; margin:0; }
+  .pc-tbl tr.pc-hid td { color:#bbb; background:#FAFAF8; }
+  .pc-tbl tr.pc-hid .pc-cat span.on { border-color:#ccc; color:#bbb; }
+  .pc-tbl tr.pcadd td { background:#FBF5EE; }
+  .pc-tbl tr.pcadd select, .pc-tbl tr.pcadd input { font-size:11.5px; padding:3px 5px; border:1px solid #E4E0DA; border-radius:4px; }
+  .pc-tbl tr.pcadd select { width:100% !important; margin:0 !important; }
+  .pcmsg { font-size:12px; margin-top:6px; min-height:16px; }
+  .pcprintbar { display:flex; align-items:center; gap:10px; justify-content:flex-end; margin:-6px 0 12px;
+                padding:8px 10px; background:#F8F1E8; border-radius:8px; font-size:12.5px; color:#7E5530; }
+  .pcprintbar button { width:auto; margin:0; padding:6px 14px; font-size:13px; font-weight:600; background:#1565c0; color:#fff;
+                       border:none; border-radius:6px; cursor:pointer; }
+  .pc-tbl .pcnote-p { display:none; font-size:11.5px; margin-top:2px; padding-left:8px; }
+  @media print {
+    .pc-tbl tr.pc-hid { display:none !important; }
+    .pc-tbl .pcnote { display:none !important; }
+    .pc-tbl .pcnote-p { display:block !important; }
+  }
+  /* 카드 결제 줄 (2026-10-09) — 빨강은 선생님이 고치셔야 하는 표시. 인쇄에도 나온다 */
+  .q_pay { font-size:11.5px; color:#4A433F; margin-top:3px; line-height:1.35; text-align:center; }
+  .q_pay.red, input.red { color:#c62828 !important; font-weight:bold; }
+  .q_pay.red, input.red { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  @media print { .q_pay { font-size:9.5px; margin-top:1px; } }
+
   @media print {
     /* 발달재활 기록지와 같은 여백 (2026-09-10)
        위를 넓게 두어 철하실 자리를 만든다 */
@@ -165,8 +219,12 @@
   <div class="form-actions no-print">
     <button class="btn-save" id="btnSave" onclick="saveRecord()">저장 전</button>
     <button class="btn-print" onclick="window.print()">인쇄 / PDF 저장</button>
+    <button class="btn-print" id="btnPrintPc" type="button">결제 변경 관리 대장 인쇄</button>
     <a href="index.html" style="margin-left:auto;background:#eee;color:#555;text-decoration:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:bold;">처음으로</a>
   </div>
+
+  <!-- 특수교육대상자 치료지원 시간표 (2026-10-09) — 누가기록서 앞장 · 회기 칸을 그대로 따라감 -->
+  <div class="sheet ttsheet" id="ttSheet" style="display:none;"></div>
 
   <div class="sheet" id="sheet1">
     <h2 class="title" id="sheetTitle">치료 [ ]월 치료지원 누가기록서</h2>
@@ -254,6 +312,10 @@
     </div>
     <div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
   </div>
+
+  <!-- [서식 3] 치료지원 결제 내역 변경 관리 (2026-10-09) — 아동마다 한 해 한 장 · 「결제 변경 관리 인쇄」로 따로 인쇄 -->
+  <div class="sheet pcsheet" id="pcSheet" style="display:none;margin-top:16px;"></div>
+  <div class="pc-edit no-print" id="pcEdit" style="display:none;"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -286,6 +348,12 @@ let SCHED = [], LOGID = null, ITEMS = [], CONT = '', PREV = null, WRITTEN = null
 let year = new Date().getFullYear();
 let month = new Date().getMonth() + 1;
 let LOADED = false;
+// 카드 결제 (2026-10-09) — 셈은 서버 nl_support_pay 한 곳. 화면은 그리기만
+//   PAY[i] = i+1회 결제 { paid_on, paid_time, appr_no, cls_start, cls_end, flag, total }
+//   MAN[i] = 선생님이 그 회 칸을 직접 고침 → 고친 내용이 먼저 · 검정
+let PAY = [], PAYTOTAL = 0, PAYERR = '', PAYEND = '', MAN = [], AUTOCHG = false;
+// 시간표 · 결제 변경 관리 (2026-10-09)
+let THGENDER = {}, LICS = [], PCROWS = [], PCERR = '';
 
 function show(el, t, ok) { el.textContent = t; el.className = 'out ' + (ok ? 'ok' : 'err'); }
 function esc(s) { return String(s == null ? '' : s)
@@ -378,13 +446,13 @@ async function afterLogin(user) {
   if (_isBlocked(me.role)) { _blockScreen(me.role); return; }
 
   const [th, st, tp] = await Promise.all([
-    sb.from('nl_therapists').select('id, name'),
+    sb.from('nl_therapists').select('id, name, gender'),
     sb.from('nl_support_types').select('id, name'),
     sb.from('nl_therapies')
-      .select('id, child_id, therapy_type_id, support_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status, disability, school, grade_year), nl_therapy_schedules(therapist_id, to_month)')
+      .select('id, child_id, therapy_type_id, support_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status, disability, school, grade_year, gender), nl_therapy_schedules(therapist_id, to_month)')
       .in('support_type_id', SUPPORTS)
   ]);
-  (th.data || []).forEach(t => THERAPISTS[t.id] = t.name);
+  (th.data || []).forEach(t => { THERAPISTS[t.id] = t.name; THGENDER[t.id] = t.gender || ''; });
   (st.data || []).forEach(s => SUPNAME[s.id] = s.name);
 
   TPRAW = tp.data || [];
@@ -415,6 +483,9 @@ async function buildPairs() {
       if (!allView && String(r.therapist_id) !== String(ME.id)) return;
       const c = KIDS[r.child_id];
       if (!c) return;
+      // 보는 달 전에 끝난 수업은 찾기 칸에서 뺀다 (2026-10-09 · 그 달 안에 끝난 수업은 남김)
+      const tpe = TPRAW.find(x => String(x.id) === String(r.therapy_id));
+      if (tpe && tpe.ended_on && String(tpe.ended_on).slice(0, 10) < mv + '-01') return;
       const k = c.id + '-' + r.support_type_id;
       if (seen[k]) return;
       seen[k] = true;
@@ -430,6 +501,7 @@ async function buildPairs() {
     const c = r.nl_children;
     if (!c) return;
     if (r.ended_on && String(r.ended_on).slice(0,7) < _keep0) return;
+    if (r.ended_on && String(r.ended_on).slice(0, 10) < mv + '-01') return;   // 보는 달 전에 끝난 수업 (2026-10-09)
     const sc = (r.nl_therapy_schedules || [])
       .filter(s => !s.to_month || s.to_month >= _keep0);
     if (!sc.length) return;
@@ -536,11 +608,44 @@ async function loadOne() {
         .eq('log_id', LOGID).order('seq_no');
       ITEMS = it.data || [];
     }
+    // 카드 결제 — 못 받아도 기록지는 그대로 연다
+    PAY = []; PAYTOTAL = 0; PAYERR = ''; PAYEND = ''; MAN = []; AUTOCHG = false;
+    // 이 달 전에 끝난 수업 — 결제 내역을 찾지 않고 「종결되었습니다」 (2026-10-09)
+    //   누가기록지는 끝난 수업도 두 달까지 목록에 남긴다
+    const tp0 = TPRAW.find(r => String(r.id) === String(cur.therapy_id));
+    const endOn = tp0 && tp0.ended_on ? String(tp0.ended_on).slice(0, 10) : '';
+    if (endOn && endOn < mk + '-01') PAYEND = endOn;
+    if (!PAYEND) try {
+      const pr2 = await sb.rpc('nl_support_pay', { p_therapy: cur.therapy_id, p_month: mk });
+      if (pr2.error) throw pr2.error;
+      PAY = (pr2.data || []).slice().sort((a, b) => a.seq - b.seq).slice(0, SESSIONS);
+      PAYTOTAL = PAY.length ? Number(PAY[0].total || PAY.length) : 0;
+    } catch (e2) { PAY = []; PAYERR = (e2 && e2.message) || String(e2); }
+    // 면허 (위탁수수료 정산에 적은 것) · 결제 변경 관리 줄 — 못 받아도 기록지는 연다
+    LICS = []; PCROWS = []; PCERR = '';
+    try {
+      const tids = [...new Set(SCHED.map(s => s.therapist_id).filter(v => v != null))];
+      if (tids.length) {
+        const lr = await sb.from('nl_th_licenses').select('therapist_id, lic_name, lic_no').in('therapist_id', tids).order('id');
+        if (!lr.error) LICS = lr.data || [];
+      }
+    } catch (e3) {}
+    await loadPc();
     LOADED = true;
     $('pInfo').textContent = mk + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
     drawAll(lg.data);
     DIRTY = false;
     setSaveBtn(LOGID ? 'done' : 'before');
+    // 결제 내역으로 칸이 바뀌었으면 「저장 전」
+    if (AUTOCHG) { DIRTY = true; setSaveBtn('before');
+      $('pInfo').textContent += ' · 카드 결제 내역으로 회기 일자를 채웠습니다 (저장 전)'; }
+    if (PAYEND) $('pInfo').textContent += ' · 종결되었습니다 (' + parseInt(PAYEND.slice(5, 7), 10) + '월 '
+      + parseInt(PAYEND.slice(8, 10), 10) + '일 종결)';
+    else if (PAYERR) $('pInfo').textContent += ' · 카드 결제 내역을 읽지 못했습니다';
+    else if (!PAY.length) $('pInfo').textContent += ' · 이 달 카드 결제 내역 없음';
+    if (PAYTOTAL > SESSIONS) $('pInfo').textContent += ' · 결제 ' + PAYTOTAL + '건 — ' + SESSIONS + '건만 넣었습니다';
+    const redN = PAY.filter((p, i) => p.flag && !MAN[i]).length;
+    if (redN) $('pInfo').textContent += ' · 빨강 ' + redN + '회 — 고쳐 주세요';
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -573,7 +678,8 @@ function _timeText() {
 function drawAll(saved) {
   const c = cur.child;
   const areaName = TTYPE[cur.therapy_type_id] || '';
-  $('pageTitle').textContent = `치료지원 누가기록서 — ${c.name} · ${SUPNAME[cur.support_type_id]} · ${year}년 ${month}월`;
+  $('pageTitle').textContent = `치료지원 누가기록서 — ${c.name} · ${SUPNAME[cur.support_type_id]} · ${year}년 ${month}월`
+    + (schedThNames(id => THERAPISTS[id] || '') ? ' · 담당 ' + schedThNames(id => THERAPISTS[id] || '') + ' 선생님' : '');
   $('sheetTitle').textContent = `${areaName}치료 [ ${month} ]월 치료지원 누가기록서`;
 
   $('f_name').value   = c.name || '';
@@ -614,26 +720,312 @@ function drawAll(saved) {
     $('pInfo').textContent += ' · 지난 기록(' + PREV.month_key + ')에서 목표를 이어받았습니다';
   }
   buildSeq();
+  drawTT();
+  drawPc();
 }
+
+
+// ════════════════════════════════════════════════════════════════
+// 특수교육대상자 치료지원 시간표 (2026-10-09)
+//   회기 칸(1~3회)의 날짜 · 시간을 그대로 달력에 넣는다 (결제일 우선 · 직접 고친 값 따름)
+// ════════════════════════════════════════════════════════════════
+const WDK = ['일','월','화','수','목','금','토'];
+function curTh() {   // 이 달 담당 — 그 달 마지막 요일줄 선생님
+  return SCHED.length ? SCHED[SCHED.length - 1].therapist_id : null;
+}
+// 면허는 이 수업의 치료 영역에 맞는 것만 (2026-10-09 · 언어 → 「언어」 든 면허 / 작업 → 「작업」 든 면허)
+//   맞는 것이 없으면 빈칸 (종이에 직접)
+function licText(tid) {
+  const kw = cur ? (TTYPE[cur.therapy_type_id] || '') : '';
+  return LICS.filter(l => String(l.therapist_id) === String(tid)
+                       && kw && String(l.lic_name || '').indexOf(kw) >= 0)
+    .map(l => (l.lic_name || '') + (l.lic_no ? ' ' + l.lic_no : '')).filter(Boolean).join(' / ');
+}
+function drawTT() {
+  const box = $('ttSheet');
+  if (!box || !cur) return;
+  const c = cur.child, tid = curTh();
+  const marks = {};
+  document.querySelectorAll('#seqBody tr').forEach(tr => {
+    const dm = String(tr.querySelector('.q_date').value || '').match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (!dm || Number(dm[1]) !== month) return;
+    const d = Number(dm[2]);
+    const tv = String(tr.querySelector('.q_time').value || '').trim();
+    (marks[d] = marks[d] || []).push(tv ? tv.replace(/\s*[-~]\s*/, '~') : '(시간 없음)');
+  });
+  const first = new Date(year, month - 1, 1).getDay();
+  const last = new Date(year, month, 0).getDate();
+  let cells = '', d = 1;
+  for (let w = 0; w < 6 && d <= last; w++) {
+    cells += '<tr>';
+    for (let k = 0; k < 7; k++) {
+      if ((w === 0 && k < first) || d > last) { cells += '<td></td>'; continue; }
+      cells += '<td><span class="dn">' + d + '</span>'
+        + (marks[d] ? '<div class="tm">' + marks[d].map(esc).join('<br>') + '</div>' : '') + '</td>';
+      d++;
+    }
+    cells += '</tr>';
+  }
+  const school = [$('f_school').value.trim(), $('f_grade').value.trim()].filter(Boolean).join(' ');
+  const area = (SUPNAME[cur.support_type_id] || '');
+  box.innerHTML =
+      '<h2 class="title">특수교육대상자 치료지원 시간표 ( ' + month + ' 월)</h2>'
+    + '<table class="rec-tbl"><colgroup><col style="width:15%"><col style="width:35%"><col style="width:15%"><col style="width:35%"></colgroup>'
+    + '<tr><td class="lbl">이름</td><td>' + esc(c.name || '') + '</td><td class="lbl">생년월일</td><td>' + esc(fmtBirth(c.birth)) + '</td></tr>'
+    + '<tr><td class="lbl">지원영역</td><td>' + esc(area) + '</td><td class="lbl">소속</td><td>' + esc(school) + '</td></tr></table>'
+    + '<table class="tt-cal"><tr>' + WDK.map(x => '<th>' + x + '</th>').join('') + '</tr>' + cells + '</table>'
+    + '<div class="tt-th">□ 치료사 정보</div>'
+    + '<table class="rec-tbl" style="margin-top:6px;"><colgroup><col style="width:15%"><col style="width:35%"><col style="width:15%"><col style="width:35%"></colgroup>'
+    + '<tr><td class="lbl">이름</td><td>' + esc(tid ? (THERAPISTS[tid] || '') : '') + '</td><td class="lbl">성별</td><td>' + esc(tid ? (THGENDER[tid] || '') : '') + '</td></tr>'
+    + '<tr><td class="lbl">치료기관</td><td>자라는 나무</td><td class="lbl">면허 번호</td><td>' + esc(tid ? licText(tid) : '') + '</td></tr></table>'
+    + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
+  box.style.display = 'block';
+}
+
+// ════════════════════════════════════════════════════════════════
+// [서식 3] 치료지원 결제 내역 변경 관리 (2026-10-09)
+//   셈은 서버 nl_pay_change_rows 한 곳 (결제가 이름 · 그날 수업 없음 · 같은 날 2건 · 3건 넘음 ·
+//   40,000원 아닌 결제 · 결석 뒤 보강) + 직원이 덧붙인 사유 · 직접 넣은 줄 (nl_pay_change_notes)
+//   보호자 서명은 종이에 직접
+// ════════════════════════════════════════════════════════════════
+const PC_CATS = ['수업일시 변경', '결제일 변경', '결제금액 변경'];
+async function loadPc() {
+  PCROWS = []; PCERR = '';
+  if (!cur) return;
+  try {
+    const { data, error } = await sb.rpc('nl_pay_change_rows', { p_therapy: cur.therapy_id, p_year: year });
+    if (error) throw error;
+    PCROWS = data || [];
+  } catch (e) { PCERR = (e && e.message) || String(e); }
+}
+function pcDate(d) {
+  if (!d) return '';
+  const s = String(d).slice(0, 10), dt = new Date(s + 'T00:00:00');
+  return parseInt(s.slice(5, 7), 10) + '. ' + parseInt(s.slice(8, 10), 10) + '.(' + WDK[dt.getDay()] + ')';
+}
+function pcAttr(s) { return esc(s || '').replace(/"/g, '&quot;'); }
+// 서식 안에서 바로 고친다 (2026-10-09 은정님) — 사유 칸 · 저장 · 서식에서 빼기 / 되살리기 · 직접 줄 넣기
+//   화면에서만 보이는 것(단추 · 뺀 줄 · 넣기 줄)은 인쇄되지 않는다. 연번은 인쇄되는 줄만 센다
+function drawPc() {
+  const box = $('pcSheet');
+  if (!box || !cur) return;
+  const c = cur.child;
+  const act = SCHED.filter(s => s.weekday);
+  const days = [...new Set(act.map(s => s.weekday))].join(', ');
+  const times = [...new Set(act.map(s => {
+    if (!s.start_time) return '';
+    const p = String(s.start_time).split(':'); let h = +p[0], m = +p[1] + (s.duration || 40);
+    const st = String(p[0]).padStart(2, '0') + ':' + String(p[1]).padStart(2, '0');
+    h += Math.floor(m / 60); m %= 60;
+    return st + '-' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  }).filter(Boolean))].join(', ');
+  const tt = TTYPE[cur.therapy_type_id] || '';
+  const area = ['작업', '물리', '언어'].map(a => '<span' + (a === tt ? ' class="on"' : '') + '>' + a + '</span>').join(' / ');
+  const catHtml = cat => PC_CATS.map(x => '<span' + (cat === x ? ' class="on"' : '') + '>' + x + '</span>').join('<br>');
+
+  let rows = '', vn = 0;
+  PCROWS.forEach((r, i) => {
+    if (!r.hidden) vn++;
+    const lead = (r.is_manual && r.on_date ? esc(pcDate(r.on_date)) + ' ' : '');
+    rows += '<tr class="pcrow' + (r.hidden ? ' pc-hid' : '') + '" data-i="' + i + '">'
+      + '<td class="pcno" style="text-align:center;">' + (r.hidden ? '—' : vn) + '</td>'
+      + '<td class="pc-cat">' + catHtml(r.category) + '</td>'
+      + '<td><div>- ' + lead + esc(r.auto_text || '')
+      + (r.is_manual ? ' <span class="no-print" style="color:#A39C95;font-size:10.5px;">(직접)</span>' : '') + '</div>'
+      + '<input type="text" class="pcnote" maxlength="300" value="' + pcAttr(r.note) + '" placeholder="사유 (예: 학부모 카드 미소지)">'
+      + (r.note ? '<div class="pcnote-p">' + esc(r.note) + '</div>' : '')
+      + '</td>'
+      + '<td><div class="pcbtns no-print">'
+      + '<button type="button" class="pcsave">저장</button>'
+      + '<button type="button" class="pchide">' + (r.hidden ? '되살리기' : '빼기') + '</button>'
+      + (r.is_manual ? '<button type="button" class="pcdel">지우기</button>' : '')
+      + '</div></td></tr>';
+  });
+  for (let k = vn; k < 15; k++) {
+    rows += '<tr class="pcblank"><td style="text-align:center;">' + (k + 1) + '</td><td class="pc-cat">' + catHtml('') + '</td><td></td><td></td></tr>';
+  }
+  // 직접 줄 넣기 — 화면에서만
+  rows += '<tr class="no-print pcadd"><td style="text-align:center;font-weight:bold;">＋</td>'
+    + '<td><select id="pcNewCat">' + PC_CATS.map(x => '<option>' + x + '</option>').join('') + '</select></td>'
+    + '<td><input type="text" id="pcNewDate" placeholder="날짜 ' + year + '-09-02" style="width:150px !important;margin:0 0 4px !important;">'
+    + '<input type="text" id="pcNewText" maxlength="300" placeholder="변경 내용 (예: 결제금액 중 20,000은 학부모 개인 결제)"></td>'
+    + '<td><div class="pcbtns"><button type="button" id="pcNewBtn">넣기</button></div></td></tr>';
+
+  box.innerHTML =
+      // 대장 바로 위 인쇄 단추 (화면에서만) — 대장만 따로 인쇄 (2026-10-09)
+      '<div class="no-print pcprintbar"><span>한 해 한 장 · 달과 상관없이 ' + year + '년 전체가 모입니다</span>'
+    + '<button type="button" class="pcprint">이 대장만 인쇄</button></div>'
+    + '<div style="font-size:11px;color:#555;">[서식 3] 치료지원 결제 내역 변경 관리 대장(학생별 누가기록서 앞면에 편철)</div>'
+    + '<h2 class="title">(' + year + '년도) 치료지원 결제 내역 변경 관리</h2>'
+    + '<div class="pc-sub">기관명: 자라는 나무</div>'
+    + (PCERR ? '<div class="no-print" style="color:#c62828;font-size:12px;margin-bottom:6px;">결제 변경 줄을 읽지 못했습니다.</div>' : '')
+    + '<table class="rec-tbl"><colgroup><col style="width:16%"><col style="width:34%"><col style="width:16%"><col style="width:34%"></colgroup>'
+    + '<tr><td class="lbl">학생명</td><td>' + esc(c.name || '') + '</td><td class="lbl">치료영역</td><td class="pc-area" style="text-align:center;">' + area + '</td></tr>'
+    + '<tr><td class="lbl">학교명</td><td>' + esc($('f_school').value.trim() || c.school || '') + '</td><td class="lbl">치료사명</td><td>' + esc(schedThNames(id => THERAPISTS[id] || '')) + '</td></tr>'
+    + '<tr><td class="lbl">수강 요일</td><td>' + esc(days) + '</td><td class="lbl">수강 시간</td><td>' + esc(times) + '</td></tr></table>'
+    + '<table class="rec-tbl pc-tbl" style="margin-top:-1px;"><colgroup><col style="width:7%"><col style="width:17%"><col style="width:56%"><col style="width:20%"></colgroup>'
+    + '<tr><th>연번</th><th>변경 사항</th><th>변경 내용</th><th>보호자 서명</th></tr>' + rows + '</table>'
+    + '<div class="pcmsg no-print" id="pcMsg"></div>'
+    + '<div class="pc-note">※ 변경 내용: 오전 결제 및 중복 결제 사유, 보강 내역 등을 기재<br>※ 치료지원 제공기관에서 필요시 활용(의무 아님, 수정 가능)</div>'
+    + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
+  box.style.display = 'block';
+  if ($('pcEdit')) $('pcEdit').style.display = 'none';
+}
+function pcMsg(t, ok) { const m = $('pcMsg'); if (m) { m.textContent = t; m.style.color = ok ? '#3B6D11' : '#c62828'; } }
+let PC_BUSY = false;
+async function pcUpsert(row) {
+  const { data, error } = await sb.from('nl_pay_change_notes')
+    .upsert(Object.assign({ therapy_id: cur.therapy_id, updated_by: ME ? ME.id : null,
+                            updated_at: new Date().toISOString() }, row), { onConflict: 'therapy_id,row_key' })
+    .select('id');
+  if (error) throw error;
+  if (!data || !data.length) throw new Error('저장되지 않았습니다.');
+}
+// 서식 안의 칸은 기록지 「저장 전」과 따로 — 위로 올라가지 않게 막는다
+['input', 'change'].forEach(ev => $('pcSheet').addEventListener(ev, e => e.stopPropagation()));
+// 사유 칸에서 Enter = 그 줄 저장
+$('pcSheet').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !e.target.classList.contains('pcnote')) return;
+  e.preventDefault();
+  const b = e.target.closest('tr').querySelector('.pcsave'); if (b) b.click();
+});
+$('pcSheet').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || PC_BUSY || !cur) return;
+  const tr = b.closest('tr'); const r = (tr && tr.dataset.i != null) ? PCROWS[Number(tr.dataset.i)] : null;
+  PC_BUSY = true;
+  try {
+    if (b.classList.contains('pcsave') && r) {
+      await pcUpsert({ row_key: r.row_key, on_date: r.on_date, category: r.category,
+                       manual_text: r.is_manual ? r.auto_text : null,
+                       note: tr.querySelector('.pcnote').value.trim() || null, hidden: !!r.hidden });
+      pcMsg('✓ 저장했습니다.', true);
+    } else if (b.classList.contains('pchide') && r) {
+      await pcUpsert({ row_key: r.row_key, on_date: r.on_date, category: r.category,
+                       manual_text: r.is_manual ? r.auto_text : null,
+                       note: tr.querySelector('.pcnote').value.trim() || null, hidden: !r.hidden });
+      pcMsg(r.hidden ? '✓ 서식에 되살렸습니다.' : '✓ 서식에서 뺐습니다. (화면에는 흐리게 남고 인쇄에는 안 나옵니다)', true);
+    } else if (b.classList.contains('pcdel') && r && r.is_manual) {
+      if (!confirm('이 줄을 지울까요?')) { PC_BUSY = false; return; }
+      const { data, error } = await sb.from('nl_pay_change_notes').delete()
+        .eq('therapy_id', cur.therapy_id).eq('row_key', r.row_key).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('지우지 못했습니다.');
+      pcMsg('✓ 지웠습니다.', true);
+    } else if (b.classList.contains('pcprint')) {
+      PC_BUSY = false; pcPrint(); return;
+    } else if (b.id === 'pcNewBtn') {
+      const ds = $('pcNewDate').value.trim(), tx = $('pcNewText').value.trim();
+      const iso = d2iso(ds);
+      if (!iso || isNaN(new Date(iso + 'T00:00:00')) || Number(iso.slice(0, 4)) !== year) {
+        pcMsg('날짜를 ' + year + '-09-02 처럼 적어 주세요 (' + year + '년 안).', false); PC_BUSY = false; return; }
+      if (!tx) { pcMsg('변경 내용을 적어 주세요.', false); PC_BUSY = false; return; }
+      await pcUpsert({ row_key: 'man|' + Date.now(), on_date: iso, category: $('pcNewCat').value,
+                       manual_text: tx, note: null, hidden: false });
+      pcMsg('✓ 넣었습니다.', true);
+    } else { PC_BUSY = false; return; }
+    const keep = $('pcMsg') ? $('pcMsg').textContent : '';
+    await loadPc(); drawPc();
+    pcMsg(keep, true);
+  } catch (err) {
+    pcMsg('❌ ' + ((err && err.message) || err), false);
+  } finally { PC_BUSY = false; }
+});
+// 저장하지 않은 사유 칸 (나갈 때 묻기)
+function pcPendingN() {
+  let n = 0;
+  document.querySelectorAll('#pcSheet tr.pcrow').forEach(tr => {
+    const r = PCROWS[Number(tr.dataset.i)]; if (!r) return;
+    if (tr.querySelector('.pcnote').value.trim() !== String(r.note || '').trim()) n++;
+  });
+  return n;
+}
+window.addEventListener('beforeunload', e => {
+  if (!pcPendingN()) return;
+  e.preventDefault(); e.returnValue = '';
+});
+// 결제 변경 관리만 따로 인쇄
+function pcPrint() {
+  if (!LOADED || !cur) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
+  document.body.classList.add('print-pc');
+  window.print();
+}
+$('btnPrintPc').addEventListener('click', pcPrint);
+window.addEventListener('afterprint', () => document.body.classList.remove('print-pc'));
+
+// ── 카드 결제 칸 (2026-10-09) ──
+function _hm5(v) { return v ? String(v).slice(0, 5) : ''; }
+function payDateText(p) {
+  const s = String(p.paid_on || '');
+  return s.length >= 10 ? parseInt(s.slice(5, 7), 10) + '월 ' + parseInt(s.slice(8, 10), 10) + '일' : '';
+}
+function payClsText(p) { return (p.cls_start && p.cls_end) ? _hm5(p.cls_start) + '-' + _hm5(p.cls_end) : ''; }
+function payLine(p, man) {
+  if (!p) return '';
+  let s = '결제 ' + esc(_hm5(p.paid_time));
+  if (p.flag && !man) s += '<br>⚠ ' + esc(p.flag);
+  return s;
+}
+function paintRow(tr) {
+  const i = Number(tr.dataset.i), p = PAY[i] || null;
+  const red = !!(p && p.flag && !MAN[i]);
+  tr.querySelector('.q_date').classList.toggle('red', red);
+  tr.querySelector('.q_time').classList.toggle('red', red);
+  const pd = tr.querySelector('.q_pay');
+  pd.classList.toggle('red', red);
+  pd.innerHTML = payLine(p, MAN[i]);
+}
+// 선생님이 일자·시간 칸을 고치면 그 회는 「직접 고침」 → 검정
+$('seqBody').addEventListener('input', e => {
+  if (!e.target.matches('.q_date, .q_time')) return;
+  const tr = e.target.closest('tr'); if (!tr) return;
+  MAN[Number(tr.dataset.i)] = true;
+  paintRow(tr);
+  drawTT();
+});
+// 두 칸을 모두 비우고 나가면 다시 카드 결제 내용으로
+$('seqBody').addEventListener('change', e => {
+  if (!e.target.matches('.q_date, .q_time')) return;
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const i = Number(tr.dataset.i), p = PAY[i] || null;
+  const qd = tr.querySelector('.q_date'), qt = tr.querySelector('.q_time');
+  if (qd.value.trim() || qt.value.trim()) return;
+  MAN[i] = false;
+  if (p) { qd.value = payDateText(p); qt.value = payClsText(p); }
+  paintRow(tr);
+  drawTT();
+});
 
 function buildSeq() {
   const tb = $('seqBody');
   tb.innerHTML = '';
   for (let i = 0; i < SESSIONS; i++) {
     const it = ITEMS[i] || {};
-    // 수업일자·시간은 자동으로 채우지 않는다.
-    // 실제 수업한 날과 카드 결제일이 다를 수 있어,
-    // 치료사분이 직접 적으시도록 비워 둔다.
+    // 회기 일자 = 카드 결제 일자 (1순위 · 2026-10-09)
+    // 둘째 칸 = 그날 이 수업 회기 시간 · 아래에 결제 시각
+    // 결제가 없는 회는 저장된 값 그대로 (선생님이 적음)
     const d  = it.service_date ? parseInt(String(it.service_date).slice(8,10),10) : '';
     const st = it.start_time ? String(it.start_time).slice(0,5) : '';
     const en = it.end_time   ? String(it.end_time).slice(0,5)   : '';
     const timeVal = (st && en) ? (st + '-' + en) : (st || en || '');
+    // 카드 결제가 1순위 (2026-10-09). 선생님이 직접 고친 회(state_json.man)는 고친 내용 그대로
+    const savedD = d ? month + '월 ' + d + '일' : '';
+    const p = PAY[i] || null;
+    const man = !!(it.state_json && it.state_json.man);
+    MAN[i] = man;
+    let dVal = savedD, tVal = timeVal;
+    if (!man && p) {
+      dVal = payDateText(p); tVal = payClsText(p);
+      if (dVal !== savedD || tVal !== timeVal || String(it.voucher_no || '') !== String(p.appr_no || '')) AUTOCHG = true;
+    }
+    const red = !!(p && p.flag && !man);
     const tr = document.createElement('tr');
+    tr.dataset.i = String(i);
     tr.innerHTML =
         '<td style="text-align:center;">'
       + '<div style="font-weight:bold;margin-bottom:4px;">' + (i+1) + '회</div>'
-      + '<input type="text" class="q_date" value="' + (d ? month + '월 ' + d + '일' : '') + '" style="text-align:center;">'
-      + '<input type="text" class="q_time" value="' + esc(timeVal) + '" style="text-align:center;margin-top:3px;">'
+      + '<input type="text" class="q_date' + (red ? ' red' : '') + '" value="' + esc(dVal) + '" style="text-align:center;">'
+      + '<input type="text" class="q_time' + (red ? ' red' : '') + '" value="' + esc(tVal) + '" style="text-align:center;margin-top:3px;">'
+      + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, man) + '</div>'
       + '</td>'
       + '<td><textarea class="q_content" style="min-height:64px;">' + esc(it.content || '') + '</textarea></td>'
       + '<td><textarea class="q_react" style="min-height:64px;">' + esc(it.reaction || '') + '</textarea></td>';
@@ -686,6 +1078,12 @@ async function saveRecord() {
         start_time: _hm(tv[0] || ''),
         end_time:   _hm(tv[1] || ''),
         therapist_id: thOnIso(iso),
+        // 카드 결제 (2026-10-09) — 승인일자·승인번호 · 직접 고침 표시
+        voucher_date: PAY[i] ? PAY[i].paid_on : null,
+        voucher_no:   PAY[i] ? (PAY[i].appr_no || null) : null,
+        state_json: { man: !!MAN[i],
+                      pay_at: PAY[i] ? _hm5(PAY[i].paid_time) : null,
+                      flag: (PAY[i] && !MAN[i]) ? (PAY[i].flag || null) : null },
         content:  tr.querySelector('.q_content').value || null,
         reaction: tr.querySelector('.q_react').value || null,
         status: '출석'

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>지원 결제 내역 올리기 - 나무링크</title>
+<title>결제내역 올리기 - 나무링크</title>
 <style>
   :root {
     --ink:#1c1f1a; --ink2:#5a6156; --ink3:#9aa294;
@@ -159,6 +159,14 @@
   button#save.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   button#save:disabled { background:#f2f1ee; color:var(--ink3); border-color:var(--line); }
   @media print { .hd { display:none !important; } .wide { padding:0; } }
+  /* 결제내역 올리기 — 세 갈래 (2026-10-09 · 발달 올리기 · 지원 결제 올리기를 한 곳으로) */
+  .paytabs { max-width:900px; margin:14px auto 0; padding:0 16px; display:flex; gap:0;
+             border-bottom:1px solid #ECE8E3; }
+  .paytabs a { padding:9px 18px; font-size:14px; color:#5F5E5A; text-decoration:none;
+               border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .paytabs a.on { color:#7E5530; border-bottom-color:#B07A4A; font-weight:600; }
+  .paytabs a:hover { color:#2F2926; }
+  @media print { .paytabs { display:none !important; } }
 </style>
 </head>
 <body>
@@ -166,7 +174,7 @@
 <!-- 로그인 전 -->
 <div class="box" id="loginBox">
   <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
-  <h1 style="text-align:center">지원 결제 내역 올리기</h1>
+  <h1 style="text-align:center">결제내역 올리기</h1>
   <div class="sub" style="text-align:center">치료지원 · 방과후 카드 결제 내역</div>
   <label for="em">이메일</label>
   <input id="em" type="email" autocomplete="username">
@@ -181,18 +189,19 @@
   <div class="hd">
     <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
     <span class="bar0"></span>
-    <h1>지원 결제 내역 올리기</h1>
+    <h1>결제내역 올리기</h1>
     <span class="who" id="who"></span>
     <span class="sp"></span>
     <button id="out" class="ghost">로그아웃</button>
     <a href="index.html"><button class="ghost" type="button" style="color:#B07A4A">처음으로</button></a>
   </div>
+  <nav class="paytabs"><a href="voucher-upload.html" data-k="dev">발달재활 바우처</a><a href="card-upload.html?st=3" data-k="tr" class="on">치료지원</a><a href="card-upload.html?st=5" data-k="af">방과후</a></nav>
   <div class="wide">
 
   <!-- 1. 파일 올리기 -->
   <div class="card">
     <h2>① 엑셀 고르기</h2>
-    <div class="kinds">
+    <div class="kinds" style="display:none;">
       <button id="kTr" class="on" type="button">치료지원</button>
       <button id="kAf" type="button">방과후</button>
     </div>
@@ -226,18 +235,18 @@
 
   <!-- 4. 미결제 점검 -->
   <div class="card">
-    <h2>④ 미결제 점검</h2>
+    <h2>④ 결제 대조 (납부 차감 ↔ 카드 결제)</h2>
     <div class="kidbar">
       <select id="ckMk"></select>
       <select id="ckKind">
         <option value="3">치료지원</option>
         <option value="5">방과후</option>
       </select>
-      <button id="ckGo" type="button">점검하기</button>
+      <button id="ckGo" type="button">대조하기</button>
       <button id="ckPdf" class="pdfbtn" type="button" style="display:none;">PDF로 저장</button>
-      <span class="note" style="margin:0;">한 아동이 그 달에 <b>120,000원</b>을 다 냈는지 봅니다.</span>
+      <span class="note" style="margin:0;">납부 계산에서 차감한 <b>120,000원</b>이 실제로 결제됐는지 봅니다. 누락 · 추가 결제를 알려 드립니다.</span>
     </div>
-    <div id="ckBody"><div class="empty">달과 갈래를 고르고 「점검하기」를 누르세요.</div></div>
+    <div id="ckBody"><div class="empty">달과 갈래를 고르고 「대조하기」를 누르세요.</div></div>
     <div id="msg4" class="out"></div>
   </div>
   </div>
@@ -315,6 +324,10 @@ function setKind(st) {
   ST = st;
   $('kTr').className = (st === 3 ? 'on' : '');
   $('kAf').className = (st === 5 ? 'on' : '');
+  document.querySelectorAll('.paytabs a').forEach(a =>
+    a.classList.toggle('on', a.dataset.k === (st === 5 ? 'af' : 'tr')));
+  if ($('ckKind')) $('ckKind').value = String(st);
+  try { history.replaceState(null, '', 'card-upload.html?st=' + st); } catch (e) {}
   ROWS = []; NEWCARDS = [];
   $('mapCard').style.display = 'none';
   $('saveCard').style.display = 'none';
@@ -322,6 +335,20 @@ function setKind(st) {
 }
 $('kTr').onclick = () => { if (cuLeaveOk()) { CU_DIRTY = false; setKind(3); } };
 $('kAf').onclick = () => { if (cuLeaveOk()) { CU_DIRTY = false; setKind(5); } };
+// 위 갈래 줄 — 치료지원·방과후는 이 화면 안에서 · 발달재활은 발달 화면으로
+document.querySelectorAll('.paytabs a').forEach(a => a.addEventListener('click', e => {
+  const k = a.dataset.k;
+  if (k === 'tr' || k === 'af') {
+    e.preventDefault();
+    const st = (k === 'af') ? 5 : 3;
+    if (st === ST) return;
+    if (!cuLeaveOk()) return;
+    CU_DIRTY = false; setKind(st);
+    return;
+  }
+  if (!cuLeaveOk()) { e.preventDefault(); return; }
+  CU_LEAVING = true;
+}));
 
 // ── 저장 단추 상태 · 나갈 때 묻기 (2026-09-16) ──
 //   엑셀을 읽거나 ②에서 아동을 고르면 「저장 전」, 저장하면 「✓ 저장됨」(계속 남김)
@@ -443,6 +470,35 @@ function parse(aoa) {
   });
 
   const mks = Array.from(new Set(out.map(r => r.month_key))).sort();
+  // 잘못 올림 막기 (2026-10-09) — 치료지원·방과후 엑셀은 모양이 같아 칸으로는 못 가린다
+  //   엑셀 속 아동이 「이 갈래」 수업은 없고 「다른 갈래」 수업만 받으면 어긋남으로 센다
+  //   이름으로 아동을 알 수 있는 사람이 3명 이상이고 절반 넘게 어긋나면 저장 전에 멈춘다
+  const wk = kindCheck(out, mks);
+  if (wk.known >= 3 && wk.wrong * 2 > wk.known) {
+    ROWS = []; NEWCARDS = [];
+    $('mapCard').style.display = 'none';
+    $('saveCard').style.display = 'none';
+    CU_DIRTY = false;
+    show($('msg2'), '⛔ 이 엑셀은 「' + KIND[ST === 3 ? 5 : 3] + '」 결제 같습니다.\n'
+      + '엑셀 속 아동 ' + wk.known + '명 중 ' + wk.wrong + '명이 ' + KIND[ST] + ' 수업 없이 '
+      + KIND[ST === 3 ? 5 : 3] + ' 수업만 받습니다.\n\n'
+      + '위쪽 「' + KIND[ST === 3 ? 5 : 3] + '」 갈래를 누르고 다시 올려 주세요. (저장하지 않았습니다)', false);
+    return;
+  }
+  // 치료지원 갈래인데 절반 넘게 10만원 이상이면 방과후 엑셀 (방과후는 한 번에 120,000원)
+  const live0 = out.filter(r => !r.canceled);
+  const big = live0.filter(r => Number(r.amount) >= 100000).length;
+  if (ST === 3 && live0.length && big * 2 > live0.length) {
+    ROWS = []; NEWCARDS = [];
+    $('mapCard').style.display = 'none';
+    $('saveCard').style.display = 'none';
+    CU_DIRTY = false;
+    show($('msg2'), '⛔ 이 엑셀은 「방과후」 결제 같습니다.\n'
+      + '결제 ' + live0.length + '건 중 ' + big + '건이 10만원 이상입니다. (치료지원은 한 건 40,000원)\n\n'
+      + '위쪽 「방과후」 갈래를 누르고 다시 올려 주세요. (저장하지 않았습니다)', false);
+    return;
+  }
+  WK = wk;
   show($('msg2'), '✅ ' + out.length + '줄 읽었습니다. (' + KIND[ST] + ')\n'
     + '달 ' + mks.join(', ')
     + (canceled ? '\n취소 ' + canceled + '줄 (금액에서 뺍니다)' : '')
@@ -453,10 +509,81 @@ function parse(aoa) {
   $('readstat').innerHTML = '읽은 줄 <b>' + out.length + '</b>건 · '
     + KIND[ST] + ' · ' + mks.join(', ')
     + (left0 ? ' · <span class="warn">아동을 고르지 않은 성명 ' + left0 + '명</span>'
-             : ' · <span class="good">아동 짝 다 맞음</span>');
+             : ' · <span class="good">아동 짝 다 맞음</span>')
+    + (WK && WK.wrong ? '<br><span class="warn">⚠ ' + KIND[ST] + ' 수업이 없는 아동 ' + WK.wrong + '명 — 갈래가 맞는지 확인해 주세요</span>' : '');
   $('saveCard').style.display = 'block';
   CU_DIRTY = true;
   setCuBtn('before');
+  crossCheck(out).then(n => {
+    if (ROWS !== out) return;          // 그 사이 다른 파일을 읽음
+    if (n < 0) {
+      $('readstat').innerHTML += '<br><span class="warn">⚠ 이미 저장된 결제와 견주지 못했습니다. 저장할 때 다시 봅니다.</span>';
+      return;
+    }
+    if (n > 0) blockCross(n);
+  });
+}
+
+// 이 엑셀의 결제(승인번호+날짜)가 서버에 「다른 갈래」로 이미 있으면 그 수 (못 보면 -1)
+//   같은 결제를 다른 갈래로 다시 올리면 덮어써져 갈래가 바뀌므로 반드시 막는다
+async function crossCheck(rows) {
+  try {
+    const want = {};
+    rows.forEach(r => { want[r.appr_no + '|' + r.paid_on] = 1; });
+    const nos = Array.from(new Set(rows.map(r => r.appr_no)));
+    let n = 0;
+    for (let i = 0; i < nos.length; i += 150) {
+      const { data, error } = await sb.from('nl_card_rows')
+        .select('appr_no, paid_on, support_type_id').in('appr_no', nos.slice(i, i + 150));
+      if (error) throw error;
+      (data || []).forEach(d => {
+        if (want[d.appr_no + '|' + String(d.paid_on).slice(0, 10)] && Number(d.support_type_id) !== ST) n++;
+      });
+    }
+    return n;
+  } catch (e) { return -1; }
+}
+function blockCross(n) {
+  const other = KIND[ST === 3 ? 5 : 3];
+  ROWS = []; NEWCARDS = [];
+  $('mapCard').style.display = 'none';
+  $('saveCard').style.display = 'none';
+  CU_DIRTY = false;
+  show($('msg2'), '⛔ 이 엑셀의 결제 ' + n + '건이 이미 「' + other + '」으로 저장돼 있습니다.\n'
+    + '갈래를 잘못 고르셨을 수 있습니다. 위쪽 「' + other + '」 갈래를 누르고 다시 올려 주세요.\n'
+    + '(저장하지 않았습니다)', false);
+}
+
+// 엑셀 속 아동이 그 갈래 수업을 받는지 (2026-10-09)
+//   치료지원 엑셀(3) = 치료지원 · 방과후 치료지원 (3·4·6·7) / 방과후 엑셀(5) = 방과후활동비 (5)
+const KSET = { 3:[3,4,6,7], 5:[5] };
+let THERAPIES = [];            // 수업 (아동 · 지원유형 · 시작 · 끝)
+let WK = null;                 // 마지막 검사 결과
+function kindCheck(rows, mks) {
+  const mine = KSET[ST] || [], other = KSET[ST === 3 ? 5 : 3] || [];
+  const f = mks[0] + '-01';
+  const lmk = mks[mks.length - 1];
+  const ly = Number(lmk.slice(0, 4)), lm = Number(lmk.slice(5, 7));
+  const l = lmk + '-' + String(new Date(ly, lm, 0).getDate()).padStart(2, '0');
+  const live = (r, set) => set.includes(Number(r.support_type_id))
+    && (!r.started_on || String(r.started_on) <= l) && (!r.ended_on || String(r.ended_on) >= f);
+  const seen = {};
+  let known = 0, wrong = 0;
+  rows.forEach(r => {
+    const nm = nmKey(r.person_name);
+    if (!nm || seen[nm]) return;
+    seen[nm] = 1;
+    let cid = CARDMAP[key(r.person_name, ST)] || null;
+    if (!cid) {
+      const hit = CHILDREN.filter(c => nmKey(c.name) === nm);
+      if (hit.length === 1) cid = hit[0].id;
+    }
+    if (!cid) return;
+    known++;
+    const tl = THERAPIES.filter(x => Number(x.child_id) === Number(cid));
+    if (!tl.some(x => live(x, mine)) && tl.some(x => live(x, other))) wrong++;
+  });
+  return { known, wrong };
 }
 
 // ── 짝 맺기 ───────────────────────────────────────
@@ -523,7 +650,21 @@ $('save').onclick = async () => {
       + '그 줄은 아동 없이 저장되고, 미결제 점검에는 안 들어갑니다.\n\n그대로 저장할까요?')) return;
   }
 
+  if (ST === 5) {
+    const lv = ROWS.filter(r => !r.canceled);
+    if (lv.length && lv.every(r => Number(r.amount) === 40000)) {
+      if (!confirm('결제가 모두 40,000원입니다.\n치료지원 엑셀과 모양이 같습니다.\n\n'
+        + '정말 「방과후」 결제가 맞습니까?\n(치료지원이면 「취소」를 누르고 위쪽 「치료지원」 갈래로 다시 올려 주세요)')) return;
+    }
+  }
   setCuBtn('saving');
+  const cn = await crossCheck(ROWS);
+  if (cn !== 0) {
+    setCuBtn('before');
+    if (cn > 0) blockCross(cn);
+    else show($('msg3'), '❌ 이미 저장된 결제와 견주지 못해 저장하지 않았습니다. 잠시 뒤 다시 눌러 주세요.', false);
+    return;
+  }
   let cuOk = false;
   try {
     // ① 새로 고른 짝을 사전에 넣는다
@@ -554,7 +695,15 @@ $('save').onclick = async () => {
 
     NEWCARDS = [];
     drawMap();
-    show($('msg3'), '✅ ' + done + '줄 저장했습니다.\n'
+    // 엑셀 줄 수와 바로 견주게 — 달마다 건수 · 사람 수 (2026-10-09)
+    const bym = {};
+    ROWS.forEach(r => {
+      const m = bym[r.month_key] || (bym[r.month_key] = { n: 0, p: {} });
+      m.n++; m.p[nmKey(r.person_name)] = 1;
+    });
+    const sumTxt = Object.keys(bym).sort().map(k => Number(k.slice(5, 7)) + '월 ' + bym[k].n + '건 · '
+      + Object.keys(bym[k].p).length + '명').join(' / ');
+    show($('msg3'), '✅ ' + done + '줄 저장했습니다. (' + KIND[ST] + ' · ' + sumTxt + ')\n'
       + (maps.length ? '성명 ' + maps.length + '명을 아동과 이어 두었습니다. 다음부터는 저절로 붙습니다.\n' : '')
       + '같은 파일을 다시 올려도 중복으로 쌓이지 않습니다.', true);
     cuOk = true;
@@ -581,138 +730,84 @@ $('ckGo').onclick = async () => {
   hide($('msg4'));
   const mk = $('ckMk').value;
   const st = Number($('ckKind').value);
+  const kind = (st === 3) ? '치료지원' : '방과후';
   $('ckBody').innerHTML = '<div class="empty">보는 중...</div>';
 
+  // 납부 계산의 지원금 차감 ↔ 실제 카드 결제 대조 (2026-10-09)
+  //   셈은 서버 nl_card_audit 한 곳. 화면은 그리기만
+  //   치료지원 카드 120,000 = 치료지원(3·4) · 방과후 치료지원(6·7)
+  //   방과후 카드 120,000   = 방과후활동(5) · 방과후 치료지원(6·7)
+  //   회기 수는 보지 않는다. 그 달 그 사업 회기가 있었는지만 본다
   try {
-    // 그 달에 그 갈래 수업이 있는 아동을 모은다
-    //   치료지원 = 치료지원(언어·작업) + 방과후 치료지원(언어·작업)
-    //   방과후    = 방과후활동비
-    const sts = (st === 3) ? [3, 4, 6, 7] : [5];
-    const { data: th, error: e1 } = await sb.from('nl_therapies')
-      .select('id, child_id, support_type_id, started_on, ended_on')
-      .in('support_type_id', sts);
-    if (e1) throw e1;
-
-    // 그 달 마지막 날 — 한국 날짜로 (2026-09-21)
-    //   toISOString 은 세계표준시라 하루 앞(29일)이 나와, 말일에 시작한 수업이 빠졌다
-    const lastDay = mk + '-' + String(new Date(Number(mk.slice(0,4)), Number(mk.slice(5,7)), 0).getDate()).padStart(2,'0');
-    const kids = {}, tpIds = [];
-    (th || []).forEach(t => {
-      if (t.started_on && String(t.started_on) > lastDay) return;   // 아직 시작 전
-      if (t.ended_on && String(t.ended_on) < mk + '-01') return;    // 이미 끝남
-      kids[t.child_id] = 1;
-      tpIds.push(t.id);
-    });
-
-    // 담당 치료사 — 그 달에 살아 있는 수업요일에서 가져온다
-    const thrOf = {};
-    if (tpIds.length) {
-      const { data: sc } = await sb.from('nl_therapy_schedules')
-        .select('therapy_id, therapist_id, from_month, to_month')
-        .in('therapy_id', tpIds);
-      const tpKid = {}; (th || []).forEach(t => { tpKid[t.id] = t.child_id; });
-      (sc || []).forEach(s => {
-        if (s.from_month && s.from_month > mk) return;
-        if (s.to_month && s.to_month < mk) return;
-        const cid = tpKid[s.therapy_id];
-        const nm = THNAME[s.therapist_id];
-        if (!cid || !nm) return;
-        (thrOf[cid] = thrOf[cid] || {})[nm] = 1;
-      });
-    }
-
-    // 그 달 결제를 모은다
-    const { data: cd, error: e2 } = await sb.from('nl_card_rows')
-      .select('child_id, amount, canceled, paid_on')
-      .eq('month_key', mk).eq('support_type_id', st).order('paid_on');
-    if (e2) throw e2;
-
-    const paid = {}, cnt = {}, days = {};
-    (cd || []).forEach(r => {
-      if (!r.child_id) return;
-      const v = r.canceled ? -Number(r.amount || 0) : Number(r.amount || 0);
-      paid[r.child_id] = (paid[r.child_id] || 0) + v;
-      if (!r.canceled) {
-        cnt[r.child_id] = (cnt[r.child_id] || 0) + 1;
-        (days[r.child_id] = days[r.child_id] || []).push(
-          Number(String(r.paid_on).slice(5,7)) + '/' + Number(String(r.paid_on).slice(8,10)));
-      }
-    });
-
+    const { data, error } = await sb.rpc('nl_card_audit', { p_month: mk });
+    if (error) throw error;
     const nmOf = {}; CHILDREN.forEach(c => { nmOf[c.id] = c.name; });
-    const list = Object.keys(kids).map(Number).map(id => ({
-      id: id, name: nmOf[id] || '',
-      thr: Object.keys(thrOf[id] || {}).join(', '),
-      got: paid[id] || 0, cnt: cnt[id] || 0,
-      days: (days[id] || []).join(', ')
-    })).sort((a, b) => (a.got - b.got) || (a.id - b.id));
+    const list = (data || []).filter(r => r.kind === kind).map(r => ({
+      id: r.child_id, name: r.child_id ? (nmOf[r.child_id] || '') : '',
+      thr: r.therapist_id ? (THNAME[r.therapist_id] || '') : '',
+      expect: Number(r.expect || 0), got: Number(r.paid || 0), cnt: Number(r.cnt || 0),
+      diff: Number(r.diff || 0), days: r.days || '',
+      note: [r.near_note, r.has_cancel ? '취소 있음' : ''].filter(Boolean).join(' · ')
+    }));
 
     if (!list.length) {
-      $('ckBody').innerHTML = '<div class="empty">' + mk + '에 ' + KIND[st]
-        + ' 수업이 있는 아동이 없습니다.</div>';
+      $('ckBody').innerHTML = '<div class="empty">' + mk + '에 ' + kind
+        + ' 차감도 결제도 없습니다.</div>';
       $('ckPdf').style.display = 'none';
       return;
     }
 
-    const bad = list.filter(x => x.got < NEED);
-    const shortSum = bad.reduce((s, x) => s + (NEED - x.got), 0);
+    const miss = list.filter(x => x.diff < 0), extra = list.filter(x => x.diff > 0);
+    const missSum = miss.reduce((s, x) => s - x.diff, 0);
+    const extraSum = extra.reduce((s, x) => s + x.diff, 0);
+    const today = (function(){ const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0'); })();
 
     const head = '<div class="phead">'
-      + '<h3>' + mk.slice(0,4) + '년 ' + Number(mk.slice(5,7)) + '월 · '
-      + KIND[st] + ' 결제 점검</h3>'
-      + '<div class="pw">자라는나무 아동발달센터 · 뽑은 날 '
-      + (function(){ const t = new Date(); return t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0'); })() + '</div></div>'
-      + '<div class="sum">' + mk + ' · ' + KIND[st]
-      + ' — 아동 <b>' + list.length + '</b>명 중 '
-      + (bad.length ? '<span class="warn">덜 낸 아동 ' + bad.length + '명 · 모자란 금액 '
-          + won(shortSum) + '</span>'
-                    : '<span class="good">모두 다 냈습니다</span>')
-      + '</div>';
+      + '<h3>' + mk.slice(0,4) + '년 ' + Number(mk.slice(5,7)) + '월 · ' + kind + ' 결제 대조</h3>'
+      + '<div class="pw">자라는나무 아동발달센터 · 뽑은 날 ' + today + '</div></div>'
+      + '<div class="sum">' + mk + ' · ' + kind + ' 카드 — 아동 <b>' + list.filter(x => x.id).length + '</b>명 · '
+      + '<span class="good">맞음 ' + list.filter(x => x.diff === 0).length + '</span>'
+      + (miss.length ? ' · <span class="warn">누락 ' + miss.length + '명 ' + won(missSum) + '</span>' : ' · 누락 없음')
+      + (extra.length ? ' · <span class="warn">추가 결제 ' + extra.length + '명 ' + won(extraSum) + '</span>' : ' · 추가 결제 없음')
+      + '<div class="note" style="margin:6px 0 0;">기준: 납부 계산에서 차감한 지원금 '
+      + won(120000) + ' (' + (st === 3 ? '치료지원 · 방과후 치료지원' : '방과후활동 · 방과후 치료지원')
+      + ') ↔ 실제 카드 결제 합 (취소 뺌)</div></div>';
 
-    // 담당 치료사별로 묶는다 (치료사가 여럿이면 첫 분 묶음에 넣는다)
+    const res = x => x.diff === 0 ? '<span class="good">맞음</span>'
+      : x.diff < 0 ? '<span class="warn">누락 ' + won(-x.diff) + ' (' + Math.ceil(-x.diff / 40000) + '건)</span>'
+      : '<span class="warn">추가 결제 ' + won(x.diff) + '</span>';
+    const oneRow = x => '<tr><td>' + (x.id ? x.id + '번' : '—') + '</td>'
+      + '<td>' + (x.id ? esc(x.name) : '<span class="warn">아동과 이어지지 않은 결제</span>') + '</td>'
+      + '<td class="dim">' + esc(x.days || '—') + '</td>'
+      + '<td class="num dim">' + (x.cnt ? x.cnt + '건' : '없음') + '</td>'
+      + '<td class="num">' + won(x.got) + '</td>'
+      + '<td class="num dim">' + (x.expect ? won(x.expect) : '차감 없음') + '</td>'
+      + '<td class="num">' + res(x) + '</td>'
+      + '<td class="dim">' + esc(x.note || '') + '</td></tr>';
+
+    // 담당 치료사별로 묶는다 — 어긋난 아동이 많은 분부터
     const byThr = {};
     list.forEach(x => {
-      const k = (x.thr || '').split(',')[0].trim() || '담당 치료사 없음';
+      const k = !x.id ? '아동과 이어지지 않은 결제' : (x.thr || '담당 치료사 없음');
       (byThr[k] = byThr[k] || []).push(x);
     });
+    const badN = arr => arr.filter(x => x.diff !== 0).length;
     const thrKeys = Object.keys(byThr).sort((a, b) => {
-      const ba = byThr[a].filter(x => x.got < NEED).length;
-      const bb = byThr[b].filter(x => x.got < NEED).length;
-      if (ba !== bb) return bb - ba;                 // 덜 낸 아동이 많은 분부터
-      if (a === '담당 치료사 없음') return 1;
-      if (b === '담당 치료사 없음') return -1;
+      if (badN(byThr[a]) !== badN(byThr[b])) return badN(byThr[b]) - badN(byThr[a]);
       return a.localeCompare(b, 'ko');
     });
 
-    const oneRow = x => {
-      const short = NEED - x.got;
-      const left = short > 0 ? Math.ceil(short / 40000) : 0;
-      return '<tr><td>' + x.id + '번</td><td>' + esc(x.name) + '</td>'
-        + '<td class="dim">' + esc(x.days || '—') + '</td>'
-        + '<td class="num dim">' + (x.cnt ? x.cnt + '회' : '없음') + '</td>'
-        + '<td class="num">' + won(x.got) + '</td>'
-        + '<td class="num ' + (left ? 'warn' : 'good') + '">'
-        + (left ? left + '건' : '—') + '</td>'
-        + '<td class="num ' + (short > 0 ? 'warn' : 'good') + '">'
-        + (short > 0 ? won(short) : '다 냄') + '</td></tr>';
-    };
-
     $('ckBody').innerHTML = head + thrKeys.map(k => {
-      const arr = byThr[k].slice().sort((a, b) => (a.got - b.got) || (a.id - b.id));
-      const nb = arr.filter(x => x.got < NEED).length;
-      const sb2 = arr.reduce((s, x) => s + Math.max(0, NEED - x.got), 0);
+      const arr = byThr[k].slice().sort((a, b) => (Math.abs(b.diff) - Math.abs(a.diff)) || ((a.id || 0) - (b.id || 0)));
+      const nb = badN(arr);
+      const plain = (k === '아동과 이어지지 않은 결제' || k === '담당 치료사 없음');
       return '<div class="thrgrp">'
-        + '<div class="thrhead">' + esc(k)
-        + (k === '담당 치료사 없음' ? '' : ' 선생님')
-        + ' <span class="thrsum">— 아동 ' + arr.length + '명'
-        + (nb ? ' · <span class="warn">덜 낸 아동 ' + nb + '명 · '
-                + won(sb2) + ' 모자람</span>'
-              : ' · <span class="good">모두 다 냈습니다</span>')
+        + '<div class="thrhead">' + esc(k) + (plain ? '' : ' 선생님')
+        + ' <span class="thrsum">— ' + arr.length + '줄'
+        + (nb ? ' · <span class="warn">어긋남 ' + nb + '</span>' : ' · <span class="good">모두 맞음</span>')
         + '</span></div>'
-        + '<table><thead><tr><th>아동</th><th>이름</th>'
-        + '<th>결제일자</th><th class="num">결제</th>'
-        + '<th class="num">받은 금액</th><th class="num">미결제</th>'
-        + '<th class="num">모자란 금액</th></tr></thead><tbody>'
+        + '<table><thead><tr><th>아동</th><th>이름</th><th>결제일자</th><th class="num">결제</th>'
+        + '<th class="num">결제 금액</th><th class="num">차감</th><th class="num">결과</th><th>메모</th></tr></thead><tbody>'
         + arr.map(oneRow).join('')
         + '</tbody></table></div>';
     }).join('');
@@ -744,12 +839,15 @@ async function afterLogin(user) {
     return;
   }
 
-  const [c, m, tn] = await Promise.all([
+  const [c, m, tn, tp] = await Promise.all([
     sb.from('nl_children').select('id, name, birth, status').order('id'),
     sb.from('nl_card_map').select('person_name, support_type_id, child_id'),
-    sb.from('nl_therapists').select('id, name')
+    sb.from('nl_therapists').select('id, name'),
+    sb.from('nl_therapies').select('child_id, support_type_id, started_on, ended_on')
+      .in('support_type_id', [3, 4, 5, 6, 7]).range(0, 4999)
   ]);
   if (c.error) { show($('msg'), '❌ 아동 조회 실패\n' + c.error.message, false); return; }
+  THERAPIES = (tp && !tp.error) ? (tp.data || []) : [];
 
   CHILDREN = c.data || [];
   CARDMAP = {};
@@ -765,6 +863,9 @@ async function afterLogin(user) {
     + ' · 이어둔 성명 ' + Object.keys(CARDMAP).length + '개';
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
+  // 주소 ?st=5 = 방과후로 열기 (결제내역 올리기 갈래 줄)
+  const st0 = Number(new URLSearchParams(location.search).get('st')) === 5 ? 5 : 3;
+  setKind(st0);
 }
 
 $('btn').onclick = async () => {

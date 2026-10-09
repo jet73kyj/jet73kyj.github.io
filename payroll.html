@@ -303,6 +303,7 @@
     <div class="ctgrid">
       <label>입사일<input id="ct_hired" type="date"></label>
       <label title="퇴사일 다음 날부터 14일은 기록지만 쓸 수 있고, 그 뒤로는 계정이 막힙니다">퇴사일<input id="ct_left" type="date"></label>
+      <label>성별<select id="ct_gender"><option value="">— 고르기 —</option><option>여</option><option>남</option></select></label>
       <label>연락처<input id="ct_phone" type="tel" data-tel inputmode="numeric" maxlength="13" autocomplete="off" placeholder="010-0000-0000"></label>
       <label>계정 아이디<input id="ct_login" type="text" disabled></label>
       <label>계약 형태<select id="ct_type"><option value="">— 고르기 —</option>
@@ -1707,7 +1708,7 @@ async function loadCard(){
   try {
     if (!TTYPES.length) { const { data: tt } = await sb.from('nl_therapy_types').select('id, name').order('id'); TTYPES = tt || []; }
     const [a, b, c, d, e, f] = await Promise.all([
-      sb.from('nl_therapists').select('id, name, phone, hired_on, left_on, login_id, login_email').eq('id', thId).maybeSingle(),
+      sb.from('nl_therapists').select('id, name, phone, hired_on, left_on, login_id, login_email, gender').eq('id', thId).maybeSingle(),
       sb.from('nl_th_private').select('rrn, bank, account_no').eq('therapist_id', thId).maybeSingle(),
       sb.from('nl_th_contract').select('contract_type, provider_no, memo').eq('therapist_id', thId).maybeSingle(),
       sb.from('nl_th_licenses').select('id, lic_name, lic_no').eq('therapist_id', thId).order('id'),
@@ -1735,7 +1736,7 @@ function drawCard(){
   $('ctCard').innerHTML = '<div class="cthd">' + thId + '번 ' + esc(t.name || '') + ' 선생님 · 위탁계약'
       + '<button id="ctEditBtn" type="button" class="ctsm">수정</button></div>'
     + (t.left_on ? '<div class="ctl ctleft">퇴사일 <b>' + esc(t.left_on) + '</b> · ' + esc(leftNote(t.left_on)) + '</div>' : '')
-    + '<div class="ctl">입사일 <b>' + esc(t.hired_on || '—') + '</b> · 연락처 ' + esc(maskTel(t.phone) || '—')
+    + '<div class="ctl">입사일 <b>' + esc(t.hired_on || '—') + '</b> · 성별 ' + esc(t.gender || '—') + ' · 연락처 ' + esc(maskTel(t.phone) || '—')
       + ' · 계정 아이디 ' + esc(t.login_id || t.login_email || '—') + '</div>'
     + '<div class="ctl">발달 제공인력번호 ' + esc(ct.provider_no || '—') + ' · 치료 영역 '
       + esc(CT.areas.map(tn).join(' · ') || '—') + ' · 계약 형태 <b>' + esc(ct.contract_type || '—') + '</b></div>'
@@ -1769,6 +1770,7 @@ function addLicRow(nm, no){
 function openCardEdit(){
   const t = CT.th, pv = CT.pv, ct = CT.ct;
   $('ct_hired').value = t.hired_on || ''; $('ct_left').value = t.left_on || ''; $('ct_phone').value = t.phone || '';
+  $('ct_gender').value = t.gender || '';   // 성별 — 치료지원 시간표 「치료사 정보」에 들어감 (2026-10-09)
   $('ct_login').value = t.login_id || t.login_email || '';
   $('ct_type').value = ct.contract_type || ''; $('ct_prov').value = ct.provider_no || '';
   $('ct_rrn').value = pv.rrn || ''; $('ct_bank').value = pv.bank || ''; $('ct_acc').value = pv.account_no || '';
@@ -1795,7 +1797,7 @@ async function saveCard(){
   if (v('ct_phone') && !telOk(v('ct_phone'))) { alert('연락처 숫자 자리 수가 맞지 않습니다.\n휴대폰 11자리 (010-0000-0000) · 일반 전화 9~11자리로 넣어 주세요.'); return; }
   const btn = $('ctSave'); btn.disabled = true; btn.textContent = '저장 중…';
   try {
-    const r1 = await sb.from('nl_therapists').update({ hired_on: v('ct_hired') || null, left_on: v('ct_left') || null, phone: v('ct_phone') || null }).eq('id', thId).select('id');
+    const r1 = await sb.from('nl_therapists').update({ hired_on: v('ct_hired') || null, left_on: v('ct_left') || null, phone: v('ct_phone') || null, gender: v('ct_gender') || null }).eq('id', thId).select('id');
     if (r1.error) throw r1.error;
     if (!r1.data || !r1.data.length) throw new Error('입사일 · 연락처가 저장되지 않았습니다 (직원 표 권한).');
     const pvRow = { therapist_id: thId, rrn: rrn || null, bank: v('ct_bank') || null, account_no: acc || null, updated_at: new Date().toISOString() };
