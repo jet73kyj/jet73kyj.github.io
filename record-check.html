@@ -93,8 +93,13 @@
   .rc button.saved { background:#EAF4EC; border-color:#9CC7A6; color:#2E6B3E; }
   .rcview { font-size:12px; color:var(--tx); }
   .legend { font-size:12px; color:var(--dim); line-height:1.9; margin-top:14px; }
+  /* 치료사별 한눈에 (2026-10-09) */
+  .ovt tr.ovr { cursor:pointer; }
+  .ovt tr.ovr:hover td { background:var(--camL); }
+  .ovt tr.ovr.on td { background:#FBF5EE; font-weight:600; }
+  #kindTabs { flex-wrap:wrap; align-items:center; }
   @media print {
-    .hd button, .hd select, .tabs2, .rc button, .legend { display:none !important; }
+    .hd button, .hd select, .tabs2, .rc button, .legend, #thAll { display:none !important; }
     body { background:#fff; }
     .card { border:none; padding:0; }
     .rc select, .rc input { border:none; }
@@ -137,6 +142,8 @@ const $ = id => document.getElementById(id);
 
 const ADMIN = [8, 19];
 let ME = null, ROWS = [], CASES = [], RES = {}, KIDNM = {}, THNM = {}, VIEW = 'left';
+// 갈래 · 보기 · 선생님 거르기 · 누적 통계 (2026-10-09)
+let KINDV = '전체', GROUPV = 'th', THF = 0, STATS = null, LOGERR = '';
 let NOTES = {};   // 아동|날짜 → 발달 기록지 특이사항 글들 · 아동|* → 그 달 전부 (2026-10-02)
 
 // 항목 이름 · 갈래 (g1 결제 · g2 기록지 · g3 서류 · g0 참고)
@@ -147,8 +154,12 @@ const ITEM = {
   10:['기록지 시각 겹침','g2'], 11:['일정표 ↔ 승인일자','g2'], 12:['기록지 빈칸','g2'],
   13:['승인번호 다름','g2'], 14:['기록지 없음','g2'],
   15:['변경계약서 · 본인부담금','g3'], 16:['변경계약서 · 담당 변경','g3'],
-  18:['제공일자 ≠ 승인일자','g2']   // 2026-10-02 · 결제일 우선
+  18:['제공일자 ≠ 승인일자','g2'],   // 2026-10-02 · 결제일 우선
+  // 치료지원 누가기록지 · 미작성 (2026-10-09) — 서버 nl_log_check · 고치면 저절로 사라짐
+  31:['결제가 이름','g1'], 32:['그날 수업 없음','g1'], 33:['같은 날 결제 2건','g1'],
+  34:['어느 수업 결제인지','g1'], 41:['미작성','g2']
 };
+const KINDS = ['발달재활', '치료지원', '센터'];
 
 function esc(s){
   return String(s == null ? '' : s)
@@ -179,7 +190,7 @@ function rcNamed(r, kidName, thName) {
 }
 function rkey(r){ return r.child_id + '|' + r.item_no + '|' + (r.item_key || ''); }
 // 갈래 나(10~14 · 18) — 목록만. 선생님이 기록지를 고치면 저절로 사라짐 (2026-10-02)
-function isList(r){ return (r.item_no >= 10 && r.item_no <= 14) || r.item_no === 18; }
+function isList(r){ return (r.item_no >= 10 && r.item_no <= 14) || r.item_no === 18 || r.item_no >= 31; }
 function isAdmin(){ return ME && ADMIN.indexOf(Number(ME.id)) >= 0; }
 
 // 달 고르기 — 지난 6달 ~ 이번 달 · 처음은 지난달 (기록지는 달이 끝난 뒤 씀)
@@ -214,16 +225,22 @@ function noteOf(r){
 async function run(){
   const k = $('mon').value;
   $('body').innerHTML = '<div class="load">' + monNo(k) + '월 기록지를 점검하고 있습니다…</div>';
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, lg, st] = await Promise.all([
     sb.rpc('nl_record_check', { p_month: k }),
     sb.from('nl_rc_cases').select('id, grp, name, need_doc, sort_no').eq('active', true).order('sort_no'),
-    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo').eq('month_key', k)
+    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo').eq('month_key', k),
+    // 치료지원 결제 빨강 · 미작성 (발달재활 · 치료지원 · 센터) — 2026-10-09
+    sb.rpc('nl_log_check', { p_month: k }),
+    isAdmin() ? sb.rpc('nl_rc_stats', { p_year: Number(k.slice(0, 4)) }) : Promise.resolve({ data: null })
   ]);
   if (a.error) {
     $('body').innerHTML = '<div class="err">점검하지 못했습니다.\n' + esc(a.error.message) + '</div>';
     return;
   }
-  ROWS = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }));
+  ROWS = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no), kind: '발달재활' }));
+  LOGERR = lg && lg.error ? lg.error.message : '';
+  ((lg && lg.data) || []).forEach(r => ROWS.push(Object.assign({}, r, { item_no: Number(r.item_no) })));
+  STATS = (st && !st.error) ? (st.data || null) : null;
   if (!isAdmin()) ROWS = ROWS.filter(r => Number(r.therapist_id) === Number(ME.id));
   CASES = b.data || [];
   RES = {};
@@ -296,41 +313,74 @@ function rcCell(r, i){
 
 function draw(){
   const k = $('mon').value;
-  const left = ROWS.filter(r => !isDone(r));
-  // 아동 번호 · 이름으로 거르기 (2026-10-02) — 숫자면 번호가 같은 아동, 아니면 이름에 그 글자
   const q = String(($('kidQ') || {}).value || '').trim();
   const hit = r => !q || (/^\d+$/.test(q) ? Number(r.child_id) === Number(q)
                                           : String(KIDNM[r.child_id] || '').indexOf(q) >= 0);
-  const list = (VIEW === 'left' ? left : ROWS).filter(hit);
-  const nList = ROWS.filter(isList).length;
-  let h = '<div class="sum">' + monNo(k) + '월 · 점검 대상 <b>' + left.filter(r => r.item_no !== 9 && !isList(r)).length + '건</b>'
-        + ' · 처리 끝 ' + ROWS.filter(r => r.item_no !== 9 && !isList(r) && isDone(r)).length + '건'
-        + ' · 선생님이 고칠 기록지 <b>' + nList + '건</b>'
-        + (isAdmin() && nList ? ' <button id="sendRc" style="margin-left:8px;">선생님께 알림 보내기</button>'
+  const kindHit = r => KINDV === '전체' || (KINDV === '미작성' ? r.item_no === 41 : r.kind === KINDV);
+  const counted = r => r.item_no !== 9;
+  const left = ROWS.filter(r => !isDone(r) && counted(r));
+  const base = (VIEW === 'left' ? ROWS.filter(r => !isDone(r)) : ROWS).filter(hit).filter(kindHit);
+  const list = base.filter(r => !THF || Number(r.therapist_id || 0) === THF);
+  const nList = ROWS.filter(r => isList(r) && r.item_no < 31).length;
+  const n41 = ROWS.filter(r => r.item_no === 41).length;
+
+  let h = '<div class="sum">' + monNo(k) + '월 · 남은 점검 <b>' + left.length + '건</b>'
+        + ' · 처리 끝 ' + ROWS.filter(r => counted(r) && !isList(r) && isDone(r)).length + '건'
+        + (isAdmin() && nList ? ' <button id="sendRc" style="margin-left:8px;">발달 기록지 · 선생님께 알림</button>'
                                 + '<span id="sendRcMsg" style="font-size:12px;margin-left:8px;"></span>' : '')
-        + '</div>'
-        + '<div class="tabs2"><button data-v="left"' + (VIEW === 'left' ? ' class="on"' : '') + '>남은 것</button>'
-        + '<button data-v="all"' + (VIEW === 'all' ? ' class="on"' : '') + '>전체</button></div>';
-  if (!list.length) {
-    h += '<div class="ok">' + monNo(k) + '월 — 남은 점검 대상이 없습니다</div>';
-  } else {
-    // 선생님별로 묶기
-    const g = {}, ord = [];
-    list.forEach(r => {
-      const t = r.therapist_id || 0;
-      if (!g[t]) { g[t] = []; ord.push(t); }
-      g[t].push(r);
+        + (isAdmin() && n41 ? ' <button id="sendLog" style="margin-left:8px;">미작성 · 선생님께 알림</button>'
+                              + '<span id="sendLogMsg" style="font-size:12px;margin-left:8px;"></span>' : '')
+        + (LOGERR ? '<div style="color:var(--coralT);margin-top:6px;">치료지원 · 센터 · 미작성 점검을 읽지 못했습니다 — ' + esc(LOGERR) + '</div>' : '')
+        + '</div>';
+  // 갈래 · 남은 것/전체 · 보기
+  h += '<div class="tabs2" id="kindTabs">' + ['전체'].concat(KINDS, ['미작성']).map(x =>
+         '<button data-k="' + x + '"' + (KINDV === x ? ' class="on"' : '') + '>' + (x === '미작성' ? '미작성만' : x) + '</button>').join('')
+     + '<span style="flex:1"></span>'
+     + '<button data-v="left"' + (VIEW === 'left' ? ' class="on"' : '') + '>남은 것</button>'
+     + '<button data-v="all"' + (VIEW === 'all' ? ' class="on"' : '') + '>전체</button>'
+     + '<span style="width:14px"></span>'
+     + '<button data-g="th"' + (GROUPV === 'th' ? ' class="on"' : '') + '>치료사별</button>'
+     + '<button data-g="kind"' + (GROUPV === 'kind' ? ' class="on"' : '') + '>기록지별</button></div>';
+
+  // 치료사별 한눈에 (남은 것 · 갈래 · 아동 찾기 반영 · 선생님 거르기 전)
+  const ths = [...new Set(base.map(r => Number(r.therapist_id || 0)))].sort((x, y) => (x || 99) - (y || 99));
+  if (ths.length) {
+    h += '<div class="card" style="padding:12px 16px;"><table class="ovt"><tr><th>선생님</th>'
+       + KINDS.map(x => '<th style="text-align:center;">' + x + '</th>').join('')
+       + '<th style="text-align:center;">그중 미작성</th><th style="text-align:center;">합계</th></tr>';
+    ths.forEach(tid => {
+      const rs = base.filter(r => Number(r.therapist_id || 0) === tid);
+      h += '<tr class="ovr' + (THF === tid ? ' on' : '') + '" data-t="' + tid + '">'
+         + '<td>' + (tid ? tid + '번 ' + esc(THNM[tid] || '') : '담당 미상') + '</td>'
+         + KINDS.map(x => { const n = rs.filter(r => r.kind === x).length; return '<td style="text-align:center;">' + (n || '·') + '</td>'; }).join('')
+         + '<td style="text-align:center;">' + (rs.filter(r => r.item_no === 41).length || '·') + '</td>'
+         + '<td style="text-align:center;font-weight:600;">' + rs.length + ' ▸</td></tr>';
     });
-    ord.sort((a, b) => (a || 99) - (b || 99));
-    ord.forEach(t => {
-      const rs = g[t].sort((a, b) => a.child_id - b.child_id || a.item_no - b.item_no
-                         || String(a.on_date || '').localeCompare(String(b.on_date || '')));
-      h += '<div class="card"><div class="thhd">' + (t ? t + '번 ' + esc(THNM[t] || '') + ' 선생님' : '담당 미상')
-         + '<span class="n">' + rs.length + '건</span></div>'
-         + '<table><tr><th>아동</th><th>날짜</th><th>항목</th><th>내용</th><th>처리 결과</th></tr>';
+    h += '</table>' + (THF ? '<div style="margin-top:6px;"><button id="thAll">모든 선생님 보기</button></div>' : '')
+       + '<div style="font-size:12px;color:var(--dim);margin-top:6px;">줄을 누르면 그 선생님 것만 봅니다.</div></div>';
+  }
+
+  if (!list.length) {
+    h += '<div class="ok">' + monNo(k) + '월 — ' + (VIEW === 'left' ? '남은 ' : '') + '점검 대상이 없습니다</div>';
+  } else {
+    const keyOf = r => GROUPV === 'th' ? String(r.therapist_id || 0) : r.kind;
+    const g = {}, ord = [];
+    list.forEach(r => { const kk = keyOf(r); if (!g[kk]) { g[kk] = []; ord.push(kk); } g[kk].push(r); });
+    if (GROUPV === 'th') ord.sort((x, y) => (Number(x) || 99) - (Number(y) || 99));
+    else ord.sort((x, y) => KINDS.indexOf(x) - KINDS.indexOf(y));
+    ord.forEach(kk => {
+      const rs = g[kk].sort((x, y) => (GROUPV === 'th' ? KINDS.indexOf(x.kind) - KINDS.indexOf(y.kind) : (x.therapist_id || 99) - (y.therapist_id || 99))
+                         || x.child_id - y.child_id || x.item_no - y.item_no
+                         || String(x.on_date || '').localeCompare(String(y.on_date || '')));
+      const title = GROUPV === 'th'
+        ? (Number(kk) ? kk + '번 ' + esc(THNM[kk] || '') + ' 선생님' : '담당 미상')
+        : esc(kk) + ' 기록지';
+      h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span></div>'
+         + '<table><tr><th>' + (GROUPV === 'th' ? '기록지' : '선생님') + '</th><th>아동</th><th>날짜</th><th>항목</th><th>내용</th><th>처리 결과</th></tr>';
       rs.forEach(r => {
         const i = ROWS.indexOf(r), it = ITEM[r.item_no] || ['?','g0'];
         h += '<tr' + (isDone(r) ? ' class="done"' : '') + '>'
+          + '<td style="white-space:nowrap;">' + (GROUPV === 'th' ? esc(r.kind || '') : (r.therapist_id ? r.therapist_id + '번 ' + esc(THNM[r.therapist_id] || '') : '—')) + '</td>'
           + '<td class="cid">' + r.child_id + '번 ' + esc(KIDNM[r.child_id] || '') + '</td>'
           + '<td>' + md(r.on_date) + '</td>'
           + '<td><span class="it ' + it[1] + '">' + r.item_no + ' ' + esc(it[0]) + '</span></td>'
@@ -342,25 +392,79 @@ function draw(){
       h += '</table></div>';
     });
   }
-  h += '<div class="legend">결제 시각은 바우처 「결제일시」, 수업 시작은 시간표 회기 시각입니다. '
+
+  // 자주 생기는 점검 (누적 · 관리자만) — 매일 밤 9시 10분 기록
+  if (isAdmin() && STATS) {
+    const yr = k.slice(0, 4);
+    const byItem = {};
+    STATS.forEach(s => {
+      const kk = s.kind + '|' + s.item_no;
+      const o = byItem[kk] || (byItem[kk] = { kind: s.kind, no: Number(s.item_no), cnt: 0, fixed: 0, open: 0, dsum: 0, dn: 0 });
+      o.cnt += s.cnt; o.fixed += s.fixed_cnt; o.open += s.open_cnt;
+      if (s.avg_days != null) { o.dsum += Number(s.avg_days) * s.fixed_cnt; o.dn += s.fixed_cnt; }
+    });
+    const items = Object.values(byItem).sort((x, y) => y.cnt - x.cnt);
+    const byTh = {};
+    STATS.forEach(s => {
+      const t2 = Number(s.therapist_id || 0);
+      const o = byTh[t2] || (byTh[t2] = { cnt: 0, open: 0 });
+      o.cnt += s.cnt; o.open += s.open_cnt;
+    });
+    h += '<div class="card"><div class="thhd">자주 생기는 점검 — ' + yr + '년 누적<span class="n">매일 밤 9시 10분에 기록 · 고치면 「고친 날」이 남음</span></div>';
+    if (!items.length) h += '<div style="font-size:13px;color:var(--dim);">아직 쌓인 기록이 없습니다.</div>';
+    else {
+      h += '<table><tr><th>기록지</th><th>항목</th><th style="text-align:right;">생긴 수</th><th style="text-align:right;">고친 수</th><th style="text-align:right;">남음</th><th style="text-align:right;">고치기까지 (평균)</th></tr>'
+         + items.map(o => { const it = ITEM[o.no] || ['?','g0'];
+             return '<tr><td>' + esc(o.kind) + '</td><td><span class="it ' + it[1] + '">' + o.no + ' ' + esc(it[0]) + '</span></td>'
+               + '<td style="text-align:right;">' + o.cnt + '</td><td style="text-align:right;">' + o.fixed + '</td>'
+               + '<td style="text-align:right;">' + o.open + '</td>'
+               + '<td style="text-align:right;">' + (o.dn ? (o.dsum / o.dn).toFixed(1) + '일' : '—') + '</td></tr>'; }).join('')
+         + '</table>'
+         + '<div style="margin-top:10px;font-size:13px;"><b>선생님별</b> · '
+         + Object.keys(byTh).map(Number).sort((x, y) => byTh[y].cnt - byTh[x].cnt)
+             .map(t2 => (t2 ? t2 + '번 ' + esc(THNM[t2] || '') : '담당 미상') + ' ' + byTh[t2].cnt + '건' + (byTh[t2].open ? ' (남음 ' + byTh[t2].open + ')' : '')).join(' · ')
+         + '</div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<div class="legend">발달재활 — 결제 시각은 바우처 「결제일시」, 수업 시작은 시간표 회기 시각입니다. '
      + '사례를 고르고 저장하면 「남은 것」에서 빠집니다. 사유서 · 변경계약서는 「서류 받음」까지, '
-     + '특이사항 기재 사례는 기록지 그 회차 특이사항이 적혀 있어야 끝납니다 (적힌 글은 내용 아래 노란 칸). '
-     + '기록지 점검(10~14 · 18)은 목록만 — 선생님이 기록지를 고치면 저절로 사라지고, 다시 열면 기록지 화면이 알려 줍니다. '
-     + '사례 목록은 표에 담겨 있어 더 넣을 수 있습니다.</div>';
+     + '특이사항 기재 사례는 기록지 그 회차 특이사항이 적혀 있어야 끝납니다. '
+     + '기록지 점검(10~14 · 18)과 치료지원(31~34) · 미작성(41)은 목록만 — 선생님이 기록지를 고치면 저절로 사라집니다. '
+     + '미작성은 치료지원 한 달 세 회, 발달재활 · 센터는 수업한 회수만큼이며 기한은 다음 달 10일입니다.</div>';
   $('body').innerHTML = h;
 
   const sr = $('sendRc');
   if (sr) sr.onclick = async () => {
-    if (!confirm(monNo(k) + '월 기록지에서 고칠 것을 담당 선생님마다 알림으로 보낼까요?\n(같은 달은 한 번만 갑니다)')) return;
+    if (!confirm(monNo(k) + '월 발달 기록지에서 고칠 것을 담당 선생님마다 알림으로 보낼까요?\n(같은 달은 한 번만 갑니다)')) return;
     sr.disabled = true; sr.textContent = '보내는 중…';
     const { data, error } = await sb.rpc('nl_send_rc_alerts', { p_month: k });
-    sr.disabled = false; sr.textContent = '선생님께 알림 보내기';
+    sr.disabled = false; sr.textContent = '발달 기록지 · 선생님께 알림';
     $('sendRcMsg').textContent = error ? '보내지 못했습니다 — ' + error.message : String(data || '');
     $('sendRcMsg').style.color = error ? 'var(--coralT)' : 'var(--sage)';
   };
-  document.querySelectorAll('.tabs2 button').forEach(b => {
-    b.onclick = () => { VIEW = b.dataset.v; draw(); };
+  const sl = $('sendLog');
+  if (sl) sl.onclick = async () => {
+    if (!confirm(monNo(k) + '월 기록지 미작성을 담당 선생님께 알림으로 보낼까요?\n(선생님 화면 🔔 · 같은 달은 한 번만 갑니다)')) return;
+    sl.disabled = true; sl.textContent = '보내는 중…';
+    const { data, error } = await sb.rpc('nl_send_log_alerts', { p_month: k });
+    sl.disabled = false; sl.textContent = '미작성 · 선생님께 알림';
+    $('sendLogMsg').textContent = error ? '보내지 못했습니다 — ' + error.message : String(data || '');
+    $('sendLogMsg').style.color = error ? 'var(--coralT)' : 'var(--sage)';
+  };
+  document.querySelectorAll('#kindTabs button').forEach(b => {
+    b.onclick = () => {
+      if (b.dataset.k) KINDV = b.dataset.k;
+      if (b.dataset.v) VIEW = b.dataset.v;
+      if (b.dataset.g) GROUPV = b.dataset.g;
+      draw();
+    };
   });
+  document.querySelectorAll('.ovr').forEach(tr => {
+    tr.onclick = () => { const tid = Number(tr.dataset.t); THF = (THF === tid ? 0 : tid); draw(); };
+  });
+  const ta = $('thAll'); if (ta) ta.onclick = () => { THF = 0; draw(); };
   document.querySelectorAll('.rc').forEach(box => {
     const btn = box.querySelector('.rcSave');
     box.querySelectorAll('select, input').forEach(el => {

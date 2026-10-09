@@ -332,6 +332,10 @@ async function loadProg(k){
   } catch (e) {}
 }
 function logBox(k, list){
+  // 기록지 미작성 · 진행은 「기록지 점검 → 미작성」으로 옮김 (2026-10-09 은정님 — 매일 떠서 지나치게 됨)
+  return '<div class="grp-why" style="margin:0;">기록지 미작성 · 진행은 <a href="record-check.html">「기록지 점검」 → 미작성</a>에서 봅니다.</div>';
+}
+function logBoxOld(k, list){
   const pm = prevMk(k);
   let L = '';
   if (list && list.length) {
