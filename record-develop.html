@@ -154,6 +154,25 @@
 #chgBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #chgBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #chgBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#rpBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
+#rpBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
+#rpBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#rpBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
+                border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
+.rpsheet .rp-tbl { border-collapse:collapse; width:100%; font-size:12.5px; table-layout:fixed; }
+.rpsheet .rp-tbl th, .rpsheet .rp-tbl td { border:1px solid #333; padding:6px 8px; vertical-align:top; }
+.rpsheet .rp-tbl th { background:#f5f5f5; font-weight:normal; text-align:center; vertical-align:middle; }
+.rpsheet .rp-tbl textarea { min-height:80px; border:1px solid #ddd; }
+.rpsheet .rp-tbl textarea.big { min-height:130px; }
+.rpsheet .rp-tbl input { border:1px solid #ddd; }
+.rpsheet .rp-pr { display:none; white-space:pre-wrap; line-height:1.6; }
+.rpsheet .rp-note { border:1px solid #333; padding:6px 10px; font-size:11.5px; margin-top:8px; }
+@media print {
+  .rpsheet .rp-tbl textarea { display:none !important; }
+  .rpsheet .rp-pr { display:block !important; }
+  .rpsheet .rp-tbl input { border:none !important; background:transparent !important; }
+  .rpsheet .rp-pr.m { min-height:22mm; } .rpsheet .rp-pr.b { min-height:34mm; }
+}
 #fcBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #fcBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #fcBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
@@ -195,7 +214,7 @@
 .chgsheet .chg-signed { display:inline-block; padding:1px 8px; border-radius:10px; background:#EAF4EC; color:#2E6B3E; font-size:11.5px; }
 @media print {
   .docwrap { display:none !important; }
-  #chgBox, #fcBox, #rcBox { display:none !important; }
+  #chgBox, #fcBox, #rcBox, #rpBox { display:none !important; }
   .chgsheet .chg-iso { display:none !important; }
   body.print-chg .container:not(.docwrap) { display:none !important; }
   body.print-chg .docwrap { display:block !important; }
@@ -254,6 +273,8 @@
   <div id="chgBox" class="no-print" style="display:none;"></div>
   <!-- 사실 확인서 작성 알림 [서식 27호] (2026-10-09) -->
   <div id="fcBox" class="no-print" style="display:none;"></div>
+  <!-- 중간 · 종결 보고서 알림 [서식 11-1호] (2026-10-09) -->
+  <div id="rpBox" class="no-print" style="display:none;"></div>
 
   <!-- ==================== 1. 서비스 일정표, 제공기록지 ==================== -->
   <div class="sheet" id="sheet1">
@@ -418,6 +439,8 @@
 <div class="container docwrap" id="chgWrap" style="display:none;"></div>
 <!-- 사실 확인서 [서식 27호] (2026-10-09) -->
 <div class="container docwrap" id="fcWrap" style="display:none;"></div>
+<!-- 중간 · 종결 보고서 [서식 11-1호] (2026-10-09) -->
+<div class="container docwrap" id="rpWrap" style="display:none;"></div>
 
 <!-- 인쇄할 때 종이마다 아래에 붙는 로고 (2026-09-10) -->
 <div class="printlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
@@ -687,7 +710,7 @@ async function loadOne() {
   try {
     const [t, g, v, lg, ss] = await Promise.all([
       sb.from('nl_therapies')
-        .select('id, therapy_type_id, nl_therapy_schedules(id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date)')
+        .select('id, therapy_type_id, started_on, ended_on, nl_therapy_schedules(id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date)')
         .eq('child_id', cid).eq('support_type_id', 2),
       sb.from('nl_child_grades').select('*').eq('child_id', cid),
       sb.from('nl_voucher_rows').select('*').eq('child_id', cid).eq('month_key', mk)
@@ -764,6 +787,7 @@ async function loadOne() {
     loadRcBox(cid, mk);
     loadChg(cid, mk);
     fcLoadDocs(cid, mk);
+    rpLoad(cid, mk);
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -1265,6 +1289,7 @@ function chgReset() {
   const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
   fcReset();
+  rpReset();
 }
 function chgArea(tid) {      // 그 선생님이 맡은 발달재활 수업의 영역 (나중에 시작한 것)
   let best = null, bd = '';
@@ -1456,7 +1481,7 @@ function chgPrint(i) {
   window.print();
   setTimeout(off, 1500);
 }
-function chgPendingN() { return CHG.filter(c => c.dirty).length + (typeof FC !== 'undefined' ? FC.filter(c => c.dirty).length : 0); }
+function chgPendingN() { return CHG.filter(c => c.dirty).length + (typeof FC !== 'undefined' ? FC.filter(c => c.dirty).length : 0) + (typeof RP !== 'undefined' && RP && RP.dirty ? 1 : 0); }
 window.addEventListener('beforeunload', e => {
   if (!chgPendingN()) return;
   e.preventDefault(); e.returnValue = '';
@@ -1720,6 +1745,185 @@ async function fcSave(i, doneVal) {
 function fcPrint(i) {
   if (FC[i] && FC[i].dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
   document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'fc_' + i));
+  document.body.classList.add('print-chg');
+  const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
+
+// ═════════════════════════════════════════════
+// 발달재활서비스 제공(중간/종결) 보고서 [서식 11-1호] (2026-10-09 은정님)
+//   6월 기록지 = 중간 보고서 (1~6월) · 12월 기록지 = 종결 보고서 (7~12월)
+//   발달재활 수업이 이 달에 끝나면 이 달 기록지에 종결 보고서
+//   기록지에서 채울 수 있는 칸은 자동 · 고친 글이 앞섬 · 문서 안에서 저장 · 「작성 끝」
+//   담기 nl_dev_docs (doc_type 중간보고 / 종결보고 · doc_key = 연도 또는 종결 달)
+// ═════════════════════════════════════════════
+let RP = null;             // {type, key, from, to, auto, doc, dirty}
+let RP_REQ = 0;
+function rpReset() {
+  RP = null; RP_REQ++;
+  const b = $('rpBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+  const w = $('rpWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
+function rpIsoLast(y, m) { return y + '-' + String(m).padStart(2, '0') + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0'); }
+function rpDot(iso) { return iso ? iso.replace(/-/g, '.') : ''; }
+async function rpLoad(cid, mk) {
+  const req = RP_REQ;
+  const y = year, m = month;
+  // 이 달에 끝나는 발달재활 수업이 있으면 종결 보고서
+  const endHere = (TL || []).map(t => String(t.ended_on || '')).filter(d => d.slice(0, 7) === mk).sort().pop() || '';
+  let type = null, key = '', from = '', to = '';
+  if (endHere) { type = '종결보고'; key = mk; to = endHere; from = (m <= 6 ? y + '-01-01' : y + '-07-01'); }
+  else if (m === 6)  { type = '중간보고'; key = String(y); from = y + '-01-01'; to = rpIsoLast(y, 6); }
+  else if (m === 12) { type = '종결보고'; key = String(y); from = y + '-07-01'; to = rpIsoLast(y, 12); }
+  if (!type) return;
+  // 수업을 이 기간 중에 시작했으면 그 날부터
+  const st0 = (TL || []).map(t => String(t.started_on || '')).concat(
+                [].concat(...(TL || []).map(t => (t.nl_therapy_schedules || []).map(sc => String(sc.from_date || '')))))
+              .filter(d => /^\d{4}-\d{2}-\d{2}/.test(d) && d.slice(0, 10) <= to).sort()[0] || '';
+  if (st0 && st0.slice(0, 10) > from) from = st0.slice(0, 10);
+  try {
+    // 장기 · 단기목표는 [서식 8호] 제공 계획서에서 그대로 가져온다 (2026-10-09 은정님)
+    //   그 기간 끝 달까지 적은 계획서 중 가장 늦은 것 · 계획서가 없으면 비워 둔다
+    const [dq, pq] = await Promise.all([
+      sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
+        .eq('child_id', Number(cid)).eq('doc_type', type).eq('doc_key', key).maybeSingle(),
+      sb.from('nl_dev_docs').select('doc_key, data')
+        .eq('child_id', Number(cid)).eq('doc_type', '계획서').lte('doc_key', to.slice(0, 7))
+        .order('doc_key', { ascending: false }).limit(1)
+    ]);
+    if (dq.error) throw dq.error;
+    if (req !== RP_REQ) return;
+    const plan = (pq && pq.data && pq.data[0] && pq.data[0].data) || {};
+    const gl = plan.goal_long || '', gs = plan.goal_short || '';
+    // 평가일 — 이 달 마지막 제공일자 (없으면 기간 끝)
+    let ev = '';
+    for (let i = 0; i < SESSIONS; i++) {
+      const x = rcRowInfo(i);
+      if (x && x.prov && x.prov.slice(0, 7) === mk && x.prov > ev) ev = x.prov;
+    }
+    RP = { type, key, from, to, doc: dq.data || null, dirty: false,
+      auto: {
+        child: child ? child.name || '' : '', birth: child && child.birth ? String(child.birth).slice(0, 10).replace(/-/g, '.') : '',
+        writer: schedThNames(thrName), period: rpDot(from) + ' ~ ' + rpDot(to), eval_on: rpDot(ev || to),
+        area: ($('s1_area') && $('s1_area').value) || '',
+        // 활동 · 변화 · 상담 · 의견 · 비고는 담당 선생님이 적는다 (비워 둠)
+        goal_long: gl, goal_short: gs, act: '', change: '', talk: '',
+        opinion: '', note: '', written_on: rpDot(ev || to)
+      } };
+    rpDraw();
+  } catch (e) {
+    if (req !== RP_REQ) return;
+    const b = $('rpBox');
+    b.className = 'no-print need'; b.style.display = 'block';
+    b.textContent = '보고서를 불러오지 못했습니다. (' + (e.message || e) + ')';
+  }
+}
+function rpVal(f) {
+  const d = RP && RP.doc && RP.doc.data;
+  return d && d[f] != null ? d[f] : (RP ? RP.auto[f] : '');
+}
+function rpDraw() {
+  const b = $('rpBox'), w = $('rpWrap');
+  if (!RP) { b.style.display = 'none'; w.style.display = 'none'; return; }
+  const nm = RP.type === '중간보고' ? '중간 보고서' : '종결 보고서';
+  const done = !!(RP.doc && RP.doc.done);
+  b.className = 'no-print ' + (done ? 'ok' : 'need');
+  b.innerHTML = done
+    ? nm + ' — 작성 끝 (' + esc(String(RP.doc.done_on || '').slice(0, 10)) + ') <button type="button" onclick="rpOpen()">보기</button>'
+    : '<b>' + nm + '를 작성해 주세요</b> · 서비스 제공기간 ' + esc(RP.auto.period)
+      + '<div style="margin-top:4px;"><button type="button" onclick="rpOpen()">' + nm + ' 열기</button></div>';
+  b.style.display = 'block';
+  const open = w.style.display === 'block';
+  const v = f => esc(rpVal(f) || '');
+  const ta = (f, cls) => '<textarea data-f="' + f + '"' + (cls ? ' class="' + cls + '"' : '') + '>' + v(f) + '</textarea>'
+                       + '<div class="rp-pr ' + (cls === 'big' ? 'b' : 'm') + '" data-p="' + f + '">' + v(f) + '</div>';
+  const inp = f => '<input type="text" data-f="' + f + '" value="' + v(f) + '">';
+  w.innerHTML = '<div class="sheet chgsheet rpsheet" id="rp_0">'
+    + '<div style="font-size:11px;">[서식 11-1호]</div>'
+    + '<h2 class="title">발달재활서비스 제공(중간/종결) 보고서</h2>'
+    + '<table class="rp-tbl">'
+    + '<colgroup><col style="width:15%"><col style="width:35%"><col style="width:22%"><col style="width:28%"></colgroup>'
+    + '<tr><th>아동명</th><td>' + inp('child') + '</td><th>생년월일</th><td>' + inp('birth') + '</td></tr>'
+    + '<tr><th>작성자</th><td>' + inp('writer') + '</td><th>서비스 제공기간</th><td>' + inp('period') + '</td></tr>'
+    + '<tr><th>' + (RP.type === '중간보고' ? '중간평가일' : '종결평가일') + '</th><td>' + inp('eval_on') + '</td><th>발달재활서비스 제공영역</th><td>' + inp('area') + '</td></tr>'
+    + '<tr><th colspan="4">서비스 진행내용</th></tr>'
+    + '<tr><th rowspan="2">서비스 목표</th><th colspan="2">장기목표</th><th>단기목표</th></tr>'
+    + '<tr><td colspan="2">' + ta('goal_long') + '</td><td>' + ta('goal_short') + '</td></tr>'
+    + '<tr><th rowspan="2">활동 내용</th><th colspan="2">활동내용</th><th>변화내용</th></tr>'
+    + '<tr><td colspan="2">' + ta('act', 'big') + '</td><td>' + ta('change', 'big') + '</td></tr>'
+    + '<tr><th>상담 내용</th><td colspan="3">' + ta('talk') + '</td></tr>'
+    + '<tr><th>담당자 의견</th><td colspan="3">' + ta('opinion') + '</td></tr>'
+    + '<tr><th>비고</th><td colspan="3">' + ta('note') + '</td></tr>'
+    + '</table>'
+    + '<div class="chg-date">' + inp('written_on').replace('<input', '<input style="width:150px;display:inline-block;text-align:center;"') + '</div>'
+    + '<table class="chg-sign"><tr><td style="width:50%;text-align:center;">작 성 자 : ' + v('writer') + ' &nbsp;&nbsp; (인)</td>'
+    + '<td style="text-align:center;">기 관 명 : ' + esc(CHG_ORG)
+    +   ' <span class="chg-ins" style="width:56px;height:18px;vertical-align:middle;"><img class="chg-stamp" alt=""'
+    +   (CHG_STAMP ? ' src="' + CHG_STAMP + '" style="display:inline"' : '') + '></span> &nbsp;&nbsp;&nbsp; 관 리 자 (인)</td></tr></table>'
+    + '<div class="chg-act no-print">'
+    +   '<span style="font-weight:600;">' + nm + '</span>'
+    +   '<button type="button" class="chg-save' + (RP.doc && !RP.dirty ? ' done' : '') + '" onclick="rpSave()">'
+    +     (RP.doc && !RP.dirty ? '✓ 저장됨' : '저장 전') + '</button>'
+    +   '<label><input type="checkbox" class="chg-done"' + (done ? ' checked' : '') + ' onchange="rpSave(this.checked)"> 작성 끝</label>'
+    +   '<button type="button" onclick="rpPrint()">이 보고서 인쇄</button>'
+    +   '<span style="color:#888;">목표는 제공 계획서에서 옵니다 · 나머지는 직접 적고 고칠 수 있습니다 · 기록지 저장과 따로 저장</span>'
+    + '</div></div>';
+  const sh = $('rp_0');
+  sh.addEventListener('input', e => {
+    const f = e.target && e.target.dataset && e.target.dataset.f;
+    const pr = f ? sh.querySelector('.rp-pr[data-p="' + f + '"]') : null;
+    if (pr) pr.textContent = e.target.value;
+    RP.dirty = true;
+    const bt = sh.querySelector('.chg-save');
+    if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
+  });
+  chgStamp();
+  w.style.display = open ? 'block' : 'none';
+}
+function rpOpen() {
+  const w = $('rpWrap');
+  w.style.display = 'block';
+  w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function rpSave(doneVal) {
+  if (!RP) return;
+  const sh = $('rp_0');
+  const bt = sh.querySelector('.chg-save'), cb = sh.querySelector('.chg-done');
+  const d = {};
+  sh.querySelectorAll('[data-f]').forEach(el => { d[el.dataset.f] = el.value; });
+  const done = doneVal !== undefined ? !!doneVal : !!(RP.doc && RP.doc.done);
+  if (done && !String(d.opinion || '').trim()) {
+    alert('「담당자 의견」을 적어 주세요.\n비어 있으면 「작성 끝」을 할 수 없습니다.');
+    if (cb) cb.checked = false;
+    return;
+  }
+  if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  d.from = RP.from; d.to = RP.to;
+  const row = { child_id: Number(childId), doc_type: RP.type, doc_key: RP.key, data: d,
+                done, done_on: done ? ((RP.doc && RP.doc.done && RP.doc.done_on) || today) : null,
+                updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
+    RP.doc = data[0]; RP.dirty = false;
+    const open = $('rpWrap').style.display === 'block';
+    rpDraw();
+    if (open) $('rpWrap').style.display = 'block';
+  } catch (e) {
+    alert('보고서를 저장하지 못했습니다.\n' + (e.message || e));
+    if (bt) { bt.disabled = false; bt.textContent = '저장 전'; }
+    if (cb && doneVal !== undefined) cb.checked = !doneVal;
+  }
+}
+function rpPrint() {
+  if (RP && RP.dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
+  document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'rp_0'));
   document.body.classList.add('print-chg');
   const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
   window.addEventListener('afterprint', off);
