@@ -2029,6 +2029,56 @@ function drawKid(c) {
   let lastCalcIdx = -1;
   calcList.forEach((g, k) => { if (g.calc_type === '회기계산') lastCalcIdx = k; });
 
+  // 발달재활 보기 줄 — 수업 줄 다음 · 소계 · 전월 이월 앞에 (2026-10-09 은정님)
+  //   회기계산 항목이 없는 아동은 전처럼 발추 줄 뒤에
+  let devDone = false;
+  const devLookHtml = () => {
+    let d = '';
+      // 발달재활 수업 — 보기만 한다 (본인부담금은 계좌입금 상자). 날짜 단추는 잠김
+      const devG = groups.find(x => x.support_type_id === 2);
+      if (devG && devG.items && devG.items.length) {
+        // 같은 치료 · 같은 사업이면 한 줄로 합친다 (2026-09-17)
+        //   달 중간에 시각·요일을 바꾸면 요일줄이 둘로 나뉘어 두 층으로 보이던 것
+        //   글은 「목 14:00→14:20」, 날짜 단추는 날짜 차례로 한 줄에. 회기 수는 더한다
+        const bag = [];
+        // 그룹 수업이 끼면 1:1 · 그룹 수업이 나뉘어도 한 줄 (단추 1~4 · 2026-10-09 은정님)
+        const devGrp = devG.items.some(x => x.group);
+        devG.items.forEach(it => {
+          const key = (devGrp ? 'dev' : (it.therapy_id || it.sched_id)) + '|' + it.row_st;
+          let g2 = bag.find(x => x.key === key);
+          if (!g2) { g2 = { key: key, list: [] }; bag.push(g2); }
+          g2.list.push(it);
+        });
+        bag.forEach(g2 => {
+          const it = g2.list[0];
+          const uniq = a => a.filter((v, i) => v && a.indexOf(v) === i);
+          const wds = uniq(g2.list.map(x => x.weekday));
+          const hms = uniq(g2.list.map(x => x.hm));
+          const lbl = g2.list.length === 1 ? it.label
+            : it.ttname + ' ' + wds.join('→') + ' ' + hms.join('→') + ' (' + it.dur + '분)'
+              + (/5주차/.test(it.label) ? ' · 5주차' : '');
+          const ths = uniq(g2.list.map(x => x.therapist_name));
+          const dn = Math.round(g2.list.reduce((a, x) => a + Number(x.count || 0), 0) * 100) / 100;
+          const srows = [];
+          g2.list.forEach(x => { (SROWS[x.sched_id + '|' + x.row_st] || []).forEach(r => srows.push(r)); });
+          srows.sort((a, b2) => String(a.plan_date).localeCompare(String(b2.plan_date)));
+          d += '<div class="r look">'
+            + '<span class="nm"></span>'
+            + '<span class="de">' + (devGrp ? '<span class="sttag dev">발달재활서비스</span>' : tagOf(it)) + esc(lbl)
+            + ' · <b class="thr">' + esc(ths.join('→')) + '</b>'
+            + ' · 본인부담금은 아래 계좌입금</span>'
+            + '<span class="ap"></span>'
+            + '<span class="ct"><span class="lookcnt">발 ' + dn + '회</span></span>'
+            + '<span class="up"></span>'
+            + '<span class="am"></span></div>'
+            + (srows.length
+               ? '<div class="sbrow" data-sched="' + it.sched_id + '" data-bst="' + it.row_st + '">'
+                 + srows.map(sbHtml).join('') + '</div>'
+               : '');
+        });
+      }
+    return d;
+  };
   calcList.forEach((g, gIdx) => {
     const tn = TYPES[g.support_type_id] || ('유형' + g.support_type_id);
     const sd = sv[g.support_type_id] !== undefined
@@ -2073,6 +2123,7 @@ function drawKid(c) {
           + '<span class="up">' + xd.unit.toLocaleString() + '</span>'
           + '<span class="am">' + (xd.n * xd.unit).toLocaleString() + '</span></div>';
       }
+      if (gIdx === lastCalcIdx && !devDone) { b += devLookHtml(); devDone = true; }
       if (g.deduction > 0) {
         b += '<div class="r sub2"><span class="nm"></span>'
           + '<span class="de">지원금 제외</span><span class="ct"></span><span class="up"></span>'
@@ -2131,49 +2182,7 @@ function drawKid(c) {
         + '<span class="ct"><input class="cnt xcnt" type="text" inputmode="numeric" value="' + cnt + '"></span>'
         + '<span class="up xunit">' + feeExtra(curT).toLocaleString() + '</span>'
         + '<span class="am gamt">0</span></div>';
-      // 발달재활 수업 — 보기만 한다 (본인부담금은 계좌입금 상자). 날짜 단추는 잠김
-      const devG = groups.find(x => x.support_type_id === 2);
-      if (devG && devG.items && devG.items.length) {
-        // 같은 치료 · 같은 사업이면 한 줄로 합친다 (2026-09-17)
-        //   달 중간에 시각·요일을 바꾸면 요일줄이 둘로 나뉘어 두 층으로 보이던 것
-        //   글은 「목 14:00→14:20」, 날짜 단추는 날짜 차례로 한 줄에. 회기 수는 더한다
-        const bag = [];
-        // 그룹 수업이 끼면 1:1 · 그룹 수업이 나뉘어도 한 줄 (단추 1~4 · 2026-10-09 은정님)
-        const devGrp = devG.items.some(x => x.group);
-        devG.items.forEach(it => {
-          const key = (devGrp ? 'dev' : (it.therapy_id || it.sched_id)) + '|' + it.row_st;
-          let g2 = bag.find(x => x.key === key);
-          if (!g2) { g2 = { key: key, list: [] }; bag.push(g2); }
-          g2.list.push(it);
-        });
-        bag.forEach(g2 => {
-          const it = g2.list[0];
-          const uniq = a => a.filter((v, i) => v && a.indexOf(v) === i);
-          const wds = uniq(g2.list.map(x => x.weekday));
-          const hms = uniq(g2.list.map(x => x.hm));
-          const lbl = g2.list.length === 1 ? it.label
-            : it.ttname + ' ' + wds.join('→') + ' ' + hms.join('→') + ' (' + it.dur + '분)'
-              + (/5주차/.test(it.label) ? ' · 5주차' : '');
-          const ths = uniq(g2.list.map(x => x.therapist_name));
-          const dn = Math.round(g2.list.reduce((a, x) => a + Number(x.count || 0), 0) * 100) / 100;
-          const srows = [];
-          g2.list.forEach(x => { (SROWS[x.sched_id + '|' + x.row_st] || []).forEach(r => srows.push(r)); });
-          srows.sort((a, b2) => String(a.plan_date).localeCompare(String(b2.plan_date)));
-          b += '<div class="r look">'
-            + '<span class="nm"></span>'
-            + '<span class="de">' + (devGrp ? '<span class="sttag dev">발달재활서비스</span>' : tagOf(it)) + esc(lbl)
-            + ' · <b class="thr">' + esc(ths.join('→')) + '</b>'
-            + ' · 본인부담금은 아래 계좌입금</span>'
-            + '<span class="ap"></span>'
-            + '<span class="ct"><span class="lookcnt">발 ' + dn + '회</span></span>'
-            + '<span class="up"></span>'
-            + '<span class="am"></span></div>'
-            + (srows.length
-               ? '<div class="sbrow" data-sched="' + it.sched_id + '" data-bst="' + it.row_st + '">'
-                 + srows.map(sbHtml).join('') + '</div>'
-               : '');
-        });
-      }
+      if (!devDone) { b += devLookHtml(); devDone = true; }
     }
   });
 
