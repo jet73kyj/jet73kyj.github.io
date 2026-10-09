@@ -805,7 +805,8 @@ function schedThNames(nameOf) {
 function drawAll(saved) {
   const mk = mkNow();
   SLOTS = computeSlots();
-  $('pageTitle').textContent = `발달재활 서비스 기록지 — ${year}년 ${month}월`;
+  { const _th = schedThNames(thrName);   // 담당 선생님 이름 (2026-10-09)
+    $('pageTitle').textContent = `발달재활 서비스 기록지 - ${year}년 ${month}월` + (_th ? ' · 담당 ' + _th : ''); }
   $('sheet1Title').textContent = `서비스 일정표, 제공기록지 (${month}월)`;
   $('sheet2Title').textContent = child ? esc(child.name) : '';
 
@@ -1755,17 +1756,20 @@ function rcLocal() {
     if (sl && sl.split && (!prov || !st || !en)) {
       const dd = Number(sl.iso.slice(5, 7)) === month ? Number(sl.iso.slice(8, 10)) + '일'
                : Number(sl.iso.slice(5, 7)) + '월 ' + Number(sl.iso.slice(8, 10)) + '일';
-      out.push({ item_no: 19, on_date: sl.iso, detail: (i + 1) + '회째 · ' + dd + ' 수업이 쪼개기 보강으로 '
+      out.push({ item_no: 19, i, f: ['prov','start','end'], on_date: sl.iso, detail: (i + 1) + '회째 · ' + dd + ' 수업이 쪼개기 보강으로 '
         + (sl.done ? '진행되어' : '진행 중이라') + ' 공란 처리하였습니다. 확인 후 제공날짜 · 시작 · 종료 · 서비스 제공일자를 넣어 주세요.' });
     }
     // 12 빈칸 — 결제 수만큼의 회차에서 (쪼개기 공란은 위 19번 하나만)
     else if (i < nPay && (!prov || !st || !en)) {
-      out.push({ item_no: 12, on_date: prov || appr, detail: (i + 1) + '회째 · '
+      out.push({ item_no: 12, i, f: [!prov && 'prov', !st && 'start', !en && 'end'].filter(Boolean), on_date: prov || appr,
+        msg: [!prov && '제공날짜', !st && '시작시간', !en && '종료시간'].filter(Boolean).join(' · ') + ' 비어 있음 — 넣어 주세요',
+        detail: (i + 1) + '회째 · '
         + [!prov && '제공일자 빈칸', !st && '시작 빈칸', !en && '종료 빈칸'].filter(Boolean).join(' · ') });
     }
     // 18 제공일자 ≠ 승인일자 (특이사항이 비었을 때)
     if (prov && appr && prov !== appr && !note) {
-      out.push({ item_no: 18, on_date: prov, detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
+      out.push({ item_no: 18, i, f: ['prov','appr'], on_date: prov,
+        msg: '결제일 ' + md(appr) + ' · 제공일자 ' + md(prov) + ' — 수정 필요', detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
         + ' · 승인일자 ' + mmdd(appr) });
     }
     // 1 결제가 이름 — 결제 시각이 그 회차 기록지 시작 + 30분보다 앞
@@ -1774,7 +1778,9 @@ function rcLocal() {
       const sm  = Number(st.slice(0, 2)) * 60 + Number(st.slice(3, 5));
       if (pay < sm + 30) {
         const g = pay - sm;
-        out.push({ item_no: 1, on_date: appr, detail: '결제 ' + am[4] + ':' + am[5] + ' · 수업 시작 ' + st
+        out.push({ item_no: 1, i, f: ['start','appr'], on_date: appr,
+          msg: '결제 ' + am[4] + ':' + am[5] + ' · 시작 ' + st + ' — 시작 30분 뒤 결제여야 합니다 ('
+             + (g < 0 ? -g + '분 전' : g + '분 뒤') + ' 결제)', detail: '결제 ' + am[4] + ':' + am[5] + ' · 수업 시작 ' + st
           + ' (' + (g < 0 ? -g + '분 전 결제' : g + '분 뒤 결제') + ')' });   // msgPayBefore (2026-10-02 「○분 전 결제」)
       }
     }
@@ -1783,24 +1789,132 @@ function rcLocal() {
 }
 function rcDraw() {
   const box = $('rcBox');
-  if (!box || RCSRV === null || !LOADED) return;
-  const rows = RCSRV.filter(r => !RC_LOCAL.has(Number(r.item_no))).concat(rcLocal())
-    .sort((a, b) => a.item_no - b.item_no || String(a.on_date || '').localeCompare(String(b.on_date || '')));
-  {
-    if (!rows.length) {
-      box.style.cssText = 'margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.7;background:#EAF4EC;border-left:3px solid #5E9A6E;color:#2E6B3E;';
-      box.innerHTML = '기록지 점검 — 이 달 걸린 것이 없습니다.';
-    } else {
-      box.style.cssText = 'margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.7;background:#FFF8E1;border-left:3px solid #F9A825;color:#4E342E;';
-      box.innerHTML = '<b>기록지 점검 — ' + rows.length + '건</b> (1 · 12 · 18 · 19번은 고치면 바로 다시 셉니다 · 결제 쪽 항목은 저장 뒤 다시 셉니다)'
-        + rows.map(r => '<div>· ' + r.item_no + ' ' + esc(RC_ITEM[r.item_no] || '')
-            + (r.on_date ? ' · ' + Number(String(r.on_date).slice(5,7)) + '/' + Number(String(r.on_date).slice(8,10)) : '')
-            + ' — ' + esc(rcNamed(r, id => RCKID[id] || (KIDS[id] && KIDS[id].name) || '', thrName)) + '</div>').join('');
-    }
-    box.style.display = 'block';
-  }
+  if (!box || !LOADED) return;
+  rcClearMarks();
+  if (RCSRV === null) { fcRefresh(); return; }
+  // 15 · 16 (변경 계약서)은 위 붉은 상자가 맡는다
+  const rows = RCSRV.filter(r => !RC_LOCAL.has(Number(r.item_no)) && ![15, 16].includes(Number(r.item_no)))
+    .concat(rcLocal());
+  let bad = 0;
+  rows.forEach(r => { if (rcPlace(r)) bad++; });
+  box.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;font-size:12.5px;line-height:1.6;'
+    + (bad ? 'background:#FDECEA;border-left:3px solid #D8684A;color:#7A2E1E;'
+           : 'background:#EAF4EC;border-left:3px solid #5E9A6E;color:#2E6B3E;');
+  box.innerHTML = bad
+    ? '<b>기록지 점검 — 고칠 곳 ' + bad + '군데</b> · 기록지 안 빨간 칸을 확인해 주세요 (칸을 고치면 바로 사라지고, 결제 쪽 항목은 저장 뒤 다시 셉니다)'
+    : '기록지 점검 — 고칠 곳 없음';
+  box.style.display = 'block';
   fcRefresh();
 }
+
+// ── 기록지 안 빨간 표시 (2026-10-09 은정님) — 노란 상자 글 대신 그 자리에 ──
+const RC_SAY = {
+  2:'같은 아동 결제가 40분 안에 둘', 3:'연속 결제 (80분 안)', 4:'선생님 결제가 다른 아동 결제와 40분 안',
+  5:'승인번호 이상', 6:'한 주 3회 이상', 7:'이 달 결제가 4회보다 적음', 8:'결제 금액 오류',
+  9:'예외 · 일괄 결제 (참고)', 10:'같은 시간에 다른 아동 기록지가 있음', 11:'일정표 날짜와 승인일자가 다름',
+  13:'바우처 승인번호와 다름', 14:'기록지 없음'
+};
+const RC_FIELDS = { 2:['appr','no'], 3:['appr'], 4:['appr'], 5:['no'], 8:['appr','no'], 10:['start','end'], 13:['no'] };
+function rcEls(i, f) {
+  const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
+  const q = c => tr ? tr.querySelector(c) : null;
+  if (f === 'prov')  return [$('s1_provDate_' + (i + 1)), q('.st_provDate')];
+  if (f === 'start') return [$('s1_startTime_' + (i + 1))];
+  if (f === 'end')   return [$('s1_endTime_' + (i + 1))];
+  if (f === 'appr')  return [q('.st_apprDate')];
+  if (f === 'no')    return [q('.st_apprNo')];
+  return [];
+}
+function rcRowOf(r) {                      // 서버 항목 → 몇 회째인지 (승인일자 → 제공일자 차례로 맞춤)
+  if (r.i != null) return r.i;
+  const d = r.on_date ? String(r.on_date).slice(0, 10) : '';
+  if (!d) return null;
+  const trs = document.querySelectorAll('#statusTbl tbody tr');
+  for (let i = 0; i < SESSIONS; i++) {
+    const tr = trs[i]; if (!tr) continue;
+    const am = String(tr.querySelector('.st_apprDate').value || '').match(/(\d{4})\D(\d{2})\D(\d{2})/);
+    if (am && am[1] + '-' + am[2] + '-' + am[3] === d) return i;
+  }
+  for (let i = 0; i < SESSIONS; i++) {
+    const tr = trs[i]; if (!tr) continue;
+    if (_provIso(tr.querySelector('.st_provDate').value) === d) return i;
+  }
+  return null;
+}
+function rcEnsureNotes() {
+  if (!$('rcnMonth')) {
+    const d = document.createElement('div');
+    d.id = 'rcnMonth'; d.className = 'no-print';
+    $('sheet1Title').insertAdjacentElement('afterend', d);
+  }
+  if (!$('rcnRow')) {
+    const th = $('s1_therapistName_1'); const tr0 = th && th.closest('tr');
+    if (tr0) {
+      const tr = document.createElement('tr');
+      tr.id = 'rcnRow'; tr.className = 'no-print'; tr.style.display = 'none';
+      tr.innerHTML = '<td colspan="2" class="lbl" style="color:#c62828;">점검</td>'
+        + [1, 2, 3, 4].map(n => '<td class="rcn" id="rcn_' + n + '"></td>').join('');
+      tr0.insertAdjacentElement('afterend', tr);
+    }
+  }
+}
+function rcClearMarks() {
+  rcEnsureNotes();
+  document.querySelectorAll('.rcbad, .rcwarn').forEach(el => el.classList.remove('rcbad', 'rcwarn'));
+  document.querySelectorAll('.rcn').forEach(td => { td.innerHTML = ''; });
+  document.querySelectorAll('.rcn2').forEach(d => d.remove());
+  const m = $('rcnMonth'); if (m) { m.innerHTML = ''; m.style.display = 'none'; }
+  const rr = $('rcnRow'); if (rr) rr.style.display = 'none';
+}
+function rcMsg(r) {
+  if (r.msg) return r.msg;
+  if (Number(r.item_no) === 19) return '쪼개기 보강으로 진행 — 확인 후 제공날짜 · 시작 · 종료를 넣어 주세요';
+  const d = rcNamed(r, id => RCKID[id] || (KIDS[id] && KIDS[id].name) || '', thrName)
+              .replace(/^\d+회째\s*·\s*/, '');
+  return (RC_SAY[r.item_no] || RC_ITEM[r.item_no] || '') + (d ? ' — ' + d : '');
+}
+function rcPlace(r) {
+  const n = Number(r.item_no);
+  const warn = n === 19 || n === 9;                 // 노랑 (참고 · 선생님 확인)
+  const cls = warn ? 'rcwarn' : 'rcbad';
+  const msg = rcMsg(r);
+  const i = rcRowOf(r);
+  const fields = r.f || RC_FIELDS[n] || [];
+  if (i == null || !fields.length) {               // 그 달 전체 일
+    const m = $('rcnMonth');
+    m.innerHTML += '<div class="' + (warn ? 'rcn-w' : 'rcn-b') + '">· ' + esc(msg) + '</div>';
+    m.style.display = 'block';
+    return !warn;
+  }
+  fields.forEach(f => rcEls(i, f).forEach(el => { if (el) el.classList.add(cls); }));
+  const line = '<div class="' + (warn ? 'rcn-w' : 'rcn-b') + '">' + esc(msg) + '</div>';
+  if (fields.some(f => f === 'prov' || f === 'start' || f === 'end')) {
+    const td = $('rcn_' + (i + 1)); if (td) td.innerHTML += line;
+    const rr = $('rcnRow'); if (rr) rr.style.display = '';
+  }
+  if (fields.some(f => f === 'appr' || f === 'no' || f === 'prov')) {
+    const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
+    const cell = tr && tr.querySelector('.st_apprNo') && tr.querySelector('.st_apprNo').closest('td');
+    if (cell) {
+      const d = document.createElement('div');
+      d.className = 'rcn2 no-print ' + (warn ? 'rcn-w' : 'rcn-b');
+      d.textContent = msg;
+      cell.appendChild(d);
+    }
+  }
+  return !warn;
+}
+(function rcStyle() {
+  const st = document.createElement('style');
+  st.textContent = '.rcbad{border:2px solid #d32f2f !important;color:#c62828 !important;background:#fff5f5 !important}'
+    + '.rcwarn{border:2px solid #f2b705 !important;background:#FFF8E1 !important}'
+    + '.rcn-b{color:#c62828;font-size:11px;line-height:1.45;margin-top:2px}'
+    + '.rcn-w{color:#8a6100;font-size:11px;line-height:1.45;margin-top:2px}'
+    + '#rcnMonth{margin:-4px 0 8px;padding:6px 10px;border:2px solid #d32f2f;border-radius:6px;background:#fff5f5;font-size:12px}'
+    + '@media print{.rcbad,.rcwarn{border:none !important;color:inherit !important;background:none !important}'
+    + '.rcn2,#rcnRow,#rcnMonth{display:none !important}}';
+  document.head.appendChild(st);
+})();
 
 // 승인일자 — 날짜와 결제 시각(시:분:초)까지 (2026-10-02 은정님)
 //   바우처 「결제일시」는 엑셀 시각 그대로 담겨 있어 글자 그대로 잘라 쓴다 (시간대 바꾸지 않음)
