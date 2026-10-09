@@ -83,6 +83,11 @@
   .gmlist .gl-r:hover { background:#FBF5EE; }
   .gmlist .gl-r.on { background:#F3ECE3; font-weight:700; color:#7E5530; }
   .gmlist .gl-e { padding:10px 12px; color:#999; }
+  .gmlist .gl-r { display:flex; align-items:center; gap:8px; }
+  .gmlist .gl-r .gl-t { flex:1; }
+  .gmlist .gl-x { width:auto !important; margin:0 !important; padding:2px 9px !important; font-size:12px; border-radius:6px;
+                  background:#fff !important; color:#c62828 !important; border:1px solid #efc9c9 !important; box-shadow:none !important; cursor:pointer; }
+  .gmlist .gl-x:hover { background:#fdecec !important; }
   #docView { display:none; }
   #docView .dv-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 12px; }
   .dsheet { background:#fff; border:1px solid #ddd; padding:28px 34px; max-width:780px; margin:0 auto 20px; font-size:12.5px; color:#111; }
@@ -1381,9 +1386,31 @@ async function gmLoadList() {
     const rows = (data || []).filter(g => GM_MODE === 'staff'
       ? (kindOf(g) === 'staff' && ((g.data.sub || 'join') === GM_SUB))
       : kindOf(g) === GM_MODE);
-    box.innerHTML = head(rows.length) + (rows.map(g => '<div class="gl-r' + (GM && String(GM.id) === String(g.id) ? ' on' : '') + '" data-gid="' + g.id + '">대가 ' + g.year + ' - '
-        + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</div>').join('')
+    box.innerHTML = head(rows.length) + (rows.map(g => '<div class="gl-r' + (GM && String(GM.id) === String(g.id) ? ' on' : '') + '" data-gid="' + g.id + '"><span class="gl-t">대가 ' + g.year + ' - '
+        + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</span>'
+        + (CAN_EDIT ? '<button type="button" class="gl-x" data-gdel="' + g.id + '" title="이 공문 지우기">✕ 지우기</button>' : '') + '</div>').join('')
       || '<div class="gl-e">아직 저장한 공문이 없습니다</div>');
+    // 지우기 (2026-10-09 은정님) — 관리자만 (서버 nl_gongmun_del) · 가장 마지막 번호면 다음 공문이 그 번호를 다시 씀
+    box.querySelectorAll('[data-gdel]').forEach(bt => bt.onclick = async ev => {
+      ev.stopPropagation();
+      const g = rows.find(x => String(x.id) === bt.dataset.gdel); if (!g) return;
+      const nm = '대가 ' + g.year + ' - ' + String(g.no).padStart(3, '0') + '호';
+      const maxNo = Math.max(...(data || []).map(x => Number(x.no) || 0));
+      const gap = Number(g.no) < maxNo;
+      if (!confirm(nm + ' · ' + (g.title || '') + '\n\n이 공문을 지울까요? 지운 뒤에는 되살릴 수 없습니다.'
+        + (gap ? '\n\n※ 마지막 번호가 아니어서 ' + nm + ' 는 빈 번호로 남습니다.' : '\n\n※ 마지막 번호라서 다음 공문이 이 번호를 다시 씁니다.'))) return;
+      bt.disabled = true; bt.textContent = '지우는 중…';
+      try {
+        const { data: dd, error } = await sb.from('nl_gongmun').delete().eq('id', g.id).select('id');
+        if (error) throw error;
+        if (!dd || !dd.length) throw new Error('지운 줄을 돌려받지 못했습니다 (지울 권한이 없을 수 있습니다)');
+        $('dvHint').textContent = nm + ' 를 지웠습니다';
+        if (GM && String(GM.id) === String(g.id)) {
+          GM_DIRTY = false; GM_EDIT = false;
+          if (GM_MODE === 'staff') openStaffLetter(false, GM_SUB); else if (GM_MODE === 'claim') openClaim(false); else openRefer(false);
+        } else gmLoadList();
+      } catch (e) { bt.disabled = false; bt.textContent = '✕ 지우기'; alert('지우지 못했습니다.\n' + (e.message || e)); }
+    });
     box.querySelectorAll('[data-gid]').forEach(el => el.onclick = () => {
       const g = rows.find(x => String(x.id) === el.dataset.gid); if (!g) return;
       if (GM && String(GM.id) === String(g.id) && !GM_EDIT) return;
