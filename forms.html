@@ -107,9 +107,11 @@
     body.print-doc #docView { position:absolute; left:0; top:0; right:0; width:auto; box-sizing:border-box; }
     body.print-doc .dsheet, body.print-doc .dsheet > div { box-sizing:border-box; width:100%; }
     body.print-doc .dsheet table { table-layout:fixed; }
-    body.print-doc .dv-bar, body.print-doc .dv-hint, body.print-doc .dv-del, body.print-doc .gmctl, body.print-doc .gskip { display:none !important; }
+    body.print-doc .dv-bar, body.print-doc .dv-hint, body.print-doc .dv-del, body.print-doc .gmctl, body.print-doc .gskip, body.print-doc .gmtabs { display:none !important; }
     body.print-doc .gml input { border:none !important; background:transparent !important; }
     body.print-doc .gml textarea { display:none !important; }
+    body.print-doc .gml input::placeholder { color:transparent !important; }
+    body.print-doc .gml td input { font-size:9.5px !important; padding:0 !important; }
     body.print-doc .gml .gpr { display:block !important; }
     body.print-doc .gmno { color:#111 !important; font-weight:normal !important; }
     body.print-doc .gsheet:last-of-type { page-break-after:auto; }
@@ -165,6 +167,7 @@
       <span id="dvTabs" style="display:none;">
         <button type="button" id="tab19" onclick="openDoc('org')">19호 내용 요약서</button>
         <button type="button" id="tabInfo" onclick="openDoc('info')">제공기관 정보 안내</button>
+        <button type="button" id="tabClaim" onclick="openDoc('claim')">예외지급 청구 공문</button>
       </span>
       <button type="button" id="dvSave" onclick="saveOrg()" style="display:none;">저장 전</button>
       <button type="button" onclick="printDoc()">인쇄</button>
@@ -552,6 +555,7 @@ function orgBind() {
   });
 }
 async function openDoc(kind) {
+  if (DOC_KIND === 'claimgm' && kind !== 'claim' && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 넘어갈까요?')) return;
   if ((DOC_KIND === 'org' || DOC_KIND === 'info') && DOC_KIND !== kind && ORG_DIRTY
       && !confirm('저장하지 않은 내용이 있습니다. 다른 서식으로 넘어갈까요?')) return;
   DOC_KIND = kind; ORG_DIRTY = false;
@@ -560,12 +564,16 @@ async function openDoc(kind) {
   $('dvTabs').style.display = kind === 'hire' ? 'none' : '';
   $('tab19').style.fontWeight = kind === 'org' ? '700' : '400';
   $('tabInfo').style.fontWeight = kind === 'info' ? '700' : '400';
+  $('tabClaim').style.fontWeight = kind === 'claim' ? '700' : '400';
+  if (kind === 'claim') { $('dvSave').style.display = 'none'; await openClaim(false); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (kind === 'info') { await openInfo(); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (kind === 'refer') { $('dvTabs').style.display = 'none'; $('dvSave').style.display = 'none'; await openRefer(); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (kind === 'hire') {
     $('dvTitle').textContent = '신규인력등록 — 개인정보 수집 및 이용 동의서 [서식 15호]';
     $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 화면에 적은 글은 저장되지 않습니다 · 주민등록번호 칸은 늘 빈칸';
-    $('dvBody').innerHTML = docHire();
+    HIRE_TAB = 'consent';
+    $('dvBody').innerHTML = hireTabs() + docHire();
+    hireBind();
   } else {
     const y = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
     ORG_KEY = y + ':19호';
@@ -768,6 +776,7 @@ function infoBind() {
 // ═════════════════════════════════════════════
 let GM = null;            // {id, year, no, date, child}
 let GM_BASE = {}, GM_KIDS = [], GM_DIRTY = false, GM_TAB = 'letter';
+let GM_MODE = 'refer', GM_STAFF = [], HIRE_TAB = 'consent', GM_SUB = 'join';   // join 치료지원 입사 · leave 발달재활 퇴사   // 치료지원 제공인력 등록 공문 (2026-10-09)
 const GM_TT = { 1:'심리', 2:'발달', 3:'언어발달' };
 function gmNoText() {
   if (GM && GM.no) return '대가 ' + GM.year + ' - ' + String(GM.no).padStart(3, '0') + '호';
@@ -775,6 +784,198 @@ function gmNoText() {
 }
 function gmDot(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '. ' + Number(m[2]) + '. ' + Number(m[3]) : ''; }
 function gmKor(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : ''; }
+
+// ═════════════════════════════════════════════
+// 신규인력등록 — [15호] 동의서 · 치료지원 제공인력 등록 공문 (2026-10-09 은정님)
+//   공문 번호는 발달의뢰서 공문과 같은 「대가 연도 - 번호」 줄을 함께 씀 (nl_gongmun_issue)
+//   선생님을 고르면 이름 · 직종 · 입사일이 본문에 들어감 · 칸은 모두 고칠 수 있음
+// ═════════════════════════════════════════════
+function hireTabs() {
+  return '<div class="gmtabs">' + [['consent', '개인정보 수집 및 이용 동의서 [15호]'], ['staff', '치료지원 제공인력 등록'], ['devjoin', '발달재활 제공인력 등록'], ['leave', '발달재활 제공인력 퇴사']]
+    .map(([k, l]) => '<button type="button" data-htab="' + k + '"' + (HIRE_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
+}
+function hireBind() {
+  document.querySelectorAll('[data-htab]').forEach(b => b.onclick = async () => {
+    if (b.dataset.htab === HIRE_TAB) return;
+    if (HIRE_TAB !== 'consent' && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 넘어갈까요?')) return;
+    HIRE_TAB = b.dataset.htab;
+    if (HIRE_TAB === 'consent') {
+      DOC_KIND = 'hire'; GM_MODE = 'refer'; GM_DIRTY = false;
+      $('dvTitle').textContent = '신규인력등록 — 개인정보 수집 및 이용 동의서 [서식 15호]';
+      $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 화면에 적은 글은 저장되지 않습니다 · 주민등록번호 칸은 늘 빈칸';
+      $('dvBody').innerHTML = hireTabs() + docHire(); hireBind();
+    } else { await openStaffLetter(false, HIRE_TAB === 'staff' ? 'join' : HIRE_TAB); }
+  });
+}
+function gmJob(lic) {
+  const t = String(lic || '');
+  if (/언어/.test(t)) return '언어치료사';
+  if (/작업/.test(t)) return '작업치료사';
+  if (/감각/.test(t)) return '감각통합치료사';
+  if (/미술/.test(t)) return '미술치료사';
+  if (/음악/.test(t)) return '음악치료사';
+  if (/놀이/.test(t)) return '놀이치료사';
+  return t.replace(/\s*\d급$/, '');
+}
+function gmJosa(w) {                     // 받침이 있으면 「이」, 없으면 「가」
+  const c = String(w || '').trim().slice(-1).charCodeAt(0);
+  if (!(c >= 0xAC00 && c <= 0xD7A3)) return '이(가)';
+  return (c - 0xAC00) % 28 ? '이' : '가';
+}
+function gmKorPad(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '년 ' + m[2] + '월 ' + m[3] + '일' : ''; }
+function gmStaffBody(nm, job, day, verb) {
+  verb = verb || (GM_SUB === 'leave' ? '퇴사 하였습니다.' : GM_SUB === 'devjoin' ? '입사 하였습니다.' : '입사하였습니다.');
+  return '제공인력 ' + (nm || '○○○') + '(' + (job || '치료사') + ')' + gmJosa(job || '치료사') + ' ' + (gmKorPad(day) || '○○○○년 ○○월 ○○일') + ' ' + verb;
+}
+// 직종 — 치료지원 공문은 「언어치료사」, 발달재활 공문은 면허 이름 그대로(「언어재활사」 · 급수 뺌)
+function gmJobFor(lic) { return GM_SUB === 'join' ? gmJob(lic) : String(lic || '').replace(/\s*\d급$/, '').trim(); }
+function gmStaffDefaults(date) {
+  return Object.assign({
+    kind: 'staff', sub: GM_SUB,
+    to: GM_SUB === 'join' ? '특수교육대상자 치료지원서비스(담당자)' : '발달재활서비스(담당자)', via: '', title: '제공인력등록신고관련',
+    p2: gmStaffBody('', '', ''), biz: GM_SUB === 'join' ? '특수교육대상자 치료지원서비스' : '발달재활서비스',
+    name2: '○○○(치료사)', who2: ME ? ME.name || '' : '',
+    sign: GM_SUB === 'leave' ? '자라는나무' : '자라는 나무 소장', boss_lab: GM_SUB === 'leave' ? '대 표' : '소 장'
+  }, { boss: GM_BASE.boss || '', addr: GM_BASE.addr || '', tel: GM_BASE.tel || '042 488 6011', fax: GM_BASE.fax || '', mail: GM_BASE.mail || '' }, { date });
+}
+function gmStaffLetter(d) {
+  const v = k => esc(d[k] || '');
+  const i = (k, w) => '<input type="text" data-g="' + k + '" value="' + v(k) + '" style="width:' + (w || '60%') + ';">';
+  const date = d.date || '';
+  const noTxt = gmNoText() || '대가 ' + (date ? date.slice(0, 4) : '') + ' - ___호';
+  return '<div class="dsheet gsheet gml" id="gmLetter" data-sheet="letter">'
+    + '<div class="lg"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div>'
+    + '<div>수 신 자 : ' + i('to', '60%') + '</div>'
+    + '<div>(경 유) ' + i('via', '50%') + '</div>'
+    + '<div>제 &nbsp;&nbsp; 목 : ' + i('title', '70%') + '</div>'
+    + '<div class="hr" style="width:100%;"></div>'
+    + '<div style="padding-left:20px;">1. 귀 기관의 무궁한 발전을 기원합니다.</div>'
+    + '<div style="padding-left:20px;display:flex;gap:4px;"><span>2.</span><textarea data-g="p2" rows="2">' + v('p2') + '</textarea><div class="gpr" data-p="p2" style="flex:1;">' + v('p2') + '</div></div>'
+    + '<br><br><div style="text-align:center;">- 아래 -</div>'
+    + '<div style="text-align:center;margin-top:6px;">가. 사업명 : ' + i('biz', '45%') + '<br>나. 치료사명 : ' + i('name2', '35%') + '</div>'
+    + '<br><br><br><div class="sign" style="letter-spacing:4px;font-size:22px;"><input type="text" data-g="sign" value="' + v('sign') + '" style="width:260px;text-align:center;font-size:22px;letter-spacing:4px;"><img class="gmstamp" alt="" style="left:58%;"></div><br><br>'
+    + '<div class="hr2"></div>'
+    + '<div class="ft">'
+    +   '<div>담당자 &nbsp; ' + i('who2', '50%') + '</div><div>' + i('boss_lab', '50px') + ' &nbsp; ' + i('boss', '50%') + '</div>'
+    +   '<div>시 행 &nbsp;&nbsp; <span class="gmno">' + esc(noTxt) + '</span>(' + esc(gmDot(date)) + ')</div><div>접 수 &nbsp;&nbsp; (' + esc(gmDot(date)) + ')</div>'
+    +   '<div class="w">우) ' + i('addr', '80%') + '</div>'
+    +   '<div class="w">전화 ' + i('tel', '24%') + ' &nbsp; 전송 ' + i('fax', '24%') + ' &nbsp; / E-mail: ' + i('mail', '30%') + '</div>'
+    + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
+}
+function gmStaffCtl(d) {
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const issued = !!(GM && GM.no);
+  return '<div class="gmctl">'
+    + '<div class="r"><b>선생님</b> <select id="gmStaff"><option value="">— 고르기 —</option>'
+    +   GM_STAFF.map(t => '<option value="' + t.id + '"' + (GM && String(GM.staffId) === String(t.id) ? ' selected' : '') + '>' + t.id + '번 ' + esc(t.name || '') + (GM_SUB === 'leave' ? (t.left_on ? ' · ' + esc(String(t.left_on).slice(0, 10)) + ' 퇴사' : '') : (t.hired_on ? ' · ' + esc(String(t.hired_on).slice(0, 10)) + ' 입사' : '')) + '</option>').join('')
+    +   '</select> <span style="color:#888;font-size:12px;">고르면 이름 · 직종 · ' + (GM_SUB === 'leave' ? '퇴사일' : '입사일') + '이 본문에 들어갑니다 (직종은 위탁계약 면허에서)</span></div>'
+    + (GM_SUB === 'devjoin' ? '<div class="r"><b>그만둔 선생님</b> <select id="gmStaff2"><option value="">— 없음 —</option>'
+        + GM_STAFF.filter(t => t.left_on).map(t => '<option value="' + t.id + '"' + (GM && String(GM.staff2) === String(t.id) ? ' selected' : '') + '>' + t.id + '번 ' + esc(t.name || '') + ' · ' + esc(String(t.left_on).slice(0, 10)) + ' 퇴사</option>').join('')
+        + '</select> <span style="color:#888;font-size:12px;">자리를 바꿔 들어온 경우 — 고르면 본문 위에 퇴사 줄이 붙습니다</span></div>' : '')
+    + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
+    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '발행 전') + '</span>'
+    +   (issued ? ' <button type="button" id="gmSave">✓ 저장됨</button>' : ' <button type="button" id="gmIssue">공문 번호 받기 (발행)</button>')
+    +   ' <button type="button" id="gmNew">새 공문</button> <button type="button" id="gmList">올해 발행한 공문</button>'
+    +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button></div>'
+    + '<div id="gmListBox"></div></div>';
+}
+async function openStaffLetter(keep, sub) {
+  DOC_KIND = 'staffgm'; GM_MODE = 'staff';
+  if (sub) GM_SUB = sub;
+  HIRE_TAB = GM_SUB === 'join' ? 'staff' : GM_SUB;
+  $('dvTitle').textContent = '신규인력등록 — ' + ({ join: '치료지원 제공인력 등록', devjoin: '발달재활 제공인력 등록', leave: '발달재활 제공인력 퇴사' }[GM_SUB]) + ' 공문';
+  $('dvHint').textContent = '점선 칸은 고칠 수 있습니다 · 번호는 발달의뢰서 공문과 같은 줄로 매겨집니다';
+  try {
+    const today0 = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    const [b, t] = await Promise.all([
+      sb.from('nl_org_docs').select('data').eq('doc_key', 'gongmun:base').limit(1),
+      sb.from('nl_therapists').select('id, name, role, hired_on, left_on').order('id')
+    ]);
+    GM_BASE = (b && b.data && b.data[0] && b.data[0].data) || {};
+    const yAgo = String(Number(today0.slice(0, 4)) - 1) + today0.slice(4);
+    GM_STAFF = ((t && t.data) || []).filter(x => x.role !== '직원' && x.role !== '데스크'
+      && (GM_SUB === 'join' ? (!x.left_on || String(x.left_on) >= today0) : (!x.left_on || String(x.left_on) >= yAgo)));
+  } catch (e) { $('dvHint').textContent = '불러오지 못한 것이 있습니다 (' + (e.message || e) + ')'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  if (!keep) GM = null;
+  const d = keep && GM && GM.data ? GM.data : gmStaffDefaults(today);
+  gmRender(d);
+}
+
+// ═════════════════════════════════════════════
+// 예외지급 청구 공문 (2026-10-09 은정님) — 기관정보 안 셋째 서식 · 지금 공문 양식(로고 · 대가 번호)으로
+//   번호는 다른 공문과 같은 줄 (nl_gongmun_issue · data.kind = 'claim')
+//   청구사유서 표의 주민번호 칸은 화면에서 적어 인쇄만 — 저장하지 않음 (data-x)
+// ═════════════════════════════════════════════
+function gmClaimDefaults(date) {
+  const r = {};
+  for (let n = 0; n < 3; n++) Object.assign(r, { ['c' + n + '_org']: n ? '' : '자라는나무', ['c' + n + '_biz']: n ? '' : '발달재활서비스', ['c' + n + '_type']: n ? '' : '발달재활서비스' });
+  return Object.assign({
+    kind: 'claim', to: '○○구청 사회복지과', via: '', title: '장애아동가족지원서비스 예외지급 청구',
+    p2: '장애아동가족지원서비스(발달재활서비스) ○월(○회차)분 예외지급을 아래와 같이 청구합니다.',
+    att: '제공기록지 1부.\n미결제사유서 1부.  끝.', who2: ME ? ME.name || '' : ''
+  }, r, { boss: GM_BASE.boss || '', addr: GM_BASE.addr || '', tel: GM_BASE.tel || '042 488 6011', fax: GM_BASE.fax || '', mail: GM_BASE.mail || '' }, { date });
+}
+function gmClaimLetter(d) {
+  const v = k => esc(d[k] || '');
+  const i = (k, w) => '<input type="text" data-g="' + k + '" value="' + v(k) + '" style="width:' + (w || '60%') + ';">';
+  const c = k => '<td><input type="text" data-g="' + k + '" value="' + v(k) + '" style="width:100%;font-size:11px;"></td>';
+  const date = d.date || '';
+  const noTxt = gmNoText() || '대가 ' + (date ? date.slice(0, 4) : '') + ' - ___호';
+  let rows = '';
+  for (let n = 0; n < 3; n++) {
+    rows += '<tr>' + c('c' + n + '_name') + '<td><input type="text" data-x="rrn" style="width:100%;font-size:11px;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td>'
+      + c('c' + n + '_org') + c('c' + n + '_bno') + c('c' + n + '_biz') + c('c' + n + '_type') + c('c' + n + '_grade')
+      + c('c' + n + '_point') + c('c' + n + '_mon') + c('c' + n + '_why') + '</tr>';
+  }
+  return '<div class="dsheet gsheet gml" id="gmLetter" data-sheet="letter">'
+    + '<div class="lg"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div>'
+    + '<div>수 신 &nbsp; ' + i('to', '50%') + '</div>'
+    + '<div>(경유) ' + i('via', '50%') + '</div>'
+    + '<div>제 목 &nbsp; ' + i('title', '80%') + '</div>'
+    + '<div class="hr"></div>'
+    + '<div>1. 기관의 무궁한 발전을 기원합니다.</div>'
+    + '<div style="display:flex;gap:4px;"><span>2.</span><textarea data-g="p2" rows="2">' + v('p2') + '</textarea><div class="gpr" data-p="p2" style="flex:1;">' + v('p2') + '</div></div><br>'
+    + '<div style="padding-left:14px;">□ 예외지급 청구사유서</div>'
+    + '<table style="margin-top:4px;font-family:\'Malgun Gothic\',sans-serif;font-size:10.5px;table-layout:fixed;">'
+    + '<colgroup><col style="width:8%"><col style="width:13%"><col style="width:10%"><col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:5%"><col style="width:9%"><col style="width:6%"><col style="width:15%"></colgroup>'
+    + '<tr><th>성 명</th><th>주민번호</th><th>제공<br>기관명</th><th>사업자<br>번호</th><th>사업<br>구분</th><th>사업유형<br>(서비스코드)</th><th>등급</th><th>인정시간<br>(포인트)</th><th>청구<br>월</th><th>청구사유</th></tr>'
+    + rows + '</table><br>'
+    + '<div style="display:flex;gap:10px;"><span>붙임</span><textarea data-g="att" rows="3" style="width:60%;">' + v('att') + '</textarea><div class="gpr" data-p="att">' + v('att') + '</div></div>'
+    + '<div class="sign">자 라 는 나 무<img class="gmstamp" alt=""></div>'
+    + '<div class="hr2"></div>'
+    + '<div class="ft">'
+    +   '<div>담 당 자 &nbsp; ' + i('who2', '50%') + '</div><div>센 터 장 &nbsp; ' + i('boss', '50%') + '</div>'
+    +   '<div>시 행 &nbsp;&nbsp; <span class="gmno">' + esc(noTxt) + '</span>(' + esc(gmDot(date)) + ')</div><div>접 수 &nbsp;&nbsp; (' + esc(gmDot(date)) + ')</div>'
+    +   '<div class="w">우) ' + i('addr', '80%') + '</div>'
+    +   '<div class="w">전화) ' + i('tel', '24%') + ' &nbsp; 전송) ' + i('fax', '24%') + ' &nbsp; E-mail) ' + i('mail', '30%') + '</div>'
+    + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
+}
+function gmClaimCtl(d) {
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const issued = !!(GM && GM.no);
+  return '<div class="gmctl">'
+    + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
+    +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '발행 전') + '</span>'
+    +   (issued ? ' <button type="button" id="gmSave">✓ 저장됨</button>' : ' <button type="button" id="gmIssue">공문 번호 받기 (발행)</button>')
+    +   ' <button type="button" id="gmNew">새 공문</button> <button type="button" id="gmList">올해 발행한 공문</button>'
+    +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button></div>'
+    + '<div class="r" style="color:#888;font-size:12px;">주민번호 칸은 인쇄 전에 적는 칸이라 저장되지 않습니다 · 다시 열면 비어 있습니다</div>'
+    + '<div id="gmListBox"></div></div>';
+}
+async function openClaim(keep) {
+  DOC_KIND = 'claimgm'; GM_MODE = 'claim';
+  $('dvTitle').textContent = '기관정보 — 예외지급 청구 공문';
+  $('dvHint').textContent = '점선 칸은 고칠 수 있습니다 · 번호는 다른 공문과 같은 줄로 매겨집니다';
+  try {
+    const b = await sb.from('nl_org_docs').select('data').eq('doc_key', 'gongmun:base').limit(1);
+    GM_BASE = (b && b.data && b.data[0] && b.data[0].data) || {};
+  } catch (e) {}
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  if (!keep) GM = null;
+  const d = keep && GM && GM.data ? GM.data : gmClaimDefaults(today);
+  gmRender(d);
+}
 function gmLetter(d) {
   const v = k => esc(d[k] || '');
   const i = (k, w) => '<input type="text" data-g="' + k + '" value="' + v(k) + '" style="width:' + (w || '60%') + ';">';
@@ -879,6 +1080,7 @@ function gmCtl(d) {
     + '<div id="gmListBox"></div></div>';
 }
 async function openRefer(keep) {
+  GM_MODE = 'refer';
   $('dvTitle').textContent = '발달의뢰서 모음 — 공문 · 의뢰서 · 세부영역 검사결과서 · 진단서';
   $('dvHint').textContent = '공문 칸(점선)은 고칠 수 있습니다 · 의뢰서 등은 빈 서식이며 ☐ 를 누르면 ☑ 로 바뀝니다 · 인쇄 단추로 고른 서식만 인쇄';
   $('dvBody').innerHTML = '<div style="padding:20px;color:#888;">불러오는 중…</div>';
@@ -901,6 +1103,19 @@ function gmKidOf(label) {
   return m ? GM_KIDS.find(k => String(k.id) === m[1]) || null : null;
 }
 function gmRender(d) {
+  if (GM_MODE === 'claim') {
+    // 주민번호 칸은 저장하지 않지만, 번호 받기 등으로 다시 그려도 화면에서는 남게 (탭을 닫으면 사라짐)
+    const rrn = [...document.querySelectorAll('#gmLetter [data-x=rrn]')].map(el => el.value);
+    $('dvBody').innerHTML = gmClaimCtl(d) + gmClaimLetter(d);
+    document.querySelectorAll('#gmLetter [data-x=rrn]').forEach((el, i) => { if (rrn[i]) el.value = rrn[i]; });
+    gmStamp(); gmBindRefer();
+    return;
+  }
+  if (GM_MODE === 'staff') {
+    $('dvBody').innerHTML = hireTabs() + gmStaffCtl(d) + gmStaffLetter(d);
+    hireBind(); gmStamp(); gmBindRefer();
+    return;
+  }
   const kid = GM && GM.child ? GM.child : {};
   const tabs = '<div class="gmtabs">' + [['letter', '공문'], ['refer', '발달재활서비스 의뢰서'], ['detail', '세부영역 검사결과서'], ['diag', '진단서']]
     .map(([k, l]) => '<button type="button" data-gtab="' + k + '"' + (GM_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
@@ -919,6 +1134,8 @@ function gmRead() {
   const d = {};
   document.querySelectorAll('#gmLetter [data-g]').forEach(el => { d[el.dataset.g] = el.value; });
   d.date = $('gmDate') ? $('gmDate').value : '';
+  if (GM_MODE === 'staff') { d.kind = 'staff'; d.sub = GM_SUB; }
+  if (GM_MODE === 'claim') d.kind = 'claim';
   return d;
 }
 async function gmStamp() {
@@ -949,7 +1166,31 @@ function gmBindRefer() {
     const d = gmRead(); d.when = d.when || gmKor(d.date);
     GM_DIRTY = true; gmRender(d);
   };
-  $('gmKid').onchange = async () => {
+  const staffFill = async () => {
+    const d = gmRead();
+    const id = $('gmStaff').value, t = GM_STAFF.find(x => String(x.id) === String(id));
+    const id2 = $('gmStaff2') ? $('gmStaff2').value : '', t2 = GM_STAFF.find(x => String(x.id) === String(id2));
+    GM = Object.assign(GM || {}, { staffId: id || null, staff2: id2 || null });
+    const jobOf = async th => {
+      try {
+        const lq = await sb.from('nl_th_licenses').select('lic_name').eq('therapist_id', th.id).order('id').limit(1);
+        return gmJobFor(lq && lq.data && lq.data[0] && lq.data[0].lic_name);
+      } catch (er) { return ''; }
+    };
+    const lines = [];
+    if (t2) { const j2 = await jobOf(t2); lines.push(gmStaffBody(t2.name, j2, String(t2.left_on || '').slice(0, 10), '퇴사 하였습니다.')); }
+    if (t) {
+      const job = await jobOf(t);
+      const day = GM_SUB === 'leave' ? t.left_on : t.hired_on;
+      lines.push(gmStaffBody(t.name, job, day ? String(day).slice(0, 10) : ''));
+      d.name2 = (t.name || '') + '(' + (job || '치료사') + ')';
+    }
+    if (lines.length) d.p2 = lines.join('\n');
+    GM_DIRTY = true; gmRender(d);
+  };
+  if ($('gmStaff')) $('gmStaff').onchange = staffFill;
+  if ($('gmStaff2')) $('gmStaff2').onchange = staffFill;
+  if ($('gmKid')) $('gmKid').onchange = async () => {
     const k = gmKidOf($('gmKid').value);
     const d = gmRead();
     GM = Object.assign(GM || {}, { child: k ? { id: k.id, name: k.name, birth: String(k.birth || '').slice(0, 10).replace(/-/g, '.') } : {}, childLabel: $('gmKid').value });
@@ -977,7 +1218,7 @@ function gmBindRefer() {
   };
   if ($('gmIssue')) $('gmIssue').onclick = gmIssue;
   if ($('gmSave')) $('gmSave').onclick = gmUpdate;
-  $('gmNew').onclick = () => { if (GM_DIRTY && GM && GM.no && !confirm('고친 내용을 저장하지 않았습니다. 새 공문을 열까요?')) return; GM_DIRTY = false; openRefer(false); };
+  $('gmNew').onclick = () => { if (GM_DIRTY && GM && GM.no && !confirm('고친 내용을 저장하지 않았습니다. 새 공문을 열까요?')) return; GM_DIRTY = false; if (GM_MODE === 'staff') openStaffLetter(false, GM_SUB); else if (GM_MODE === 'claim') openClaim(false); else openRefer(false); };
   $('gmList').onclick = gmShowList;
   $('gmBaseBtn').onclick = gmSaveBase;
 }
@@ -1035,12 +1276,16 @@ async function gmShowList() {
     const { data, error } = await sb.from('nl_gongmun').select('id, year, no, issued_on, title, recipient, child_id, data')
       .eq('year', y).order('no', { ascending: false });
     if (error) throw error;
+    const kindOf = g => (g.data && g.data.kind) || 'refer';
+    const rows = (data || []).filter(g => GM_MODE === 'staff'
+      ? (kindOf(g) === 'staff' && ((g.data.sub || 'join') === GM_SUB))
+      : kindOf(g) === GM_MODE);
     box.innerHTML = '<div style="margin-top:6px;max-height:220px;overflow:auto;background:#fff;border:1px solid #eee;border-radius:6px;">'
-      + ((data || []).map(g => '<div style="padding:5px 8px;border-bottom:1px solid #f2f2f2;cursor:pointer;" data-gid="' + g.id + '">대가 ' + g.year + ' - '
+      + (rows.map(g => '<div style="padding:5px 8px;border-bottom:1px solid #f2f2f2;cursor:pointer;" data-gid="' + g.id + '">대가 ' + g.year + ' - '
           + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</div>').join('')
          || '<div style="padding:8px;color:#888;">올해 발행한 공문이 없습니다</div>') + '</div>';
     box.querySelectorAll('[data-gid]').forEach(el => el.onclick = () => {
-      const g = (data || []).find(x => String(x.id) === el.dataset.gid); if (!g) return;
+      const g = rows.find(x => String(x.id) === el.dataset.gid); if (!g) return;
       const k = GM_KIDS.find(x => String(x.id) === String(g.child_id));
       GM = { id: g.id, year: g.year, no: g.no, data: Object.assign({}, g.data, { date: String(g.issued_on).slice(0, 10) }),
              child: k ? { id: k.id, name: k.name, birth: String(k.birth || '').slice(0, 10).replace(/-/g, '.') } : {},
@@ -1051,11 +1296,13 @@ async function gmShowList() {
 }
 function closeDoc() {
   if ((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY && !confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return;
-  if (DOC_KIND === 'refer' && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 닫을까요?')) return;
+  if ((DOC_KIND === 'refer' || DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && GM_DIRTY && GM && GM.no && !confirm('고친 공문을 저장하지 않았습니다. 닫을까요?')) return;
+  GM_MODE = 'refer';
   GM_DIRTY = false;
   $('docView').style.display = 'none'; $('dvBody').innerHTML = ''; DOC_KIND = ''; ORG_DIRTY = false;
 }
 function printDoc() {
+  if ((DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && !(GM && GM.no) && !confirm('공문 번호를 아직 받지 않았습니다. 번호 없이 인쇄할까요?')) return;
   if (DOC_KIND === 'refer') {
     const on = [...document.querySelectorAll('.gmpr:checked')].map(x => x.value);
     if (!on.length) { alert('인쇄할 서식을 하나 이상 고르세요.'); return; }
