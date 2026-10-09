@@ -154,6 +154,19 @@
 #chgBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #chgBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #chgBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#fcBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
+#fcBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
+#fcBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#fcBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
+                border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
+.chgsheet .chg-tbl textarea.fc-body { min-height:240px; line-height:1.7; }
+.chgsheet .chg-tbl textarea.fc-att { min-height:80px; }
+.chgsheet .fc-pr { display:none; white-space:pre-wrap; line-height:1.7; }
+.chgsheet .fc-guide { font-size:11.5px; color:#7a6a55; background:#FBF5EE; padding:6px 10px; border-radius:6px; margin:6px 0 0; }
+@media print { .chgsheet .fc-guide { display:none !important; }
+  .chgsheet textarea.fc-body, .chgsheet textarea.fc-att { display:none !important; }
+  .chgsheet .fc-pr { display:block !important; }
+  .chgsheet .fc-pr.b { min-height:95mm; } .chgsheet .fc-pr.a { min-height:25mm; } }
 #chgBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
                  border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
 .chgsheet .chg-lead { font-size:12.5px; margin:0 0 10px; }
@@ -179,12 +192,12 @@
                          -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .chgsheet .chg-signed { display:inline-block; padding:1px 8px; border-radius:10px; background:#EAF4EC; color:#2E6B3E; font-size:11.5px; }
 @media print {
-  #chgWrap { display:none !important; }
+  .docwrap { display:none !important; }
   .chgsheet .chg-iso { display:none !important; }
-  body.print-chg .container:not(#chgWrap) { display:none !important; }
-  body.print-chg #chgWrap { display:block !important; }
-  body.print-chg #chgWrap .chgsheet { display:none !important; }
-  body.print-chg #chgWrap .chgsheet.on { display:block !important; page-break-after:auto; }
+  body.print-chg .container:not(.docwrap) { display:none !important; }
+  body.print-chg .docwrap { display:block !important; }
+  body.print-chg .docwrap .chgsheet { display:none !important; }
+  body.print-chg .docwrap .chgsheet.on { display:block !important; page-break-after:auto; }
   .chgsheet .chg-tbl, .chgsheet .chg-apply, .chgsheet .chg-date, .chgsheet .chg-sign { font-size:12px !important; }
   .chgsheet input, .chgsheet textarea { border:none !important; background:transparent !important; font-size:12px !important; resize:none; }
 }
@@ -236,6 +249,8 @@
   <div id="rcBox" class="no-print" style="display:none;margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.7;"></div>
   <!-- 변경 계약서 서명 알림 [서식 10호] (2026-10-09) — 셈은 서버 nl_change_need 한 곳 -->
   <div id="chgBox" class="no-print" style="display:none;"></div>
+  <!-- 사실 확인서 작성 알림 [서식 27호] (2026-10-09) -->
+  <div id="fcBox" class="no-print" style="display:none;"></div>
 
   <!-- ==================== 1. 서비스 일정표, 제공기록지 ==================== -->
   <div class="sheet" id="sheet1">
@@ -397,7 +412,9 @@
 </div>
 
 <!-- 변경 계약서 [서식 10호] — 기록지 저장과 따로 저장 · 따로 인쇄 (2026-10-09) -->
-<div class="container" id="chgWrap" style="display:none;"></div>
+<div class="container docwrap" id="chgWrap" style="display:none;"></div>
+<!-- 사실 확인서 [서식 27호] (2026-10-09) -->
+<div class="container docwrap" id="fcWrap" style="display:none;"></div>
 
 <!-- 인쇄할 때 종이마다 아래에 붙는 로고 (2026-09-10) -->
 <div class="printlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
@@ -743,6 +760,7 @@ async function loadOne() {
       + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
     loadRcBox(cid, mk);
     loadChg(cid, mk);
+    fcLoadDocs(cid, mk);
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -1235,13 +1253,14 @@ async function chgStamp() {
     const { data, error } = await sb.storage.from('nl-private').download('stamp.png');
     if (error || !data) return;
     CHG_STAMP = URL.createObjectURL(data);
-    document.querySelectorAll('#chgWrap .chg-stamp').forEach(im => { im.src = CHG_STAMP; im.style.display = 'inline'; });
+    document.querySelectorAll('.chg-stamp').forEach(im => { im.src = CHG_STAMP; im.style.display = 'inline'; });
   } catch (e) {}
 }
 function chgReset() {
   CHG = []; CHG_REQ++;
   const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+  fcReset();
 }
 function chgArea(tid) {      // 그 선생님이 맡은 발달재활 수업의 영역 (나중에 시작한 것)
   let best = null, bd = '';
@@ -1426,19 +1445,240 @@ async function chgSave(i, doneVal) {
 }
 function chgPrint(i) {
   if (CHG[i] && CHG[i].dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
-  document.querySelectorAll('#chgWrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'chg_' + i));
+  document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'chg_' + i));
   document.body.classList.add('print-chg');
   const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
   window.addEventListener('afterprint', off);
   window.print();
   setTimeout(off, 1500);
 }
-function chgPendingN() { return CHG.filter(c => c.dirty).length; }
+function chgPendingN() { return CHG.filter(c => c.dirty).length + (typeof FC !== 'undefined' ? FC.filter(c => c.dirty).length : 0); }
 window.addEventListener('beforeunload', e => {
   if (!chgPendingN()) return;
   e.preventDefault(); e.returnValue = '';
 });
 
+
+// ═════════════════════════════════════════════
+// 사실 확인서 [서식 27호] (2026-10-09 은정님)
+//   ① 수업일과 결제일이 다름  ② 제공인력을 잘못 골라 결제  ③ 결제 금액 오류
+//   이런 회차가 있으면 기록지 위에 알리고 확인서를 자동으로 써 둔다 · 결제(승인번호)마다 한 장
+//   사유는 선생님이 꼭 적는다 · 고친 글이 앞섬 · 「작성 끝」 체크 = done
+//   ①② 는 기록지 칸으로 바로 센다 (고치면 바로 다시 셈) · ③ 은 서버 점검 8번
+// ═════════════════════════════════════════════
+let FC = [];               // [{key, i, why:[], auto:{}, doc, dirty}]
+let FC_DOCS = {};          // doc_key -> 저장된 줄
+let FC_MK = '';
+let FC_SIG = '';
+function fcReset() {
+  FC = []; FC_DOCS = {}; FC_MK = ''; FC_SIG = '';
+  const b = $('fcBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+  const w = $('fcWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
+async function fcLoadDocs(cid, mk) {
+  const req = CHG_REQ;
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .select('id, doc_key, data, done, done_on, updated_at')
+      .eq('child_id', Number(cid)).eq('doc_type', '사실확인').like('doc_key', mk + ':%');
+    if (error) throw error;
+    if (req !== CHG_REQ) return;
+    FC_DOCS = {}; (data || []).forEach(d => { FC_DOCS[d.doc_key] = d; });
+    FC_MK = mk; FC_SIG = '';
+    fcRefresh();
+  } catch (e) {
+    if (req !== CHG_REQ) return;
+    const b = $('fcBox');
+    b.className = 'need'; b.style.display = 'block';
+    b.textContent = '사실 확인서를 불러오지 못했습니다. (' + (e.message || e) + ')';
+  }
+}
+function fcWd(iso) { return ['일','월','화','수','목','금','토'][new Date(iso + 'T00:00:00').getDay()]; }
+function fcKorD(iso) { return chgKor(iso) + '(' + fcWd(iso) + ')'; }
+function fcCases() {
+  const out = [];
+  if (!LOADED || !child) return out;
+  const trs = document.querySelectorAll('#statusTbl tbody tr');
+  const area = ($('s1_org') && $('s1_org').value) || '';
+  for (let i = 0; i < SESSIONS; i++) {
+    const tr = trs[i]; if (!tr) continue;
+    const no = String(tr.querySelector('.st_apprNo').value || '').trim();
+    if (!no) continue;
+    const prov = _provIso(tr.querySelector('.st_provDate').value);
+    const am = String(tr.querySelector('.st_apprDate').value || '')
+                 .match(/(\d{4})\D(\d{2})\D(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    const appr = am ? am[1] + '-' + am[2] + '-' + am[3] : null;
+    const atime = am && am[4] ? Number(am[4]) + '시 ' + am[5] + '분' : '';
+    const tname = String(($('s1_therapistName_' + (i + 1)) || {}).value || '').trim();
+    const st = _to24(($('s1_startTime_' + (i + 1)) || {}).value);
+    const v = VOUCHER.find(x => String(x.appr_no || '').trim() === no) || null;
+    const vname = v ? String(v.therapist_name || '').trim() : '';
+    const why = [];
+    if (prov && appr && prov !== appr) why.push('date');
+    if (vname && tname && vname.replace(/\s/g, '') !== tname.replace(/\s/g, '')) why.push('th');
+    const amt = (RCSRV || []).filter(r => Number(r.item_no) === 8
+                  && (!r.on_date || String(r.on_date).slice(0, 10) === appr));
+    if (amt.length && appr) why.push('amt');
+    if (!why.length) continue;
+    const day = prov || appr;
+    const nm = child.name || '';
+    let body = (day ? fcKorD(day) + (st ? ' ' + st : '') + ' ' : '') + nm + ' 아동에게 발달재활서비스'
+             + (area ? '(' + area + ')' : '') + '를 ' + (tname || '담당') + ' 선생님이 제공하였습니다.';
+    if (why.includes('date')) body += '\n바우처 결제는 ' + fcKorD(appr) + (atime ? ' ' + atime : '') + '에 이루어져 수업일과 결제일이 다릅니다.';
+    if (why.includes('th'))   body += '\n결제할 때 제공인력이 ' + vname + ' 선생님으로 잘못 선택되었습니다.';
+    if (why.includes('amt'))  body += '\n결제 금액이 바르지 않습니다 (' + amt.map(r => String(r.detail || '')).join(' · ') + ').';
+    body += '\n(승인번호 ' + no + ')\n\n사유: \n조치: ';
+    const att = ['1. 발달재활서비스 제공기록지 사본 1부', '2. 바우처 결제 내역 1부'];
+    if (why.includes('th') || why.includes('amt')) att.push('3. 결제 취소 · 재결제 내역 1부');
+    out.push({ key: FC_MK + ':' + no, i, why, day, appr, no, tname,
+      auto: { body, att: att.join('\n'), writer: tname,
+              written_on: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) } });
+  }
+  return out;
+}
+const FC_WHY = { date:'수업일과 결제일이 다름', th:'제공인력을 다르게 결제', amt:'결제 금액 오류' };
+function fcRefresh() {
+  if (!FC_MK || FC_MK !== mkNow()) return;
+  const cs = fcCases();
+  const sig = cs.map(c => c.key + '|' + c.why.join(',')).join(';');
+  // 적던 글은 살린다
+  const keep = {};
+  FC.forEach((c, i) => { if (c.dirty) keep[c.key] = fcRead(i); });
+  FC = cs.map(c => Object.assign(c, { doc: FC_DOCS[c.key] || null, dirty: !!keep[c.key], kept: keep[c.key] || null }));
+  fcBanner();
+  if (sig !== FC_SIG) { FC_SIG = sig; fcDrawSheets(); }
+}
+function fcBanner() {
+  const b = $('fcBox');
+  if (!FC.length) { b.style.display = 'none'; $('fcWrap').style.display = 'none'; return; }
+  const left = FC.filter(c => !(c.doc && c.doc.done));
+  const md = iso => iso ? Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10)) : '';
+  const line = c => (c.i + 1) + '회째 ' + md(c.day) + ' — ' + c.why.map(w => FC_WHY[w]).join(' · ');
+  if (left.length) {
+    b.className = 'need';
+    b.innerHTML = '<b>사실 확인서를 작성해 주세요 — ' + left.length + '건</b>'
+      + left.map(c => '<div>· ' + esc(line(c)) + '</div>').join('')
+      + '<div style="margin-top:4px;"><button type="button" onclick="fcOpen()">사실 확인서 열기</button></div>';
+  } else {
+    b.className = 'ok';
+    b.innerHTML = '사실 확인서 — ' + FC.length + '건 모두 작성 끝 <button type="button" onclick="fcOpen()">보기</button>';
+  }
+  b.style.display = 'block';
+}
+function fcVal(c, f) {
+  if (c.kept && c.kept[f] != null) return c.kept[f];
+  const d = c.doc && c.doc.data;
+  return d && d[f] != null ? d[f] : c.auto[f];
+}
+function fcDrawSheets() {
+  const w = $('fcWrap');
+  const open = w.style.display === 'block';
+  w.innerHTML = FC.map((c, i) => fcSheetHtml(c, i)).join('');
+  w.querySelectorAll('.chgsheet').forEach(sh => {
+    const i = Number(sh.dataset.i);
+    sh.addEventListener('input', e => {
+      const f = e.target && e.target.dataset && e.target.dataset.f;
+      const pr = f ? sh.querySelector('.fc-pr[data-p="' + f + '"]') : null;
+      if (pr) pr.textContent = e.target.value;
+      fcDirty(i);
+    });
+  });
+  if (FC.length) chgStamp();
+  w.style.display = open && FC.length ? 'block' : 'none';
+}
+function fcSheetHtml(c, i) {
+  const v = f => esc(fcVal(c, f) || '');
+  const done = !!(c.doc && c.doc.done);
+  return '<div class="sheet chgsheet" id="fc_' + i + '" data-i="' + i + '">'
+    + '<h2 class="title">사 실 확 인 서</h2>'
+    + '<table class="chg-tbl">'
+    + '<tr><th style="width:16%;">기관명</th><td>' + esc(CHG_ORG) + '</td>'
+    +   '<th style="width:16%;">사업명</th><td>발달재활서비스</td></tr>'
+    + '<tr><th>확인 내용</th><td colspan="3"><textarea class="fc-body" data-f="body">' + v('body') + '</textarea><div class="fc-pr b" data-p="body">' + v('body') + '</div>'
+    +   '<div class="fc-guide">육하원칙(언제 · 어디서 · 누가 · 무엇을 · 어떻게 · 왜)으로 적고, 「사유」와 「조치」를 꼭 채워 주세요. 객관적인 근거(결제 내역 · 기록지 등)를 첨부자료로 남깁니다.</div></td></tr>'
+    + '<tr><th>첨부자료 목록</th><td colspan="3"><textarea class="fc-att" data-f="att">' + v('att') + '</textarea><div class="fc-pr a" data-p="att">' + v('att') + '</div></td></tr>'
+    + '</table>'
+    + '<div class="chg-apply">위 내용이 사실임을 확인합니다.</div>'
+    + '<div class="chg-date">작성일 <input type="text" data-f="written_on" value="' + v('written_on') + '"></div>'
+    + '<table class="chg-sign">'
+    + '<tr><td style="width:50%;">작성자 : <input type="text" data-f="writer" value="' + v('writer') + '" style="width:120px;display:inline-block;"> (서명)</td>'
+    +   '<td>기관장 : ' + esc(CHG_ORG) + ' &nbsp;&nbsp; <span class="chg-ins">(인)<img class="chg-stamp" alt=""'
+    +     (CHG_STAMP ? ' src="' + CHG_STAMP + '" style="display:inline"' : '') + '></span></td></tr>'
+    + '</table>'
+    + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>'
+    + '<div class="chg-act no-print">'
+    +   '<span style="font-weight:600;">' + (c.i + 1) + '회째 · ' + esc(c.why.map(w => FC_WHY[w]).join(' · ')) + '</span>'
+    +   '<button type="button" class="chg-save' + (c.doc && !c.dirty ? ' done' : '') + '" onclick="fcSave(' + i + ')">'
+    +     (c.doc && !c.dirty ? '✓ 저장됨' : '저장 전') + '</button>'
+    +   '<label><input type="checkbox" class="chg-done"' + (done ? ' checked' : '') + ' onchange="fcSave(' + i + ', this.checked)"> 작성 끝</label>'
+    +   (done && c.doc.done_on ? '<span class="chg-signed">' + esc(String(c.doc.done_on).slice(0, 10)) + ' 작성 끝</span>' : '')
+    +   '<button type="button" onclick="fcPrint(' + i + ')">이 확인서 인쇄</button>'
+    + '</div>'
+    + '</div>';
+}
+function fcDirty(i) {
+  const c = FC[i]; if (!c) return;
+  c.dirty = true;
+  const bt = document.querySelector('#fc_' + i + ' .chg-save');
+  if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
+}
+function fcOpen() {
+  const w = $('fcWrap');
+  w.style.display = 'block';
+  w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function fcRead(i) {
+  const out = {};
+  document.querySelectorAll('#fc_' + i + ' [data-f]').forEach(el => { out[el.dataset.f] = el.value; });
+  return out;
+}
+async function fcSave(i, doneVal) {
+  const c = FC[i]; if (!c) return;
+  const bt = document.querySelector('#fc_' + i + ' .chg-save');
+  const cb = document.querySelector('#fc_' + i + ' .chg-done');
+  const d = fcRead(i);
+  const done = doneVal !== undefined ? !!doneVal : !!(c.doc && c.doc.done);
+  if (done) {
+    const why = (String(d.body || '').match(/사유[ \t]*:[ \t]*(.*)/) || [])[1] || '';
+    if (!why.trim()) {
+      alert('「사유:」 뒤에 왜 그렇게 되었는지 적어 주세요.\n사유가 비어 있으면 「작성 끝」을 할 수 없습니다.');
+      if (cb) cb.checked = false;
+      return;
+    }
+  }
+  if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  d.why = c.why; d.seq = c.i + 1; d.appr_no = c.no; d.day = c.day;
+  const row = { child_id: Number(childId), doc_type: '사실확인', doc_key: c.key, data: d,
+                done: done, done_on: done ? ((c.doc && c.doc.done && c.doc.done_on) || today) : null,
+                updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
+    FC_DOCS[c.key] = data[0];
+    c.doc = data[0]; c.dirty = false; c.kept = null;
+    fcBanner();
+    const open = $('fcWrap').style.display === 'block';
+    fcDrawSheets();
+    if (open) $('fcWrap').style.display = 'block';
+  } catch (e) {
+    alert('사실 확인서를 저장하지 못했습니다.\n' + (e.message || e));
+    if (bt) { bt.disabled = false; bt.textContent = '저장 전'; bt.classList.remove('done'); }
+    if (cb && doneVal !== undefined) cb.checked = !doneVal;
+  }
+}
+function fcPrint(i) {
+  if (FC[i] && FC[i].dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
+  document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'fc_' + i));
+  document.body.classList.add('print-chg');
+  const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
 // ── 이 아동 이 달 기록지 점검 결과 (2026-10-02) — 셈은 서버 nl_record_check 한 곳 ──
 const RC_ITEM = {
   1:'결제 이름', 2:'아동 중복 결제', 3:'연속 결제 80분 안', 4:'치료사 중복 결제', 5:'승인번호 이상',
@@ -1559,6 +1799,7 @@ function rcDraw() {
     }
     box.style.display = 'block';
   }
+  fcRefresh();
 }
 
 // 승인일자 — 날짜와 결제 시각(시:분:초)까지 (2026-10-02 은정님)
