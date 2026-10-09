@@ -154,6 +154,27 @@
 #chgBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #chgBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #chgBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#plBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
+#plBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
+#plBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
+#plBox.info { background:#F7F6F4; border-left:3px solid #C9C3BC; color:#5F5E5A; }
+#plBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
+                border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
+.plsheet .pl-lead { border:1px dashed #999; background:#f3f3f3; text-align:center; padding:10px; font-size:13px; margin:0 0 12px; }
+.plsheet .pl-tbl { border-collapse:collapse; width:100%; font-size:12px; table-layout:fixed; margin-bottom:10px; }
+.plsheet .pl-tbl th, .plsheet .pl-tbl td { border:1px solid #333; padding:4px 6px; vertical-align:middle; }
+.plsheet .pl-tbl th { background:#f5f5f5; font-weight:normal; text-align:center; }
+.plsheet .pl-tbl th.cap { background:#fff; font-weight:bold; }
+.plsheet .pl-tbl input, .plsheet .pl-tbl textarea { border:1px solid #ddd; font-size:12px; }
+.plsheet .pl-tbl textarea { min-height:52px; }
+.plsheet .pl-pr { display:none; white-space:pre-wrap; line-height:1.5; }
+.plsheet .pl-foot { font-size:11.5px; line-height:1.7; margin-top:6px; }
+@media print {
+  .plsheet .pl-tbl textarea { display:none !important; }
+  .plsheet .pl-pr { display:block !important; min-height:12mm; }
+  .plsheet .pl-tbl input { border:none !important; background:transparent !important; }
+  .plsheet .pl-tbl, .plsheet .pl-foot { font-size:10.5px !important; }
+}
 #rpBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #rpBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #rpBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
@@ -214,7 +235,7 @@
 .chgsheet .chg-signed { display:inline-block; padding:1px 8px; border-radius:10px; background:#EAF4EC; color:#2E6B3E; font-size:11.5px; }
 @media print {
   .docwrap { display:none !important; }
-  #chgBox, #fcBox, #rcBox, #rpBox { display:none !important; }
+  #chgBox, #fcBox, #rcBox, #rpBox, #plBox { display:none !important; }
   .chgsheet .chg-iso { display:none !important; }
   body.print-chg .container:not(.docwrap) { display:none !important; }
   body.print-chg .docwrap { display:block !important; }
@@ -275,6 +296,8 @@
   <div id="fcBox" class="no-print" style="display:none;"></div>
   <!-- 중간 · 종결 보고서 알림 [서식 11-1호] (2026-10-09) -->
   <div id="rpBox" class="no-print" style="display:none;"></div>
+  <!-- 제공 계획서 알림 [서식 8호] (2026-10-09) -->
+  <div id="plBox" class="no-print" style="display:none;"></div>
 
   <!-- ==================== 1. 서비스 일정표, 제공기록지 ==================== -->
   <div class="sheet" id="sheet1">
@@ -441,6 +464,8 @@
 <div class="container docwrap" id="fcWrap" style="display:none;"></div>
 <!-- 중간 · 종결 보고서 [서식 11-1호] (2026-10-09) -->
 <div class="container docwrap" id="rpWrap" style="display:none;"></div>
+<!-- 제공(이용) 계획서 [서식 8호] (2026-10-09) -->
+<div class="container docwrap" id="plWrap" style="display:none;"></div>
 
 <!-- 인쇄할 때 종이마다 아래에 붙는 로고 (2026-09-10) -->
 <div class="printlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>
@@ -788,6 +813,7 @@ async function loadOne() {
     loadChg(cid, mk);
     fcLoadDocs(cid, mk);
     rpLoad(cid, mk);
+    plLoad(cid, mk);
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -1290,6 +1316,7 @@ function chgReset() {
   const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
   fcReset();
   rpReset();
+  plReset();
 }
 function chgArea(tid) {      // 그 선생님이 맡은 발달재활 수업의 영역 (나중에 시작한 것)
   let best = null, bd = '';
@@ -1481,7 +1508,7 @@ function chgPrint(i) {
   window.print();
   setTimeout(off, 1500);
 }
-function chgPendingN() { return CHG.filter(c => c.dirty).length + (typeof FC !== 'undefined' ? FC.filter(c => c.dirty).length : 0) + (typeof RP !== 'undefined' && RP && RP.dirty ? 1 : 0); }
+function chgPendingN() { return CHG.filter(c => c.dirty).length + (typeof FC !== 'undefined' ? FC.filter(c => c.dirty).length : 0) + (typeof RP !== 'undefined' && RP && RP.dirty ? 1 : 0) + (typeof PL !== 'undefined' && PL && PL.dirty ? 1 : 0); }
 window.addEventListener('beforeunload', e => {
   if (!chgPendingN()) return;
   e.preventDefault(); e.returnValue = '';
@@ -1924,6 +1951,197 @@ async function rpSave(doneVal) {
 function rpPrint() {
   if (RP && RP.dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
   document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'rp_0'));
+  document.body.classList.add('print-chg');
+  const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
+
+// ═════════════════════════════════════════════
+// 발달재활서비스 제공(이용) 계획서 [서식 8호] (2026-10-09 은정님)
+//   아동마다 · 발달재활을 처음 시작한 달과 매년 1월에 작성 · 담당 선생님이 적고 보호자 서명
+//   서비스 계획 수립의 단기 · 장기 목표 → 중간 · 종결 보고서 [11-1호] 목표로 그대로 (data.goal_short · goal_long)
+//   담기 nl_dev_docs (doc_type 계획서 · doc_key = 작성한 달 YYYY-MM)
+//   그 밖의 달은 가장 최근 계획서를 「보기」로 연다 (고치면 그 계획서에 저장)
+// ═════════════════════════════════════════════
+let PL = null;             // {need, key, doc, auto, dirty}
+let PL_REQ = 0;
+function plReset() {
+  PL = null; PL_REQ++;
+  const b = $('plBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
+  const w = $('plWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
+async function plLoad(cid, mk) {
+  const req = PL_REQ;
+  const st0 = (TL || []).map(t => String(t.started_on || '')).concat(
+                [].concat(...(TL || []).map(t => (t.nl_therapy_schedules || []).map(sc => String(sc.from_date || '')))))
+              .filter(d => /^\d{4}-\d{2}-\d{2}/.test(d)).sort()[0] || '';
+  const need = month === 1 || (st0 && st0.slice(0, 7) === mk);
+  try {
+    const q = need
+      ? sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
+          .eq('child_id', Number(cid)).eq('doc_type', '계획서').eq('doc_key', mk).limit(1)
+      : sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
+          .eq('child_id', Number(cid)).eq('doc_type', '계획서').lte('doc_key', mk)
+          .order('doc_key', { ascending: false }).limit(1);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (req !== PL_REQ) return;
+    const doc = (data && data[0]) || null;
+    if (!need && !doc) return;                 // 작성할 달도 아니고 계획서도 없음
+    const area = ($('s1_area') && $('s1_area').value) || '';
+    const self = String(($('s1_costSelf') || {}).value || '').replace(/[^\d]/g, '');
+    const selfN = self ? Number(self) : 0;
+    const tot = UNIT * SESSIONS;
+    const won = n => Number(n || 0).toLocaleString();
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '.');
+    PL = { need, key: doc ? doc.doc_key : mk, doc, dirty: false,
+      auto: {
+        name: child ? child.name || '' : '', birth: child && child.birth ? String(child.birth).slice(0, 10).replace(/-/g, '.') : '',
+        mgmt: child ? child.manager_no || '' : '', dis_type: '', dis_level: '',
+        area, g_name: '', g_tel: '',
+        fee_month: won(tot), fee_self: selfN ? won(selfN) : '', issued_on: today,
+        p1_need: '', p1_now: '', p1_short: '', p1_long: '',
+        p2_need: '', p2_now: '', p2_short: '', p2_long: '',
+        p3_need: '', p3_now: '', p3_short: '', p3_long: '',
+        m1_when: '', m1_short: '', m1_long: '', m1_next: '',
+        m2_when: '', m2_short: '', m2_long: '', m2_next: '',
+        m3_when: '', m3_short: '', m3_long: '', m3_next: '',
+        c_kind: area, c_cnt: String(SESSIONS), c_cost: won(UNIT) + ' × ' + SESSIONS + ' = ' + won(tot), c_self: selfN ? won(selfN) : '',
+        c_sum_cost: won(tot), c_sum_self: selfN ? won(selfN) : '',
+        contact_th: schedThNames(thrName), contact_mail: ''
+      } };
+    plDraw();
+  } catch (e) {
+    if (req !== PL_REQ) return;
+    const b = $('plBox');
+    b.className = 'no-print need'; b.style.display = 'block';
+    b.textContent = '제공 계획서를 불러오지 못했습니다. (' + (e.message || e) + ')';
+  }
+}
+function plVal(f) {
+  const d = PL && PL.doc && PL.doc.data;
+  return d && d[f] != null ? d[f] : (PL ? PL.auto[f] : '');
+}
+function plDraw() {
+  const b = $('plBox'), w = $('plWrap');
+  if (!PL) { b.style.display = 'none'; w.style.display = 'none'; return; }
+  const done = !!(PL.doc && PL.doc.done);
+  const ym = k => Number(k.slice(0, 4)) + '년 ' + Number(k.slice(5, 7)) + '월';
+  if (PL.need && !done) {
+    b.className = 'no-print need';
+    b.innerHTML = '<b>제공(이용) 계획서를 작성해 주세요</b> · ' + (month === 1 ? '해마다 1월' : '발달재활을 시작한 달')
+      + '<div style="margin-top:4px;"><button type="button" onclick="plOpen()">제공 계획서 열기</button></div>';
+  } else if (done) {
+    b.className = 'no-print ok';
+    b.innerHTML = '제공 계획서 — ' + ym(PL.key) + ' 작성 · 보호자 서명 받음 (' + esc(String(PL.doc.done_on || '').slice(0, 10)) + ') <button type="button" onclick="plOpen()">보기</button>';
+  } else {
+    b.className = 'no-print info';
+    b.innerHTML = '제공 계획서 — ' + ym(PL.key) + ' 작성 (보호자 서명 전) <button type="button" onclick="plOpen()">보기</button>';
+  }
+  b.style.display = 'block';
+  const open = w.style.display === 'block';
+  const v = f => esc(plVal(f) || '');
+  const inp = (f, st) => '<input type="text" data-f="' + f + '" value="' + v(f) + '"' + (st ? ' style="' + st + '"' : '') + '>';
+  const ta = f => '<textarea data-f="' + f + '">' + v(f) + '</textarea><div class="pl-pr" data-p="' + f + '">' + v(f) + '</div>';
+  const pRow = n => '<tr><td style="text-align:center;">' + n + '</td><td>' + ta('p' + n + '_need') + '</td><td>' + ta('p' + n + '_now')
+    + '</td><td>' + ta('p' + n + '_short') + '</td><td>' + ta('p' + n + '_long') + '</td></tr>';
+  const mRow = n => '<tr><td>' + inp('m' + n + '_when') + '</td><td>' + ta('m' + n + '_short') + '</td><td>' + ta('m' + n + '_long')
+    + '</td><td>' + ta('m' + n + '_next') + '</td></tr>';
+  w.innerHTML = '<div class="sheet chgsheet plsheet" id="pl_0">'
+    + '<div style="font-size:11px;">[서식 8호]</div>'
+    + '<h2 class="title">발달재활서비스 제공(이용) 계획서</h2>'
+    + '<div class="pl-lead">본 계획서는 사회복지서비스 대상 결정자가 서비스를 원활히 이용할 수 있도록 돕는 계획서입니다.</div>'
+    + '<table class="pl-tbl"><colgroup><col style="width:22%"><col style="width:28%"><col style="width:18%"><col style="width:32%"></colgroup>'
+    + '<tr><th>성 명</th><td>' + inp('name') + '</td><th>생년월일</th><td>' + inp('birth') + '</td></tr>'
+    + '<tr><th>사회복지서비스<br>관리번호</th><td>' + inp('mgmt') + '</td><th>장애아동 정보</th><td>등록(예견) 유형: ' + inp('dis_type', 'width:55%;display:inline-block') + '<br>장애정도: ' + inp('dis_level', 'width:55%;display:inline-block') + '</td></tr>'
+    + '<tr><th>발달재활서비스<br>제공영역</th><td>' + inp('area') + '</td><th>보호자<br>성명 및 연락처</th><td>성함: ' + inp('g_name', 'width:50%;display:inline-block') + ' (인)<br>연락처: ' + inp('g_tel', 'width:60%;display:inline-block') + '</td></tr>'
+    + '<tr><th>월 이용액<br>(본인부담금)</th><td>' + inp('fee_month', 'width:45%;display:inline-block') + ' 원/월<br>( ' + inp('fee_self', 'width:40%;display:inline-block') + ' 원)</td><th>발급일</th><td>' + inp('issued_on') + '</td></tr>'
+    + '</table>'
+    + '<table class="pl-tbl"><colgroup><col style="width:8%"><col style="width:26%"><col style="width:24%"><col style="width:21%"><col style="width:21%"></colgroup>'
+    + '<tr><th class="cap" colspan="5">서비스 계획 수립</th></tr>'
+    + '<tr><th>순번</th><th>주요 욕구</th><th>현행수준<br>(관찰, 평가 결과 등)</th><th>단기 목표</th><th>장기 목표</th></tr>'
+    + pRow(1) + pRow(2) + pRow(3) + '</table>'
+    + '<table class="pl-tbl"><colgroup><col style="width:10%"><col style="width:30%"><col style="width:30%"><col style="width:30%"></colgroup>'
+    + '<tr><th class="cap" colspan="4">서비스 계획 모니터링</th></tr>'
+    + '<tr><th>시기</th><th>단기목표 달성 확인<br>(발전사항, 개입전략, 평가도구 등)</th><th>장기목표 달성 확인<br>(발전사항, 개입전략, 평가도구 등)</th><th>향후계획</th></tr>'
+    + mRow(1) + mRow(2) + mRow(3) + '</table>'
+    + '<table class="pl-tbl"><colgroup><col style="width:22%"><col style="width:22%"><col style="width:34%"><col style="width:22%"></colgroup>'
+    + '<tr><th class="cap" colspan="4">발달재활서비스 이용 계획 및 비용(조정가능)</th></tr>'
+    + '<tr><th>서비스종류</th><th>횟 수<br>(월 4주 기준)</th><th>서비스비용<br>(서비스 가격 × 횟수)</th><th>본인부담금</th></tr>'
+    + '<tr><td>' + inp('c_kind') + '</td><td>' + inp('c_cnt') + '</td><td>' + inp('c_cost') + '</td><td>' + inp('c_self') + '</td></tr>'
+    + '<tr><th colspan="2">합 계</th><td>' + inp('c_sum_cost') + '</td><td>' + inp('c_sum_self') + '</td></tr>'
+    + '</table>'
+    + '<div class="pl-foot">☞ 본 계획서는 작성하여, 아동의 보호자에게 반드시 서명을 받은 후, 이용자와 제공기관에서 각각 한부씩 보관하여야 함<br>'
+    + '☞ 본 계획서는 아동에 대한 초기 계획 수립부터 추후 목표 달성을 위한 피드백 과정까지 활용하도록 함.<br>'
+    + '☞ 서비스 계획 수립 및 모니터링 자료는 연 1회 최신화 하여 아동의 기능 향상 및 서비스의 품질관리를 위해 활용되도록 함.<br><br>'
+    + '※ 상담문의 : ' + esc(CHG_ORG) + ' &nbsp; 담당자 ' + inp('contact_th', 'width:110px;display:inline-block')
+    + ' (☎ 042-488-6011, E-mail : ' + inp('contact_mail', 'width:180px;display:inline-block') + ' )</div>'
+    + '<div class="chg-act no-print">'
+    +   '<span style="font-weight:600;">제공 계획서 · ' + ym(PL.key) + '</span>'
+    +   '<button type="button" class="chg-save' + (PL.doc && !PL.dirty ? ' done' : '') + '" onclick="plSave()">'
+    +     (PL.doc && !PL.dirty ? '✓ 저장됨' : '저장 전') + '</button>'
+    +   '<label><input type="checkbox" class="chg-done"' + (done ? ' checked' : '') + ' onchange="plSave(this.checked)"> 보호자 서명 받음</label>'
+    +   '<button type="button" onclick="plPrint()">이 계획서 인쇄</button>'
+    +   '<span style="color:#888;">단기 · 장기 목표는 중간 · 종결 보고서로 이어집니다 · 기록지 저장과 따로 저장</span>'
+    + '</div></div>';
+  const sh = $('pl_0');
+  sh.addEventListener('input', e => {
+    const f = e.target && e.target.dataset && e.target.dataset.f;
+    const pr = f ? sh.querySelector('.pl-pr[data-p="' + f + '"]') : null;
+    if (pr) pr.textContent = e.target.value;
+    PL.dirty = true;
+    const bt = sh.querySelector('.chg-save');
+    if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
+  });
+  w.style.display = open ? 'block' : 'none';
+}
+function plOpen() {
+  const w = $('plWrap');
+  w.style.display = 'block';
+  w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function plSave(doneVal) {
+  if (!PL) return;
+  const sh = $('pl_0');
+  const bt = sh.querySelector('.chg-save'), cb = sh.querySelector('.chg-done');
+  const d = {};
+  sh.querySelectorAll('[data-f]').forEach(el => { d[el.dataset.f] = el.value; });
+  // 보고서로 넘길 목표 — 순번마다 적은 것을 줄로 모음
+  const lines = k => [1, 2, 3].map(n => String(d['p' + n + '_' + k] || '').trim()).filter(Boolean)
+                      .map((t, i, a) => a.length > 1 ? (i + 1) + '. ' + t : t).join('\n');
+  d.goal_short = lines('short'); d.goal_long = lines('long');
+  const done = doneVal !== undefined ? !!doneVal : !!(PL.doc && PL.doc.done);
+  if (done && !d.goal_short && !d.goal_long) {
+    alert('서비스 계획 수립의 단기 · 장기 목표를 적어 주세요.\n목표가 비어 있으면 「보호자 서명 받음」을 할 수 없습니다.');
+    if (cb) cb.checked = false;
+    return;
+  }
+  if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const row = { child_id: Number(childId), doc_type: '계획서', doc_key: PL.key, data: d,
+                done, done_on: done ? ((PL.doc && PL.doc.done && PL.doc.done_on) || today) : null,
+                updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
+    PL.doc = data[0]; PL.dirty = false;
+    const open = $('plWrap').style.display === 'block';
+    plDraw();
+    if (open) $('plWrap').style.display = 'block';
+  } catch (e) {
+    alert('제공 계획서를 저장하지 못했습니다.\n' + (e.message || e));
+    if (bt) { bt.disabled = false; bt.textContent = '저장 전'; }
+    if (cb && doneVal !== undefined) cb.checked = !doneVal;
+  }
+}
+function plPrint() {
+  if (PL && PL.dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
+  document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'pl_0'));
   document.body.classList.add('print-chg');
   const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
   window.addEventListener('afterprint', off);
