@@ -162,6 +162,8 @@
 .chgsheet .chg-tbl textarea.fc-body { min-height:240px; line-height:1.7; }
 .chgsheet .chg-tbl textarea.fc-att { min-height:80px; }
 .chgsheet .fc-pr { display:none; white-space:pre-wrap; line-height:1.7; }
+.chgsheet .fc-pick { font-size:12px; margin:6px 0 0; }
+.chgsheet .fc-pick select { width:auto; display:inline-block; max-width:100%; }
 .chgsheet .fc-guide { font-size:11.5px; color:#7a6a55; background:#FBF5EE; padding:6px 10px; border-radius:6px; margin:6px 0 0; }
 @media print { .chgsheet .fc-guide { display:none !important; }
   .chgsheet textarea.fc-body, .chgsheet textarea.fc-att { display:none !important; }
@@ -1258,7 +1260,7 @@ async function chgStamp() {
   } catch (e) {}
 }
 function chgReset() {
-  CHG = []; CHG_REQ++;
+  CHG = []; CHG_REQ++; BUSY = {}; SUG = {};
   const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
   fcReset();
@@ -1471,6 +1473,7 @@ let FC = [];               // [{key, i, why:[], auto:{}, doc, dirty}]
 let FC_DOCS = {};          // doc_key -> 저장된 줄
 let FC_MK = '';
 let FC_SIG = '';
+let FC_CASES = [];         // 사례 목록 예시 글 (nl_rc_cases.tmpl · 은정님이 표에서 고침)
 function fcReset() {
   FC = []; FC_DOCS = {}; FC_MK = ''; FC_SIG = '';
   const b = $('fcBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
@@ -1479,10 +1482,15 @@ function fcReset() {
 async function fcLoadDocs(cid, mk) {
   const req = CHG_REQ;
   try {
-    const { data, error } = await sb.from('nl_dev_docs')
-      .select('id, doc_key, data, done, done_on, updated_at')
-      .eq('child_id', Number(cid)).eq('doc_type', '사실확인').like('doc_key', mk + ':%');
+    const [{ data, error }, cs] = await Promise.all([
+      sb.from('nl_dev_docs')
+        .select('id, doc_key, data, done, done_on, updated_at')
+        .eq('child_id', Number(cid)).eq('doc_type', '사실확인').like('doc_key', mk + ':%'),
+      sb.from('nl_rc_cases').select('id, grp, name, ex_no, tmpl, sort_no')
+        .eq('active', true).not('tmpl', 'is', null).order('sort_no')
+    ]);
     if (error) throw error;
+    FC_CASES = (cs && cs.data) || [];
     if (req !== CHG_REQ) return;
     FC_DOCS = {}; (data || []).forEach(d => { FC_DOCS[d.doc_key] = d; });
     FC_MK = mk; FC_SIG = '';
@@ -1500,7 +1508,7 @@ function fcCases() {
   const out = [];
   if (!LOADED || !child) return out;
   const trs = document.querySelectorAll('#statusTbl tbody tr');
-  const area = ($('s1_org') && $('s1_org').value) || '';
+  const area = ($('s1_area') && $('s1_area').value) || '';   // 제공영역 (s1_org 는 제공기관)
   for (let i = 0; i < SESSIONS; i++) {
     const tr = trs[i]; if (!tr) continue;
     const no = String(tr.querySelector('.st_apprNo').value || '').trim();
@@ -1528,11 +1536,20 @@ function fcCases() {
     if (why.includes('date')) body += '\n바우처 결제는 ' + fcKorD(appr) + (atime ? ' ' + atime : '') + '에 이루어져 수업일과 결제일이 다릅니다.';
     if (why.includes('th'))   body += '\n결제할 때 제공인력이 ' + vname + ' 선생님으로 잘못 선택되었습니다.';
     if (why.includes('amt'))  body += '\n결제 금액이 바르지 않습니다 (' + amt.map(r => String(r.detail || '')).join(' · ') + ').';
-    body += '\n(승인번호 ' + no + ')\n\n사유: \n조치: ';
+    body += '\n(승인번호 ' + no + ')\n\n';
+    const ctx = { '수업일': day ? fcKorD(day) : '', '수업시각': st || '', '결제일': appr ? fcKorD(appr) : '',
+                  '결제시각': atime, '선생님': tname, '아동': nm, '승인번호': no };
+    // 예시 미리 고르기 — 해결 방안 셈이 가린 경우 → 제공인력 → 금액 차례
+    const exNo = SUG[i] && SUG[i].ex;
+    let caseId = exNo ? ((FC_CASES.find(x => Number(x.ex_no) === Number(exNo)) || {}).id || null) : null;
+    if (!caseId && why.includes('th'))  caseId = FC_CASES.some(x => x.id === 2) ? 2 : null;
+    if (!caseId && why.includes('amt')) caseId = FC_CASES.some(x => x.id === 1) ? 1 : null;
+    const cs0 = FC_CASES.find(x => x.id === caseId);
+    body += cs0 ? fcFill(cs0.tmpl, ctx) : '사유: \n조치: ';
     const att = ['1. 발달재활서비스 제공기록지 사본 1부', '2. 바우처 결제 내역 1부'];
     if (why.includes('th') || why.includes('amt')) att.push('3. 결제 취소 · 재결제 내역 1부');
-    out.push({ key: FC_MK + ':' + no, i, why, day, appr, no, tname,
-      auto: { body, att: att.join('\n'), writer: tname,
+    out.push({ key: FC_MK + ':' + no, i, why, day, appr, no, tname, ctx,
+      auto: { body, att: att.join('\n'), writer: tname, case_id: caseId ? String(caseId) : '',
               written_on: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) } });
   }
   return out;
@@ -1541,7 +1558,7 @@ const FC_WHY = { date:'수업일과 결제일이 다름', th:'제공인력을 �
 function fcRefresh() {
   if (!FC_MK || FC_MK !== mkNow()) return;
   const cs = fcCases();
-  const sig = cs.map(c => c.key + '|' + c.why.join(',')).join(';');
+  const sig = cs.map(c => c.key + '|' + c.why.join(',') + '|' + c.auto.case_id).join(';');
   // 적던 글은 살린다
   const keep = {};
   FC.forEach((c, i) => { if (c.dirty) keep[c.key] = fcRead(i); });
@@ -1583,6 +1600,8 @@ function fcDrawSheets() {
       if (pr) pr.textContent = e.target.value;
       fcDirty(i);
     });
+    const sel = sh.querySelector('.fc-case');
+    if (sel) sel.addEventListener('change', () => fcPickCase(i, sel.value));
   });
   if (FC.length) chgStamp();
   w.style.display = open && FC.length ? 'block' : 'none';
@@ -1596,6 +1615,10 @@ function fcSheetHtml(c, i) {
     + '<tr><th style="width:16%;">기관명</th><td>' + esc(CHG_ORG) + '</td>'
     +   '<th style="width:16%;">사업명</th><td>발달재활서비스</td></tr>'
     + '<tr><th>확인 내용</th><td colspan="3"><textarea class="fc-body" data-f="body">' + v('body') + '</textarea><div class="fc-pr b" data-p="body">' + v('body') + '</div>'
+    +   '<div class="fc-pick no-print">예시 고르기 <select class="fc-case" data-f="case_id"><option value="">— 직접 적기 —</option>'
+    +     FC_CASES.map(x => '<option value="' + x.id + '"' + (String(fcVal(c, 'case_id') || '') === String(x.id) ? ' selected' : '') + '>'
+    +       esc((x.ex_no ? '예시 ' + x.ex_no + ' · ' : '') + x.name) + '</option>').join('')
+    +   '</select> <span style="color:#888;">고르면 「사유 · 조치」가 채워집니다 · 채운 뒤 고칠 수 있습니다</span></div>'
     +   '<div class="fc-guide">육하원칙(언제 · 어디서 · 누가 · 무엇을 · 어떻게 · 왜)으로 적고, 「사유」와 「조치」를 꼭 채워 주세요. 객관적인 근거(결제 내역 · 기록지 등)를 첨부자료로 남깁니다.</div></td></tr>'
     + '<tr><th>첨부자료 목록</th><td colspan="3"><textarea class="fc-att" data-f="att">' + v('att') + '</textarea><div class="fc-pr a" data-p="att">' + v('att') + '</div></td></tr>'
     + '</table>'
@@ -1616,6 +1639,28 @@ function fcSheetHtml(c, i) {
     +   '<button type="button" onclick="fcPrint(' + i + ')">이 확인서 인쇄</button>'
     + '</div>'
     + '</div>';
+}
+
+function fcFill(tmpl, ctx) {
+  return String(tmpl || '').replace(/\{([^}]+)\}/g, (m, k) => (ctx && ctx[k] != null && ctx[k] !== '') ? ctx[k] : '○○');
+}
+function fcPickCase(i, id) {
+  const c = FC[i]; if (!c) return;
+  const ta = document.querySelector('#fc_' + i + ' [data-f="body"]');
+  const pr = document.querySelector('#fc_' + i + ' .fc-pr[data-p="body"]');
+  if (!ta) return;
+  const cs = FC_CASES.find(x => String(x.id) === String(id));
+  const part = cs ? fcFill(cs.tmpl, c.ctx) : '사유: \n조치: ';
+  const cur = String(ta.value || '');
+  const had = /(^|\n)사유[ \t]*:/.test(cur);
+  const filled = /(^|\n)사유[ \t]*:[ \t]*\S/.test(cur);
+  if (filled && !confirm('지금 적힌 「사유 · 조치」를 고른 예시로 바꿀까요?')) {
+    const sel = document.querySelector('#fc_' + i + ' .fc-case'); if (sel) sel.value = String(fcVal(c, 'case_id') || '');
+    return;
+  }
+  ta.value = had ? cur.replace(/(^|\n)사유[ \t]*:[\s\S]*$/, (m, a) => a + part) : (cur.replace(/\s*$/, '') + '\n\n' + part);
+  if (pr) pr.textContent = ta.value;
+  fcDirty(i);
 }
 function fcDirty(i) {
   const c = FC[i]; if (!c) return;
@@ -1807,6 +1852,162 @@ function rcDraw() {
   fcRefresh();
 }
 
+
+// ═════════════════════════════════════════════
+// 해결 방안 (2026-10-09 은정님) — 결제 일시에서 거꾸로 빈 50분을 찾는다
+//   규칙  ① 기록지 한 회 = 시작부터 50분  ② 1:1 — 선생님 · 아동 50분이 겹치면 안 됨
+//         ③ 카드 결제는 시작 30분 뒤부터
+//   겹침은 발달재활 · 치료지원(언어 · 작업)끼리만 (센터 · 방과후 시간은 써도 됨) — 서버 nl_dev_busy 한 곳
+//   찾으면 「이대로 고치기」 → 제공날짜 · 시작 · 종료 칸에 넣음 (저장은 선생님이)
+//   못 찾으면 경우를 가려 사실 확인서 예시를 미리 고름 (SUG[i].ex)
+// ═════════════════════════════════════════════
+let BUSY = {};             // '날짜|선생님' -> 바쁜 시간 줄 (또는 'loading')
+let SUG = {};              // 회차 -> {fix:{d,s,e}, text, ex}
+let RC_SUGSHOWN = {};
+function busyGet(day, th) {
+  const k = day + '|' + th;
+  const v = BUSY[k];
+  if (v && v !== 'loading') return v;
+  if (!v) {
+    BUSY[k] = 'loading';
+    const req = CHG_REQ;
+    sb.rpc('nl_dev_busy', { p_child: Number(childId), p_th: Number(th), p_day: day })
+      .then(({ data, error }) => {
+        if (req !== CHG_REQ) return;
+        BUSY[k] = error ? { err: error.message || '오류' } : (data || []);
+        rcDraw();
+      })
+      .catch(e => { if (req === CHG_REQ) { BUSY[k] = { err: String(e.message || e) }; rcDraw(); } });
+  }
+  return null;
+}
+const _m = hm => { const g = String(hm || '').match(/(\d{1,2}):(\d{2})/); return g ? Number(g[1]) * 60 + Number(g[2]) : null; };
+const _hhmm = n => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+function rcRowInfo(i) {
+  const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
+  if (!tr) return null;
+  const am = String(tr.querySelector('.st_apprDate').value || '')
+               .match(/(\d{4})\D(\d{2})\D(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+  return {
+    tr,
+    prov: _provIso(($('s1_provDate_' + (i + 1)) || {}).value) || _provIso(tr.querySelector('.st_provDate').value),
+    appr: am ? am[1] + '-' + am[2] + '-' + am[3] : null,
+    pay: am && am[4] ? Number(am[4]) * 60 + Number(am[5]) : null,
+    no: String(tr.querySelector('.st_apprNo').value || '').trim(),
+    st: _m(_to24(($('s1_startTime_' + (i + 1)) || {}).value)),
+    th: (SLOTS[i] && SLOTS[i].th) || null
+  };
+}
+function rcSuggest(i) {
+  const x = rcRowInfo(i);
+  if (!x || !x.appr || x.pay == null) return null;
+  const th = x.th || thOnIso(x.appr) || thOnIso(x.prov);
+  if (!th) return null;
+  const rows = busyGet(x.appr, th);
+  if (rows === null) return { wait: true };
+  if (rows.err) return { err: rows.err };
+  const mk = mkNow();
+  const P = x.pay, D = x.appr, md = iso => Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10));
+  // 다른 회차가 이미 쓰는 날 · 시각
+  const used = [];
+  for (let k = 0; k < SESSIONS; k++) if (k !== i) {
+    const y = rcRowInfo(k); if (y && y.prov) used.push(y.prov + '|' + y.st);
+  }
+  const live = rows.filter(r => !(r.src === '기록지' && r.mine && r.month_key === mk));
+  // 가) 결제한 날에 그 아동 발달 수업이 있음 → 그 수업으로
+  const own = live.filter(r => r.src === '수업' && r.mine && Number(r.support_type_id) === 2)
+    .map(r => _m(r.st)).filter(v => v != null)
+    .filter(v => P >= v + 30 && !used.includes(D + '|' + v))
+    .sort((a, b) => b - a);
+  if (own.length && !(x.prov === D && x.st === own[0])) {
+    const s0 = own[0];
+    return { fix: { d: D, s: s0, e: s0 + 50 },
+             text: md(D) + ' ' + _hhmm(s0) + ' 에 이 아동 발달 수업이 있습니다 — ' + md(D) + ' ' + _hhmm(s0) + '~' + _hhmm(s0 + 50)
+                   + ' 로 고치면 해결됩니다 (결제 ' + _hhmm(P) + ' · 시작 ' + (P - s0) + '분 뒤)'
+                   + (P > s0 + 50 + 60 ? ' · 수업 끝나고 ' + (P - s0 - 50) + '분 뒤 결제라 소급 결제면 사실 확인서(예시 1)도 남겨 주세요' : '') };
+  }
+  // 나) 결제 시각에서 거꾸로 빈 50분 찾기 — 이 회차 자기 수업 줄은 뺀다
+  const busy = live.filter(r => r.same_th || r.mine)
+    .filter(r => !(r.src === '수업' && r.mine && Number(r.support_type_id) === 2
+                   && D === x.prov && _m(r.st) === x.st))
+    .map(r => [_m(r.st), _m(r.en)]).filter(v => v[0] != null && v[1] != null);
+  const free = c => !busy.some(b => c < b[1] && c + 50 > b[0]);
+  const c0 = Math.floor((P - 50) / 10) * 10;
+  const cand = [];
+  for (let c = c0; c <= P - 30; c += 10) cand.push(c);
+  for (let c = c0 - 10; c >= P - 90; c -= 10) cand.push(c);
+  const hit = cand.find(c => c >= 9 * 60 && c + 50 <= 20 * 60 + 20 && free(c));
+  if (hit != null) {
+    return { fix: { d: D, s: hit, e: hit + 50 },
+             text: md(D) + ' ' + _hhmm(hit) + '~' + _hhmm(hit + 50) + ' 로 고치면 해결됩니다 (결제 ' + _hhmm(P)
+                   + ' · 시작 ' + (P - hit) + '분 뒤 · 선생님 · 아동 시간 비어 있음)' };
+  }
+  // 다) 빈 자리가 없음 → 경우 가리기 (사실 확인서 예시)
+  let ex = 0;
+  if (x.prov && x.prov !== D) ex = 4;
+  else if (x.st != null) {
+    const nexts = live.filter(r => r.src === '수업' && r.mine).map(r => _m(r.st))
+      .filter(v => v != null && v > x.st).sort((a, b) => a - b);
+    const nx = nexts[0];
+    if (nx != null && P >= nx + 30) ex = (nx - (x.st + 50) <= 10) ? 2 : 1;
+  }
+  return { none: true, ex,
+           text: md(D) + ' 결제 앞 50분에 비는 자리가 없습니다 — 사실 확인서를 작성해 주세요'
+                 + (ex ? ' (예시 ' + ex + ' · ' + FC_EXNAME[ex] + ')' : '') };
+}
+const FC_EXNAME = { 1:'카드 미소지 — 다음 타임에 소급 결제', 2:'학부모 이탈 — 2타임 종료 때 결제',
+                    3:'행정 직원 대신 결제 (연속 결제)', 4:'카드 미소지 — 다른 날 방문 결제' };
+function rcSugHtml(r, i) {
+  const n = Number(r.item_no);
+  if (i == null) return '';
+  if (n === 3) return '<div class="rcsug">→ 2타임 연속 수업이면 오류가 아닙니다. 둘째 결제가 둘째 시작 30분 뒤면 사유서(예시 3 · '
+                      + FC_EXNAME[3] + ')를 남겨 주세요</div>';
+  if (![1, 12, 18, 19].includes(n) || RC_SUGSHOWN[i]) return '';
+  RC_SUGSHOWN[i] = true;
+  const g = rcSuggest(i);
+  SUG[i] = g;
+  if (!g) {
+    if (n === 19 || n === 12) {
+      const x = rcRowInfo(i);
+      if (x && x.no) return '<div class="rcsug">→ 결제 ' + (x.appr ? Number(x.appr.slice(5, 7)) + '/' + Number(x.appr.slice(8, 10)) : '')
+        + (x.pay != null ? ' ' + _hhmm(x.pay) : '') + ' · 승인번호 ' + esc(x.no) + ' — 실제 수업한 날짜와 시간을 적어 주세요</div>';
+    }
+    return '';
+  }
+  if (g.wait) return '<div class="rcsug" style="color:#888;">해결 방안을 찾는 중…</div>';
+  if (g.err)  return '<div class="rcsug" style="color:#888;">해결 방안을 찾지 못했습니다 (' + esc(g.err) + ')</div>';
+  if (g.fix)  return '<div class="rcsug">→ ' + esc(g.text)
+                   + ' <button type="button" class="rcfix" data-rcfix="' + i + '">이대로 고치기</button></div>';
+  if (n === 19 || n === 12) {
+    const x = rcRowInfo(i);
+    return '<div class="rcsug">→ 쪼개기 회차 결제 ' + Number(x.appr.slice(5, 7)) + '/' + Number(x.appr.slice(8, 10)) + ' ' + _hhmm(x.pay)
+      + ' · 승인번호 ' + esc(x.no) + ' — 결제 앞 50분이 비지 않습니다. 실제 수업한 날짜와 시간을 적어 주세요</div>';
+  }
+  return '<div class="rcsug">→ ' + esc(g.text) + '</div>';
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-rcfix]');
+  if (!b) return;
+  const i = Number(b.dataset.rcfix), g = SUG[i];
+  if (!g || !g.fix) return;
+  const hm = n => _hm12(_hhmm(n));
+  if (!confirm((i + 1) + '회째를 ' + g.fix.d + ' ' + _hhmm(g.fix.s) + '~' + _hhmm(g.fix.e)
+               + ' 로 고칠까요?\n(제공날짜 · 시작 · 종료 칸이 바뀝니다. 저장은 「저장」을 눌러야 됩니다)')) return;
+  _calFire($('s1_provDate_' + (i + 1)), g.fix.d.replace(/-/g, '.'));
+  _calFire($('s1_startTime_' + (i + 1)), hm(g.fix.s));
+  _calFire($('s1_endTime_' + (i + 1)), hm(g.fix.e));
+  const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
+  const sp = tr && tr.querySelector('.st_provDate');
+  if (sp && _provIso(sp.value) !== g.fix.d) _calFire(sp, g.fix.d.replace(/-/g, '.'));
+});
+(function () {
+  const st = document.createElement('style');
+  st.textContent = '.rcsug{color:#1b5e20;margin-top:2px}'
+    + '.rcsug .rcfix{width:auto !important;margin:2px 0 0 4px !important;padding:2px 8px !important;font-size:11px !important;'
+    + 'background:#2e7d32 !important;color:#fff !important;border:none !important;border-radius:5px;cursor:pointer}'
+    + '@media print{.rcsug{display:none !important}}';
+  document.head.appendChild(st);
+})();
 // ── 기록지 안 빨간 표시 (2026-10-09 은정님) — 노란 상자 글 대신 그 자리에 ──
 const RC_SAY = {
   2:'같은 아동 결제가 40분 안에 둘', 3:'연속 결제 (80분 안)', 4:'선생님 결제가 다른 아동 결제와 40분 안',
@@ -1861,6 +2062,7 @@ function rcEnsureNotes() {
 function rcClearMarks() {
   rcEnsureNotes();
   document.querySelectorAll('.rcbad, .rcwarn').forEach(el => el.classList.remove('rcbad', 'rcwarn'));
+  RC_SUGSHOWN = {};
   document.querySelectorAll('.rcn').forEach(td => { td.innerHTML = ''; });
   document.querySelectorAll('.rcn2').forEach(d => d.remove());
   const m = $('rcnMonth'); if (m) { m.innerHTML = ''; m.style.display = 'none'; }
@@ -1887,7 +2089,8 @@ function rcPlace(r) {
     return !warn;
   }
   fields.forEach(f => rcEls(i, f).forEach(el => { if (el) el.classList.add(cls); }));
-  const line = '<div class="' + (warn ? 'rcn-w' : 'rcn-b') + '">' + esc(msg) + '</div>';
+  const sugH = rcSugHtml(r, i);
+  const line = '<div class="' + (warn ? 'rcn-w' : 'rcn-b') + '">' + esc(msg) + sugH + '</div>';
   if (fields.some(f => f === 'prov' || f === 'start' || f === 'end')) {
     const td = $('rcn_' + (i + 1)); if (td) td.innerHTML += line;
     const rr = $('rcnRow'); if (rr) rr.style.display = '';
@@ -1898,7 +2101,7 @@ function rcPlace(r) {
     if (cell) {
       const d = document.createElement('div');
       d.className = 'rcn2 no-print ' + (warn ? 'rcn-w' : 'rcn-b');
-      d.textContent = msg;
+      d.innerHTML = esc(msg) + sugH;
       cell.appendChild(d);
     }
   }
