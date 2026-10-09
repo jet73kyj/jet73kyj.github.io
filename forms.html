@@ -94,16 +94,46 @@
   .gmchk { cursor:pointer; user-select:none; }
   .gml .gpr { display:none; white-space:pre-wrap; }
   .dsheet.gsheet { page-break-after:always; }
-  .gmtabs { display:flex; gap:0; margin:0 auto 10px; max-width:780px; border-bottom:2px solid #ECE8E3; }
-  .gmtabs button { border:none !important; border-radius:0 !important; background:none !important; padding:8px 14px !important;
-                   color:#8a8178; font-weight:500; border-bottom:2px solid transparent !important; margin-bottom:-2px; }
-  .gmtabs button.on { color:#7E5530; font-weight:700; border-bottom-color:#B07A4A !important; }
+  /* 책갈피 라벨 모양 갈래 (2026-10-09 은정님) — 고른 라벨만 흰 바탕 · 위 카멜 띠 · 아래 선과 이어짐 */
+  .gmtabs { display:flex; gap:4px; align-items:flex-end; flex-wrap:wrap; margin:0 auto 12px; max-width:780px;
+            padding:0 6px; border-bottom:2px solid #B07A4A; }
+  .gmtabs button { width:auto !important; margin:0 0 -2px 0 !important; padding:8px 16px 7px !important;
+                   background:#F3ECE3 !important; color:#8a7a6a !important; font-weight:500; font-size:13px;
+                   border:1px solid #E2D4C2 !important; border-bottom:2px solid #B07A4A !important;
+                   border-radius:10px 10px 0 0 !important; box-shadow:none !important; cursor:pointer; }
+  .gmtabs button:hover { background:#FBF5EE !important; color:#7E5530 !important; }
+  .gmtabs button.on { background:#fff !important; color:#7E5530 !important; font-weight:700;
+                      border-color:#B07A4A !important; border-top:4px solid #B07A4A !important;
+                      border-bottom:2px solid #fff !important; padding-top:6px !important; }
+  /* 넓은 화면 — 책갈피를 서식 오른쪽 옆면에 세로로 (2026-10-09 은정님) · 좁은 화면은 위에 가로로 */
+  #dvBody { display:grid; grid-template-columns:minmax(0,1fr); }
+  #dvBody > * { min-width:0; }
+  @media screen and (min-width:701px) {
+    #docView { grid-template-columns:minmax(0,850px) auto; justify-content:center; align-items:start; }
+    #docView:has(#dvTabs[style*="none"]) #dvBody { grid-column:1 / -1; }
+    #docView .dv-bar { grid-column:1 / -1; }
+    #docView #dvBody { grid-column:1; grid-row:2; grid-template-columns:minmax(0,850px) auto; justify-content:center; align-items:start; }
+    #docView #dvTabs { grid-column:2; grid-row:2; }
+    #dvBody > * { grid-column:1; }
+    #docView #dvBody > .gmtabs { grid-column:2; grid-row:1 / span 30; }
+    #docView .gmtabs { flex-direction:column; align-items:stretch; flex-wrap:nowrap; gap:4px; margin:24px 0 0 0;
+              padding:6px 0; border-bottom:none; border-left:2px solid #B07A4A; max-width:none;
+              position:sticky; top:12px; width:auto; margin-left:-1px !important; }
+    #docView .gmtabs button { margin:0 0 0 -2px !important; padding:14px 8px !important; line-height:1.2;
+                     writing-mode:vertical-rl; text-orientation:upright; letter-spacing:0; word-spacing:-0.45em; white-space:nowrap; font-size:13px;
+                     border:1px solid #E2D4C2 !important; border-left:2px solid #B07A4A !important;
+                     border-radius:0 10px 10px 0 !important; }
+    #docView .gmtabs button.on { border-color:#B07A4A !important;
+                        border-left:2px solid #fff !important; border-right:5px solid #B07A4A !important;
+                        padding:14px 8px !important; }
+  }
   @media screen { .gsheet.gm-off { display:none; } }
   .dsheet .foot { font-size:11px; margin-top:4px; line-height:1.6; }
   @media print {
     @page { size:A4 portrait; margin:10mm 12mm; }
     body.print-doc * { visibility:hidden; }
     body.print-doc #docView, body.print-doc #docView * { visibility:visible; }
+    body.print-doc #docView, body.print-doc #dvBody { display:block !important; }
     body.print-doc #docView { position:absolute; left:0; top:0; right:0; width:auto; box-sizing:border-box; }
     body.print-doc .dsheet, body.print-doc .dsheet > div { box-sizing:border-box; width:100%; }
     body.print-doc .dsheet table { table-layout:fixed; }
@@ -158,21 +188,21 @@
   <!-- 서식 바로 쓰기 (2026-10-09) — 화면에서 채워 바로 인쇄 -->
   <div class="docbtns" id="docBtns" style="display:none;">
     <button type="button" onclick="openDoc('hire')">신규인력등록 · 개인정보 동의서 [15호]</button>
-    <button type="button" onclick="openDoc('org')">기관정보 · 발달재활서비스 내용 요약서 [19호]</button>
+    <button type="button" onclick="openDoc('info')">기관정보 · 제공기관 정보 · 예외지급 · 내용 요약서 [19호]</button>
     <button type="button" onclick="openDoc('refer')">발달의뢰서 모음 · 공문</button>
   </div>
   <div id="docView">
     <div class="dv-bar">
       <b id="dvTitle"></b>
-      <span id="dvTabs" style="display:none;">
-        <button type="button" id="tab19" onclick="openDoc('org')">19호 내용 요약서</button>
-        <button type="button" id="tabInfo" onclick="openDoc('info')">제공기관 정보 안내</button>
-        <button type="button" id="tabClaim" onclick="openDoc('claim')">예외지급 청구 공문</button>
-      </span>
       <button type="button" id="dvSave" onclick="saveOrg()" style="display:none;">저장 전</button>
       <button type="button" onclick="printDoc()">인쇄</button>
       <button type="button" onclick="closeDoc()">닫기</button>
       <span class="dv-hint" id="dvHint" style="font-size:12px;color:#888;"></span>
+    </div>
+    <div id="dvTabs" class="gmtabs" style="display:none;">
+      <button type="button" id="tabInfo" onclick="openDoc('info')">제공기관 정보</button>
+      <button type="button" id="tabClaim" onclick="openDoc('claim')">예외지급 청구</button>
+      <button type="button" id="tab19" onclick="openDoc('org')">내용 요약서 19호</button>
     </div>
     <div id="dvBody"></div>
   </div>
@@ -559,12 +589,12 @@ async function openDoc(kind) {
   if ((DOC_KIND === 'org' || DOC_KIND === 'info') && DOC_KIND !== kind && ORG_DIRTY
       && !confirm('저장하지 않은 내용이 있습니다. 다른 서식으로 넘어갈까요?')) return;
   DOC_KIND = kind; ORG_DIRTY = false;
-  $('docView').style.display = 'block';
+  $('docView').style.display = 'grid';
   $('dvSave').style.display = kind === 'hire' ? 'none' : '';
   $('dvTabs').style.display = kind === 'hire' ? 'none' : '';
-  $('tab19').style.fontWeight = kind === 'org' ? '700' : '400';
-  $('tabInfo').style.fontWeight = kind === 'info' ? '700' : '400';
-  $('tabClaim').style.fontWeight = kind === 'claim' ? '700' : '400';
+  $('tab19').classList.toggle('on', kind === 'org');
+  $('tabInfo').classList.toggle('on', kind === 'info');
+  $('tabClaim').classList.toggle('on', kind === 'claim');
   if (kind === 'claim') { $('dvSave').style.display = 'none'; await openClaim(false); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (kind === 'info') { await openInfo(); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (kind === 'refer') { $('dvTabs').style.display = 'none'; $('dvSave').style.display = 'none'; await openRefer(); $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
@@ -791,7 +821,7 @@ function gmKor(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2}
 //   선생님을 고르면 이름 · 직종 · 입사일이 본문에 들어감 · 칸은 모두 고칠 수 있음
 // ═════════════════════════════════════════════
 function hireTabs() {
-  return '<div class="gmtabs">' + [['consent', '개인정보 수집 및 이용 동의서 [15호]'], ['staff', '치료지원 제공인력 등록'], ['devjoin', '발달재활 제공인력 등록'], ['leave', '발달재활 제공인력 퇴사']]
+  return '<div class="gmtabs">' + [['consent', '개인정보 동의서 15호'], ['staff', '치료지원 인력 등록'], ['devjoin', '발달재활 인력 등록'], ['leave', '발달재활 인력 퇴사']]
     .map(([k, l]) => '<button type="button" data-htab="' + k + '"' + (HIRE_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
 }
 function hireBind() {
@@ -1117,7 +1147,7 @@ function gmRender(d) {
     return;
   }
   const kid = GM && GM.child ? GM.child : {};
-  const tabs = '<div class="gmtabs">' + [['letter', '공문'], ['refer', '발달재활서비스 의뢰서'], ['detail', '세부영역 검사결과서'], ['diag', '진단서']]
+  const tabs = '<div class="gmtabs">' + [['letter', '공문'], ['refer', '의뢰서'], ['detail', '검사결과서'], ['diag', '진단서']]
     .map(([k, l]) => '<button type="button" data-gtab="' + k + '"' + (GM_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
   $('dvBody').innerHTML = gmCtl(d) + tabs + gmLetter(d) + gmRefer(kid) + gmDetail(kid) + gmDiag(kid);
   gmTab(GM_TAB);
