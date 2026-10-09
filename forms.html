@@ -57,6 +57,44 @@
          background:#F1EFE8; color:#5F5E5A; white-space:nowrap; }
   .fn { font-size:12.5px; color:var(--dim); }
   .empty { padding:40px; text-align:center; color:var(--dim); font-size:14px; }
+  /* ===== 서식 바로 쓰기 — [15호] 신규인력등록 · [19호] 기관정보 (2026-10-09) ===== */
+  .docbtns { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+  .docbtns button { background:#fff; border-color:#D9C3A7; color:#7E5530; font-weight:600; }
+  #docView { display:none; }
+  #docView .dv-bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 12px; }
+  .dsheet { background:#fff; border:1px solid #ddd; padding:28px 34px; max-width:780px; margin:0 auto 20px; font-size:12.5px; color:#111; }
+  .dsheet .dno { font-size:11px; margin-bottom:4px; }
+  .dsheet h2 { text-align:center; font-size:19px; margin:4px 0 14px; letter-spacing:1px; }
+  .dsheet table { width:100%; border-collapse:collapse; background:#fff; font-size:12px; }
+  .dsheet th, .dsheet td { border:1px solid #333; padding:4px 6px; vertical-align:middle; }
+  .dsheet th { background:#f3f3f3; font-weight:normal; text-align:center; color:#111; border-bottom:1px solid #333; white-space:normal; }
+  .dsheet tr:hover td { background:#fff; }
+  .dsheet td input { width:100%; box-sizing:border-box; border:1px solid #e3e3e3; padding:3px 5px; font-size:12px; border-radius:3px; }
+  .dsheet .box { border:1px solid #333; padding:6px 10px; margin-top:-1px; line-height:1.65; }
+  .dsheet .box b { font-weight:normal; }
+  .dsheet .ind { padding-left:14px; } .dsheet .ind2 { padding-left:28px; }
+  .dsheet .chk { display:flex; justify-content:flex-end; gap:40px; padding-right:30px; }
+  .dsheet .sec { margin:10px 0 3px; }
+  .dsheet .dv-del { padding:0 6px !important; font-size:11px !important; color:#b33 !important; border-color:#e6c9c9 !important; margin-left:4px; }
+  .dsheet .dv-back { padding:2px 8px !important; font-size:11.5px !important; }
+  .dsheet .foot { font-size:11px; margin-top:4px; line-height:1.6; }
+  @media print {
+    @page { size:A4 portrait; margin:10mm 12mm; }
+    body.print-doc * { visibility:hidden; }
+    body.print-doc #docView, body.print-doc #docView * { visibility:visible; }
+    body.print-doc #docView { position:absolute; left:0; top:0; right:0; width:auto; box-sizing:border-box; }
+    body.print-doc .dsheet, body.print-doc .dsheet > div { box-sizing:border-box; width:100%; }
+    body.print-doc .dsheet table { table-layout:fixed; }
+    body.print-doc .dv-bar, body.print-doc .dv-hint, body.print-doc .dv-del { display:none !important; }
+    body.print-doc .dsheet { border:none; padding:0; max-width:none; margin:0; font-size:11px; }
+    body.print-doc .dsheet input { border:none; padding:0; background:transparent; }
+    body.print-doc .dsheet table { font-size:10.5px; }
+    body.print-doc .dsheet th, body.print-doc .dsheet td { padding:2.5px 5px; }
+    body.print-doc #dsHire { font-size:10px; } body.print-doc #dsHire h2 { font-size:16px; margin:0 0 8px; }
+    body.print-doc #dsHire .box { padding:3px 8px; line-height:1.45; }
+    body.print-doc #dsHire table { font-size:10px; }
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
 </style>
 </head>
 <body>
@@ -87,6 +125,22 @@
 <div class="container">
   <div class="page-title">서식</div>
   <div class="sub">정부지원 서식처럼 해마다 새로 나오는 문서를 여기에 담아 둡니다.</div>
+
+  <!-- 서식 바로 쓰기 (2026-10-09) — 화면에서 채워 바로 인쇄 -->
+  <div class="docbtns" id="docBtns" style="display:none;">
+    <button type="button" onclick="openDoc('hire')">신규인력등록 · 개인정보 동의서 [15호]</button>
+    <button type="button" onclick="openDoc('org')">기관정보 · 발달재활서비스 내용 요약서 [19호]</button>
+  </div>
+  <div id="docView">
+    <div class="dv-bar">
+      <b id="dvTitle"></b>
+      <button type="button" id="dvSave" onclick="saveOrg()" style="display:none;">저장 전</button>
+      <button type="button" onclick="printDoc()">인쇄</button>
+      <button type="button" onclick="closeDoc()">닫기</button>
+      <span class="dv-hint" id="dvHint" style="font-size:12px;color:#888;"></span>
+    </div>
+    <div id="dvBody"></div>
+  </div>
 
   <!-- 올리기 (관리자만) -->
   <div class="card" id="upCard" style="display:none;">
@@ -376,6 +430,165 @@ $('u_go').onclick = async () => {
 $('f_year').onchange = draw;
 $('f_cat').onchange = draw;
 
+// ═════════════════════════════════════════════
+// 서식 바로 쓰기 (2026-10-09 은정님)
+//   [15호] 개인정보 수집 및 이용 동의서 — 신규 선생님 채용 때 · 인쇄해서 받음 (주민번호는 늘 빈칸 · 화면에 담지 않음)
+//   [19호] 발달재활서비스 내용 요약서 — 매년 1월 1주 · 행정 · 해마다 저장 (nl_org_docs · doc_key 연도:19호)
+// ═════════════════════════════════════════════
+const ORG_NAME = '자라는나무 아동발달센터';
+let DOC_KIND = '', ORG_DIRTY = false, ORG_KEY = '';
+function docHire() {
+  const c = '☐';
+  return '<div class="dsheet" id="dsHire"><div class="dno">[서식 15호]</div>'
+    + '<div style="border:1px solid #333;padding:10px 14px;">'
+    + '<h2>개인정보 수집 및 이용 동의서</h2>'
+    + '<table><colgroup><col style="width:13%"><col style="width:14%"><col style="width:30%"><col style="width:16%"><col style="width:27%"></colgroup>'
+    + '<tr><th colspan="2">소속 제공기관명</th><td colspan="3">' + ORG_NAME + '</td></tr>'
+    + '<tr><th rowspan="2">서비스<br>제공인력</th><th>성 명</th><td><input type="text"></td><th>주민등록번호</th><td></td></tr>'
+    + '<tr><th>주 소</th><td colspan="3"><input type="text" style="width:62%;display:inline-block;"> (전화번호 : <input type="text" style="width:24%;display:inline-block;"> )</td></tr>'
+    + '</table>'
+    + '<div class="box">보건복지부 및 한국사회보장정보원은 「개인정보 보호법」 제15조(개인정보의 수집·이용)에 의거하여 민감정보 및 고유식별정보를 수집합니다.</div>'
+    + '<div class="box">' + c + ' 개인정보 수집 항목<div class="ind">○ 개인정보 : 성명, 주민번호, 주소, 연락처, 이메일, 자격·면허, 교육이력, 서비스 제공이력 등 제공인력 관리 서식에 명기된 항목(기본정보, 재직정보, 자격정보, 급여정보, 금융정보)</div></div>'
+    + '<div class="box">' + c + ' 개인정보 수집 및 이용 목적<div class="ind">○ 바우처의 지불·정산 및 만족도조사 업무 수행에 활용<br>○ 사회서비스 전자바우처 제도 관련 본인 확인절차<br>○ 서비스 제공을 위한 바우처 카드 제작 및 배송<br>○ 서비스 결제 수행 및 우편물·휴대전화 문자메세지 발송<br>○ 서비스 중복수혜 및 부정수급 확인<br>○ 기타 사회서비스 전자바우처 제도 운영에 필요한 자료로 활용</div></div>'
+    + '<div class="box">' + c + ' 개인정보 보유 및 이용기간<div class="ind">○ 상기 개인정보는 제공인력 퇴사처리 후 5년 동안 보유 및 이용됩니다.</div></div>'
+    + '<div class="box">' + c + ' 동의를 거부할 권리 및 거부시 불이익<div class="ind">○ 상기 내용은 사회서비스 전자바우처 업무와 지원을 위해 필요한 최소한의 정보에 해당하며 그 내용에 관하여 개인정보 제공 동의를 거부할 권리가 있으며, 동의 거부에 따른 불이익은 없음. 다만, 전자바우처 서비스를 제공할 수 있는 제공인력이 될 수 없음을 알려드립니다.</div></div>'
+    + '<div class="box">' + c + ' 개인정보 수집 및 이용에 관한 동의<div class="ind">"개인정보 보호법"에 명기된 관련 법률에 의거, 개인정보 수집 및 이용에 동의하십니까?</div><div class="chk"><span>' + c + ' 동의함</span><span>' + c + ' 동의하지 않음</span></div></div>'
+    + '<div class="box">' + c + ' 중요한 개인정보 수집에 관한 별도 동의<div class="ind">○ 고유식별정보 수집에 관한 동의</div><div class="ind2">본 기관은 사회서비스 제공을 위하여 다음과 같은 목적으로 고유식별정보(주민등록번호 등)을 수집하고 있습니다.<br>– 사회서비스 전자바우처 제도 관련 서비스 제공 관리·감독 및 본인 확인절차</div></div>'
+    + '<div class="box" style="display:flex;gap:30px;">※ 고유식별정보 수집에 동의하십니까? <span>' + c + ' 동의함</span><span>' + c + ' 동의하지 않음</span></div>'
+    + '<div class="box">' + c + ' 개인정보 수집에 관한 별도 동의<div class="ind">○ 개인정보의 제3자 제공에 관한 동의</div><div class="ind2">보건복지부는 사회서비스 제공을 위하여 수집한 개인정보를 아래의 내용과 같이 제공하고 있습니다.<br>'
+    +   '– 사회서비스 제공인력에 대한 지방자치단체 관리·감독을 위한 정보제공<br>'
+    +   '– 정부 재정 지원 일자리 현황 관리 및 참여자 중복수혜 방지, 관련 성과관리를 위해 고용노동부(일모아시스템)에 정보제공<br>'
+    +   '– 서비스 제공을 위한 바우처 카드 제작 및 배송을 위한 정보제공<br>'
+    +   '– 서비스 결제 수행 및 우편물·휴대전화 문자메세지 발송을 위한 정보제공<br>'
+    +   '– 유사서비스 제공 정부기관 및 공단에 서비스 부정수급 등을 확인하기 위해 서비스 내역 등의 정보제공<br>'
+    +   '– 사회보험 관리주체(국민연금공단, 국민건강보험공단, 근로복지공단 등)에 4대 보험 가입여부를 확인하기 위해 개인식별번호 등 정보제공</div></div>'
+    + '<div class="box" style="display:flex;gap:30px;">※ 개인정보의 제3자 제공에 동의하십니까? <span>' + c + ' 동의함</span><span>' + c + ' 동의하지 않음</span></div>'
+    + '<div class="box" style="text-align:center;">개인정보 보호법에 명기된 법률상의 개인정보처리자가 준수하여야 할 개인정보보호 규정을 준수하며, 관련법령에 의거하여 제공인력의 권익보호에 최선을 다하고 있으며 동의한 이용 목적 외에는 사용하지 않을 것을 약속드립니다.'
+    +   '<div style="margin-top:8px;">20 &nbsp;&nbsp;&nbsp;&nbsp; 년 &nbsp;&nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp;&nbsp; 일</div>'
+    +   '<div style="margin-top:6px;">동의인: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (서명)</div></div>'
+    + '</div></div>';
+}
+const ORG_SVC = ['언어재활','청능재활','미술심리재활','음악재활','행동발달재활','놀이심리','재활심리','감각발달재활','운동발달재활','심리운동','기타'];
+function docOrg(d) {
+  d = d || {};
+  const hide = new Set((d.hide || []).map(Number));          // 제공하지 않는 영역 (2026-10-09 은정님)
+  const v = k => esc(d[k] || '');
+  const inp = (k, st) => '<input type="text" data-k="' + k + '" value="' + v(k) + '"' + (st ? ' style="' + st + '"' : '') + '>';
+  const svcName = (n, k) => n === '기타' ? '기타( ' + inp(k, 'width:60px;display:inline-block;') + ' )' : n;
+  const live = ORG_SVC.map((n, i) => ({ n, i })).filter(x => !hide.has(x.i));
+  const del = i => ' <button type="button" class="dv-del" data-hide="' + i + '" title="제공하지 않는 영역 — 서식에서 뺌">✕</button>';
+  let h = '<div class="dsheet" id="dsOrg" data-hide="' + [...hide].join(',') + '"><div class="dno">[서식 19호]</div>'
+    + '<div style="border:1px solid #333;padding:10px 14px;">'
+    + '<h2>발달재활서비스 내용 요약서</h2>'
+    + '<div style="margin:0 0 6px;">기관명 : ' + inp('org', 'width:240px;display:inline-block;') + '</div>'
+    + '<div class="sec">1. 서비스 제공내용 요약서(1회 또는 1인당 서비스 공급기준)</div>'
+    + '<table><colgroup><col style="width:30%"><col></colgroup><tr><th>서비스 구분</th><th>세부 서비스 제공 내용</th></tr>';
+  live.forEach(x => { h += '<tr><td style="text-align:center;">' + svcName(x.n, 'a_etc') + del(x.i) + '</td><td>' + inp('a' + x.i) + '</td></tr>'; });
+  h += '</table><div class="sec">2. 서비스 단가 및 산출근거(1회 또는 1인당 서비스 공급기준)</div>'
+    + '<table><colgroup><col style="width:12%"><col style="width:18%"><col style="width:20%"><col></colgroup>'
+    + '<tr><th colspan="2">서비스 구분</th><th>단가</th><th>산출 근거</th></tr>';
+  live.forEach((x, j) => {
+    h += '<tr>' + (j === 0 ? '<td rowspan="' + live.length + '" style="text-align:center;">기관 내<br>서비스</td>' : '')
+      + '<td style="text-align:center;">' + svcName(x.n, 'c_etc') + '</td><td>' + inp('c' + x.i + '_p') + '</td><td>' + inp('c' + x.i + '_b') + '</td></tr>';
+  });
+  h += '</table><div class="foot">※ 단가는 1회당 서비스 제공시간 50분을 기준으로 산출하되 VAT 포함 가격으로 제시<br>** 기타 ( ) 안에 제공서비스명 기재</div>'
+    + '</div>';
+  if (hide.size) h += '<div class="dv-hint" style="margin-top:8px;font-size:12px;color:#888;">뺀 영역 — '
+    + [...hide].sort((p, q) => p - q).map(i => '<button type="button" class="dv-back" data-show="' + i + '">' + esc(ORG_SVC[i]) + ' 되살리기</button>').join(' ') + '</div>';
+  return h + '</div>';
+}
+function orgRead() {
+  const d = {};
+  document.querySelectorAll('#dsOrg [data-k]').forEach(el => { if (el.value.trim()) d[el.dataset.k] = el.value.trim(); });
+  const hs = String(($('dsOrg') || {}).dataset ? $('dsOrg').dataset.hide : '');
+  d.hide = hs ? hs.split(',').map(Number) : [];
+  return d;
+}
+function orgBind() {
+  const sh = $('dsOrg'); if (!sh) return;
+  sh.addEventListener('input', () => { ORG_DIRTY = true; setOrgBtn('before'); });
+  sh.addEventListener('click', e => {
+    const hb = e.target.closest('[data-hide]:not(#dsOrg)'), sb2 = e.target.closest('[data-show]');
+    if (!hb && !sb2) return;
+    const d = orgRead();
+    const set = new Set(d.hide);
+    if (hb) set.add(Number(hb.dataset.hide)); else set.delete(Number(sb2.dataset.show));
+    d.hide = [...set];
+    $('dvBody').innerHTML = docOrg(d);
+    orgBind();
+    ORG_DIRTY = true; setOrgBtn('before');
+  });
+}
+async function openDoc(kind) {
+  DOC_KIND = kind;
+  $('docView').style.display = 'block';
+  $('dvSave').style.display = kind === 'org' ? '' : 'none';
+  if (kind === 'hire') {
+    $('dvTitle').textContent = '신규인력등록 — 개인정보 수집 및 이용 동의서 [서식 15호]';
+    $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 화면에 적은 글은 저장되지 않습니다 · 주민등록번호 칸은 늘 빈칸';
+    $('dvBody').innerHTML = docHire();
+  } else {
+    const y = new Date(Date.now() + 9 * 3600e3).getUTCFullYear();
+    ORG_KEY = y + ':19호';
+    $('dvTitle').textContent = '기관정보 — 발달재활서비스 내용 요약서 [서식 19호] · ' + y + '년';
+    $('dvHint').textContent = '매년 1월 1주에 확인 · 적은 내용은 「저장」하면 해마다 남고, 지난해 것을 이어받습니다';
+    $('dvBody').innerHTML = '<div style="padding:20px;color:#888;">불러오는 중…</div>';
+    let d = null, from = '';
+    try {
+      const { data, error } = await sb.from('nl_org_docs').select('doc_key, data').like('doc_key', '%:19호')
+        .lte('doc_key', ORG_KEY).order('doc_key', { ascending: false }).limit(1);
+      if (error) throw error;
+      if (data && data[0]) { d = data[0].data; from = data[0].doc_key; }
+    } catch (e) {
+      $('dvHint').textContent = '저장된 요약서를 불러오지 못했습니다 (' + (e.message || e) + ') · 화면에서 적어 인쇄는 할 수 있습니다';
+    }
+    d = d || {};
+    if (!d.org) d.org = ORG_NAME;
+    $('dvBody').innerHTML = docOrg(d);
+    ORG_DIRTY = !!(from && from !== ORG_KEY);   // 지난해 것을 이어받았으면 올해 것으로 저장해야 함
+    setOrgBtn(from === ORG_KEY ? 'done' : 'before');
+    if (from && from !== ORG_KEY) $('dvHint').textContent = Number(from.slice(0, 4)) + '년 요약서를 이어받았습니다 · 확인 후 「저장」하면 올해 것으로 남습니다';
+    orgBind();
+  }
+  $('docView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function setOrgBtn(st) {
+  const b = $('dvSave');
+  b.disabled = st === 'saving';
+  b.textContent = st === 'saving' ? '저장 중…' : st === 'done' ? '✓ 저장됨' : '저장 전';
+  b.style.background = st === 'done' ? '#2e7d32' : '#fff';
+  b.style.color = st === 'done' ? '#fff' : '';
+}
+async function saveOrg() {
+  if (DOC_KIND !== 'org') return;
+  const d = orgRead();
+  setOrgBtn('saving');
+  try {
+    const { data, error } = await sb.from('nl_org_docs')
+      .upsert({ doc_key: ORG_KEY, data: d, updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() }, { onConflict: 'doc_key' })
+      .select('doc_key');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
+    ORG_DIRTY = false; setOrgBtn('done');
+    $('dvHint').textContent = '저장했습니다 · ' + ORG_KEY.slice(0, 4) + '년 요약서';
+  } catch (e) {
+    setOrgBtn('before');
+    alert('저장하지 못했습니다.\n' + (e.message || e));
+  }
+}
+function closeDoc() {
+  if (DOC_KIND === 'org' && ORG_DIRTY && !confirm('저장하지 않은 내용이 있습니다. 닫을까요?')) return;
+  $('docView').style.display = 'none'; $('dvBody').innerHTML = ''; DOC_KIND = ''; ORG_DIRTY = false;
+}
+function printDoc() {
+  document.body.classList.add('print-doc');
+  const off = () => { document.body.classList.remove('print-doc'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
+window.addEventListener('beforeunload', e => { if (DOC_KIND === 'org' && ORG_DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+
 async function afterLogin(user) {
   const { data: me, error: e1 } = await sb
     .from('nl_therapists').select('id, name, role')
@@ -390,6 +603,7 @@ async function afterLogin(user) {
   $('mainBox').style.display = '';
   $('who').textContent = me.name + ' (' + (me.role || '') + ')';
   $('upCard').style.display = CAN_EDIT ? '' : 'none';
+  $('docBtns').style.display = CAN_EDIT ? '' : 'none';   // 서식 바로 쓰기 — 관리자 · 행정 · 데스크
 
   fillYears();
   await loadList();
