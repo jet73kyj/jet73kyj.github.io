@@ -1747,7 +1747,7 @@ async function fcSave(i, doneVal) {
   }
   if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  d.why = c.why; d.seq = c.i + 1; d.appr_no = c.no; d.day = c.day;
+  d.why = c.why; d.seq = c.i + 1; d.appr_no = c.no; d.day = c.day; d.appr = c.appr;   // 기록지 점검이 날짜로 맞춤
   const row = { child_id: Number(childId), doc_type: '사실확인', doc_key: c.key, data: d,
                 done: done, done_on: done ? ((c.doc && c.doc.done && c.doc.done_on) || today) : null,
                 updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };

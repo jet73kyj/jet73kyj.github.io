@@ -144,6 +144,7 @@ const ADMIN = [8, 19];
 let ME = null, ROWS = [], CASES = [], RES = {}, KIDNM = {}, THNM = {}, VIEW = 'left';
 // 갈래 · 보기 · 선생님 거르기 · 누적 통계 (2026-10-09)
 let KINDV = '전체', GROUPV = 'th', THF = 0, STATS = null, LOGERR = '';
+let DEVDOC = {};  // 아동 → 발달 기록지에서 끝낸 서식 [{type, key, data, done_on}] — 10호 서명 받음 · 27호 작성 끝 (2026-10-09)
 let NOTES = {};   // 아동|날짜 → 발달 기록지 특이사항 글들 · 아동|* → 그 달 전부 (2026-10-02)
 
 // 항목 이름 · 갈래 (g1 결제 · g2 기록지 · g3 서류 · g0 참고)
@@ -207,8 +208,23 @@ function fillMon(){
 }
 
 // 처리 끝 = 사례를 골랐고, 서류가 필요한 사례면 「서류 받음」까지
+// 10호 변경 계약서 「서명 받음」 · 27호 사실 확인서 「작성 끝」이면 처리 끝 (2026-10-09 은정님)
+//   15 본인부담금 — 그 달 1일부터 바뀐 계약 / 16 담당 — 그 달 안 날짜부터 바뀐 계약
+//   1 결제 이름 · 8 금액 · 18 제공일자 ≠ 승인일자 — 같은 날(수업일 또는 결제일) 사실 확인서
+function devDone(r){
+  const ds = DEVDOC[r.child_id] || [];
+  const k = $('mon').value;
+  const d = r.on_date ? String(r.on_date).slice(0, 10) : '';
+  if (r.item_no === 15) return ds.find(x => x.type === '변경계약' && x.key === '본인부담금:' + k + '-01') || null;
+  if (r.item_no === 16) return ds.find(x => x.type === '변경계약' && x.key.indexOf('담당:' + k) === 0) || null;
+  if ([1, 8, 18].includes(r.item_no) && d)
+    return ds.find(x => x.type === '사실확인' && x.key.indexOf(k + ':') === 0
+                        && ((x.data && (x.data.day === d || x.data.appr === d)))) || null;
+  return null;
+}
 function isDone(r){
   if (r.item_no === 9) return true;
+  if (devDone(r)) return true;
   if (isList(r)) return false;
   const x = RES[rkey(r)];
   if (!x || !x.case_id) return false;
@@ -245,6 +261,18 @@ async function run(){
   CASES = b.data || [];
   RES = {};
   (c.data || []).forEach(x => { RES[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
+
+  // 발달 기록지에서 끝낸 서식 — 결과에 나온 아동만 (2026-10-09)
+  DEVDOC = {};
+  try {
+    const kids0 = [...new Set(ROWS.map(r => r.child_id).filter(Boolean))];
+    for (let i = 0; i < kids0.length; i += 200) {
+      const { data, error } = await sb.from('nl_dev_docs').select('child_id, doc_type, doc_key, data, done_on')
+        .in('child_id', kids0.slice(i, i + 200)).in('doc_type', ['변경계약', '사실확인']).eq('done', true);
+      if (error) throw error;
+      (data || []).forEach(x => { (DEVDOC[x.child_id] = DEVDOC[x.child_id] || []).push({ type: x.doc_type, key: x.doc_key, data: x.data || {}, done_on: x.done_on }); });
+    }
+  } catch (e) { DEVDOC = {}; }
 
   // 이름 — 결과에 나온 아동 · 선생님만
   KIDNM = {}; THNM = {};
@@ -297,6 +325,9 @@ function caseOpts(sel){
 function rcCell(r, i){
   const x = RES[rkey(r)] || {};
   if (r.item_no === 9) return '<span class="rcview">참고</span>';
+  const dd = devDone(r);
+  if (dd) return '<span class="rcview" style="color:#2E6B3E;">' + (dd.type === '변경계약' ? '변경 계약서 서명 받음' : '사실 확인서 작성 끝')
+                + (dd.done_on ? ' · ' + esc(String(dd.done_on).slice(5, 10).replace('-', '/')) : '') + '</span>';
   if (isList(r)) return '<span class="rcview" style="color:var(--dim);">선생님이 고치면 사라짐</span>';
   if (!isAdmin()) {
     const c = CASES.find(c => c.id === x.case_id);
@@ -429,7 +460,7 @@ function draw(){
   }
 
   h += '<div class="legend">발달재활 — 결제 시각은 바우처 「결제일시」, 수업 시작은 시간표 회기 시각입니다. '
-     + '사례를 고르고 저장하면 「남은 것」에서 빠집니다. 사유서 · 변경계약서는 「서류 받음」까지, '
+     + '사례를 고르고 저장하면 「남은 것」에서 빠집니다. 발달 기록지에서 변경 계약서(10호)를 「서명 받음」, 사실 확인서(27호)를 「작성 끝」으로 하면 저절로 처리 끝이 됩니다. 사유서 · 변경계약서는 「서류 받음」까지, '
      + '특이사항 기재 사례는 기록지 그 회차 특이사항이 적혀 있어야 끝납니다. '
      + '기록지 점검(10~14 · 18)과 치료지원(31~34) · 미작성(41)은 목록만 — 선생님이 기록지를 고치면 저절로 사라집니다. '
      + '미작성은 치료지원 한 달 세 회, 발달재활 · 센터는 수업한 회수만큼이며 기한은 다음 달 10일입니다.</div>';
