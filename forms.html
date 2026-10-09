@@ -1413,7 +1413,8 @@ function placeTools() {
     if (GM_SAVING) html = B('save', '저장 중…', true, true);
     else if (!issued) html = B('save', '저장', true);
     else if (GM_EDIT) html = B('save', '저장', true) + B('cancel', '취소');
-    else html = B('edit', '수정') + B('print', '인쇄');
+    else html = B('edit', '수정');
+    html += B('print', '인쇄', false, GM_SAVING);
     const L = $('gmLetter');
     if (L) { L.classList.toggle('locked', lock); L.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); }
     ['gmKid', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
@@ -1422,7 +1423,8 @@ function placeTools() {
     if (!sh) return;
     if (ORG_ST === 'saving') html = B('save', '저장 중…', true, true);
     else if (ORG_EDIT) html = B('save', '저장', true) + (ORG_SAVED ? B('cancel', '취소') : '');
-    else html = B('edit', '수정') + B('print', '인쇄');
+    else html = B('edit', '수정');
+    html += B('print', '인쇄', false, ORG_ST === 'saving');
     sh.classList.toggle('locked', !ORG_EDIT);
     sh.querySelectorAll('input[data-k]').forEach(el => { el.readOnly = !ORG_EDIT; });
   }
@@ -1454,12 +1456,14 @@ function closeDoc() {
   return true;
 }
 function printDoc() {
-  if ((DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && !(GM && GM.no) && !confirm('공문 번호를 아직 받지 않았습니다. 번호 없이 인쇄할까요?')) return;
+  if ((DOC_KIND === 'staffgm' || DOC_KIND === 'claimgm') && !(GM && GM.no) && !confirm('아직 저장하지 않아 공문 번호가 없습니다. 번호 없이 인쇄할까요?\n(번호를 넣으려면 먼저 「저장」)')) return;
+  if (GM_KINDS.includes(DOC_KIND) && GM && GM.no && GM_DIRTY && !confirm('고친 내용을 아직 저장하지 않았습니다. 화면 그대로 인쇄할까요?')) return;
+  if ((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY && !confirm('저장하지 않은 내용이 있습니다. 화면 그대로 인쇄할까요?')) return;
   if (DOC_KIND === 'refer') {
     const on = [...document.querySelectorAll('.gmpr:checked')].map(x => x.value);
     if (!on.length) { alert('인쇄할 서식을 하나 이상 고르세요.'); return; }
     document.querySelectorAll('.gsheet').forEach(sh => sh.classList.toggle('gskip', !on.includes(sh.dataset.sheet)));
-    if (on.includes('letter') && !(GM && GM.no) && !confirm('공문 번호를 아직 받지 않았습니다. 번호 없이 인쇄할까요?')) return;
+    if (on.includes('letter') && !(GM && GM.no) && !confirm('아직 저장하지 않아 공문 번호가 없습니다. 번호 없이 인쇄할까요?\n(번호를 넣으려면 먼저 「저장」)')) return;
   }
   document.body.classList.add('print-doc');
   const off = () => { document.body.classList.remove('print-doc'); window.removeEventListener('afterprint', off); };
