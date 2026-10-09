@@ -437,6 +437,20 @@
   @media (min-width:641px) {
     .r.look, .r.look + .sbrow { margin-left:170px; }
   }
+  /* 카드결제 상자 — 계좌입금 상자와 같은 모양 · 왼쪽 파랑 줄 (2026-10-09 은정님) */
+  .sect.card { margin:0; padding:12px 14px 8px; background:#fff; color:#4E6E8E; font-weight:600;
+               border:1px solid #ECE8E3; border-left:3px solid #8AA6C1; border-bottom:none; border-radius:10px 10px 0 0; }
+  .cardbody { background:#fff; border:1px solid #ECE8E3; border-left:3px solid #8AA6C1; border-top:none;
+              border-radius:0 0 10px 10px; padding:2px 14px 14px; margin-bottom:4px; }
+  .cardbody .pay { margin-top:10px; }
+  /* 상자 안 왼쪽 시작점 하나 — 수업 줄의 빈 이름 칸을 없앤다 */
+  .cardbody .r.line .nm, .cardbody .r.sum .nm, .cardbody .r.sub2 .nm,
+  .cardbody .r.xdiffrow .nm, .cardbody .r.tot .nm { display:none; }
+  .cardbody .sbrow { padding-left:0; }
+  @media (min-width:641px) { .cardbody .r.look, .cardbody .r.look + .sbrow { margin-left:0; } }
+  /* 두 상자 사이 — 선 대신 틈 */
+  .sect.bank { margin-top:16px; }
+  .sect.bank::before { display:none; }
 </style>
 </head>
 <body>
@@ -2021,7 +2035,13 @@ function drawKid(c) {
         + '<div class="shortmust">발추 단추(이)를 눌러 켜 주세요.</div></div></div>';
   }
 
-  b += '<div class="sect">카드결제</div>';
+  // 카드결제도 계좌입금처럼 한 상자로 묶는다 · 제목에 카드로 내는 사업 (2026-10-09 은정님)
+  {
+    const cn = [];
+    groups.forEach(g => { if (g.support_type_id !== 2 && g.calc_type === '회기계산') { const n = TYPES[g.support_type_id]; if (n && cn.indexOf(n) < 0) cn.push(n); } });
+    if (groups.some(g => (g.items || []).some(it => it.group))) cn.push('그룹');
+    b += '<div class="sect card">카드결제' + (cn.length ? ' · ' + esc(cn.join(' · ')) : '') + '</div><div class="cardbody">';
+  }
 
   // 전월 이월은 아동당 한 줄만, 회기계산 항목이 다 끝난 뒤에 그린다
   let lastCoSt = null;
@@ -2268,7 +2288,8 @@ function drawKid(c) {
     + '<input class="tx knote" type="text" maxlength="500" placeholder="특이사항 (지울 때까지 달마다 그대로)" value="'
     + esc(PAYNOTE[String(c.id)] || '') + '">'
     + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
-    + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>';
+    + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>'
+    + '</div>';   // .cardbody 닫기
 
   const dev = groups.find(g => g.support_type_id === 2);
   if (dev) {
