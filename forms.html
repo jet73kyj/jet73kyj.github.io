@@ -1359,13 +1359,18 @@ async function gmUpdate() {
 }
 async function gmSaveBase() {
   const d = gmRead();
+  { const bb = $('gmBaseBtn'); if (bb) { if (bb.disabled) return; bb.disabled = true; bb.textContent = '저장 중…'; setTimeout(() => { bb.disabled = false; if (bb.textContent === '저장 중…') bb.textContent = '기관 공문 정보 저장'; }, 8000); } }
   const base = { boss: d.boss || '', addr: d.addr || '', tel: d.tel || '', fax: d.fax || '', mail: d.mail || '' };
   try {
     const { data, error } = await sb.from('nl_org_docs').upsert({ doc_key: 'gongmun:base', data: base, updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() }, { onConflict: 'doc_key' }).select('doc_key');
     if (error) throw error;
     if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
     GM_BASE = base; $('dvHint').textContent = '기관 공문 정보를 저장했습니다 · 다음 공문부터 자동으로 들어갑니다';
-  } catch (e) { alert('저장하지 못했습니다.\n' + (e.message || e)); }
+    // 단추 위에도 보이게 (안내 줄만으로는 눈에 안 띄었음 · 2026-10-10)
+    const bb = $('gmBaseBtn');
+    if (bb) { bb.disabled = false; bb.textContent = '✓ 저장했습니다'; bb.style.background = '#E8F5E9'; bb.style.borderColor = '#9CC7A6'; bb.style.color = '#2E6B3E';
+              setTimeout(() => { if (bb.isConnected) { bb.textContent = '기관 공문 정보 저장'; bb.style.background = ''; bb.style.borderColor = ''; bb.style.color = ''; } }, 3000); }
+  } catch (e) { const bb = $('gmBaseBtn'); if (bb) { bb.disabled = false; bb.textContent = '기관 공문 정보 저장'; } alert('저장하지 못했습니다.\n' + (e.message || e)); }
 }
 // 올해 저장한 공문 — 용지 아래에 번호 차례로 (2026-10-09 은정님) · 줄을 누르면 위에 열림
 async function gmLoadList() {
