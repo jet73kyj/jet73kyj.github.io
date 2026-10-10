@@ -181,6 +181,9 @@ const NSTATES = ['접수', '처리 중', '끝'];
 const NSCL = { '접수':'ns1', '처리 중':'ns2', '끝':'ns3' };
 let ME_ID = null, NOTES = [], NMSG = null, MKIND = 'all';
 let MTASKS = [], MNOTES = [], MOFF = {}, PREV = [];
+let KIDS = [];   // 아동 이름으로 고르기 (2026-10-10 은정님 — 번호를 외울 수 없음)
+function kidOf(id){ return KIDS.find(k => Number(k.id) === Number(id)); }
+function kidLabel(id){ const k = kidOf(id); if (!k) return id == null ? '' : id + '번 아동'; const b = String(k.birth || '').replace(/-/g, ''); return k.name + (b.length >= 8 ? ' ' + b.slice(2, 8) : ''); }
 // 열린 일지 칸 — { task: 할 일 번호 | 'free'(할 일 없이), note: 고치는 일지 번호 | null }
 let FORM = null;
 let MOVE = null;            // 날짜 옮기기 칸이 열린 할 일 번호
@@ -284,7 +287,7 @@ function noteRow(n){
   const on = FORM && FORM.note === n.id;
   return '<div class="wn' + (on ? ' edit' : '') + '">'
     + '<span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
-    + (n.note_date !== DAY ? dlab(n.note_date) + ' ' : '') + (n.note_time ? hm(n.note_time) + ' · ' : '') + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
+    + (n.note_date !== DAY ? dlab(n.note_date) + ' ' : '') + (n.note_time ? hm(n.note_time) + ' · ' : '') + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + esc(kidLabel(n.child_id)) : '')
     + (isComplaint(n.kind) ? ' <span class="kf" style="display:inline-flex;margin-left:6px">' + NSTATES.map(s => '<button type="button" data-ns="' + n.id + '" data-s="' + s + '" class="' + (n.state === s ? 'on' : '') + '">' + s + '</button>').join('') + '</span>' : '')
     + ' <button type="button" class="lnk" data-nedit="' + n.id + '">고치기</button> <button type="button" class="lnk" style="color:#c62828 !important" data-ndel="' + n.id + '">✕ 지우기</button>'
     + '<div class="ln">' + esc(n.content) + '</div>'
@@ -302,13 +305,16 @@ function formHtml(){
      + '<div style="grid-column:1/-1;font-size:13px;font-weight:600;color:#7E5530">' + (ed ? '업무일지 고치기' : t ? '업무일지 · ' + esc(t.title) : '추가 업무') + '</div>'
      + '<div><label>갈래</label><select id="wkind">' + KINDS.map(k => '<option' + (kind === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></div>'
      + '<div><label>시각</label><input type="time" id="wtime" value="' + (ed ? hm(ed.note_time) : nowHm()) + '"></div>'
-     + '<div><label>아동 번호 (없으면 비움)</label><input id="wchild" inputmode="numeric" placeholder="52" value="' + (ed && ed.child_id != null ? ed.child_id : '') + '" style="width:110px"></div>'
+     + '<div style="position:relative"><label>아동 (이름을 치면 목록이 나옵니다 · 없으면 비움)</label>'
+     + '<input id="wkidq" autocomplete="off" placeholder="아동 이름" value="' + esc(ed && ed.child_id != null ? kidLabel(ed.child_id) : '') + '" style="width:180px">'
+     + '<input type="hidden" id="wchild" value="' + (ed && ed.child_id != null ? ed.child_id : '') + '">'
+     + '<div id="wkidlist" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);margin-top:2px;min-width:220px;max-height:240px;overflow:auto"></div></div>'
      + '<div style="grid-column:1/-1"><label>내용 (반드시)</label><textarea id="wcontent" maxlength="2000">' + esc(ed ? ed.content : '') + '</textarea></div>'
      + '<div><label>개선 방향</label><textarea id="wimprove" maxlength="2000">' + esc(ed ? ed.improve : '') + '</textarea></div>'
      + '<div><label>결과</label><textarea id="wresult" maxlength="2000">' + esc(ed ? ed.result : '') + '</textarea></div>'
-     + '<div class="row" style="grid-column:1/-1"><button type="button" class="pri" id="wsave">' + (ed ? '고친 것 저장' : '일지 저장') + '</button>'
+     + '<div class="row" style="grid-column:1/-1"><button type="button" class="pri" id="wsave">' + (ed ? '고친 것 저장' : '저장') + '</button>'
      + '<button type="button" id="wcancel">그만</button><span id="wmsg" style="font-size:13px;font-weight:600"></span></div>'
-     + '<div class="note" style="grid-column:1/-1;margin-top:0">아동은 번호만 — 이름 · 연락처 · 진단명은 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
+     + '<div class="note" style="grid-column:1/-1;margin-top:0">아동은 위 칸에서 이름으로 고르세요 — 내용에는 연락처 · 진단명을 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
 }
 
 // 할 일 한 칸 — kind: 'today' 그 날 · 'cont' 이어서 하는 일(진행 중) · 'late' 지난 날 남은 일
@@ -418,7 +424,7 @@ function monthNotesHtml(){
   if (!ml.length) return '<span class="dim">없습니다.</span>';
   return ml.map(n => '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
       + '<a href="#" data-goday="' + n.note_date + '" style="color:var(--cam)">' + dlab(n.note_date) + '</a> ' + (n.note_time ? hm(n.note_time) : '')
-      + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
+      + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + esc(kidLabel(n.child_id)) : '')
       + (isComplaint(n.kind) && n.state ? ' <span class="bdg ' + (NSCL[n.state] || 'ns1') + '">' + esc(n.state) + '</span>' : '')
       + '<div class="ln">' + esc(n.content) + '</div>'
       + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
@@ -545,12 +551,37 @@ function bind(){
   });
   const wmsg = (t, ok) => { NMSG = { t, ok }; const m = $('wmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
   if ($('wcancel')) $('wcancel').onclick = () => { if (noteDraft() && !confirm('적은 것을 저장하지 않고 그만둘까요?')) return; FORM = null; draw(); };
+  // 아동 이름 고르기 (2026-10-10)
+  if ($('wkidq')) {
+    const q = $('wkidq'), lst = $('wkidlist');
+    const show = () => {
+      const t = q.value.trim();
+      if (!t) { lst.style.display = 'none'; return; }
+      const hit = KIDS.filter(k => String(k.name || '').indexOf(t) >= 0).slice(0, 12);
+      lst.innerHTML = hit.length ? hit.map(k => '<div data-kid="' + k.id + '" style="padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #F3F0EC">'
+          + esc(kidLabel(k.id)) + (k.status && k.status !== '치료중' ? ' <span class="dim">' + esc(k.status) + '</span>' : '') + '</div>').join('')
+        : '<div class="dim" style="padding:6px 10px;font-size:12.5px">맞는 아동이 없습니다</div>';
+      lst.style.display = 'block';
+      lst.querySelectorAll('[data-kid]').forEach(el => {
+        el.onmouseenter = () => { el.style.background = '#FBF5EE'; }; el.onmouseleave = () => { el.style.background = ''; };
+        el.onmousedown = e => { e.preventDefault(); $('wchild').value = el.dataset.kid; q.value = kidLabel(el.dataset.kid); lst.style.display = 'none'; };
+      });
+    };
+    q.addEventListener('input', () => { $('wchild').value = ''; show(); });
+    q.addEventListener('focus', show);
+    q.addEventListener('blur', () => setTimeout(() => { lst.style.display = 'none'; }, 150));
+  }
   if ($('wsave')) $('wsave').onclick = async () => {
     const b = $('wsave'); if (b.disabled) return;
     const content = $('wcontent').value.trim();
     if (!content) { wmsg('⚠ 내용을 적어 주세요', false); $('wcontent').focus(); return; }
+    // 아동 — 이름을 쳤는데 목록에서 안 골랐으면, 같은 이름이 한 명뿐일 때만 저절로 고름
+    if ($('wkidq').value.trim() && !$('wchild').value) {
+      const q = $('wkidq').value.trim(), hit = KIDS.filter(k => k.name === q);
+      if (hit.length === 1) $('wchild').value = hit[0].id;
+      else { wmsg(hit.length ? '⚠ 같은 이름이 ' + hit.length + '명 — 목록에서 골라 주세요' : '⚠ 목록에서 아동을 골라 주세요', false); $('wkidq').focus(); return; }
+    }
     const cv = $('wchild').value.trim();
-    if (cv && !/^\d{1,6}$/.test(cv)) { wmsg('⚠ 아동 번호는 숫자만 적어 주세요', false); return; }
     const row = { kind: $('wkind').value, note_time: $('wtime').value || null, child_id: cv ? Number(cv) : null,
                   content: content, improve: $('wimprove').value.trim() || null, result: $('wresult').value.trim() || null };
     b.disabled = true; b.textContent = '저장 중…';
@@ -558,7 +589,7 @@ function bind(){
                         : sb.from('nl_work_notes').insert(Object.assign({ note_date: DAY, staff_id: ME_ID, task_id: FORM.task === 'free' ? null : FORM.task }, row)).select('id');
     const { data, error } = await q;
     if (error || !data || !data.length) {
-      b.disabled = false; b.textContent = FORM.note ? '고친 것 저장' : '일지 저장';
+      b.disabled = false; b.textContent = FORM.note ? '고친 것 저장' : '저장';
       let why = error ? error.message : '저장된 줄을 돌려받지 못했습니다';
       if (/foreign key|child/i.test(why)) why = '그 번호의 아동이 없습니다. 아동 번호를 확인해 주세요.\n(' + why + ')';
       wmsg('❌ 저장하지 못했습니다', false); alert('업무일지를 저장하지 못했습니다.\n' + why); return;
@@ -729,6 +760,7 @@ $('home').onclick = () => { location.href = 'index.html'; };
   $('whoami').textContent = me.name + ' 님으로 로그인됨';
   const { data: st } = await sb.from('nl_therapists').select('id, name, role, left_on').order('id');
   STAFF = (st || []).filter(s => !s.left_on && !/치료사/.test(s.role || ''));
+  { const kr = await readAll(() => sb.from('nl_children').select('id, name, birth, status').order('name').order('id')); KIDS = kr.data || []; }
   DAY = today();
   load();
 })();
