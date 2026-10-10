@@ -209,7 +209,7 @@ function smsText(tid){
     t += '\n■ ' + kk + '\n';
     g[kk].forEach(r => {
       const it = (ITEM[r.item_no] || ['점검'])[0];
-      const det = rcNamed(r, id => KIDNM[id] || '', id => THNM[id] || '').replace(/\s+/g, ' ').trim();
+      const det = rcNamed(r, id => KIDNM[id] || '다른 아동', id => THNM[id] || '').replace(/\s+/g, ' ').trim();   // 번호가 문자에 안 남게 (2026-10-10)
       t += '· ' + (KIDNM[r.child_id] || '아동') + (r.on_date ? ' ' + md(r.on_date) : '') + ' — '
          + (r.item_no === 41 ? (r.kind && det.indexOf(r.kind) < 0 ? r.kind + ' · ' : '') : it + (det ? ': ' : '')) + det + '\n';
     });
