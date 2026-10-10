@@ -99,7 +99,7 @@
   .ovt tr.ovr.on td { background:#FBF5EE; font-weight:600; }
   #kindTabs { flex-wrap:wrap; align-items:center; }
   @media print {
-    .hd button, .hd select, .tabs2, .rc button, .legend, #thAll { display:none !important; }
+    .hd button, .hd select, .tabs2, .rc button, .legend, #thAll, .smsCopy, .smsMsg { display:none !important; }
     body { background:#fff; }
     .card { border:none; padding:0; }
     .rc select, .rc input { border:none; }
@@ -413,7 +413,7 @@ function draw(){
       const rs = base.filter(r => Number(r.therapist_id || 0) === tid);
       h += '<tr class="ovr' + (THF === tid ? ' on' : '') + '" data-t="' + tid + '">'
          + '<td>' + (tid ? tid + '번 ' + esc(THNM[tid] || '') : '담당 미상')
-         + ((isAdmin() && tid && smsRows(tid).length) ? ' <button class="smsCopy" data-t="' + tid + '" style="margin-left:6px;font-size:12px;padding:2px 9px;">📋 문자로 복사 (' + smsRows(tid).length + ')</button>'
+         + ((isAdmin() && tid && smsRows(tid).length) ? ' <button class="smsCopy" data-t="' + tid + '" title="선생님께 보낼 문자 복사 (' + smsRows(tid).length + '줄)" style="margin-left:4px;border:none;background:none;padding:0 3px;font-size:15px;line-height:1;cursor:pointer;vertical-align:middle;">📋</button>'
             + '<span class="smsMsg" data-t="' + tid + '" style="font-size:12px;margin-left:6px;color:var(--sage);"></span>' : '') + '</td>'
          + KINDS.map(x => { const n = rs.filter(r => r.kind === x).length; return '<td style="text-align:center;">' + (n || '·') + '</td>'; }).join('')
          + '<td style="text-align:center;">' + (rs.filter(r => r.item_no === 41).length || '·') + '</td>'
@@ -533,7 +533,7 @@ function draw(){
     const tid = Number(b.dataset.t), txt = smsText(tid);
     const ok = await copyText(txt);
     const m = document.querySelector('.smsMsg[data-t="' + tid + '"]');
-    if (ok) { if (m) m.textContent = '✓ 복사했습니다 — 문자 앱에 붙여 넣으세요'; }
+    if (ok) { if (m) { m.textContent = '✓ 복사됨'; setTimeout(() => { m.textContent = ''; }, 2500); } }
     else { prompt('복사가 막혀 있습니다. 아래 글을 Ctrl+C 로 복사해 주세요.', txt); }
   });
   document.querySelectorAll('.rc').forEach(box => {
