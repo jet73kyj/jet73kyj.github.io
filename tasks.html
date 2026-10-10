@@ -121,7 +121,9 @@ const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
 const sb = window.supabase.createClient(URL_, KEY_, { auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
 const $ = id => document.getElementById(id);
-const CAN_SEE = [8];
+// 원장님 · 행정(19) · 홍보(10) — 선생님은 내 것만 (2026-10-10)
+const CAN_SEE = [8, 19, 10];
+let IS_BOSS = false;
 const STATES = ['할 일', '하는 중', '끝냄', '미룸', '못 함'];
 const SCL = { '할 일':'s1', '하는 중':'s2', '끝냄':'s3', '미룸':'s4', '못 함':'s5' };
 // 화면 글자 — 서버 값 「하는 중」은 「진행 중」으로 보임 (2026-10-10)
@@ -339,7 +341,7 @@ function taskRow(t, kind){
     + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '하는 중' ? '할 일' : '하는 중') + '" class="' + (st === '하는 중' ? 'on2' : '') + '" title="' + (st === '하는 중' ? '다시 누르면 할 일로' : '끝낼 때까지 날마다 따라옴') + '">진행 중</button>'
     + (done ? '' : '<button type="button" data-mv="' + t.id + '">📅 날짜 옮기기</button>')
     + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '못 함' ? '할 일' : '못 함') + '" class="' + (st === '못 함' ? 'on5' : '') + '">못 함</button>'
-    + '<button type="button" data-del="' + t.id + '" title="지우기">✕</button></div>';
+    + (IS_BOSS ? '<button type="button" data-del="' + t.id + '" title="지우기">✕</button>' : '') + '</div>';
   h += '</div>';
   if (MOVE === t.id) h += '<div class="mv">옮길 날 <input type="date" id="mvday" min="' + addDay(t.task_date, 1) + '" value="' + addDay(DAY > t.task_date ? DAY : t.task_date, 1) + '">'
     + '<button type="button" class="pri" id="mvgo">옮기기</button><button type="button" id="mvno">그만</button>'
@@ -439,7 +441,7 @@ function draw(){
   const y = Number(DAY.slice(0, 4)), mo = Number(DAY.slice(5, 7));
   // ① 달력
   let h = '<div class="card"><div class="ct"><button type="button" id="mprev">‹</button><span>' + y + '년 ' + mo + '월</span><button type="button" id="mnext">›</button>'
-    + '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
+    + (IS_BOSS ? '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>' : '')
     + '<span style="flex:1"></span><button type="button" id="gotoday">오늘</button></div>'
     + calHtml()
     + '<div class="note">날짜를 누르면 아래에 그 날 할 일이 나옵니다. 칸 숫자 — 끝냄/할 일 (미룬 일은 뺌) · 일지 · 민원. 초록 = 다 끝냄 · 주황 = 남은 일 · 빨강 = 지난 날 남은 일이나 못 함</div></div>';
@@ -447,7 +449,7 @@ function draw(){
   h += '<div class="card" id="dayCard"><div class="ct">'
     + '<button type="button" id="dprev" title="앞 날">‹</button><span>' + dlab(DAY) + '</span><button type="button" id="dnext" title="다음 날">›</button>'
     + '<span class="dim" style="font-weight:400">' + tl.length + '개 중 끝냄 ' + done + ' · 업무일지 ' + NOTES.filter(n => n.note_date === DAY && (WHO === 'all' || Number(n.staff_id) === Number(WHO))).length + '</span>'
-    + '<span style="flex:1"></span><button type="button" id="remake">이 날 목록 다시 만들기</button></div>';
+    + '<span style="flex:1"></span>' + (IS_BOSS ? '<button type="button" id="remake">이 날 목록 다시 만들기</button>' : '') + '</div>';
   const lc = ll.filter(t => t.state === '하는 중'), lt = ll.filter(t => t.state !== '하는 중');
   if (lc.length) h += '<div class="glab">이어서 하는 일 ' + lc.length + ' — 진행 중 · 끝낼 때까지 날마다 따라옴</div>' + lc.map(t => taskRow(t, 'cont')).join('');
   if (lt.length) h += '<div class="glab red">지난 날 남은 일 ' + lt.length + '</div>' + lt.map(t => taskRow(t, 'late')).join('');
@@ -464,16 +466,16 @@ function draw(){
      + (freeOpen ? '' : '<button type="button" id="freeopen">＋ 추가 업무 적기</button>') + '</div>'
      + (free.length ? free.map(noteRow).join('') : (freeOpen ? '' : '<div class="dim" style="font-size:12.5px;margin-top:4px">없습니다.</div>'))
      + (freeOpen ? formHtml() : '') + '</div>';
-  // 할 일 맡기기
-  h += '<div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">'
+  // 할 일 맡기기 (원장님만)
+  if (IS_BOSS) h += '<div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">'
      + '<select id="nwho">' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
      + '<input type="date" id="nday" value="' + DAY + '">'
      + '<input id="ntitle" placeholder="맡길 일" style="flex:1 1 240px">'
-     + '<button type="button" class="pri" id="nadd">＋ 할 일 맡기기</button></div>'
-     + '<div id="tmsg" class="msg"></div></div>';
+     + '<button type="button" class="pri" id="nadd">＋ 할 일 맡기기</button></div>';
+  h += '<div id="tmsg" class="msg"></div></div>';
 
   // ③ 접은 묶음 — 늘 하는 일 설정 · 직원별 · 이 달 일지
-  h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 설정 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary><table>'
+  if (IS_BOSS) h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 설정 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary><table>'
      + '<tr><th>직원</th><th>할 일</th><th>주기</th><th>쉬는 날</th><th>기간</th><th></th></tr>'
      + RULES.map(r => '<tr data-rid="' + r.id + '" title="눌러서 고치기" class="rrow' + (r.active ? '' : ' dim') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + '</td>'
          + '<td>' + esc(ruleText(r)) + '</td>'
@@ -497,7 +499,7 @@ function draw(){
      + (EDIT_RID ? '<button type="button" id="rcancel">취소</button>' : '')
      + '<span id="rmsg"></span></div>'
      + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다. 날짜 상자의 반복하는 일 칸 「✕」로도 「이 날 것만 / 반복 자체」를 골라 지울 수 있습니다.</div></details>';
-  h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
+  if (IS_BOSS) h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
   h += '<details class="card fold" data-fold="mnotes"' + (FOLD.mnotes ? ' open' : '') + '><summary class="ct">이 달 업무일지 모아 보기</summary>'
      + '<div class="kf" style="margin-bottom:8px">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</div>'
      + '<div id="mlist">' + monthNotesHtml() + '</div></details>';
@@ -516,7 +518,7 @@ function bind(){
   $('gotoday').onclick = () => goDay(today());
   document.querySelectorAll('[data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday);
     setTimeout(() => { const c = $('dayCard'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); });
-  $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } FORM = null; WHO = $('wsel').value; draw(); };
+  if ($('wsel')) $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } FORM = null; WHO = $('wsel').value; draw(); };
   document.querySelectorAll('details.fold').forEach(dt => dt.addEventListener('toggle', () => { FOLD[dt.dataset.fold] = dt.open; saveFold(); }));
   document.querySelectorAll('button[data-mk]').forEach(b => b.onclick = () => {
     MKIND = b.dataset.mk;
@@ -524,13 +526,13 @@ function bind(){
     $('mlist').innerHTML = monthNotesHtml();
     document.querySelectorAll('#mlist [data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday); });
   });
-  $('remake').onclick = async () => {
+  if ($('remake')) $('remake').onclick = async () => {
     if (!leaveOk()) return;
     const { data, error } = await sb.rpc('nl_make_tasks', { p_date: DAY });
     if (error) { msg('❌ ' + error.message, false); return; }
     msg('늘 하는 일에서 ' + data + '개를 새로 넣었습니다.', true); FORM = null; load();
   };
-  $('nadd').onclick = async () => {
+  if ($('nadd')) $('nadd').onclick = async () => {
     const title = $('ntitle').value.trim();
     if (!title) { msg('맡길 일을 적어 주세요.', false); return; }
     if (!leaveOk()) return;
@@ -691,7 +693,8 @@ function bind(){
     DELQ = null; if (String(EDIT_RID) === String(r.id)) EDIT_RID = null;
     await load(); msg('✓ 반복하는 일 「' + r.title + '」 지웠습니다', true);
   };
-  // 늘 하는 일 설정
+  // 늘 하는 일 설정 (원장님만 — 선생님 화면에는 이 칸이 없음)
+  if (!$('radd')) return;
   const prev = () => { const d = dialRule(); $('rprev').textContent = d.err ? '⚠ ' + d.err : '→ ' + d.text; $('rprev').style.color = d.err ? '#c62828' : ''; };
   ['rmon', 'rwk', 'rday'].forEach(id => $(id).onchange = prev); prev();
   const rmsg = (t, ok) => { RMSG = { t, ok }; const m = $('rmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
@@ -757,6 +760,8 @@ $('home').onclick = () => { location.href = 'index.html'; };
   nlKeep(me.id);
   ME_ID = Number(me.id);
   if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="card err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+  IS_BOSS = ME_ID === 8;
+  if (!IS_BOSS) WHO = String(ME_ID);   // 선생님은 내 것만
   $('whoami').textContent = me.name + ' 님으로 로그인됨';
   const { data: st } = await sb.from('nl_therapists').select('id, name, role, left_on').order('id');
   STAFF = (st || []).filter(s => !s.left_on && !/치료사/.test(s.role || ''));
