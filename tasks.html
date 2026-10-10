@@ -16,6 +16,7 @@
          「📅 날짜 옮기기」 = 미룸 (뒤 날짜만 · 그 날에 할 일이 저절로 · 원래 날에 「→ ○로 옮김」)
          할 일에 업무일지를 새로 붙이지 않음 — 긴 기록은 「추가 업무」에서 (이미 붙은 일지는 「업무일지 n」으로 보이기만)
        오늘 화면을 열면 오늘 몫 늘 하는 일이 저절로 들어옴 (nl_make_tasks · 한 번만)
+       반복하는 일 칸 ✕ — 이 날 것만(nl_task_skips 에 적혀 다시 안 생김) / 반복 자체(오늘부터 앞날 「할 일」 칸 함께 지움 · 장치 trg_task_rule_del)
        늘 하는 일 설정 · 직원별 이 달 확인 · 이 달 업무일지 모아 보기 — 아래에 접어 둠
 -->
 <style>
@@ -183,6 +184,7 @@ let MTASKS = [], MNOTES = [], MOFF = {}, PREV = [];
 // 열린 일지 칸 — { task: 할 일 번호 | 'free'(할 일 없이), note: 고치는 일지 번호 | null }
 let FORM = null;
 let MOVE = null;            // 날짜 옮기기 칸이 열린 할 일 번호
+let DELQ = null;            // 「오늘 것만 / 반복 자체」 고르는 칸이 열린 할 일 번호
 const AUTO_MADE = {};       // 오늘 몫을 저절로 넣은 날 (한 번만)
 // 접은 묶음 (탭 닫으면 잊음)
 let FOLD = (() => { try { return JSON.parse(sessionStorage.getItem('nl_tasks_fold') || '{}'); } catch (e) { return {}; } })();
@@ -205,7 +207,7 @@ function noteDraft(){
 function memoDraft(){
   return [...document.querySelectorAll('textarea[data-memo]')].some(el => {
     const t = TASKS.concat(LATE).find(x => x.id === Number(el.dataset.memo));
-    return t && el.value.trim() !== (t.result || '');
+    return t && !el.dataset.saving && el.value.trim() !== (t.result || '');
   });
 }
 function leaveOk(){
@@ -273,6 +275,7 @@ async function load(){
   if (FORM && FORM.note && !NOTES.some(x => x.id === FORM.note)) FORM = null;
   if (FORM && FORM.task !== 'free' && !TASKS.concat(LATE).some(t => t.id === FORM.task)) FORM = null;
   if (MOVE && !TASKS.concat(LATE).some(t => t.id === MOVE)) MOVE = null;
+  if (DELQ && !TASKS.concat(LATE).some(t => t.id === DELQ)) DELQ = null;
   draw();
 }
 
@@ -335,6 +338,12 @@ function taskRow(t, kind){
   if (MOVE === t.id) h += '<div class="mv">옮길 날 <input type="date" id="mvday" min="' + addDay(t.task_date, 1) + '" value="' + addDay(DAY > t.task_date ? DAY : t.task_date, 1) + '">'
     + '<button type="button" class="pri" id="mvgo">옮기기</button><button type="button" id="mvno">그만</button>'
     + '<span class="dim" style="font-size:12px">고른 날에 이 일이 들어가고, 이 날에는 「→ 옮김」이 남습니다.</span></div>';
+  if (DELQ === t.id) { const rr = RULES.find(r => r.id === t.rule_id);
+    h += '<div class="mv" style="background:#FCEFEA">이 반복하는 일을 어떻게 지울까요?'
+      + '<button type="button" id="delone">이 날 것만 지우기</button>'
+      + (rr ? '<button type="button" id="delrule" style="color:#c62828;border-color:#efc9c9">반복 자체 지우기</button>' : '')
+      + '<button type="button" id="delno">그만</button>'
+      + '<span class="dim" style="font-size:12px;width:100%">이 날 것만 — 이 날은 다시 안 생깁니다. 반복 자체' + (rr ? ' (' + esc(ruleText(rr)) + ')' : '') + ' — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다.</span></div>'; }
   if (!moved) h += '<div class="memo"><textarea data-memo="' + t.id + '" maxlength="1000" placeholder="보완 메모 — 눌러서 적기 (칸을 벗어나면 저장)" class="' + (t.result ? 'has' : '') + '">' + esc(t.result || '') + '</textarea></div>';
   else if (t.result) h += '<div class="memo"><div class="dim" style="font-size:12.5px">메모 · ' + esc(t.result) + '</div></div>';
   if (tn.length) h += '<details class="lg"' + (noteOpen ? ' open' : '') + '><summary>업무일지 ' + tn.length + '</summary>' + tn.map(noteRow).join('') + '</details>';
@@ -353,7 +362,7 @@ function calHtml(){
     if (t.state === '미룸') return;
     const o = cell(t.task_date); o.n++;
     if (t.state === '끝냄') o.done++; if (t.state === '못 함') o.cant++;
-    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
+    if (t.state === '할 일' && t.task_date < td) o.left++;   // 진행 중은 일부러 이어서 하는 일이라 빨강에서 뺌 (2026-10-10)
   });
   MNOTES.filter(who).forEach(n => { const o = cell(n.note_date); if (isComplaint(n.kind)) o.nc++; else o.nt++; });
   let c = ['월', '화', '수', '목', '금', '토'].map(w => '<div class="h">' + w + '</div>').join('');
@@ -389,7 +398,7 @@ function staffHtml(){
     o.n++;
     if (t.state === '끝냄') o.done++;
     if (t.state === '못 함') o.cant.push(dlab(t.task_date) + ' ' + t.title + ' — ' + (t.reason || ''));
-    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
+    if (t.state === '할 일' && t.task_date < td) o.left++;   // 진행 중은 일부러 이어서 하는 일이라 빨강에서 뺌 (2026-10-10)
   });
   MNOTES.filter(who).forEach(n => { const o = get(n.staff_id); o.notes++; if (isComplaint(n.kind)) o.comp++; });
   const ks = Object.keys(g);
@@ -481,7 +490,7 @@ function draw(){
      + '<button type="button" class="pri" id="radd">' + (EDIT_RID ? '저장' : '＋ 더하기') + '</button>'
      + (EDIT_RID ? '<button type="button" id="rcancel">취소</button>' : '')
      + '<span id="rmsg"></span></div>'
-     + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 지워도 이미 만들어진 지난 할 일은 그대로 남습니다.</div></details>';
+     + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다. 날짜 상자의 반복하는 일 칸 「✕」로도 「이 날 것만 / 반복 자체」를 골라 지울 수 있습니다.</div></details>';
   h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
   h += '<details class="card fold" data-fold="mnotes"' + (FOLD.mnotes ? ' open' : '') + '><summary class="ct">이 달 업무일지 모아 보기</summary>'
      + '<div class="kf" style="margin-bottom:8px">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</div>'
@@ -600,7 +609,9 @@ function bind(){
       const t = TASKS.concat(LATE).find(x => x.id === Number(el.dataset.memo)); if (!t) return;
       const v = el.value.trim();
       if (v === (t.result || '')) return;
+      el.dataset.saving = '1';
       const { data, error } = await sb.from('nl_tasks').update({ result: v || null }).eq('id', t.id).select('id, result');
+      delete el.dataset.saving;
       if (error || !data || !data.length) { alert('보완 메모를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return; }
       t.result = data[0].result; el.classList.toggle('has', !!t.result);
       msg('✓ 보완 메모를 저장했습니다 — ' + t.title, true);
@@ -622,6 +633,8 @@ function bind(){
   };
   document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
     const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.del)); if (!t) return;
+    // 반복하는 일 — 「이 날 것만 / 반복 자체」 고르기 (2026-10-10)
+    if (t.source === '늘 하는 일' && t.rule_id) { if (!leaveOk()) return; DELQ = DELQ === t.id ? null : t.id; MOVE = null; FORM = null; draw(); return; }
     const tn = NOTES.filter(n => n.task_id === t.id).length;
     if (!confirm('이 할 일을 지울까요?\n' + t.title + (tn ? '\n\n딸린 업무일지 ' + tn + '개는 남고, 「추가 업무」로 옮겨집니다.' : ''))) return;
     if (!leaveOk()) return;
@@ -629,6 +642,24 @@ function bind(){
     if (error || !data || !data.length) { msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
     FORM = null; load();
   });
+  if ($('delno')) $('delno').onclick = () => { DELQ = null; draw(); };
+  if ($('delone')) $('delone').onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === DELQ); if (!t) return;
+    const b = $('delone'); if (b.disabled) return; b.disabled = true;
+    const { data, error } = await sb.from('nl_tasks').delete().eq('id', t.id).select('id');
+    if (error || !data || !data.length) { b.disabled = false; msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    DELQ = null; await load(); msg('✓ ' + dlab(t.task_date) + ' 「' + t.title + '」 지웠습니다 — 이 날은 다시 안 생깁니다', true);
+  };
+  if ($('delrule')) $('delrule').onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === DELQ); if (!t) return;
+    const r = RULES.find(x => x.id === t.rule_id); if (!r) return;
+    if (!confirm('「' + r.title + '」 · ' + ruleText(r) + '\n\n반복 자체를 지울까요?\n\n오늘부터 앞날의 「할 일」 칸도 함께 지워집니다.\n끝낸 칸 · 지난 기록은 남습니다.')) return;
+    const b = $('delrule'); if (b.disabled) return; b.disabled = true;
+    const { data, error } = await sb.from('nl_task_rules').delete().eq('id', r.id).select('id');
+    if (error || !data || !data.length) { b.disabled = false; msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    DELQ = null; if (String(EDIT_RID) === String(r.id)) EDIT_RID = null;
+    await load(); msg('✓ 반복하는 일 「' + r.title + '」 지웠습니다', true);
+  };
   // 늘 하는 일 설정
   const prev = () => { const d = dialRule(); $('rprev').textContent = d.err ? '⚠ ' + d.err : '→ ' + d.text; $('rprev').style.color = d.err ? '#c62828' : ''; };
   ['rmon', 'rwk', 'rday'].forEach(id => $(id).onchange = prev); prev();
@@ -672,7 +703,7 @@ function bind(){
   };
   document.querySelectorAll('button[data-rdel]').forEach(b => b.onclick = async () => {
     const r = RULES.find(x => x.id === Number(b.dataset.rdel)); if (!r) return;
-    if (!confirm('「' + r.title + '」 · ' + ruleText(r) + '\n\n이 늘 하는 일을 지울까요?\n\n이미 만들어진 지난 할 일은 그대로 남습니다.\n잠시 멈추기만 하려면 「끄기」를 누르세요.')) return;
+    if (!confirm('「' + r.title + '」 · ' + ruleText(r) + '\n\n이 늘 하는 일을 지울까요?\n\n오늘부터 앞날의 「할 일」 칸도 함께 지워집니다.\n끝낸 칸 · 지난 기록은 그대로 남습니다.\n잠시 멈추기만 하려면 「끄기」를 누르세요.')) return;
     const { data, error } = await sb.from('nl_task_rules').delete().eq('id', r.id).select('id');
     if (error || !data || !data.length) { alert('지우지 못했습니다.\n' + (error ? error.message : '지운 줄을 돌려받지 못했습니다')); return; }
     if (String(EDIT_RID) === String(r.id)) EDIT_RID = null;
