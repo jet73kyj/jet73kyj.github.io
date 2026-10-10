@@ -11,7 +11,11 @@
        업무일지 nl_work_notes (+ task_id 어느 할 일 · 비면 「추가 업무」 — 민원 · 기타)
        앞날 예정 nl_task_preview(시작, 끝) — 늘 하는 일이 그날 새벽에 할 일로 생길 예정 (셈은 nl_task_rule_due 한 곳)
        늘 하는 일을 저장하면 오늘 몫을 바로 만듦 (nl_make_tasks)
-       결과는 업무일지 결과 칸에 (nl_tasks.result 는 화면에서 쓰지 않음 · 적힌 것이 있으면 보이기만)
+       할 일 칸 (2026-10-10 은정님) — 넓은 둥근 칸 · 체크 상자(끝냄 ↔ 할 일) · 보완 메모 한 줄(nl_tasks.result · 칸을 벗어나면 저장)
+         「진행 중」(서버 값은 「하는 중」 그대로 · 화면 글자만) — 끝낼 때까지 날마다 「이어서 하는 일」로 따라옴
+         「📅 날짜 옮기기」 = 미룸 (뒤 날짜만 · 그 날에 할 일이 저절로 · 원래 날에 「→ ○로 옮김」)
+         할 일에 업무일지를 새로 붙이지 않음 — 긴 기록은 「추가 업무」에서 (이미 붙은 일지는 「업무일지 n」으로 보이기만)
+       오늘 화면을 열면 오늘 몫 늘 하는 일이 저절로 들어옴 (nl_make_tasks · 한 번만)
        늘 하는 일 설정 · 직원별 이 달 확인 · 이 달 업무일지 모아 보기 — 아래에 접어 둠
 -->
 <style>
@@ -77,6 +81,27 @@
   details.fold[open] > summary::before { content:'▾'; } details.fold[open] > summary { margin-bottom:10px; }
   .tk .t[data-topen] { cursor:pointer; border-radius:6px; } .tk .t[data-topen]:hover { background:#FBF5EE; }
   .tk.topen > .t { background:#F8F1E8; }
+  /* 할 일 칸 (2026-10-10) */
+  .tc { border:1.5px solid #E6DED4; border-radius:16px; padding:12px 16px; margin-bottom:10px; background:#fff; }
+  .tc.done { background:#F3F8EF; border-color:#BFD9B0; } .tc.cont { background:#FFFBF5; border-color:#E8C9A6; }
+  .tc.cant { background:#FCF3F0; border-color:#F2D3C8; } .tc.moved { background:#FAFAF8; border-style:dashed; border-color:#D9D3CC; }
+  .tc .top { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .tc .cb { width:24px; height:24px; border:2px solid var(--cam); border-radius:6px; flex:none; background:#fff; padding:0; margin-top:1px;
+            display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:15px; line-height:1; }
+  .tc .cb:hover { background:var(--camL); } .tc.done .cb { background:var(--sage); border-color:var(--sage); }
+  .tc .cb:disabled { border-color:#D9D3CC; background:#FAFAF8; cursor:default; }
+  .tc .tt { flex:1 1 260px; min-width:0; font-size:15.5px; font-weight:700; line-height:1.45; }
+  .tc.done .tt { color:#5E7A63; } .tc.moved .tt { color:#8A817A; }
+  .tc .sub { font-size:12px; color:#8A817A; font-weight:400; margin-top:2px; }
+  .tc .sb { display:flex; gap:4px; flex-wrap:wrap; }
+  .tc .sb button { font-size:12px; border:1px solid #E6E2DD; border-radius:12px; padding:2px 10px; color:#6b635c; }
+  .tc .sb button.on2 { background:#FAEEDA; border-color:#E8C9A6; color:#633806; } .tc .sb button.on5 { background:#D8684A; border-color:#D8684A; color:#fff; }
+  .tc .memo { margin:10px 0 0 36px; }
+  .tc .memo textarea { min-height:34px; height:34px; background:#FBFAF8; border-color:#ECE8E3; padding:6px 10px; }
+  .tc .memo textarea.has { background:#FBF5EE; border-color:#F0E4D6; } .tc .memo textarea:focus { background:#fff; border-color:var(--camB); outline:none; }
+  .tc .mv { margin:10px 0 0 36px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; background:#F8F1E8; border-radius:10px; padding:8px 10px; font-size:13px; }
+  .tc .lg { margin:8px 0 0 36px; font-size:12.5px; } .tc .lg summary { color:var(--cam); cursor:pointer; }
+  .glab { font-size:12px; font-weight:700; color:var(--cam); margin:12px 0 6px; } .glab.red { color:var(--coral); }
   .kf button { padding:3px 9px; font-size:12px; } .kf button.on { background:var(--camL); border-color:var(--camB); }
 </style>
 </head>
@@ -98,6 +123,8 @@ const $ = id => document.getElementById(id);
 const CAN_SEE = [8];
 const STATES = ['할 일', '하는 중', '끝냄', '미룸', '못 함'];
 const SCL = { '할 일':'s1', '하는 중':'s2', '끝냄':'s3', '미룸':'s4', '못 함':'s5' };
+// 화면 글자 — 서버 값 「하는 중」은 「진행 중」으로 보임 (2026-10-10)
+const SLAB = s => s === '하는 중' ? '진행 중' : s;
 const WD = ['일','월','화','수','목','금','토'];
 // 늘 하는 일 주기 — 월 · 주 · 일 다이얼 셋 (2026-10-09 은정님) · 「적용 없음」 칸은 따지지 않음
 const WK = ['', '첫째', '둘째', '셋째', '넷째', '마지막'];   // 5 = 마지막 주 (그 달의 마지막 그 요일)
@@ -155,6 +182,8 @@ let ME_ID = null, NOTES = [], NMSG = null, MKIND = 'all';
 let MTASKS = [], MNOTES = [], MOFF = {}, PREV = [];
 // 열린 일지 칸 — { task: 할 일 번호 | 'free'(할 일 없이), note: 고치는 일지 번호 | null }
 let FORM = null;
+let MOVE = null;            // 날짜 옮기기 칸이 열린 할 일 번호
+const AUTO_MADE = {};       // 오늘 몫을 저절로 넣은 날 (한 번만)
 // 접은 묶음 (탭 닫으면 잊음)
 let FOLD = (() => { try { return JSON.parse(sessionStorage.getItem('nl_tasks_fold') || '{}'); } catch (e) { return {}; } })();
 function saveFold(){ try { sessionStorage.setItem('nl_tasks_fold', JSON.stringify(FOLD)); } catch (e) {} }
@@ -172,11 +201,19 @@ function noteDraft(){
   }
   return ['wcontent', 'wimprove', 'wresult'].some(id => $(id).value.trim());
 }
+// 적고 저장 안 한 보완 메모 (칸을 벗어나면 저장되지만, 칸 안에 있는 채로 넘어갈 때)
+function memoDraft(){
+  return [...document.querySelectorAll('textarea[data-memo]')].some(el => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(el.dataset.memo));
+    return t && el.value.trim() !== (t.result || '');
+  });
+}
 function leaveOk(){
+  if (memoDraft()) { if (!confirm('저장하지 않은 보완 메모가 있습니다.\n저장하지 않고 넘어갈까요?')) return false; }
   if (!noteDraft()) return true;
   return confirm('저장하지 않은 업무일지가 있습니다.\n저장하지 않고 넘어갈까요?');
 }
-window.addEventListener('beforeunload', e => { if (noteDraft()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (noteDraft() || memoDraft()) { e.preventDefault(); e.returnValue = ''; } });
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function today(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function dlab(d){ const x = new Date(d + 'T00:00:00'); return (x.getMonth()+1) + '/' + x.getDate() + '(' + WD[x.getDay()] + ')'; }
@@ -221,6 +258,12 @@ async function load(){
     const { data: pv, error: pe } = await sb.rpc('nl_task_preview', { p_from: pf, p_to: to });
     if (!pe) PREV = pv || [];
   }
+  // 오늘 화면이면 오늘 몫 늘 하는 일을 저절로 넣음 (흐린 「예정」으로 남지 않게 · 한 번만)
+  if (DAY === today() && !AUTO_MADE[DAY] && PREV.some(x => x.on_date === DAY)) {
+    AUTO_MADE[DAY] = true;
+    const mk = await sb.rpc('nl_make_tasks', { p_date: DAY });
+    if (!mk.error && Number(mk.data) > 0) return load();
+  }
   // 지난 날 남은 일에 딸린 일지도 보이게 (그 일이 다른 날에 있어도)
   const lateIds = LATE.map(t => t.id);
   if (lateIds.length) {
@@ -229,6 +272,7 @@ async function load(){
   }
   if (FORM && FORM.note && !NOTES.some(x => x.id === FORM.note)) FORM = null;
   if (FORM && FORM.task !== 'free' && !TASKS.concat(LATE).some(t => t.id === FORM.task)) FORM = null;
+  if (MOVE && !TASKS.concat(LATE).some(t => t.id === MOVE)) MOVE = null;
   draw();
 }
 
@@ -264,23 +308,39 @@ function formHtml(){
      + '<div class="note" style="grid-column:1/-1;margin-top:0">아동은 번호만 — 이름 · 연락처 · 진단명은 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
 }
 
-function taskRow(t, late){
+// 할 일 한 칸 — kind: 'today' 그 날 · 'cont' 이어서 하는 일(진행 중) · 'late' 지난 날 남은 일
+function dayGap(a, b){ return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000); }
+function taskRow(t, kind){
   const tn = NOTES.filter(n => n.task_id === t.id);
-  const open = FORM && FORM.task === t.id && !FORM.note;
-  return '<div class="tk' + (open ? ' topen' : '') + '">'
-    + '<div class="t" data-topen="' + t.id + '" title="눌러서 이 일의 업무일지">' + (late ? '<b style="color:var(--coral)">' + dlab(t.task_date) + '</b> · ' : '')
-    + (WHO === 'all' ? '<span class="dim">' + esc(stName(t.staff_id)) + '</span> · ' : '')
-    + esc(t.title) + '<span class="src">' + esc(t.source) + '</span>'
-    + (tn.length ? ' <span class="bdg k1">일지 ' + tn.length + '</span>' : '')
-    + (t.reason ? '<div class="dim" style="font-size:12.5px">사유 · ' + esc(t.reason) + '</div>' : '')
-    + (t.moved_to ? '<div class="dim" style="font-size:12.5px">→ ' + dlab(t.moved_to) + '로 미룸</div>' : '')
-    + (t.result ? '<div class="res">결과 · ' + esc(t.result) + '</div>' : '')
-    + '</div>'
-    + '<div class="st">' + STATES.map(s => '<button type="button" data-tk="' + t.id + '" data-s="' + s + '" class="' + (t.state === s ? 'on ' + SCL[s] : '') + '">' + s + '</button>').join('')
-    + ' <button type="button" data-del="' + t.id + '" title="지우기">✕</button></div>'
-    + '<div style="flex:1 1 100%">' + tn.map(noteRow).join('') + (open ? formHtml() : '') + '</div>'
-    + '</div>';
+  const st = t.state, done = st === '끝냄', moved = st === '미룸';
+  const cls = done ? ' done' : moved ? ' moved' : st === '못 함' ? ' cant' : st === '하는 중' ? ' cont' : '';
+  const sub = [];
+  if (WHO === 'all') sub.push(esc(stName(t.staff_id)));
+  sub.push(t.source === '맡김' ? '맡긴 일' : esc(t.source || ''));
+  if (kind === 'cont') sub.push(dlab(t.task_date) + '부터 · ' + (dayGap(t.task_date, DAY) + 1) + '일째 진행 중');
+  else if (kind === 'late') sub.push('<b style="color:var(--coral)">' + dlab(t.task_date) + ' 할 일</b>');
+  else if (st === '하는 중') sub.push('진행 중');
+  if (moved && t.moved_to) sub.push('→ ' + dlab(t.moved_to) + '로 옮김');
+  if (st === '못 함' && t.reason) sub.push('못 함 · ' + esc(t.reason));
+  const noteOpen = FORM && FORM.note && tn.some(n => n.id === FORM.note);
+  let h = '<div class="tc' + cls + '"><div class="top">'
+    + '<button type="button" class="cb" data-chk="' + t.id + '" title="' + (done ? '체크 풀기 (할 일로)' : '체크하면 끝냄') + '"' + (moved ? ' disabled' : '') + '>' + (done ? '✓' : '') + '</button>'
+    + '<div class="tt">' + esc(t.title) + '<div class="sub">' + sub.filter(Boolean).join(' · ') + '</div></div>';
+  if (!moved) h += '<div class="sb">'
+    + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '하는 중' ? '할 일' : '하는 중') + '" class="' + (st === '하는 중' ? 'on2' : '') + '" title="' + (st === '하는 중' ? '다시 누르면 할 일로' : '끝낼 때까지 날마다 따라옴') + '">진행 중</button>'
+    + (done ? '' : '<button type="button" data-mv="' + t.id + '">📅 날짜 옮기기</button>')
+    + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '못 함' ? '할 일' : '못 함') + '" class="' + (st === '못 함' ? 'on5' : '') + '">못 함</button>'
+    + '<button type="button" data-del="' + t.id + '" title="지우기">✕</button></div>';
+  h += '</div>';
+  if (MOVE === t.id) h += '<div class="mv">옮길 날 <input type="date" id="mvday" min="' + addDay(t.task_date, 1) + '" value="' + addDay(DAY > t.task_date ? DAY : t.task_date, 1) + '">'
+    + '<button type="button" class="pri" id="mvgo">옮기기</button><button type="button" id="mvno">그만</button>'
+    + '<span class="dim" style="font-size:12px">고른 날에 이 일이 들어가고, 이 날에는 「→ 옮김」이 남습니다.</span></div>';
+  if (!moved) h += '<div class="memo"><textarea data-memo="' + t.id + '" maxlength="1000" placeholder="보완 메모 — 눌러서 적기 (칸을 벗어나면 저장)" class="' + (t.result ? 'has' : '') + '">' + esc(t.result || '') + '</textarea></div>';
+  else if (t.result) h += '<div class="memo"><div class="dim" style="font-size:12.5px">메모 · ' + esc(t.result) + '</div></div>';
+  if (tn.length) h += '<details class="lg"' + (noteOpen ? ' open' : '') + '><summary>업무일지 ' + tn.length + '</summary>' + tn.map(noteRow).join('') + '</details>';
+  return h + '</div>';
 }
+function addDay(d, k){ const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + k); return ymd(x); }
 
 // 달력 (월~토 · 일요일은 뺌)
 function calHtml(){
@@ -373,13 +433,15 @@ function draw(){
     + '<button type="button" id="dprev" title="앞 날">‹</button><span>' + dlab(DAY) + '</span><button type="button" id="dnext" title="다음 날">›</button>'
     + '<span class="dim" style="font-weight:400">' + tl.length + '개 중 끝냄 ' + done + ' · 업무일지 ' + NOTES.filter(n => n.note_date === DAY && (WHO === 'all' || Number(n.staff_id) === Number(WHO))).length + '</span>'
     + '<span style="flex:1"></span><button type="button" id="remake">이 날 목록 다시 만들기</button></div>';
-  if (ll.length) h += '<div class="late"><b style="color:var(--coral)">지난 날 남은 일 ' + ll.length + '</b>' + ll.map(t => taskRow(t, true)).join('') + '</div>';
+  const lc = ll.filter(t => t.state === '하는 중'), lt = ll.filter(t => t.state !== '하는 중');
+  if (lc.length) h += '<div class="glab">이어서 하는 일 ' + lc.length + ' — 진행 중 · 끝낼 때까지 날마다 따라옴</div>' + lc.map(t => taskRow(t, 'cont')).join('');
+  if (lt.length) h += '<div class="glab red">지난 날 남은 일 ' + lt.length + '</div>' + lt.map(t => taskRow(t, 'late')).join('');
   const pl = PREV.filter(x => x.on_date === DAY && (WHO === 'all' || Number(x.staff_id) === Number(WHO)));
-  h += tl.length ? tl.map(t => taskRow(t, false)).join('') : (pl.length ? '' : '<div class="dim">이 날 할 일이 없습니다.</div>');
-  if (pl.length) h += '<div style="margin-top:6px;background:#FAFAF8;border:1px dashed var(--line);border-radius:8px;padding:8px 10px">'
-     + '<div class="dim" style="font-size:12.5px;margin-bottom:4px">' + (DAY === today() ? '늘 하는 일 — 아직 오늘 목록에 안 들어감 (「이 날 목록 다시 만들기」를 누르면 들어옵니다)' : '예정 — 그날 새벽 5시에 할 일로 들어옵니다') + '</div>'
-     + pl.map(x => '<div class="dim" style="font-size:13px;padding:3px 0">' + (WHO === 'all' ? esc(stName(x.staff_id)) + ' · ' : '') + esc(x.title) + ' <span class="src">늘 하는 일</span></div>').join('') + '</div>';
-  h += '<div class="note" style="margin-top:4px">할 일 글을 누르면 그 일의 업무일지를 적습니다 (끝냄을 누르면 저절로 열림 · 적지 않아도 끝냄).</div>';
+  if (ll.length && (tl.length || pl.length)) h += '<div class="glab">' + (DAY === today() ? '오늘' : dlab(DAY)) + ' 할 일</div>';
+  h += tl.length ? tl.map(t => taskRow(t, 'today')).join('') : (pl.length ? '' : '<div class="dim">이 날 할 일이 없습니다.</div>');
+  if (pl.length) h += pl.map(x => '<div class="tc moved"><div class="top"><button type="button" class="cb" disabled></button><div class="tt">' + esc(x.title)
+     + '<div class="sub">' + (WHO === 'all' ? esc(stName(x.staff_id)) + ' · ' : '') + '늘 하는 일 · 예정 — ' + (DAY === today() ? '「이 날 목록 다시 만들기」를 누르면 들어옵니다' : '그날 새벽 5시에 들어옵니다') + '</div></div></div></div>').join('');
+  h += '<div class="note" style="margin-top:4px">끝내면 체크 · 며칠 걸리는 일은 「진행 중」(끝낼 때까지 날마다 따라옴) · 다른 날로 미룰 때는 「📅 날짜 옮기기」. 길게 남길 기록과 민원은 아래 「추가 업무」에 적습니다.</div>';
   // 추가 업무 (할 일에 붙지 않은 일지)
   const freeOpen = FORM && FORM.task === 'free' && !FORM.note;
   h += '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'
@@ -467,7 +529,6 @@ function bind(){
     if (!leaveOk()) return;
     FORM = f; NMSG = null; draw(); if ($('wcontent')) $('wcontent').focus();
   };
-  document.querySelectorAll('[data-topen]').forEach(el => el.onclick = () => openForm({ task: Number(el.dataset.topen), note: null }));
   if ($('freeopen')) $('freeopen').onclick = () => openForm({ task: 'free', note: null });
   document.querySelectorAll('button[data-nedit]').forEach(b => b.onclick = () => {
     const n = NOTES.find(x => x.id === Number(b.dataset.nedit)); if (!n) return;
@@ -520,16 +581,45 @@ function bind(){
     if (!leaveOk()) return;
     const up = { state: s };
     if (s === '못 함') { const w = prompt('못 한 까닭을 적어 주세요. (반드시)', t.reason || ''); if (w === null || !w.trim()) return; up.reason = w.trim(); }
-    if (s === '미룸') {
-      const d = prompt('며칠로 미룰까요? (예: 2026-10-12)', ''); if (d === null) return;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.trim()) || d.trim() <= t.task_date) { msg('미룰 날은 그 날 뒤 날짜로 적어 주세요 (2026-10-12 모양).', false); return; }
-      up.moved_to = d.trim();
-    }
     const { data, error } = await sb.from('nl_tasks').update(up).eq('id', t.id).select('id');
     if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
-    FORM = (s === '끝냄') ? { task: t.id, note: null } : null;   // 끝냄이면 그 일의 일지 칸을 엶 (적지 않아도 됨)
-    load();
+    FORM = null; MOVE = null; load();
   });
+  // 체크 상자 — 끝냄 ↔ 할 일
+  document.querySelectorAll('button[data-chk]').forEach(b => b.onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.chk)); if (!t || t.state === '미룸') return;
+    if (b.disabled) return; b.disabled = true;
+    const ns = t.state === '끝냄' ? '할 일' : '끝냄';
+    const { data, error } = await sb.from('nl_tasks').update({ state: ns }).eq('id', t.id).select('id');
+    if (error || !data || !data.length) { b.disabled = false; msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    MOVE = null; load();
+  });
+  // 보완 메모 — 칸을 벗어나면 저장
+  document.querySelectorAll('textarea[data-memo]').forEach(el => {
+    el.addEventListener('blur', async () => {
+      const t = TASKS.concat(LATE).find(x => x.id === Number(el.dataset.memo)); if (!t) return;
+      const v = el.value.trim();
+      if (v === (t.result || '')) return;
+      const { data, error } = await sb.from('nl_tasks').update({ result: v || null }).eq('id', t.id).select('id, result');
+      if (error || !data || !data.length) { alert('보완 메모를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return; }
+      t.result = data[0].result; el.classList.toggle('has', !!t.result);
+      msg('✓ 보완 메모를 저장했습니다 — ' + t.title, true);
+    });
+  });
+  // 날짜 옮기기 (= 미룸 · 뒤 날짜만)
+  document.querySelectorAll('button[data-mv]').forEach(b => b.onclick = () => {
+    if (!leaveOk()) return; MOVE = MOVE === Number(b.dataset.mv) ? null : Number(b.dataset.mv); FORM = null; draw();
+  });
+  if ($('mvno')) $('mvno').onclick = () => { MOVE = null; draw(); };
+  if ($('mvgo')) $('mvgo').onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === MOVE); if (!t) return;
+    const d = $('mvday').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d <= t.task_date) { msg('옮길 날은 ' + dlab(t.task_date) + ' 뒤 날짜로 골라 주세요.', false); return; }
+    const b = $('mvgo'); if (b.disabled) return; b.disabled = true; b.textContent = '옮기는 중…';
+    const { data, error } = await sb.from('nl_tasks').update({ state: '미룸', moved_to: d }).eq('id', t.id).select('id');
+    if (error || !data || !data.length) { b.disabled = false; b.textContent = '옮기기'; msg('❌ 옮기지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    MOVE = null; msg('✓ ' + dlab(d) + '로 옮겼습니다 — ' + t.title, true); await load(); msg('✓ ' + dlab(d) + '로 옮겼습니다 — ' + t.title, true);
+  };
   document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
     const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.del)); if (!t) return;
     const tn = NOTES.filter(n => n.task_id === t.id).length;
