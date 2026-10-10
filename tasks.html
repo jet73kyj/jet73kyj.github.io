@@ -7,9 +7,11 @@
 <!-- 할 일 목록 — 지금은 원장님(8번)만 (2026-10-07 은정님 · 신규 직원 채용 뒤 직원 화면을 엶)
      표 nl_task_rules(늘 하는 일) · nl_tasks(날마다 할 일) · 새벽 5시 nl_make_tasks 가 그날 목록을 만듦
      상태 — 할 일 · 하는 중 · 끝냄 · 미룸(다른 날로 · 그 날에 「미룬 일」이 저절로) · 못 함(사유 반드시)
-     업무일지 (2026-10-10) — 갈래 셋: 하루 보기 · 한 달 보기 · 늘 하는 일
-       할 일 결과 칸 nl_tasks.result (끝냄을 누르면 결과 칸이 열림 · 적지 않아도 끝냄)
-       업무일지 nl_work_notes — 하루 보기에서 적고 고침 · 한 달 보기에서 달력 · 직원별 표 · 일지 목록 -->
+     업무일지 (2026-10-10 · 한 화면) — 달력 → 날짜를 누르면 그 날 할 일 → 할 일 글을 누르면 그 일의 업무일지
+       업무일지 nl_work_notes (+ task_id 어느 할 일 · 비면 「할 일 없이 적은 일지」 — 민원 · 기타)
+       결과는 업무일지 결과 칸에 (nl_tasks.result 는 화면에서 쓰지 않음 · 적힌 것이 있으면 보이기만)
+       늘 하는 일 설정 · 직원별 이 달 확인 · 이 달 업무일지 모아 보기 — 아래에 접어 둠
+-->
 <style>
   :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
          --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --sage:#5E9A6E; --coral:#D8684A; --coralL:#FCEFEA; }
@@ -67,6 +69,12 @@
   .cal .c.sel { border:2px solid var(--cam); padding:4px 5px; } .cal .c.blank { border:none; cursor:default; background:none; }
   .cal .ok3 { color:#3B6D11; } .cal .ok2 { color:#854F0B; } .cal .bad { color:#A32D2D; }
   .kf { display:flex; gap:4px; flex-wrap:wrap; }
+  details.fold > summary { cursor:pointer; list-style:none; margin:0; }
+  details.fold > summary::-webkit-details-marker { display:none; }
+  details.fold > summary::before { content:'▸'; color:var(--cam); margin-right:2px; }
+  details.fold[open] > summary::before { content:'▾'; } details.fold[open] > summary { margin-bottom:10px; }
+  .tk .t[data-topen] { cursor:pointer; border-radius:6px; } .tk .t[data-topen]:hover { background:#FBF5EE; }
+  .tk.topen > .t { background:#F8F1E8; }
   .kf button { padding:3px 9px; font-size:12px; } .kf button.on { background:var(--camL); border-color:var(--camB); }
 </style>
 </head>
@@ -136,141 +144,244 @@ function dialRule() {
 }
 let STAFF = [], TASKS = [], LATE = [], RULES = [], DAY = null, WHO = 'all';
 let EDIT_RID = null, NEW_RID = null, RMSG = null;   // 고치는 줄 · 방금 저장한 줄 · 단추 옆 알림
-// 업무일지 (2026-10-10)
+// 업무일지 (2026-10-10 · 한 화면: 달력 → 날짜 → 그 날 할 일 → 그 일의 업무일지)
 const KINDS = ['업무', '학부모 민원', '치료사 민원', '기타'];
 const KCL = { '업무':'k1', '학부모 민원':'k2', '치료사 민원':'k3', '기타':'k4' };
 const NSTATES = ['접수', '처리 중', '끝'];
 const NSCL = { '접수':'ns1', '처리 중':'ns2', '끝':'ns3' };
-let ME_ID = null, NOTES = [], RES_OPEN = null, NOTE_EDIT = null, NMSG = null, MKIND = 'all';
-let VIEW = (() => { try { return sessionStorage.getItem('nl_tasks_view') || 'day'; } catch (e) { return 'day'; } })();
-function setView(v){ VIEW = v; try { sessionStorage.setItem('nl_tasks_view', v); } catch (e) {} }
+let ME_ID = null, NOTES = [], NMSG = null, MKIND = 'all';
+let MTASKS = [], MNOTES = [], MOFF = {};
+// 열린 일지 칸 — { task: 할 일 번호 | 'free'(할 일 없이), note: 고치는 일지 번호 | null }
+let FORM = null;
+// 접은 묶음 (탭 닫으면 잊음)
+let FOLD = (() => { try { return JSON.parse(sessionStorage.getItem('nl_tasks_fold') || '{}'); } catch (e) { return {}; } })();
+function saveFold(){ try { sessionStorage.setItem('nl_tasks_fold', JSON.stringify(FOLD)); } catch (e) {} }
 function isComplaint(k){ return k === '학부모 민원' || k === '치료사 민원'; }
 function hm(t){ return t ? String(t).slice(0, 5) : ''; }
 function nowHm(){ const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
-// 적고 저장 안 한 것 — 일지 칸 · 결과 칸
+// 적고 저장 안 한 일지
 function noteDraft(){
-  const ids = ['wcontent', 'wimprove', 'wresult'];
-  if (NOTE_EDIT) {
-    const n = NOTES.find(x => x.id === NOTE_EDIT); if (!n) return false;
-    return ($('wcontent') && $('wcontent').value !== (n.content || '')) || ($('wimprove') && $('wimprove').value !== (n.improve || ''))
-        || ($('wresult') && $('wresult').value !== (n.result || '')) || ($('wkind') && $('wkind').value !== n.kind)
-        || ($('wtime') && $('wtime').value !== hm(n.note_time)) || ($('wchild') && $('wchild').value !== (n.child_id == null ? '' : String(n.child_id)));
+  if (!FORM || !$('wcontent')) return false;
+  const n = FORM.note ? NOTES.find(x => x.id === FORM.note) : null;
+  if (n) {
+    return $('wcontent').value !== (n.content || '') || $('wimprove').value !== (n.improve || '')
+        || $('wresult').value !== (n.result || '') || $('wkind').value !== n.kind
+        || $('wtime').value !== hm(n.note_time) || $('wchild').value !== (n.child_id == null ? '' : String(n.child_id));
   }
-  return ids.some(id => $(id) && $(id).value.trim());
-}
-function resDraft(){
-  if (!RES_OPEN || !$('resbox')) return false;
-  const t = TASKS.concat(LATE).find(x => x.id === RES_OPEN);
-  return !!t && $('resbox').value.trim() !== (t.result || '').trim();
+  return ['wcontent', 'wimprove', 'wresult'].some(id => $(id).value.trim());
 }
 function leaveOk(){
-  if (!noteDraft() && !resDraft()) return true;
-  return confirm('저장하지 않은 ' + (noteDraft() ? '업무일지' : '결과') + '가 있습니다.\n저장하지 않고 넘어갈까요?');
+  if (!noteDraft()) return true;
+  return confirm('저장하지 않은 업무일지가 있습니다.\n저장하지 않고 넘어갈까요?');
 }
-window.addEventListener('beforeunload', e => { if (noteDraft() || resDraft()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (noteDraft()) { e.preventDefault(); e.returnValue = ''; } });
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function today(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function dlab(d){ const x = new Date(d + 'T00:00:00'); return (x.getMonth()+1) + '/' + x.getDate() + '(' + WD[x.getDay()] + ')'; }
 function stName(id){ const s = STAFF.find(x => Number(x.id) === Number(id)); return s ? id + '번 ' + s.name : id + '번'; }
 function msg(t, ok){ const m = $('tmsg'); if (m) { m.className = 'msg ' + (ok ? 'ok' : 'err'); m.textContent = t; } }
+function ymd(x){ return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+
+// 1,000줄씩 나눠 읽기
+async function readAll(mk){
+  let out = [], f = 0;
+  for (;;) {
+    const { data, error } = await mk().range(f, f + 999);
+    if (error) return { error };
+    out = out.concat(data || []);
+    if (!data || data.length < 1000) break;
+    f += 1000;
+  }
+  return { data: out };
+}
 
 async function load(){
-  const qs = [
+  const m = DAY.slice(0, 7), y = Number(m.slice(0, 4)), mo = Number(m.slice(5, 7));
+  const from = m + '-01', to = m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2, '0');
+  const [a, b, c, d, mt, mn, mo2] = await Promise.all([
     sb.from('nl_tasks').select('*').eq('task_date', DAY).order('staff_id').order('id'),
     sb.from('nl_tasks').select('*').lt('task_date', DAY).in('state', ['할 일', '하는 중']).order('task_date').limit(500),
     sb.from('nl_task_rules').select('*').order('active', { ascending: false }).order('staff_id').order('id'),
-    sb.from('nl_work_notes').select('*').eq('note_date', DAY).order('note_time', { ascending: true, nullsFirst: true }).order('id').limit(1000)
-  ];
-  const [a, b, c, d] = await Promise.all(qs);
-  const er = a.error || b.error || c.error || d.error;
+    sb.from('nl_work_notes').select('*').eq('note_date', DAY).order('note_time', { ascending: true, nullsFirst: true }).order('id').limit(1000),
+    readAll(() => sb.from('nl_tasks').select('id, staff_id, state, reason, title, task_date').gte('task_date', from).lte('task_date', to).order('id')),
+    readAll(() => sb.from('nl_work_notes').select('*').gte('note_date', from).lte('note_date', to).order('note_date').order('note_time', { ascending: true, nullsFirst: true }).order('id')),
+    sb.from('nl_offdays').select('off_date, kind, reason').gte('off_date', from).lte('off_date', to).in('kind', ['공휴일', '센터휴무'])
+  ]);
+  const er = a.error || b.error || c.error || d.error || mt.error || mn.error || mo2.error;
   if (er) { $('body').innerHTML = '<div class="card err">불러오지 못했습니다.\n' + esc(er.message) + '</div>'; return; }
   TASKS = a.data || []; LATE = b.data || []; RULES = c.data || []; NOTES = d.data || [];
+  MTASKS = mt.data || []; MNOTES = mn.data || [];
+  MOFF = {}; (mo2.data || []).forEach(o => { MOFF[o.off_date] = o.reason || o.kind; });
+  // 지난 날 남은 일에 딸린 일지도 보이게 (그 일이 다른 날에 있어도)
+  const lateIds = LATE.map(t => t.id);
+  if (lateIds.length) {
+    const { data: ln } = await sb.from('nl_work_notes').select('*').in('task_id', lateIds).limit(1000);
+    (ln || []).forEach(n => { if (!NOTES.some(x => x.id === n.id)) NOTES.push(n); });
+  }
+  if (FORM && FORM.note && !NOTES.some(x => x.id === FORM.note)) FORM = null;
+  if (FORM && FORM.task !== 'free' && !TASKS.concat(LATE).some(t => t.id === FORM.task)) FORM = null;
   draw();
 }
 
-// 결과 — 끝냄인 일에만 · 적지 않아도 끝냄 (2026-10-10 은정님)
-function resHtml(t){
-  if (RES_OPEN === t.id) {
-    return '<div style="margin-top:6px"><textarea id="resbox" maxlength="1000" placeholder="한 일의 결과 (보기 — 9월분 58건 올림, 승인번호 이상 2건 처리)">' + esc(t.result || '') + '</textarea>'
-      + '<div class="row" style="margin-top:4px"><button type="button" class="pri" data-ressave="' + t.id + '">결과 저장</button>'
-      + '<button type="button" data-resclose="1">그만</button><span id="resmsg" class="dim" style="font-size:12px"></span></div></div>';
-  }
-  if (t.state !== '끝냄') return '';
-  return t.result
-    ? '<div class="res">결과 · ' + esc(t.result) + ' <button type="button" class="lnk" data-resopen="' + t.id + '">고치기</button></div>'
-    : '<div><button type="button" class="lnk" data-resopen="' + t.id + '">＋ 결과 적기</button></div>';
-}
-
-// 업무일지 한 줄 — 하루 보기 (고치기 · 지우기 · 민원 상태)
+// 일지 한 줄
 function noteRow(n){
-  return '<div class="wn' + (NOTE_EDIT === n.id ? ' edit' : '') + '">'
+  const on = FORM && FORM.note === n.id;
+  return '<div class="wn' + (on ? ' edit' : '') + '">'
     + '<span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
-    + (n.note_time ? hm(n.note_time) + ' · ' : '') + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
+    + (n.note_date !== DAY ? dlab(n.note_date) + ' ' : '') + (n.note_time ? hm(n.note_time) + ' · ' : '') + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
     + (isComplaint(n.kind) ? ' <span class="kf" style="display:inline-flex;margin-left:6px">' + NSTATES.map(s => '<button type="button" data-ns="' + n.id + '" data-s="' + s + '" class="' + (n.state === s ? 'on' : '') + '">' + s + '</button>').join('') + '</span>' : '')
     + ' <button type="button" class="lnk" data-nedit="' + n.id + '">고치기</button> <button type="button" class="lnk" style="color:#c62828 !important" data-ndel="' + n.id + '">✕ 지우기</button>'
     + '<div class="ln">' + esc(n.content) + '</div>'
     + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
     + (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : '')
-    + '</div>';
+    + '</div>' + (on ? formHtml() : '');
+}
+
+// 일지 칸 — 할 일 아래 · 할 일 없이 아래 · 고치는 줄 아래에 하나만 열림
+function formHtml(){
+  const ed = FORM.note ? NOTES.find(x => x.id === FORM.note) : null;
+  const t = FORM.task !== 'free' ? TASKS.concat(LATE).find(x => x.id === FORM.task) : null;
+  const kind = ed ? ed.kind : (t ? '업무' : '학부모 민원');
+  return '<div class="nf" style="background:#FBF7F2;border:1px solid var(--camB);border-radius:10px;padding:10px 12px;margin:6px 0 4px">'
+     + '<div style="grid-column:1/-1;font-size:13px;font-weight:600;color:#7E5530">' + (ed ? '업무일지 고치기' : t ? '업무일지 · ' + esc(t.title) : '할 일 없이 적는 업무일지') + '</div>'
+     + '<div><label>갈래</label><select id="wkind">' + KINDS.map(k => '<option' + (kind === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></div>'
+     + '<div><label>시각</label><input type="time" id="wtime" value="' + (ed ? hm(ed.note_time) : nowHm()) + '"></div>'
+     + '<div><label>아동 번호 (없으면 비움)</label><input id="wchild" inputmode="numeric" placeholder="52" value="' + (ed && ed.child_id != null ? ed.child_id : '') + '" style="width:110px"></div>'
+     + '<div style="grid-column:1/-1"><label>내용 (반드시)</label><textarea id="wcontent" maxlength="2000">' + esc(ed ? ed.content : '') + '</textarea></div>'
+     + '<div><label>개선 방향</label><textarea id="wimprove" maxlength="2000">' + esc(ed ? ed.improve : '') + '</textarea></div>'
+     + '<div><label>결과</label><textarea id="wresult" maxlength="2000">' + esc(ed ? ed.result : '') + '</textarea></div>'
+     + '<div class="row" style="grid-column:1/-1"><button type="button" class="pri" id="wsave">' + (ed ? '고친 것 저장' : '일지 저장') + '</button>'
+     + '<button type="button" id="wcancel">그만</button><span id="wmsg" style="font-size:13px;font-weight:600"></span></div>'
+     + '<div class="note" style="grid-column:1/-1;margin-top:0">아동은 번호만 — 이름 · 연락처 · 진단명은 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
 }
 
 function taskRow(t, late){
-  return '<div class="tk">'
-    + '<div class="t">' + (late ? '<b style="color:var(--coral)">' + dlab(t.task_date) + '</b> · ' : '')
+  const tn = NOTES.filter(n => n.task_id === t.id);
+  const open = FORM && FORM.task === t.id && !FORM.note;
+  return '<div class="tk' + (open ? ' topen' : '') + '">'
+    + '<div class="t" data-topen="' + t.id + '" title="눌러서 이 일의 업무일지">' + (late ? '<b style="color:var(--coral)">' + dlab(t.task_date) + '</b> · ' : '')
     + (WHO === 'all' ? '<span class="dim">' + esc(stName(t.staff_id)) + '</span> · ' : '')
     + esc(t.title) + '<span class="src">' + esc(t.source) + '</span>'
+    + (tn.length ? ' <span class="bdg k1">일지 ' + tn.length + '</span>' : '')
     + (t.reason ? '<div class="dim" style="font-size:12.5px">사유 · ' + esc(t.reason) + '</div>' : '')
     + (t.moved_to ? '<div class="dim" style="font-size:12.5px">→ ' + dlab(t.moved_to) + '로 미룸</div>' : '')
-    + resHtml(t)
+    + (t.result ? '<div class="res">결과 · ' + esc(t.result) + '</div>' : '')
     + '</div>'
     + '<div class="st">' + STATES.map(s => '<button type="button" data-tk="' + t.id + '" data-s="' + s + '" class="' + (t.state === s ? 'on ' + SCL[s] : '') + '">' + s + '</button>').join('')
     + ' <button type="button" data-del="' + t.id + '" title="지우기">✕</button></div>'
+    + '<div style="flex:1 1 100%">' + tn.map(noteRow).join('') + (open ? formHtml() : '') + '</div>'
     + '</div>';
+}
+
+// 달력 (월~토 · 일요일은 뺌)
+function calHtml(){
+  const m = DAY.slice(0, 7), y = Number(m.slice(0, 4)), mo = Number(m.slice(5, 7));
+  const last = new Date(y, mo, 0).getDate(), td = today();
+  const who = x => WHO === 'all' || Number(x.staff_id) === Number(WHO);
+  const day = {};
+  const cell = ds => day[ds] || (day[ds] = { n: 0, done: 0, cant: 0, left: 0, nt: 0, nc: 0 });
+  MTASKS.filter(who).forEach(t => {
+    if (t.state === '미룸') return;
+    const o = cell(t.task_date); o.n++;
+    if (t.state === '끝냄') o.done++; if (t.state === '못 함') o.cant++;
+    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
+  });
+  MNOTES.filter(who).forEach(n => { const o = cell(n.note_date); if (isComplaint(n.kind)) o.nc++; else o.nt++; });
+  let c = ['월', '화', '수', '목', '금', '토'].map(w => '<div class="h">' + w + '</div>').join('');
+  const first = new Date(y, mo - 1, 1).getDay();
+  const lead = first === 0 ? 0 : first - 1;
+  for (let i = 0; i < lead; i++) c += '<div class="c blank"></div>';
+  for (let d = 1; d <= last; d++) {
+    const ds = m + '-' + String(d).padStart(2, '0');
+    if (new Date(y, mo - 1, d).getDay() === 0) continue;
+    const o = day[ds], off = MOFF[ds];
+    let inner = '<b style="font-weight:600">' + d + '</b>' + (ds === td ? ' <span class="dim">오늘</span>' : '');
+    if (off) inner += ' <span class="dim">' + esc(off) + '</span>';
+    if (o && o.n) {
+      const cl = (o.left || o.cant) ? 'bad' : (o.done === o.n ? 'ok3' : 'ok2');
+      inner += '<br><span class="' + cl + '">' + o.done + '/' + o.n + (o.cant ? ' 못함' + o.cant : '') + '</span>';
+    }
+    if (o && (o.nt || o.nc)) inner += (o.n ? ' · ' : '<br>') + (o.nt ? '일지 ' + o.nt : '') + (o.nt && o.nc ? ' · ' : '') + (o.nc ? '<span style="color:#993556">민원 ' + o.nc + '</span>' : '');
+    c += '<div class="c' + (off ? ' off' : '') + (ds === DAY ? ' sel' : '') + '" data-goday="' + ds + '">' + inner + '</div>';
+  }
+  return '<div class="cal">' + c + '</div>';
+}
+
+// 직원별 이 달 확인
+function staffHtml(){
+  const who = x => WHO === 'all' || Number(x.staff_id) === Number(WHO);
+  const g = {}, td = today();
+  const get = k => g[k] || (g[k] = { n: 0, done: 0, moved: 0, cant: [], left: 0, notes: 0, comp: 0 });
+  MTASKS.filter(who).forEach(t => {
+    const o = get(t.staff_id);
+    if (t.state === '미룸') { o.moved++; return; }
+    o.n++;
+    if (t.state === '끝냄') o.done++;
+    if (t.state === '못 함') o.cant.push(dlab(t.task_date) + ' ' + t.title + ' — ' + (t.reason || ''));
+    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
+  });
+  MNOTES.filter(who).forEach(n => { const o = get(n.staff_id); o.notes++; if (isComplaint(n.kind)) o.comp++; });
+  const ks = Object.keys(g);
+  if (!ks.length) return '<span class="dim">이 달 할 일 · 업무일지가 아직 없습니다.</span>';
+  return '<table><tr><th>직원</th><th>할 일</th><th>끝냄</th><th>끝냄 비율</th><th>미룬 횟수</th><th>지난 날 남은 일</th><th>업무일지</th><th>못 함</th></tr>'
+    + ks.map(k => { const o = g[k];
+        return '<tr><td>' + esc(stName(k)) + '</td><td>' + o.n + '</td><td>' + o.done + '</td><td><b>' + (o.n ? Math.round(o.done / o.n * 100) : 0) + '%</b></td>'
+          + '<td>' + o.moved + '</td><td' + (o.left ? ' style="color:var(--coral);font-weight:600"' : '') + '>' + o.left + '</td>'
+          + '<td>' + o.notes + (o.comp ? ' <span style="color:#993556">(민원 ' + o.comp + ')</span>' : '') + '</td>'
+          + '<td style="white-space:normal">' + (o.cant.length ? o.cant.map(esc).join('<br>') : '<span class="dim">–</span>') + '</td></tr>'; }).join('')
+    + '</table><div class="note">미룬 일은 미룬 날에 「미룬 일」로 다시 세어지므로 할 일 수에서 뺐습니다.</div>';
+}
+
+// 이 달 업무일지 모아 보기 (갈래로 거르기)
+function monthNotesHtml(){
+  const ml = MNOTES.filter(n => (WHO === 'all' || Number(n.staff_id) === Number(WHO)) && (MKIND === 'all' || n.kind === MKIND));
+  if (!ml.length) return '<span class="dim">없습니다.</span>';
+  return ml.map(n => '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
+      + '<a href="#" data-goday="' + n.note_date + '" style="color:var(--cam)">' + dlab(n.note_date) + '</a> ' + (n.note_time ? hm(n.note_time) : '')
+      + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
+      + (isComplaint(n.kind) && n.state ? ' <span class="bdg ' + (NSCL[n.state] || 'ns1') + '">' + esc(n.state) + '</span>' : '')
+      + '<div class="ln">' + esc(n.content) + '</div>'
+      + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
+      + (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : '') + '</div>').join('');
 }
 
 function draw(){
   const tl = TASKS.filter(t => WHO === 'all' || Number(t.staff_id) === Number(WHO));
   const ll = LATE.filter(t => WHO === 'all' || Number(t.staff_id) === Number(WHO));
   const done = tl.filter(t => t.state === '끝냄').length;
-  const nl = NOTES.filter(n => WHO === 'all' || Number(n.staff_id) === Number(WHO));
-  const vis = v => VIEW === v ? '' : ' style="display:none"';
-  let h = '<div class="tabs">'
-    + [['day', '하루 보기'], ['month', '한 달 보기'], ['rules', '늘 하는 일']].map(([v, nm]) => '<button type="button" data-view="' + v + '" class="' + (VIEW === v ? 'on' : '') + '">' + nm + '</button>').join('')
-    + '</div><div id="vday"' + vis('day') + '>';
-  h += '<div class="card"><div class="ct">'
-    + '<button type="button" id="dprev" title="앞 날">‹</button><input type="date" id="day" value="' + DAY + '"><button type="button" id="dnext" title="다음 날">›</button>'
+  const free = NOTES.filter(n => !n.task_id && n.note_date === DAY && (WHO === 'all' || Number(n.staff_id) === Number(WHO)));
+  const y = Number(DAY.slice(0, 4)), mo = Number(DAY.slice(5, 7));
+  // ① 달력
+  let h = '<div class="card"><div class="ct"><button type="button" id="mprev">‹</button><span>' + y + '년 ' + mo + '월</span><button type="button" id="mnext">›</button>'
     + '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
-    + '<span class="dim" style="font-weight:400">' + dlab(DAY) + ' · ' + tl.length + '개 중 끝냄 ' + done + ' · 업무일지 ' + nl.length + '</span>'
+    + '<span style="flex:1"></span><button type="button" id="gotoday">오늘</button></div>'
+    + calHtml()
+    + '<div class="note">날짜를 누르면 아래에 그 날 할 일이 나옵니다. 칸 숫자 — 끝냄/할 일 (미룬 일은 뺌) · 일지 · 민원. 초록 = 다 끝냄 · 주황 = 남은 일 · 빨강 = 지난 날 남은 일이나 못 함</div></div>';
+  // ② 고른 날
+  h += '<div class="card" id="dayCard"><div class="ct">'
+    + '<button type="button" id="dprev" title="앞 날">‹</button><span>' + dlab(DAY) + '</span><button type="button" id="dnext" title="다음 날">›</button>'
+    + '<span class="dim" style="font-weight:400">' + tl.length + '개 중 끝냄 ' + done + ' · 업무일지 ' + NOTES.filter(n => n.note_date === DAY && (WHO === 'all' || Number(n.staff_id) === Number(WHO))).length + '</span>'
     + '<span style="flex:1"></span><button type="button" id="remake">이 날 목록 다시 만들기</button></div>';
   if (ll.length) h += '<div class="late"><b style="color:var(--coral)">지난 날 남은 일 ' + ll.length + '</b>' + ll.map(t => taskRow(t, true)).join('') + '</div>';
   h += tl.length ? tl.map(t => taskRow(t, false)).join('') : '<div class="dim">이 날 할 일이 없습니다.</div>';
+  h += '<div class="note" style="margin-top:4px">할 일 글을 누르면 그 일의 업무일지를 적습니다 (끝냄을 누르면 저절로 열림 · 적지 않아도 끝냄).</div>';
+  // 할 일 없이 적은 일지
+  const freeOpen = FORM && FORM.task === 'free' && !FORM.note;
+  h += '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">'
+     + '<div class="row"><b style="font-size:13px">할 일 없이 적은 일지</b><span class="dim" style="font-size:12px">학부모 민원 · 치료사 민원 · 기타</span><span style="flex:1"></span>'
+     + (freeOpen ? '' : '<button type="button" id="freeopen">＋ 할 일 없이 일지 적기</button>') + '</div>'
+     + (free.length ? free.map(noteRow).join('') : (freeOpen ? '' : '<div class="dim" style="font-size:12.5px;margin-top:4px">없습니다.</div>'))
+     + (freeOpen ? formHtml() : '') + '</div>';
+  // 할 일 맡기기
   h += '<div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">'
      + '<select id="nwho">' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
      + '<input type="date" id="nday" value="' + DAY + '">'
      + '<input id="ntitle" placeholder="맡길 일" style="flex:1 1 240px">'
-     + '<button type="button" class="pri" id="nadd">＋ 맡기기</button></div>'
+     + '<button type="button" class="pri" id="nadd">＋ 할 일 맡기기</button></div>'
      + '<div id="tmsg" class="msg"></div></div>';
 
-  // 업무일지 — 그 날 있었던 일 (2026-10-10)
-  const ed = NOTE_EDIT ? NOTES.find(x => x.id === NOTE_EDIT) : null;
-  if (NOTE_EDIT && !ed) NOTE_EDIT = null;
-  h += '<div class="card"><div class="ct">업무일지 <span class="dim" style="font-weight:400">— ' + dlab(DAY) + ' 있었던 일 · 민원 · 개선</span></div>'
-     + (nl.length ? nl.map(noteRow).join('') : '<div class="dim">이 날 적은 업무일지가 없습니다.</div>')
-     + '<div class="nf">'
-     + '<div><label>갈래</label><select id="wkind">' + KINDS.map(k => '<option' + ((ed ? ed.kind : '업무') === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></div>'
-     + '<div><label>시각</label><input type="time" id="wtime" value="' + (ed ? hm(ed.note_time) : nowHm()) + '"></div>'
-     + '<div><label>아동 번호 (없으면 비움)</label><input id="wchild" inputmode="numeric" placeholder="52" value="' + (ed && ed.child_id != null ? ed.child_id : '') + '" style="width:110px"></div>'
-     + '<div style="grid-column:1/-1"><label>내용 (반드시)</label><textarea id="wcontent" maxlength="2000">' + esc(ed ? ed.content : '') + '</textarea></div>'
-     + '<div><label>개선 방향</label><textarea id="wimprove" maxlength="2000">' + esc(ed ? ed.improve : '') + '</textarea></div>'
-     + '<div><label>결과</label><textarea id="wresult" maxlength="2000">' + esc(ed ? ed.result : '') + '</textarea></div>'
-     + '</div><div class="row" style="margin-top:8px"><button type="button" class="pri" id="wsave">' + (ed ? '고친 것 저장' : '＋ 일지 저장') + '</button>'
-     + (ed ? '<button type="button" id="wcancel">그만</button>' : '')
-     + '<span id="wmsg" style="font-size:13px;font-weight:600"></span></div>'
-     + '<div class="note">업무일지는 적는 사람(나) 이름으로 저장됩니다. 학부모 민원 · 치료사 민원은 「접수 → 처리 중 → 끝」 상태가 붙고, 업무 · 기타는 상태 없이 남습니다.<br>아동은 번호만 적습니다 — 이름 · 연락처 · 진단명은 내용에 적지 마세요.</div></div>';
-  h += '</div>';   // vday 끝
-
-  // 늘 하는 일
-  h += '<div id="vrules"' + vis('rules') + '><div class="card"><div class="ct">늘 하는 일 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></div><table>'
+  // ③ 접은 묶음 — 늘 하는 일 설정 · 직원별 · 이 달 일지
+  h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 설정 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary><table>'
      + '<tr><th>직원</th><th>할 일</th><th>주기</th><th>쉬는 날</th><th>기간</th><th></th></tr>'
      + RULES.map(r => '<tr data-rid="' + r.id + '" title="눌러서 고치기" class="rrow' + (r.active ? '' : ' dim') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + '</td>'
          + '<td>' + esc(ruleText(r)) + '</td>'
@@ -293,171 +404,63 @@ function draw(){
      + '<button type="button" class="pri" id="radd">' + (EDIT_RID ? '저장' : '＋ 더하기') + '</button>'
      + (EDIT_RID ? '<button type="button" id="rcancel">취소</button>' : '')
      + '<span id="rmsg"></span></div>'
-     + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 지워도 이미 만들어진 지난 할 일은 그대로 남습니다.</div></div></div>';
-
-  // 한 달 보기 — 달력 · 직원별 · 업무일지 목록
-  h += '<div id="vmonth"' + vis('month') + '>'
-     + '<div class="card"><div class="ct"><button type="button" id="mprev">‹</button><span id="mlab"></span><button type="button" id="mnext">›</button>'
-     + '<span class="dim" style="font-weight:400">— 날짜를 누르면 그 날 하루 보기</span></div><div id="mcal" class="dim">불러오는 중…</div>'
-     + '<div class="note">칸 숫자 — 끝냄/할 일 (미룬 일은 뺌) · 일지 · 민원. 초록 = 다 끝냄 · 주황 = 남은 일 · 빨강 = 지난 날 남은 일이나 못 함</div></div>'
-     + '<div class="card"><div class="ct">직원별</div><div id="mon" class="dim">불러오는 중…</div></div>'
-     + '<div class="card"><div class="ct">이 달 업무일지 <span class="kf" id="mkf">'
-     + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('')
-     + '</span></div><div id="mlist" class="dim">불러오는 중…</div></div></div>';
+     + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 지워도 이미 만들어진 지난 할 일은 그대로 남습니다.</div></details>';
+  h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
+  h += '<details class="card fold" data-fold="mnotes"' + (FOLD.mnotes ? ' open' : '') + '><summary class="ct">이 달 업무일지 모아 보기</summary>'
+     + '<div class="kf" style="margin-bottom:8px">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</div>'
+     + '<div id="mlist">' + monthNotesHtml() + '</div></details>';
   $('body').innerHTML = h;
   bind();
-  if (VIEW === 'month') drawMonth();
-}
-
-async function drawMonth(){
-  const m = DAY.slice(0, 7), from = m + '-01';
-  const y = Number(m.slice(0, 4)), mo = Number(m.slice(5, 7));
-  const last = new Date(y, mo, 0).getDate();
-  const to = m + '-' + String(last).padStart(2, '0');
-  $('mlab').textContent = y + '년 ' + mo + '월';
-  // 1,000줄씩 나눠 읽기 (할 일 · 일지)
-  const readAll = async (mk) => {
-    let out = [], f = 0;
-    for (;;) {
-      const { data, error } = await mk().range(f, f + 999);
-      if (error) return { error };
-      out = out.concat(data || []);
-      if (!data || data.length < 1000) break;
-      f += 1000;
-    }
-    return { data: out };
-  };
-  const [rt, rn, ro] = await Promise.all([
-    readAll(() => sb.from('nl_tasks').select('id, staff_id, state, reason, title, task_date, result').gte('task_date', from).lte('task_date', to).order('id')),
-    readAll(() => sb.from('nl_work_notes').select('*').gte('note_date', from).lte('note_date', to).order('note_date').order('note_time', { ascending: true, nullsFirst: true }).order('id')),
-    sb.from('nl_offdays').select('off_date, kind, reason').gte('off_date', from).lte('off_date', to).in('kind', ['공휴일', '센터휴무'])
-  ]);
-  const er = rt.error || rn.error || ro.error;
-  if (er) { $('mcal').textContent = '불러오지 못했습니다. ' + er.message; $('mon').textContent = ''; $('mlist').textContent = ''; return; }
-  const who = x => WHO === 'all' || Number(x.staff_id) === Number(WHO);
-  const tasks = (rt.data || []).filter(who), notes = (rn.data || []).filter(who);
-  const off = {}; (ro.data || []).forEach(o => { off[o.off_date] = o.reason || o.kind; });
-  const td = today();
-
-  // 달력 (월~토 · 일요일은 뺌)
-  const day = {};
-  tasks.forEach(t => {
-    const o = day[t.task_date] || (day[t.task_date] = { n: 0, done: 0, cant: 0, left: 0, nt: 0, nc: 0 });
-    if (t.state === '미룸') return;
-    o.n++; if (t.state === '끝냄') o.done++; if (t.state === '못 함') o.cant++;
-    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
-  });
-  notes.forEach(n => {
-    const o = day[n.note_date] || (day[n.note_date] = { n: 0, done: 0, cant: 0, left: 0, nt: 0, nc: 0 });
-    if (isComplaint(n.kind)) o.nc++; else o.nt++;
-  });
-  let c = ['월', '화', '수', '목', '금', '토'].map(w => '<div class="h">' + w + '</div>').join('');
-  const first = new Date(y, mo - 1, 1).getDay();      // 0 일 ~ 6 토
-  const lead = first === 0 ? 0 : first - 1;            // 1일이 일요일이면 앞 칸 없음
-  for (let i = 0; i < lead; i++) c += '<div class="c blank"></div>';
-  for (let d = 1; d <= last; d++) {
-    const ds = m + '-' + String(d).padStart(2, '0');
-    if (new Date(y, mo - 1, d).getDay() === 0) continue;
-    const o = day[ds], isOff = off[ds];
-    let inner = '<b style="font-weight:600">' + d + '</b>';
-    if (isOff) inner += ' <span class="dim">' + esc(isOff) + '</span>';
-    if (o && o.n) {
-      const cl = (o.left || o.cant) ? 'bad' : (o.done === o.n ? 'ok3' : 'ok2');
-      inner += '<br><span class="' + cl + '">' + o.done + '/' + o.n + (o.cant ? ' 못함' + o.cant : '') + '</span>';
-    }
-    if (o && (o.nt || o.nc)) inner += (o && o.n ? ' · ' : '<br>') + (o.nt ? '일지 ' + o.nt : '') + (o.nt && o.nc ? ' · ' : '') + (o.nc ? '<span style="color:#993556">민원 ' + o.nc + '</span>' : '');
-    c += '<div class="c' + (isOff ? ' off' : '') + (ds === DAY ? ' sel' : '') + '" data-goday="' + ds + '">' + inner + '</div>';
-  }
-  $('mcal').className = ''; $('mcal').innerHTML = '<div class="cal">' + c + '</div>';
-  document.querySelectorAll('[data-goday]').forEach(el => el.onclick = () => { DAY = el.dataset.goday; setView('day'); load(); });
-
-  // 직원별
-  const g = {};
-  tasks.forEach(t => {
-    const o = g[t.staff_id] || (g[t.staff_id] = { n: 0, done: 0, moved: 0, cant: [], left: 0, res: 0, notes: 0, comp: 0 });
-    if (t.state === '미룸') { o.moved++; return; }
-    o.n++;
-    if (t.state === '끝냄') { o.done++; if (t.result) o.res++; }
-    if (t.state === '못 함') o.cant.push(dlab(t.task_date) + ' ' + t.title + ' — ' + (t.reason || ''));
-    if ((t.state === '할 일' || t.state === '하는 중') && t.task_date < td) o.left++;
-  });
-  notes.forEach(n => {
-    const o = g[n.staff_id] || (g[n.staff_id] = { n: 0, done: 0, moved: 0, cant: [], left: 0, res: 0, notes: 0, comp: 0 });
-    o.notes++; if (isComplaint(n.kind)) o.comp++;
-  });
-  const ks = Object.keys(g);
-  $('mon').className = '';
-  $('mon').innerHTML = !ks.length ? '<span class="dim">이 달 할 일 · 업무일지가 아직 없습니다.</span>'
-    : '<table><tr><th>직원</th><th>할 일</th><th>끝냄</th><th>끝냄 비율</th><th>결과 적음</th><th>미룬 횟수</th><th>지난 날 남은 일</th><th>업무일지</th><th>못 함</th></tr>'
-    + ks.map(k => { const o = g[k];
-        return '<tr><td>' + esc(stName(k)) + '</td><td>' + o.n + '</td><td>' + o.done + '</td><td><b>' + (o.n ? Math.round(o.done / o.n * 100) : 0) + '%</b></td>'
-          + '<td>' + o.res + '</td><td>' + o.moved + '</td><td' + (o.left ? ' style="color:var(--coral);font-weight:600"' : '') + '>' + o.left + '</td>'
-          + '<td>' + o.notes + (o.comp ? ' <span style="color:#993556">(민원 ' + o.comp + ')</span>' : '') + '</td>'
-          + '<td style="white-space:normal">' + (o.cant.length ? o.cant.map(esc).join('<br>') : '<span class="dim">–</span>') + '</td></tr>'; }).join('')
-    + '</table><div class="note">미룬 일은 미룬 날에 「미룬 일」로 다시 세어지므로 할 일 수에서 뺐습니다. 결과는 적지 않아도 끝냄입니다.</div>';
-
-  // 이 달 업무일지 목록 (갈래로 거르기)
-  const ml = notes.filter(n => MKIND === 'all' || n.kind === MKIND);
-  $('mlist').className = '';
-  $('mlist').innerHTML = !ml.length ? '<span class="dim">없습니다.</span>'
-    : ml.map(n => '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
-        + '<a href="#" data-goday="' + n.note_date + '" style="color:var(--cam)">' + dlab(n.note_date) + '</a> ' + (n.note_time ? hm(n.note_time) : '')
-        + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + n.child_id + '번 아동' : '')
-        + (isComplaint(n.kind) && n.state ? ' <span class="bdg ' + (NSCL[n.state] || 'ns1') + '">' + esc(n.state) + '</span>' : '')
-        + '<div class="ln">' + esc(n.content) + '</div>'
-        + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
-        + (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : '') + '</div>').join('');
-  document.querySelectorAll('#mlist [data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); DAY = el.dataset.goday; setView('day'); load(); });
 }
 
 function bind(){
-  const goDay = d => { if (!leaveOk()) { $('day').value = DAY; return; } RES_OPEN = null; NOTE_EDIT = null; DAY = d; load(); };
-  $('day').onchange = () => goDay($('day').value || today());
-  const shift = (k) => { const x = new Date(DAY + 'T00:00:00'); x.setDate(x.getDate() + k);
-    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  const goDay = d => { if (d === DAY) return; if (!leaveOk()) return; FORM = null; DAY = d; load(); };
+  const shift = k => { const x = new Date(DAY + 'T00:00:00'); x.setDate(x.getDate() + k); return ymd(x); };
+  const mshift = k => { const x = new Date(Number(DAY.slice(0, 4)), Number(DAY.slice(5, 7)) - 1 + k, 1); return ymd(x); };
   $('dprev').onclick = () => goDay(shift(-1));
   $('dnext').onclick = () => goDay(shift(1));
-  $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } WHO = $('wsel').value; draw(); };
-  document.querySelectorAll('button[data-view]').forEach(b => b.onclick = () => {
-    if (VIEW === b.dataset.view) return;
-    if (!leaveOk()) return;
-    RES_OPEN = null; NOTE_EDIT = null; setView(b.dataset.view); draw();
-  });
-  // 한 달 보기 — 달 옮기기 · 갈래 거르기
-  const mshift = k => { const y = Number(DAY.slice(0, 4)), mo = Number(DAY.slice(5, 7)) + k;
-    const x = new Date(y, mo - 1, 1); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-01'; };
-  $('mprev').onclick = () => { DAY = mshift(-1); load(); };
-  $('mnext').onclick = () => { DAY = mshift(1); load(); };
+  $('mprev').onclick = () => goDay(mshift(-1));
+  $('mnext').onclick = () => goDay(mshift(1));
+  $('gotoday').onclick = () => goDay(today());
+  document.querySelectorAll('[data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday);
+    setTimeout(() => { const c = $('dayCard'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); });
+  $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } FORM = null; WHO = $('wsel').value; draw(); };
+  document.querySelectorAll('details.fold').forEach(dt => dt.addEventListener('toggle', () => { FOLD[dt.dataset.fold] = dt.open; saveFold(); }));
   document.querySelectorAll('button[data-mk]').forEach(b => b.onclick = () => {
     MKIND = b.dataset.mk;
     document.querySelectorAll('button[data-mk]').forEach(x => x.classList.toggle('on', x.dataset.mk === MKIND));
-    drawMonth();
+    $('mlist').innerHTML = monthNotesHtml();
+    document.querySelectorAll('#mlist [data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday); });
   });
-  // 결과 칸
-  document.querySelectorAll('button[data-resopen]').forEach(b => b.onclick = () => {
-    if (RES_OPEN && RES_OPEN !== Number(b.dataset.resopen) && resDraft() && !confirm('적던 결과를 저장하지 않고 다른 결과를 열까요?')) return;
-    RES_OPEN = Number(b.dataset.resopen); draw(); if ($('resbox')) $('resbox').focus();
+  $('remake').onclick = async () => {
+    if (!leaveOk()) return;
+    const { data, error } = await sb.rpc('nl_make_tasks', { p_date: DAY });
+    if (error) { msg('❌ ' + error.message, false); return; }
+    msg('늘 하는 일에서 ' + data + '개를 새로 넣었습니다.', true); FORM = null; load();
+  };
+  $('nadd').onclick = async () => {
+    const title = $('ntitle').value.trim();
+    if (!title) { msg('맡길 일을 적어 주세요.', false); return; }
+    if (!leaveOk()) return;
+    const { data, error } = await sb.from('nl_tasks').insert({ task_date: $('nday').value || DAY, staff_id: Number($('nwho').value), title: title, source: '맡김' }).select('id');
+    if (error || !data || !data.length) { msg('❌ 맡기지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    msg('맡겼습니다.', true); FORM = null; load();
+  };
+  // 일지 칸 열기 — 할 일 글 · 할 일 없이 · 고치기
+  const openForm = f => {
+    if (FORM && JSON.stringify(FORM) === JSON.stringify(f)) return;
+    if (!leaveOk()) return;
+    FORM = f; NMSG = null; draw(); if ($('wcontent')) $('wcontent').focus();
+  };
+  document.querySelectorAll('[data-topen]').forEach(el => el.onclick = () => openForm({ task: Number(el.dataset.topen), note: null }));
+  if ($('freeopen')) $('freeopen').onclick = () => openForm({ task: 'free', note: null });
+  document.querySelectorAll('button[data-nedit]').forEach(b => b.onclick = () => {
+    const n = NOTES.find(x => x.id === Number(b.dataset.nedit)); if (!n) return;
+    openForm({ task: n.task_id || 'free', note: n.id });
   });
-  document.querySelectorAll('button[data-resclose]').forEach(b => b.onclick = () => {
-    if (resDraft() && !confirm('적은 결과를 저장하지 않고 닫을까요?')) return;
-    RES_OPEN = null; draw();
-  });
-  document.querySelectorAll('button[data-ressave]').forEach(b => b.onclick = async () => {
-    if (b.disabled) return;
-    const id = Number(b.dataset.ressave), v = $('resbox').value.trim();
-    b.disabled = true; b.textContent = '저장 중…';
-    const { data, error } = await sb.from('nl_tasks').update({ result: v || null }).eq('id', id).select('id');
-    if (error || !data || !data.length) {
-      b.disabled = false; b.textContent = '결과 저장';
-      if ($('resmsg')) { $('resmsg').textContent = '❌ 저장하지 못했습니다'; $('resmsg').style.color = '#c62828'; }
-      alert('결과를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return;
-    }
-    RES_OPEN = null; load();
-  });
-  // 업무일지 — 적기 · 고치기 · 지우기 · 민원 상태
   const wmsg = (t, ok) => { NMSG = { t, ok }; const m = $('wmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
-  if (NMSG) { wmsg(NMSG.t, NMSG.ok); NMSG = null; }
-  $('wsave').onclick = async () => {
+  if ($('wcancel')) $('wcancel').onclick = () => { if (noteDraft() && !confirm('적은 것을 저장하지 않고 그만둘까요?')) return; FORM = null; draw(); };
+  if ($('wsave')) $('wsave').onclick = async () => {
     const b = $('wsave'); if (b.disabled) return;
     const content = $('wcontent').value.trim();
     if (!content) { wmsg('⚠ 내용을 적어 주세요', false); $('wcontent').focus(); return; }
@@ -466,56 +469,64 @@ function bind(){
     const row = { kind: $('wkind').value, note_time: $('wtime').value || null, child_id: cv ? Number(cv) : null,
                   content: content, improve: $('wimprove').value.trim() || null, result: $('wresult').value.trim() || null };
     b.disabled = true; b.textContent = '저장 중…';
-    const q = NOTE_EDIT ? sb.from('nl_work_notes').update(row).eq('id', NOTE_EDIT).select('id')
-                        : sb.from('nl_work_notes').insert(Object.assign({ note_date: DAY, staff_id: ME_ID }, row)).select('id');
+    const q = FORM.note ? sb.from('nl_work_notes').update(row).eq('id', FORM.note).select('id')
+                        : sb.from('nl_work_notes').insert(Object.assign({ note_date: DAY, staff_id: ME_ID, task_id: FORM.task === 'free' ? null : FORM.task }, row)).select('id');
     const { data, error } = await q;
     if (error || !data || !data.length) {
-      b.disabled = false; b.textContent = NOTE_EDIT ? '고친 것 저장' : '＋ 일지 저장';
+      b.disabled = false; b.textContent = FORM.note ? '고친 것 저장' : '일지 저장';
       let why = error ? error.message : '저장된 줄을 돌려받지 못했습니다';
       if (/foreign key|child/i.test(why)) why = '그 번호의 아동이 없습니다. 아동 번호를 확인해 주세요.\n(' + why + ')';
       wmsg('❌ 저장하지 못했습니다', false); alert('업무일지를 저장하지 못했습니다.\n' + why); return;
     }
-    const was = NOTE_EDIT; NOTE_EDIT = null;
-    NMSG = { t: was ? '✓ 고친 것을 저장했습니다' : '✓ 업무일지를 저장했습니다', ok: true };
-    load();
+    const was = FORM.note; FORM = null;
+    msg(was ? '✓ 고친 것을 저장했습니다' : '✓ 업무일지를 저장했습니다', true);
+    await load(); msg(was ? '✓ 고친 것을 저장했습니다' : '✓ 업무일지를 저장했습니다', true);
   };
-  if ($('wcancel')) $('wcancel').onclick = () => { if (noteDraft() && !confirm('고친 것을 저장하지 않고 그만둘까요?')) return; NOTE_EDIT = null; draw(); };
-  document.querySelectorAll('button[data-nedit]').forEach(b => b.onclick = () => {
-    if (noteDraft() && !confirm('적던 업무일지를 저장하지 않고 다른 줄을 고칠까요?')) return;
-    NOTE_EDIT = Number(b.dataset.nedit); NMSG = { t: '고치는 중 — 고친 뒤 「고친 것 저장」', ok: true }; draw();
-    if ($('wcontent')) $('wcontent').focus();
-  });
+  if (NMSG) { wmsg(NMSG.t, NMSG.ok); NMSG = null; }
   document.querySelectorAll('button[data-ndel]').forEach(b => b.onclick = async () => {
     const n = NOTES.find(x => x.id === Number(b.dataset.ndel)); if (!n) return;
     if (!confirm('이 업무일지를 지울까요?\n\n' + n.kind + ' · ' + String(n.content).slice(0, 60) + '\n\n지운 뒤에는 되살릴 수 없습니다.')) return;
     const { data, error } = await sb.from('nl_work_notes').delete().eq('id', n.id).select('id');
     if (error || !data || !data.length) { alert('지우지 못했습니다.\n' + (error ? error.message : '지운 줄을 돌려받지 못했습니다')); return; }
-    if (NOTE_EDIT === n.id) NOTE_EDIT = null;
-    NMSG = { t: '✓ 지웠습니다', ok: true }; load();
+    if (FORM && FORM.note === n.id) FORM = null;
+    load();
   });
   document.querySelectorAll('button[data-ns]').forEach(b => b.onclick = async () => {
     const n = NOTES.find(x => x.id === Number(b.dataset.ns)); if (!n || n.state === b.dataset.s) return;
     if (!leaveOk()) return;
     const { data, error } = await sb.from('nl_work_notes').update({ state: b.dataset.s }).eq('id', n.id).select('id');
     if (error || !data || !data.length) { alert('바꾸지 못했습니다.\n' + (error ? error.message : '바뀐 줄을 돌려받지 못했습니다')); return; }
+    FORM = null; load();
+  });
+  // 할 일 상태 · 지우기
+  document.querySelectorAll('button[data-tk]').forEach(b => b.onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.tk)); if (!t) return;
+    const s = b.dataset.s; if (t.state === s) return;
+    if (!leaveOk()) return;
+    const up = { state: s };
+    if (s === '못 함') { const w = prompt('못 한 까닭을 적어 주세요. (반드시)', t.reason || ''); if (w === null || !w.trim()) return; up.reason = w.trim(); }
+    if (s === '미룸') {
+      const d = prompt('며칠로 미룰까요? (예: 2026-10-12)', ''); if (d === null) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.trim()) || d.trim() <= t.task_date) { msg('미룰 날은 그 날 뒤 날짜로 적어 주세요 (2026-10-12 모양).', false); return; }
+      up.moved_to = d.trim();
+    }
+    const { data, error } = await sb.from('nl_tasks').update(up).eq('id', t.id).select('id');
+    if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    FORM = (s === '끝냄') ? { task: t.id, note: null } : null;   // 끝냄이면 그 일의 일지 칸을 엶 (적지 않아도 됨)
     load();
   });
+  document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
+    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.del)); if (!t) return;
+    const tn = NOTES.filter(n => n.task_id === t.id).length;
+    if (!confirm('이 할 일을 지울까요?\n' + t.title + (tn ? '\n\n딸린 업무일지 ' + tn + '개는 남고, 「할 일 없이 적은 일지」로 옮겨집니다.' : ''))) return;
+    if (!leaveOk()) return;
+    const { data, error } = await sb.from('nl_tasks').delete().eq('id', t.id).select('id');
+    if (error || !data || !data.length) { msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
+    FORM = null; load();
+  });
+  // 늘 하는 일 설정
   const prev = () => { const d = dialRule(); $('rprev').textContent = d.err ? '⚠ ' + d.err : '→ ' + d.text; $('rprev').style.color = d.err ? '#c62828' : ''; };
   ['rmon', 'rwk', 'rday'].forEach(id => $(id).onchange = prev); prev();
-  $('remake').onclick = async () => {
-    if (!leaveOk()) return;
-    const { data, error } = await sb.rpc('nl_make_tasks', { p_date: DAY });
-    if (error) { msg('❌ ' + error.message, false); return; }
-    msg('늘 하는 일에서 ' + data + '개를 새로 넣었습니다.', true); load();
-  };
-  $('nadd').onclick = async () => {
-    if (!leaveOk()) return;
-    const title = $('ntitle').value.trim();
-    if (!title) { msg('맡길 일을 적어 주세요.', false); return; }
-    const { data, error } = await sb.from('nl_tasks').insert({ task_date: $('nday').value || DAY, staff_id: Number($('nwho').value), title: title, source: '맡김' }).select('id');
-    if (error || !data || !data.length) { msg('❌ 맡기지 못했습니다. ' + (error ? error.message : ''), false); return; }
-    msg('맡겼습니다.', true); load();
-  };
   const rmsg = (t, ok) => { RMSG = { t, ok }; const m = $('rmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
   if (RMSG) { rmsg(RMSG.t, RMSG.ok); RMSG = null; }
   // 고치는 줄이면 아래 칸을 그 줄 내용으로 채움
@@ -562,29 +573,6 @@ function bind(){
     const r = RULES.find(x => x.id === Number(b.dataset.ra)); if (!r) return;
     const { data, error } = await sb.from('nl_task_rules').update({ active: !r.active }).eq('id', r.id).select('id');
     if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
-    load();
-  });
-  document.querySelectorAll('button[data-tk]').forEach(b => b.onclick = async () => {
-    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.tk)); if (!t) return;
-    const s = b.dataset.s; if (t.state === s) return;
-    if (!leaveOk()) return;
-    const up = { state: s };
-    if (s === '못 함') { const w = prompt('못 한 까닭을 적어 주세요. (반드시)', t.reason || ''); if (w === null || !w.trim()) return; up.reason = w.trim(); }
-    if (s === '미룸') {
-      const d = prompt('며칠로 미룰까요? (예: 2026-10-12)', ''); if (d === null) return;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.trim()) || d.trim() <= t.task_date) { msg('미룰 날은 그 날 뒤 날짜로 적어 주세요 (2026-10-12 모양).', false); return; }
-      up.moved_to = d.trim();
-    }
-    const { data, error } = await sb.from('nl_tasks').update(up).eq('id', t.id).select('id');
-    if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
-    RES_OPEN = (s === '끝냄') ? t.id : null; NOTE_EDIT = null;   // 끝냄이면 결과 칸을 바로 엶 (적지 않아도 됨)
-    load();
-  });
-  document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
-    const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.del)); if (!t) return;
-    if (!confirm('이 할 일을 지울까요?\n' + t.title)) return;
-    const { data, error } = await sb.from('nl_tasks').delete().eq('id', t.id).select('id');
-    if (error || !data || !data.length) { msg('❌ 지우지 못했습니다. ' + (error ? error.message : ''), false); return; }
     load();
   });
 }
