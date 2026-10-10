@@ -307,7 +307,8 @@ function formHtml(){
      + '<div style="grid-column:1/-1;font-size:13px;font-weight:600;color:#7E5530">' + (ed ? '업무일지 고치기' : t ? '업무일지 · ' + esc(t.title) : '추가 업무') + '</div>'
      + '<div><label>갈래</label><select id="wkind">' + KINDS.map(k => '<option' + (kind === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></div>'
      + '<div><label>시각</label><input type="time" id="wtime" value="' + (ed ? hm(ed.note_time) : nowHm()) + '"></div>'
-     + '<div style="position:relative"><label>아동 (이름을 치면 목록이 나옵니다 · 없으면 비움)</label>'
+     // 아동 표를 못 보는 계정(홍보)은 아동 칸을 감춤 — 칸은 숨긴 채 남겨 저장 셈은 그대로 (2026-10-10)
+     + '<div style="position:relative' + (KIDS.length ? '' : ';display:none') + '"><label>아동 (이름을 치면 목록이 나옵니다 · 없으면 비움)</label>'
      + '<input id="wkidq" autocomplete="off" placeholder="아동 이름" value="' + esc(ed && ed.child_id != null ? kidLabel(ed.child_id) : '') + '" style="width:180px">'
      + '<input type="hidden" id="wchild" value="' + (ed && ed.child_id != null ? ed.child_id : '') + '">'
      + '<div id="wkidlist" style="display:none;position:absolute;z-index:20;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12);margin-top:2px;min-width:220px;max-height:240px;overflow:auto"></div></div>'
@@ -316,7 +317,7 @@ function formHtml(){
      + '<div><label>결과</label><textarea id="wresult" maxlength="2000">' + esc(ed ? ed.result : '') + '</textarea></div>'
      + '<div class="row" style="grid-column:1/-1"><button type="button" class="pri" id="wsave">' + (ed ? '고친 것 저장' : '저장') + '</button>'
      + '<button type="button" id="wcancel">그만</button><span id="wmsg" style="font-size:13px;font-weight:600"></span></div>'
-     + '<div class="note" style="grid-column:1/-1;margin-top:0">아동은 위 칸에서 이름으로 고르세요 — 내용에는 연락처 · 진단명을 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
+     + '<div class="note" style="grid-column:1/-1;margin-top:0">' + (KIDS.length ? '아동은 위 칸에서 이름으로 고르세요 — ' : '') + '내용에는 연락처 · 진단명을 적지 마세요. 민원은 「접수 → 처리 중 → 끝」 상태가 붙습니다.</div></div>';
 }
 
 // 할 일 한 칸 — kind: 'today' 그 날 · 'cont' 이어서 하는 일(진행 중) · 'late' 지난 날 남은 일
