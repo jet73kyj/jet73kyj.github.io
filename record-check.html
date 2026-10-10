@@ -193,6 +193,36 @@ function rkey(r){ return r.child_id + '|' + r.item_no + '|' + (r.item_key || '')
 // 갈래 나(10~14 · 18) — 목록만. 선생님이 기록지를 고치면 저절로 사라짐 (2026-10-02)
 function isList(r){ return (r.item_no >= 10 && r.item_no <= 14) || r.item_no === 18 || r.item_no >= 31; }
 function isAdmin(){ return ME && ADMIN.indexOf(Number(ME.id)) >= 0; }
+// 선생님께 보낼 문자 (2026-10-10 은정님) — 선생님이 고치면 사라지는 줄만 · 처리 끝 뺌 · 아동 번호 없이 이름만 · 기한 다음 달 15일
+function smsRows(tid){
+  return ROWS.filter(r => Number(r.therapist_id || 0) === tid && isList(r) && !isDone(r))
+    .sort((x, y) => (KINDS.indexOf(x.kind) - KINDS.indexOf(y.kind)) || (x.item_no === 41) - (y.item_no === 41)
+                    || String(KIDNM[x.child_id] || '').localeCompare(String(KIDNM[y.child_id] || ''))
+                    || String(x.on_date || '').localeCompare(String(y.on_date || '')));
+}
+function smsText(tid){
+  const k = $('mon').value, m = monNo(k), nm = m === 12 ? 1 : m + 1;
+  const rs = smsRows(tid), g = {}, ord = [];
+  rs.forEach(r => { const kk = r.item_no === 41 ? '미작성' : (r.kind || '기록지'); if (!g[kk]) { g[kk] = []; ord.push(kk); } g[kk].push(r); });
+  let t = '[자라는나무] ' + (THNM[tid] || '') + ' 선생님, ' + m + '월 기록지 점검 안내입니다.\n';
+  ord.forEach(kk => {
+    t += '\n■ ' + kk + '\n';
+    g[kk].forEach(r => {
+      const it = (ITEM[r.item_no] || ['점검'])[0];
+      const det = rcNamed(r, id => KIDNM[id] || '', id => THNM[id] || '').replace(/\s+/g, ' ').trim();
+      t += '· ' + (KIDNM[r.child_id] || '아동') + (r.on_date ? ' ' + md(r.on_date) : '') + ' — '
+         + (r.item_no === 41 ? (r.kind && det.indexOf(r.kind) < 0 ? r.kind + ' · ' : '') : it + (det ? ': ' : '')) + det + '\n';
+    });
+  });
+  return t + '\n기한 ' + nm + '월 15일까지 고쳐 주세요.\n나무링크 → 기록지 점검에서 확인하실 수 있습니다.';
+}
+async function copyText(t){
+  try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(t); return true; } } catch (e) {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok;
+  } catch (e) { return false; }
+}
 
 // 달 고르기 — 지난 6달 ~ 이번 달 · 처음은 지난달 (기록지는 달이 끝난 뒤 씀)
 function fillMon(){
@@ -406,7 +436,10 @@ function draw(){
       const title = GROUPV === 'th'
         ? (Number(kk) ? kk + '번 ' + esc(THNM[kk] || '') + ' 선생님' : '담당 미상')
         : esc(kk) + ' 기록지';
-      h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span></div>'
+      const smsN = (GROUPV === 'th' && isAdmin() && Number(kk)) ? smsRows(Number(kk)).length : 0;
+      h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span>'
+         + (smsN ? ' <button class="smsCopy" data-t="' + kk + '" style="margin-left:8px;font-size:12px;padding:3px 10px;">📋 문자로 복사 (' + smsN + ')</button><span class="smsMsg" data-t="' + kk + '" style="font-size:12px;margin-left:6px;color:var(--sage);"></span>' : '')
+         + '</div>'
          + '<table><tr><th>' + (GROUPV === 'th' ? '기록지' : '선생님') + '</th><th>아동</th><th>날짜</th><th>항목</th><th>내용</th><th>처리 결과</th></tr>';
       rs.forEach(r => {
         const i = ROWS.indexOf(r), it = ITEM[r.item_no] || ['?','g0'];
@@ -463,7 +496,7 @@ function draw(){
      + '사례를 고르고 저장하면 「남은 것」에서 빠집니다. 발달 기록지에서 변경 계약서(10호)를 「서명 받음」, 사실 확인서(27호)를 「작성 끝」으로 하면 저절로 처리 끝이 됩니다. 사유서 · 변경계약서는 「서류 받음」까지, '
      + '특이사항 기재 사례는 기록지 그 회차 특이사항이 적혀 있어야 끝납니다. '
      + '기록지 점검(10~14 · 18)과 치료지원(31~34) · 미작성(41)은 목록만 — 선생님이 기록지를 고치면 저절로 사라집니다. '
-     + '미작성은 치료지원 한 달 세 회, 발달재활 · 센터는 수업한 회수만큼이며 기한은 다음 달 10일입니다.</div>';
+     + '미작성은 치료지원 한 달 세 회, 발달재활 · 센터는 수업한 회수만큼이며 기한은 다음 달 15일입니다.</div>';
   $('body').innerHTML = h;
 
   const sr = $('sendRc');
@@ -496,6 +529,13 @@ function draw(){
     tr.onclick = () => { const tid = Number(tr.dataset.t); THF = (THF === tid ? 0 : tid); draw(); };
   });
   const ta = $('thAll'); if (ta) ta.onclick = () => { THF = 0; draw(); };
+  document.querySelectorAll('.smsCopy').forEach(b => b.onclick = async () => {
+    const tid = Number(b.dataset.t), txt = smsText(tid);
+    const ok = await copyText(txt);
+    const m = document.querySelector('.smsMsg[data-t="' + tid + '"]');
+    if (ok) { if (m) m.textContent = '✓ 복사했습니다 — 문자 앱에 붙여 넣으세요'; }
+    else { prompt('복사가 막혀 있습니다. 아래 글을 Ctrl+C 로 복사해 주세요.', txt); }
+  });
   document.querySelectorAll('.rc').forEach(box => {
     const btn = box.querySelector('.rcSave');
     box.querySelectorAll('select, input').forEach(el => {
