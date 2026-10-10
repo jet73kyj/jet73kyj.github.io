@@ -412,7 +412,9 @@ function draw(){
     ths.forEach(tid => {
       const rs = base.filter(r => Number(r.therapist_id || 0) === tid);
       h += '<tr class="ovr' + (THF === tid ? ' on' : '') + '" data-t="' + tid + '">'
-         + '<td>' + (tid ? tid + '번 ' + esc(THNM[tid] || '') : '담당 미상') + '</td>'
+         + '<td>' + (tid ? tid + '번 ' + esc(THNM[tid] || '') : '담당 미상')
+         + ((isAdmin() && tid && smsRows(tid).length) ? ' <button class="smsCopy" data-t="' + tid + '" style="margin-left:6px;font-size:12px;padding:2px 9px;">📋 문자로 복사 (' + smsRows(tid).length + ')</button>'
+            + '<span class="smsMsg" data-t="' + tid + '" style="font-size:12px;margin-left:6px;color:var(--sage);"></span>' : '') + '</td>'
          + KINDS.map(x => { const n = rs.filter(r => r.kind === x).length; return '<td style="text-align:center;">' + (n || '·') + '</td>'; }).join('')
          + '<td style="text-align:center;">' + (rs.filter(r => r.item_no === 41).length || '·') + '</td>'
          + '<td style="text-align:center;font-weight:600;">' + rs.length + ' ▸</td></tr>';
@@ -436,10 +438,7 @@ function draw(){
       const title = GROUPV === 'th'
         ? (Number(kk) ? kk + '번 ' + esc(THNM[kk] || '') + ' 선생님' : '담당 미상')
         : esc(kk) + ' 기록지';
-      const smsN = (GROUPV === 'th' && isAdmin() && Number(kk)) ? smsRows(Number(kk)).length : 0;
-      h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span>'
-         + (smsN ? ' <button class="smsCopy" data-t="' + kk + '" style="margin-left:8px;font-size:12px;padding:3px 10px;">📋 문자로 복사 (' + smsN + ')</button><span class="smsMsg" data-t="' + kk + '" style="font-size:12px;margin-left:6px;color:var(--sage);"></span>' : '')
-         + '</div>'
+      h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span></div>'
          + '<table><tr><th>' + (GROUPV === 'th' ? '기록지' : '선생님') + '</th><th>아동</th><th>날짜</th><th>항목</th><th>내용</th><th>처리 결과</th></tr>';
       rs.forEach(r => {
         const i = ROWS.indexOf(r), it = ITEM[r.item_no] || ['?','g0'];
@@ -529,7 +528,8 @@ function draw(){
     tr.onclick = () => { const tid = Number(tr.dataset.t); THF = (THF === tid ? 0 : tid); draw(); };
   });
   const ta = $('thAll'); if (ta) ta.onclick = () => { THF = 0; draw(); };
-  document.querySelectorAll('.smsCopy').forEach(b => b.onclick = async () => {
+  document.querySelectorAll('.smsCopy').forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();   // 줄 누르기(선생님 거르기)로 번지지 않게
     const tid = Number(b.dataset.t), txt = smsText(tid);
     const ok = await copyText(txt);
     const m = document.querySelector('.smsMsg[data-t="' + tid + '"]');
