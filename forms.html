@@ -62,7 +62,12 @@
   .docbtns button { background:#fff; border-color:#D9C3A7; color:#7E5530; font-weight:600; }
   .docbtns button.on { background:#B07A4A !important; border-color:#B07A4A !important; color:#fff !important; }
   .catbtns { margin-top:-6px; }
-  .catbtns button { font-weight:500; }
+  /* 단추 한 줄 (2026-10-10 은정님) — 두 묶음을 한 줄에 · 사이에 옅은 세로선 */
+  .btnrow { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 14px; }
+  .btnrow > .docbtns { display:contents; }
+  .btnrow .bsep { width:1px; height:22px; background:#E2D3C1; margin:0 4px; }
+  #docBtns[style*="none"] + #catBtns .bsep { display:none; }
+  .catbtns button { font-weight:600; }
   .lw-title { font-size:16px; font-weight:700; color:#7E5530; margin:4px 0 12px; }
   /* 용지 안 단추 (2026-10-09 은정님) — 저장 · 수정 · 인쇄 · 취소 · 인쇄에는 안 나옴 */
   #dvSave { display:none !important; }
@@ -216,6 +221,7 @@
   <div class="sub">정부지원 서식처럼 해마다 새로 나오는 문서를 여기에 담아 둡니다. 아래 갈래 단추를 누르면 그 갈래에 올려 둔 서식이 나옵니다.</div>
 
   <!-- 서식 바로 쓰기 (2026-10-09) — 화면에서 채워 바로 인쇄 -->
+  <div class="btnrow">
   <div class="docbtns" id="docBtns" style="display:none;">
     <button type="button" data-doc="hire" onclick="openDoc('hire')">신규인력등록</button>
     <button type="button" data-doc="org" onclick="openDoc('info')">기관정보</button>
@@ -223,9 +229,11 @@
   </div>
   <!-- 올려 둔 서식 — 갈래마다 단추 (2026-10-09 은정님) -->
   <div class="docbtns catbtns" id="catBtns">
+    <span class="bsep"></span>
     <!-- 2026-10-10 은정님 — 발달재활 · 치료지원 · 방과후를 「지원금서식」 하나로 · 세무 · 인사 · 그 밖 단추 지움 · 「신청서(학생용)」 새로 -->
     <button type="button" data-cat="support" onclick="openCat('support')">지원금서식</button>
     <button type="button" data-cat="신청서" onclick="openCat('신청서')">신청서(학생용)</button>
+  </div>
   </div>
   <div id="docView">
     <div class="dv-bar">
