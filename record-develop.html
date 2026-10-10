@@ -933,6 +933,12 @@ function _checkProvDates() {
   const vd = VOUCHER.filter(v => v.service_date).map(v => String(v.service_date).slice(0, 10)).sort();
   const left = vd.slice(), onlyS = [];
   sd.forEach(d => { const k = left.indexOf(d); if (k >= 0) left.splice(k, 1); else onlyS.push(d); });
+  // 쪼개기로 채운 원래 날(그 날 결제 없음)은 남은 결제를 앞에서부터 하나씩 가져감 — 24번 사유서가 맡음 (2026-10-10 · 서버 spair 와 같은 셈)
+  SESSROWS.filter(r => r.month_key === mk && filledBy.has(r.id) && ['완료', '보강', '예정'].includes(r.status)
+      && !(r.minutes != null && Number(r.minutes) < 40) && String(r.plan_date) <= today
+      && !vd.includes(String(r.plan_date)))
+    .map(r => String(r.plan_date)).sort()
+    .forEach(() => { if (left.length) left.shift(); });
   const same = !onlyS.length && !left.length && sd.length > 0;
   // 빈 서비스 제공일자는 그 줄 승인일자로 채운다 — 결제일 우선 (2026-10-02 은정님)
   //   같은 날 두 결제가 40분 이상 떨어져 있으면 두 회 (바우처 줄이 둘이므로 그대로 두 줄)
@@ -1061,21 +1067,22 @@ function fillFromSlots() {
     const tr = trs[i];
     const pv = tr ? tr.querySelector('.st_provDate') : null;
     const dt = $('s1_provDate_' + (i + 1)), st = $('s1_startTime_' + (i + 1)), en = $('s1_endTime_' + (i + 1));
-    // 시간표 값 (쪼개기 회차는 빈칸)
+    // 시간표 값 — 쪼개기로 다 채운 회차는 원래 수업 날 · 시각 (2026-10-10 은정님 · 결제일이 다르면 24번 사유서)
+    //   쪼개기가 아직 진행 중인 회차만 빈칸
     let ad = '', aa = '', ab = '';
-    if (sl && !sl.split) { ad = sl.iso; aa = sl.hm || ''; ab = aa ? _addMin(aa, VOUCH_MIN) : ''; }
+    if (sl && (!sl.split || sl.done)) { ad = sl.iso; aa = sl.hm || ''; ab = aa ? _addMin(aa, VOUCH_MIN) : ''; }
     AUTO1[i] = { d: ad, a: aa, b: ab };
     // 저장된 값
     const sv = it.service_date ? String(it.service_date).slice(0, 10) : '';
     const sa = _hm(it.start_time) || '', sb = _hm(it.end_time) || '';
     let d = ad, a = aa, b = ab;
     // 쪼개기 회차의 옛 자동 값(원래 결석한 날 · 그 시각 · +50분)은 버림
-    const oldAuto = !!(sl && sl.split) && sv === sl.iso && sa === (sl.hm || '') && sb === (sl.hm ? _addMin(sl.hm, VOUCH_MIN) : '');
+    const oldAuto = !!(sl && sl.split && !sl.done) && sv === sl.iso && sa === (sl.hm || '') && sb === (sl.hm ? _addMin(sl.hm, VOUCH_MIN) : '');
     if (sv && !oldAuto) {
       d = sv;
       a = sa || (sv === ad ? aa : '');
       b = sb || (sv === ad ? ab : '');
-    } else if (!sv && (sa || sb) && !oldAuto && sl && sl.split) {
+    } else if (!sv && (sa || sb) && !oldAuto && sl && sl.split && !sl.done) {
       a = sa; b = sb;
     }
     if (pv) { pv.value = dot(d); _setLock(pv, false); }
@@ -2153,7 +2160,8 @@ const RC_ITEM = {
   1:'결제 이름', 2:'아동 중복 결제', 3:'연속 결제 80분 안', 4:'치료사 중복 결제', 5:'승인번호 이상',
   6:'주 3회 이상', 7:'월 4회 미달', 8:'결제금액 불일치', 9:'예외 · 일괄 (참고)',
   10:'기록지 시각 겹침', 11:'일정표 ↔ 승인일자', 12:'기록지 빈칸', 13:'승인번호 다름', 14:'기록지 없음',
-  15:'변경계약서 · 본인부담금', 16:'변경계약서 · 담당 변경', 18:'제공일자 ≠ 승인일자', 19:'쪼개기 보강 공란', 20:'시간 겹침', 21:'제공시간 50분 아님', 22:'승인번호 두 번', 23:'다른 달 날짜'
+  15:'변경계약서 · 본인부담금', 16:'변경계약서 · 담당 변경', 18:'제공일자 ≠ 승인일자', 19:'쪼개기 보강 공란', 20:'시간 겹침', 21:'제공시간 50분 아님', 22:'승인번호 두 번', 23:'다른 달 날짜',
+  24:'다른 날 결제 (사유서)'
 };
 async function loadRcBox(cid, mk) {
   const box = $('rcBox');
@@ -2201,7 +2209,7 @@ function rcNamed(r, kidName, thName) {
 }
 let RCKID = {};            // 점검 글에 나온 다른 아동 번호 → 이름
 let RCSRV = null;
-const RC_LOCAL = new Set([1, 12, 18, 19, 20, 21, 22, 23]);
+const RC_LOCAL = new Set([1, 12, 18, 19, 20, 21, 22, 23, 24]);
 function rcLocal() {
   const out = [];
   const trs = document.querySelectorAll('#statusTbl tbody tr');
@@ -2221,7 +2229,7 @@ function rcLocal() {
     const note = String(tr.querySelector('.st_note').value || '').trim();
     // 19 쪼개기 보강 공란 — 선생님이 직접 넣을 칸 (2026-10-02)
     const sl = SLOTS[i];
-    if (sl && sl.split && (!prov || !st || !en)) {
+    if (sl && sl.split && !sl.done && (!prov || !st || !en)) {
       const dd = Number(sl.iso.slice(5, 7)) === month ? Number(sl.iso.slice(8, 10)) + '일'
                : Number(sl.iso.slice(5, 7)) + '월 ' + Number(sl.iso.slice(8, 10)) + '일';
       out.push({ item_no: 19, i, f: ['prov','start','end'], on_date: sl.iso, detail: (i + 1) + '회째 · ' + dd + ' 수업이 쪼개기 보강으로 '
@@ -2235,7 +2243,13 @@ function rcLocal() {
         + [!prov && '제공일자 빈칸', !st && '시작 빈칸', !en && '종료 빈칸'].filter(Boolean).join(' · ') });
     }
     // 18 제공일자 ≠ 승인일자 (특이사항이 비었을 때)
-    if (prov && appr && prov !== appr && !note) {
+    if (prov && appr && prov !== appr && !note && sl && sl.split && sl.done && prov === sl.iso) {
+      // 24 쪼개기로 채운 수업을 다른 날 결제 — 대안이 없으므로 사유서 (2026-10-10 은정님)
+      out.push({ item_no: 24, i, f: ['prov','appr'], on_date: prov,
+        msg: md(prov) + ' 수업 결제를 ' + md(appr) + (am[4] ? ' ' + am[4] + ':' + am[5] : '') + '에 함 — '
+           + Number(prov.slice(8, 10)) + '일에 결제하지 못한 사유서가 필요합니다',
+        detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov) + ' · 승인일자 ' + mmdd(appr) });
+    } else if (prov && appr && prov !== appr && !note) {
       out.push({ item_no: 18, i, f: ['prov','appr'], on_date: prov,
         msg: '결제일 ' + md(appr) + ' · 제공일자 ' + md(prov) + ' — 수정 필요', detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
         + ' · 승인일자 ' + mmdd(appr) });
@@ -2467,6 +2481,8 @@ function rcOverlapLocal() {
     rows.filter(r => r.same_th || r.mine)
       .filter(r => !(r.src === '기록지' && r.mine && r.month_key === mk))
       .filter(r => !(r.src === '수업' && r.mine && Number(r.support_type_id) === 2 && _m(r.st) === x.st))
+      // 이 아동 자기 쪼개기 조각(40분 미만)은 같은 방문이라 겹침에서 뺌 (2026-10-10 은정님)
+      .filter(r => !(r.src === '수업' && r.mine && _m(r.en) != null && _m(r.st) != null && _m(r.en) - _m(r.st) < 40))
       .forEach(r => {
         const a = _m(r.st), b = _m(r.en);
         if (a == null || b == null || !(x.st < b && en > a)) return;
@@ -2577,7 +2593,7 @@ function rcMsg(r) {
 }
 function rcPlace(r) {
   const n = Number(r.item_no);
-  const warn = n === 19 || n === 9;                 // 노랑 (참고 · 선생님 확인)
+  const warn = n === 19 || n === 9 || n === 24;     // 노랑 (참고 · 선생님 확인 · 24 사유서)
   const cls = warn ? 'rcwarn' : 'rcbad';
   const msg = rcMsg(r);
   const i = rcRowOf(r);
