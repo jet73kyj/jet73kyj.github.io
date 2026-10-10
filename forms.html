@@ -217,16 +217,15 @@
 
   <!-- 서식 바로 쓰기 (2026-10-09) — 화면에서 채워 바로 인쇄 -->
   <div class="docbtns" id="docBtns" style="display:none;">
-    <button type="button" data-doc="hire" onclick="openDoc('hire')">신규인력등록 · 개인정보 동의서 [15호]</button>
-    <button type="button" data-doc="org" onclick="openDoc('info')">기관정보 · 제공기관 정보 · 예외지급 · 내용 요약서 [19호]</button>
-    <button type="button" data-doc="refer" onclick="openDoc('refer')">발달의뢰서 모음 · 공문</button>
+    <button type="button" data-doc="hire" onclick="openDoc('hire')">신규인력등록</button>
+    <button type="button" data-doc="org" onclick="openDoc('info')">기관정보</button>
+    <button type="button" data-doc="refer" onclick="openDoc('refer')">발달의뢰서</button>
   </div>
   <!-- 올려 둔 서식 — 갈래마다 단추 (2026-10-09 은정님) -->
   <div class="docbtns catbtns" id="catBtns">
-    <button type="button" data-cat="발달재활서비스" onclick="openCat('발달재활서비스')">발달재활 서식</button>
-    <button type="button" data-cat="치료지원" onclick="openCat('치료지원')">치료지원 서식</button>
-    <button type="button" data-cat="방과후" onclick="openCat('방과후')">방과후 서식</button>
-    <button type="button" data-cat="etc" onclick="openCat('etc')">세무 · 인사 · 그 밖</button>
+    <!-- 2026-10-10 은정님 — 발달재활 · 치료지원 · 방과후를 「지원금서식」 하나로 · 세무 · 인사 · 그 밖 단추 지움 · 「신청서(학생용)」 새로 -->
+    <button type="button" data-cat="support" onclick="openCat('support')">지원금서식</button>
+    <button type="button" data-cat="신청서" onclick="openCat('신청서')">신청서(학생용)</button>
   </div>
   <div id="docView">
     <div class="dv-bar">
@@ -254,9 +253,7 @@
         <option value="발달재활서비스">발달재활서비스</option>
         <option value="치료지원">치료지원</option>
         <option value="방과후">방과후</option>
-        <option value="세무">세무</option>
-        <option value="인사">인사</option>
-        <option value="그 밖">그 밖</option>
+        <option value="신청서">신청서(학생용)</option>
       </select>
       <input id="u_title" type="text" placeholder="서식 이름 (예: 제공기록지 서식)" style="width:320px;">
     </div>
@@ -360,7 +357,7 @@ function draw() {
   const fc = $('f_cat').value;
   const list = ALL.filter(x =>
     (!fy || String(x.year) === String(fy)) && (!fc || x.category === fc)
-    && (!CUR_CAT || (CUR_CAT === 'etc' ? CAT_ETC.includes(x.category || '그 밖') : x.category === CUR_CAT)));
+    && (!CUR_CAT || (CUR_CAT === 'support' ? CAT_SUP.includes(x.category) : x.category === CUR_CAT)));
 
   $('cnt').textContent = list.length + '개';
   $('empty').style.display = list.length ? 'none' : 'block';
@@ -524,7 +521,7 @@ $('u_go').onclick = async () => {
     show($('msg2'), '\u2705 올렸습니다. 빈 서식 ' + blanks.length
       + '개 · 작성 견본 ' + samples.length + '개', true);
     $('u_title').value = ''; $('u_blank').value = ''; $('u_sample').value = '';
-    { const uc = $('u_cat').value; setCat(CAT_ETC.includes(uc) ? 'etc' : uc); }
+    { const uc = $('u_cat').value; setCat(CAT_SUP.includes(uc) ? 'support' : uc); }
     await loadList();
   } catch (e) {
     show($('msg2'), '\u274c 올리지 못했습니다.\n' + e.message, false);
@@ -536,13 +533,13 @@ $('u_go').onclick = async () => {
 $('f_year').onchange = draw;
 // 갈래 단추 (2026-10-09 은정님) — 누르면 그 갈래에 올려 둔 서식만 · 바로 쓰는 서식 창은 닫힘
 let CUR_CAT = '';
-const CAT_ETC = ['세무', '인사', '그 밖'];
-function catTitle(c) { return c === 'etc' ? '세무 · 인사 · 그 밖 서식' : (c === '발달재활서비스' ? '발달재활' : c) + ' 서식'; }
+const CAT_SUP = ['발달재활서비스', '치료지원', '방과후'];   // 「지원금서식」 단추 하나에 셋 (2026-10-10)
+function catTitle(c) { return c === 'support' ? '지원금서식 — 발달재활 · 치료지원 · 방과후' : c === '신청서' ? '신청서 (학생용)' : c + ' 서식'; }
 function setCat(c) {
   CUR_CAT = c || '';
   $('listWrap').style.display = CUR_CAT ? '' : 'none';
   $('listTitle').textContent = CUR_CAT ? catTitle(CUR_CAT) : '';
-  if (CUR_CAT && $('u_cat')) $('u_cat').value = CUR_CAT === 'etc' ? '세무' : CUR_CAT;
+  if (CUR_CAT && $('u_cat')) $('u_cat').value = CUR_CAT === 'support' ? '발달재활서비스' : CUR_CAT;
   markBtns();
 }
 function openCat(c) {
