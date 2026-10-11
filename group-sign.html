@@ -72,6 +72,8 @@
   .who { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
   .pad { border:2px dashed #C9B8A3; border-radius:10px; background:#fffdf9; position:relative; touch-action:none; height:180px; }
   .pad canvas { width:100%; height:100%; display:block; touch-action:none; }
+  .pad.npad { height:110px; }
+  .plab { font-weight:600; margin:14px 0 6px; }
   .pad .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#C9B8A3; pointer-events:none; font-size:16px; }
   .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0 0; }
   .signimg { max-width:320px; max-height:120px; display:block; border-bottom:1px solid #333; }
@@ -177,7 +179,7 @@ const PHOTO_NOTE = [
 const RELS = ['모', '부', '조모', '조부', '기타'];
 
 let ME = null, KIDS = {}, GROUPS = [], MEMS = [], SIGNS = [], THN = {}, TTN = {}, STN = {}, FEES = [];
-let CUR = null, DIRTY = false, SAVING = false, PAD = null;
+let CUR = null, DIRTY = false, SAVING = false, PAD = null, NPAD = null;
 
 async function loadAll() {
   const [c, t, g, s, th, tt, st, f] = await Promise.all([
@@ -279,14 +281,19 @@ function sheetHtml(sn, mode, s) {
     + '<h3>6. 확인 및 서명</h3><div>위 내용을 확인하고 그룹 수업을 신청합니다.</div>'
     + '<div class="info" style="margin-top:8px;"><span class="k">신청일</span><span>' + korDate(take ? today() : kstDay(s.signed_at)) + '</span></div>';
   if (take) {
-    h += '<div class="who"><input type="text" id="gName" maxlength="20" placeholder="보호자 이름" style="width:180px;">'
-      + '<select id="gRel"><option value="">관계 고르기</option>' + RELS.map(r => '<option>' + r + '</option>').join('') + '</select></div>'
+    h += '<div class="prow" style="margin-top:12px;"><span class="pl" style="min-width:0;font-weight:600;">관계</span><span class="pick" id="pk_rel">'
+      + RELS.map(r => '<label><input type="radio" name="rel" value="' + r + '"> ' + r + '</label>').join('') + '</span></div>'
+      + '<div class="plab">보호자 이름</div>'
+      + '<div class="pad npad" id="npad"><canvas id="ncv"></canvas><div class="ph" id="nph">여기에 손가락으로 이름을 써 주세요</div></div>'
+      + '<div class="bar no-print" style="margin-top:6px;"><button type="button" id="nClr">다시 쓰기</button></div>'
+      + '<div class="plab">보호자 서명</div>'
       + '<div class="pad" id="pad"><canvas id="cv"></canvas><div class="ph" id="ph">여기에 손가락으로 서명해 주세요</div></div>'
       + '<div class="bar no-print"><button type="button" id="padClr">다시 쓰기</button><span style="flex:1"></span>'
       + '<button type="button" class="btn-main" id="submitBtn" style="font-size:17px;padding:10px 28px;">제출</button></div>'
       + '<div class="note no-print" style="text-align:right;margin-top:6px;">제출하면 고칠 수 없게 잠깁니다.</div>';
   } else {
-    h += '<div class="info"><span class="k">보호자</span><span>' + esc(s.guardian_name) + ' (' + esc(s.guardian_rel) + ')</span>'
+    h += '<div class="info"><span class="k">관계</span><span>' + esc(s.guardian_rel) + '</span>'
+      + '<span class="k">보호자 이름</span><span>' + (s.guardian_name_png ? '<img class="signimg" id="nameImg" alt="보호자 이름" style="max-height:80px;">' : esc(s.guardian_name || '')) + '</span>'
       + '<span class="k">서명</span><span><img class="signimg" id="signImg" alt="서명"></span></div>';
     if (CAN_EDIT() && ((s.photo_record && !s.photo_record_off_at) || (s.photo_promo && !s.photo_promo_off_at))) {
       h += '<div class="bar no-print"><span class="note">보호자가 사진 · 동영상 동의를 철회하시면 눌러 주세요 →</span>'
@@ -320,6 +327,7 @@ async function openView(sid) {
   $('printBtn').style.display = '';
   $('sheet').innerHTML = sheetHtml(r.data.snap || {}, 'view', r.data);
   $('signImg').src = r.data.sign_png;
+  if ($('nameImg')) $('nameImg').src = r.data.guardian_name_png;
   $('sheet').querySelectorAll('[data-off]').forEach(b => b.onclick = () => photoOff(r.data, b.dataset.off, b));
   window.scrollTo(0, 0);
 }
@@ -340,8 +348,8 @@ function bindTake() {
     p.classList.remove('bad'); DIRTY = true;
   }));
   sh.querySelectorAll('.agree input').forEach(i => i.addEventListener('change', () => { i.closest('.agree').classList.remove('bad'); DIRTY = true; }));
-  $('gName').addEventListener('input', () => { $('gName').classList.remove('bad'); DIRTY = true; });
-  $('gRel').addEventListener('change', () => { $('gRel').classList.remove('bad'); DIRTY = true; });
+  NPAD = makePad($('ncv'), () => { $('nph').style.display = 'none'; $('npad').classList.remove('bad'); DIRTY = true; });
+  $('nClr').onclick = () => { NPAD.clear(); $('nph').style.display = ''; };
   PAD = makePad($('cv'), () => { $('ph').style.display = 'none'; $('pad').classList.remove('bad'); DIRTY = true; });
   $('padClr').onclick = () => { PAD.clear(); $('ph').style.display = ''; };
   $('submitBtn').onclick = submit;
@@ -384,14 +392,14 @@ async function submit() {
   const kind = sh.querySelector('input[name=kind]:checked');
   const rec = sh.querySelector('input[name=pRec]:checked');
   const pro = sh.querySelector('input[name=pPro]:checked');
-  const nm = $('gName').value.trim(), rel = $('gRel').value;
+  const relI = sh.querySelector('input[name=rel]:checked'), rel = relI ? relI.value : '';
   if (!kind) bad.push(['pkKind', '수업명(유치부 · 초등부)을 골라 주세요']);
   if (!$('cRules').checked) bad.push(['ag_cRules', '운영 규정 확인에 체크해 주세요']);
   if (!$('cPriv').checked) bad.push(['ag_cPriv', '개인정보 동의에 체크해 주세요']);
   if (!rec) bad.push(['pk_pRec', '사진 · 동영상 「가」를 골라 주세요 (동의하지 않아도 됩니다)']);
   if (!pro) bad.push(['pk_pPro', '사진 · 동영상 「나」를 골라 주세요 (동의하지 않아도 됩니다)']);
-  if (!nm) bad.push(['gName', '보호자 이름을 적어 주세요']);
-  if (!rel) bad.push(['gRel', '관계를 골라 주세요']);
+  if (!rel) bad.push(['pk_rel', '관계를 골라 주세요']);
+  if (!NPAD.used()) bad.push(['npad', '보호자 이름을 손가락으로 써 주세요']);
   if (!PAD.used()) bad.push(['pad', '서명해 주세요']);
   sh.querySelectorAll('.bad').forEach(x => x.classList.remove('bad'));
   if (bad.length) {
@@ -400,14 +408,15 @@ async function submit() {
     show('아직 채우지 않은 곳이 있습니다\n· ' + bad.map(b => b[1]).join('\n· '), false, true);
     return;
   }
-  const png = PAD.png();
+  const png = PAD.png(), npng = NPAD.png();
   if (png.length >= 400000) { show('서명 그림이 너무 큽니다. 「다시 쓰기」 후 조금 작게 서명해 주세요.', false); return; }
+  if (npng.length >= 300000) { show('이름 그림이 너무 큽니다. 「다시 쓰기」 후 조금 작게 써 주세요.', false); return; }
   SAVING = true; $('submitBtn').disabled = true; $('submitBtn').textContent = '제출 중…'; hideMsg();
   const t = CUR.t;
   const row = { therapy_id: t.id, child_id: t.child_id, group_id: t.group_id, form_ver: FORM_VER, snap: CUR.snap,
     class_kind: kind.value, agree_rules: true, agree_privacy: true,
     photo_record: rec.value === '1', photo_promo: pro.value === '1',
-    guardian_name: nm, guardian_rel: rel, sign_png: png };
+    guardian_name: null, guardian_name_png: npng, guardian_rel: rel, sign_png: png };
   try {
     const r = await sb.from('nl_group_signs').insert(row).select('id');
     if (r.error) throw r.error;

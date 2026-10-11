@@ -73,6 +73,8 @@
   .who { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
   .pad { border:2px dashed #C9B8A3; border-radius:10px; background:#fffdf9; position:relative; touch-action:none; height:180px; }
   .pad canvas { width:100%; height:100%; display:block; touch-action:none; }
+  .pad.npad { height:110px; }
+  .plab { font-weight:600; margin:14px 0 6px; }
   .pad .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#C9B8A3; pointer-events:none; font-size:16px; }
   .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0 0; }
   .signimg { max-width:320px; max-height:120px; display:block; border-bottom:1px solid #333; }
@@ -236,7 +238,7 @@ const CHOICES = [
 const RELS = ['모', '부', '조모', '조부', '기타'];
 
 let ME = null, KIDS = [], SIGNS = [], PICK = null;
-let CUR = null, DIRTY = false, SAVING = false, PAD = null;
+let CUR = null, DIRTY = false, SAVING = false, PAD = null, NPAD = null;
 
 // 1,000줄씩 나눠 끝까지 읽기
 async function readAll(mk) {
@@ -347,14 +349,19 @@ function sheetHtml(sn, mode, s) {
     + '<span class="k">아동 이름</span><span>' + esc(sn.child_name) + '</span>'
     + '<span class="k">생년월일</span><span>' + esc(dotDate(sn.birth)) + '</span></div>';
   if (take) {
-    h += '<div class="who"><input type="text" id="gName" maxlength="20" placeholder="보호자 이름" style="width:180px;">'
-      + '<select id="gRel"><option value="">아동과의 관계</option>' + RELS.map(r => '<option>' + r + '</option>').join('') + '</select></div>'
+    h += '<div class="prow" style="margin-top:12px;"><span class="pl" style="min-width:0;font-weight:600;">아동과의 관계</span><span class="pick" id="pk_rel">'
+      + RELS.map(r => '<label><input type="radio" name="rel" value="' + r + '"> ' + r + '</label>').join('') + '</span></div>'
+      + '<div class="plab">보호자 이름</div>'
+      + '<div class="pad npad" id="npad"><canvas id="ncv"></canvas><div class="ph" id="nph">여기에 손가락으로 이름을 써 주세요</div></div>'
+      + '<div class="bar no-print" style="margin-top:6px;"><button type="button" id="nClr">다시 쓰기</button></div>'
+      + '<div class="plab">보호자 서명</div>'
       + '<div class="pad" id="pad"><canvas id="cv"></canvas><div class="ph" id="ph">여기에 손가락으로 서명해 주세요</div></div>'
       + '<div class="bar no-print"><button type="button" id="padClr">다시 쓰기</button><span style="flex:1"></span>'
       + '<button type="button" class="btn-main" id="submitBtn" style="font-size:17px;padding:10px 28px;">제출</button></div>'
       + '<div class="note no-print" style="text-align:right;margin-top:6px;">제출하면 고칠 수 없게 잠깁니다.</div>';
   } else {
-    h += '<div class="info"><span class="k">보호자</span><span>' + esc(s.guardian_name) + ' (' + esc(s.guardian_rel) + ')</span>'
+    h += '<div class="info"><span class="k">관계</span><span>' + esc(s.guardian_rel) + '</span>'
+      + '<span class="k">보호자 이름</span><span>' + (s.guardian_name_png ? '<img class="signimg" id="nameImg" alt="보호자 이름" style="max-height:80px;">' : esc(s.guardian_name || '')) + '</span>'
       + '<span class="k">서명</span><span><img class="signimg" id="signImg" alt="서명"></span></div>';
     const can = CHOICES.filter(c => s[c.col] === '동의' && !s[c.off]);
     if (CAN_EDIT() && !s.replaced_at && can.length) {
@@ -402,6 +409,7 @@ async function openView(sid) {
   } else $('hist').style.display = 'none';
   $('sheet').innerHTML = sheetHtml(s.snap || {}, 'view', s);
   $('signImg').src = s.sign_png;
+  if ($('nameImg')) $('nameImg').src = s.guardian_name_png;
   $('sheet').querySelectorAll('[data-off]').forEach(b => b.onclick = () => itemOff(s, b.dataset.off, b));
   window.scrollTo(0, 0);
 }
@@ -434,8 +442,8 @@ function bindTake() {
     const p = i.closest('.pick'); p.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
     p.classList.remove('bad'); DIRTY = true; senCheck();
   }));
-  $('gName').addEventListener('input', () => { $('gName').classList.remove('bad'); DIRTY = true; });
-  $('gRel').addEventListener('change', () => { $('gRel').classList.remove('bad'); DIRTY = true; });
+  NPAD = makePad($('ncv'), () => { $('nph').style.display = 'none'; $('npad').classList.remove('bad'); DIRTY = true; });
+  $('nClr').onclick = () => { NPAD.clear(); $('nph').style.display = ''; };
   PAD = makePad($('cv'), () => { $('ph').style.display = 'none'; $('pad').classList.remove('bad'); DIRTY = true; });
   $('padClr').onclick = () => { PAD.clear(); $('ph').style.display = ''; };
   $('submitBtn').onclick = submit;
@@ -479,9 +487,9 @@ async function submit() {
     const i = sh.querySelector('input[name=' + c.key + ']:checked');
     if (i) val[c.col] = i.value; else bad.push(['pk_' + c.key, c.label + ' — 골라 주세요']);
   });
-  const nm = $('gName').value.trim(), rel = $('gRel').value;
-  if (!nm) bad.push(['gName', '보호자 이름을 적어 주세요']);
-  if (!rel) bad.push(['gRel', '아동과의 관계를 골라 주세요']);
+  const relI = sh.querySelector('input[name=rel]:checked'), rel = relI ? relI.value : '';
+  if (!rel) bad.push(['pk_rel', '아동과의 관계를 골라 주세요']);
+  if (!NPAD.used()) bad.push(['npad', '보호자 이름을 손가락으로 써 주세요']);
   if (!PAD.used()) bad.push(['pad', '서명해 주세요']);
   sh.querySelectorAll('.bad').forEach(x => x.classList.remove('bad'));
   if (!bad.length && senCheck()) bad.push(['pk_sen', '4) 민감정보에 동의하지 않으시면 1) ~ 3) 을 신청하실 수 없습니다']);
@@ -492,11 +500,12 @@ async function submit() {
     show((onlyClash ? '고른 답을 다시 확인해 주세요' : '아직 채우지 않은 곳이 있습니다') + '\n· ' + bad.map(b => b[1]).join('\n· '), false, true);
     return;
   }
-  const png = PAD.png();
+  const png = PAD.png(), npng = NPAD.png();
   if (png.length >= 400000) { show('서명 그림이 너무 큽니다. 「다시 쓰기」 후 조금 작게 서명해 주세요.', false); return; }
+  if (npng.length >= 300000) { show('이름 그림이 너무 큽니다. 「다시 쓰기」 후 조금 작게 써 주세요.', false); return; }
   SAVING = true; $('submitBtn').disabled = true; $('submitBtn').textContent = '제출 중…'; hideMsg();
   const row = Object.assign({ child_id: CUR.k.id, form_ver: FORM_VER, snap: CUR.snap,
-    guardian_name: nm, guardian_rel: rel, sign_png: png }, val);
+    guardian_name: null, guardian_name_png: npng, guardian_rel: rel, sign_png: png }, val);
   try {
     const r = await sb.from('nl_ai_consents').insert(row).select('id');
     if (r.error) throw r.error;
