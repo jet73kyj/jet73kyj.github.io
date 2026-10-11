@@ -244,6 +244,11 @@
   .chgsheet .chg-tbl, .chgsheet .chg-apply, .chgsheet .chg-date, .chgsheet .chg-sign { font-size:12px !important; }
   .chgsheet input, .chgsheet textarea { border:none !important; background:transparent !important; font-size:12px !important; resize:none; }
 }
+
+  /* 새로고침 · ☰ 메뉴 · 홈을 오른쪽에 모음 (2026-10-11 은정님) — nl-login.js 가 홈 앞에 넣으므로 같은 칸 안에 모임
+     새로고침은 a 라서 단추 모양을 따로 줌 (전에는 밑줄 글자로 보였음) */
+  .form-actions .fa-right a, .form-actions .fa-right button { display:inline-flex; align-items:center; box-sizing:border-box;
+    text-decoration:none !important; border-radius:6px; padding:8px 18px; font-size:13px; line-height:1.2; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -286,7 +291,7 @@
     <button class="btn-save" id="btnSave" onclick="saveRecord()">저장 전</button>
     <button class="btn-print" onclick="window.print()">인쇄 / PDF 저장</button>
     <button onclick="_shareRecordHelp()" style="background:#fee500;color:#3c1e1e;">학부모 전달 안내</button>
-    <a href="index.html" style="margin-left:auto;background:#eee;color:#555;text-decoration:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:bold;">처음으로</a>
+    <span class="fa-right" style="margin-left:auto;display:inline-flex;align-items:center;"><a href="index.html" style="background:#eee;color:#555;text-decoration:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:bold;">처음으로</a></span>
   </div>
   <!-- 이 아동 이 달 기록지 점검 결과 (nl_record_check · 2026-10-02) -->
   <div id="rcBox" class="no-print" style="display:none;margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12.5px;line-height:1.7;"></div>
@@ -3279,8 +3284,9 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
     else if (e.key === 'ArrowUp') { if (hits.length) { cur = (cur - 1 + hits.length) % hits.length; mark(); } e.preventDefault(); }
     else if (e.key === 'Enter') {
       e.preventDefault();
+      // 고르고 바로 불러오기 (2026-10-11 은정님 — 엔터 한 번으로)
       if (box.style.display === 'block' && hits[cur]) pick(hits[cur]);
-      else if (q.dataset.picked) { const b = document.getElementById('pLoad'); if (b) b.click(); }
+      if (q.dataset.picked) { const b = document.getElementById('pLoad'); if (b) b.click(); q.blur(); }
     }
     else if (e.key === 'Escape') { box.style.display = 'none'; }
   });
