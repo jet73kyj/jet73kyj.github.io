@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 서비스 동의서 - 나무링크</title>
+<!-- AI 서비스 신청 · 동의서 · 아이패드 서명 (2026-10-11 은정님)
+     서식 화면 「신청서(학생용)」에서 엶 · 표 nl_ai_consents (아동마다 쌓임 · 가장 최근 장이 효력)
+     받으면 잠김 · 항목마다 철회만 됨 · 4)(민감정보) 철회하면 1)~3)도 함께 (서버 장치)
+     다시 받으면 옛 장에 replaced_at (서버 장치) -->
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --camBg:#FBF5EE; }
+  body { font-family:'Malgun Gothic','맑은 고딕',sans-serif; background:var(--bg); margin:0; color:var(--tx); }
+  header { background:var(--sf); border-bottom:1px solid var(--line); padding:10px 16px;
+           display:flex; align-items:center; gap:10px; }
+  header img.lg { height:22px; display:block; }
+  header .bar0 { width:1px; height:16px; background:var(--line); }
+  /* 위 띠 단추 — ☰ 메뉴 · 새로고침도 이 모양을 그대로 받음 (nl-login.js 가 class 를 베낌) */
+  header .hbtn { display:inline-flex; align-items:center; box-sizing:border-box; height:30px; margin:0; background:#fff; color:#B07A4A;
+    text-decoration:none; border:1px solid #ECE8E3; border-radius:8px; padding:0 12px; font-size:13px; font-weight:500;
+    font-family:inherit; line-height:1; cursor:pointer; white-space:nowrap; }
+  header .hbtn:hover { background:var(--camL); }
+  header #nlMenuBtn, header #nlReload { margin-right:0 !important; }
+  .container { max-width:900px; margin:0 auto; padding:16px; }
+  .sub { font-size:13px; color:var(--dim); margin:0 0 14px; line-height:1.6; }
+  .out { margin-top:12px; padding:12px 14px; border-radius:8px; font-size:14px; line-height:1.6; display:none; white-space:pre-wrap; }
+  .ok  { background:var(--sf); border-left:3px solid #5E9A6E; display:block; }
+  .err { background:var(--sf); border-left:3px solid #D8684A; color:#993C1D; display:block; }
+  button { border:1px solid var(--line); border-radius:8px; padding:7px 16px; font-size:14px; font-weight:500;
+           cursor:pointer; background:var(--sf); color:var(--tx); font-family:inherit; }
+  button:hover { background:var(--camL); }
+  button:disabled { background:#f2f1ee; color:var(--dim); cursor:default; }
+  .btn-main { background:var(--cam); border-color:var(--cam); color:#fff; font-weight:700; }
+  .btn-main:hover { background:#9C6B3F; }
+  input[type=text], select { padding:9px 10px; border:1px solid #DDD3C7; border-radius:8px; font-size:16px;
+           font-family:inherit; background:#fff; color:var(--tx); }
+
+  /* 목록 */
+  .grp { background:#fff; border:1px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden; }
+  .grp-h { background:var(--camL); border-bottom:1px solid var(--camB); padding:9px 14px; font-size:14px; color:#7E5530; font-weight:600; }
+  .grp-h span { font-weight:400; color:#9a8b7c; font-size:12.5px; margin-left:6px; }
+  .kid { display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #F3EFE9; font-size:15px; flex-wrap:wrap; }
+  .kid:last-child { border-bottom:none; }
+  .kid .nm { flex:1; min-width:180px; }
+  .kid .bd { color:var(--dim); font-size:13px; margin-left:4px; }
+  .kid .done { color:#3B6D11; font-size:13px; }
+  .empty { padding:40px; text-align:center; color:var(--dim); }
+
+  /* 신청서 */
+  .sheet { background:#fff; border:1px solid #ddd; border-radius:12px; padding:26px 30px; max-width:820px; margin:0 auto 20px;
+           font-size:16px; line-height:1.75; }
+  .sheet h2 { text-align:center; font-size:22px; margin:0 0 4px; letter-spacing:1px; }
+  .sheet .org { text-align:center; font-size:13px; color:#8a7a6a; margin-bottom:18px; }
+  .sheet h3 { font-size:16.5px; margin:20px 0 8px; padding-bottom:4px; border-bottom:1.5px solid #333; }
+  .sheet .info { display:grid; grid-template-columns:110px 1fr; gap:4px 12px; }
+  .sheet .info .k { color:#6E6660; }
+  .sheet ol.rule { margin:0; padding-left:0; list-style:none; }
+  .sheet ol.rule li { margin:0 0 8px; padding-left:26px; text-indent:-26px; }
+  .sheet .dl div { margin:2px 0; }
+  .agree { display:flex; align-items:center; gap:10px; margin:10px 0 2px; padding:10px 12px; border:1.5px solid #E2D4C2;
+           border-radius:10px; background:var(--camBg); cursor:pointer; user-select:none; font-weight:600; }
+  .agree input { width:24px; height:24px; accent-color:#B07A4A; }
+  .need { color:#C2553A; font-size:13px; font-weight:400; }
+  .pick { display:inline-flex; gap:8px; flex-wrap:wrap; }
+  .pick label { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border:1.5px solid #E2D4C2;
+                border-radius:999px; cursor:pointer; user-select:none; background:#fff; font-size:15.5px; }
+  .pick input { width:20px; height:20px; accent-color:#B07A4A; margin:0; }
+  .pick label.on { border-color:#B07A4A; background:var(--camL); }
+  .prow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0; }
+  .prow .pl { min-width:230px; }
+  .note { font-size:14px; color:#6E6660; }
+  .who { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .pad { border:2px dashed #C9B8A3; border-radius:10px; background:#fffdf9; position:relative; touch-action:none; height:180px; }
+  .pad canvas { width:100%; height:100%; display:block; touch-action:none; }
+  .pad .ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#C9B8A3; pointer-events:none; font-size:16px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0 0; }
+  .signimg { max-width:320px; max-height:120px; display:block; border-bottom:1px solid #333; }
+  .bad { outline:2px solid #D8684A; outline-offset:3px; border-radius:10px; }
+  .tool { display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:820px; margin:0 auto 12px; }
+  .tool .sp { flex:1; }
+  .off { color:#993C1D; font-size:13px; }
+  /* 보호자가 아이패드를 든 동안 — 위 띠 · 메뉴 숨김 (다른 화면으로 못 가게) */
+  body.signing header, body.signing #nlMenuBtn, body.signing #nlMenuPanel, body.signing #nlReload { display:none !important; }
+  .staffonly { font-size:12px; color:#A39C95; }
+  .srch { display:flex; gap:8px; align-items:center; margin:0 0 12px; flex-wrap:wrap; }
+  .srch input { width:220px; }
+  .tabs { display:flex; gap:14px; }
+  .tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:6px 2px; color:#8a7a6a; }
+  .tabs button.on { border-bottom-color:#B07A4A; color:#7E5530; font-weight:700; }
+  .tabs button:hover { background:none; color:#7E5530; }
+  .chips { font-size:12.5px; color:#6E6660; }
+  .chips b { font-weight:600; }
+  .chips .x { color:#993C1D; }
+  .sheet pre.tx { white-space:pre-wrap; font-family:inherit; margin:0; }
+  .sheet .gain div, .sheet .dl div { margin:2px 0; }
+  .sheet .box { background:#FBF8F4; border:1px solid #EFE6DA; border-radius:8px; padding:8px 12px; margin:8px 0; font-size:15px; }
+  .crow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:10px 0; padding:8px 0; border-bottom:1px dashed #EFE6DA; }
+  .crow .pl { min-width:260px; font-weight:600; }
+  .oldtag { background:#FCEFEA; border-left:3px solid #D8684A; padding:8px 12px; border-radius:6px; font-size:14px; color:#993C1D; margin:0 auto 12px; max-width:820px; }
+  .hist { max-width:820px; margin:0 auto 12px; font-size:13px; color:#6E6660; }
+  .hist a { color:#B07A4A; cursor:pointer; text-decoration:underline; margin-right:10px; }
+  @media (max-width:640px){ .sheet { padding:18px 16px; } .sheet .info { grid-template-columns:90px 1fr; } .crow .pl { min-width:0; width:100%; } }
+  @media print {
+    @page { size:A4 portrait; margin:12mm; }
+    body { background:#fff; }
+    header, .tool, .no-print, #listBox, #msg, .hist { display:none !important; }
+    .container { padding:0; max-width:none; }
+    .sheet { border:none; border-radius:0; padding:0; max-width:none; font-size:12.5px; line-height:1.6; }
+    .sheet h2 { font-size:18px; } .sheet h3 { font-size:13px; margin:12px 0 5px; }
+    .agree { padding:4px 8px; margin:6px 0 0; }
+    .pick label { padding:2px 8px; font-size:12px; }
+    .crow { margin:3px 0; padding:3px 0; } .sheet .box { font-size:12px; padding:5px 8px; }
+    body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+
+<div id="mainBox" style="display:none;">
+<header>
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar0"></span>
+  <h1 style="margin:0;font-size:15px;font-weight:600;">AI 서비스 신청 · 동의서</h1>
+  <span style="margin-left:auto;font-size:12px;color:#A39C95;" id="who"></span>
+  <a href="forms.html" class="hbtn">서식</a>
+  <a href="index.html" class="hbtn">처음으로</a>
+</header>
+
+<div class="container">
+  <div id="listBox">
+    <div class="sub">치료중 · 대기중 아동입니다. 「동의서 받기」를 누르고 아이패드를 보호자께 드리면, 보호자가 읽고 항목마다 고르고 서명한 뒤 「제출」합니다.<br>
+      제출한 동의서는 고칠 수 없습니다 (항목마다 철회만 됩니다). 다시 신청하시면 「보기」 → 「새 동의서 받기」로 한 장 더 받습니다.</div>
+    <div class="srch">
+      <input type="text" id="q" placeholder="이름 또는 번호" autocomplete="off">
+      <span class="tabs" id="tabs">
+        <button type="button" data-f="all" class="on">전체</button>
+        <button type="button" data-f="no">아직 안 받음</button>
+        <button type="button" data-f="yes">받음</button>
+      </span>
+      <span style="flex:1"></span><span class="chips" id="cnt"></span>
+    </div>
+    <div id="list"></div>
+  </div>
+  <div id="formBox" style="display:none;">
+    <div class="tool no-print">
+      <button type="button" id="backBtn">← 목록으로</button><span class="staffonly" id="staffNote">직원이 누르는 단추입니다</span>
+      <span class="sp"></span>
+      <button type="button" id="againBtn" style="display:none;">새 동의서 받기</button>
+      <button type="button" id="printBtn" style="display:none;">인쇄 · PDF</button>
+    </div>
+    <div id="oldTag" class="oldtag no-print" style="display:none;"></div>
+    <div id="hist" class="hist" style="display:none;"></div>
+    <div id="sheet"></div>
+  </div>
+  <div id="msg" class="out"></div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+function esc(s) { return String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function show(t, ok, noScroll) { const el = $('msg'); el.textContent = t; el.className = 'out ' + (ok ? 'ok' : 'err');
+  if (t && !noScroll) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function hideMsg() { $('msg').className = 'out'; $('msg').textContent = ''; }
+function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function korDate(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : ''; }
+function dotDate(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[1] + '. ' + Number(m[2]) + '. ' + Number(m[3]) + '.' : ''; }
+function b6(iso) { const m = String(iso || '').match(/^\d{2}(\d{2})-(\d{2})-(\d{2})/); return m ? m[1] + m[2] + m[3] : ''; }
+function kstHm(ts) { const k = new Date(new Date(ts).getTime() + 9 * 3600 * 1000); return k.toISOString().slice(11, 16); }
+function kstDay(ts) { const d = new Date(ts); const k = new Date(d.getTime() + 9 * 3600 * 1000); return k.toISOString().slice(0, 10); }
+
+// ===== 동의서 글 (2026-10-06 정함 · 2026-10-11 서명 화면) — 글을 바꾸면 FORM_VER 도 바꿀 것 =====
+const FORM_VER = '2026-10-11';
+const TITLE = ['월간 치료 요약 · 가정 과제 · 발음 녹음 서비스 신청 및', '개인정보 수집 · 이용 동의서 (무료 · 선택)'];
+const INTRO = '자라는나무 아동발달센터(이하 "센터")는 보호자님께서 아이의 치료를 더 쉽게 이해하시고 집에서도 함께하실 수 있도록 AI(인공지능)를 활용한 서비스를 준비하고 있습니다. 만 14세 미만 아동은 「개인정보 보호법」에 따라 법정대리인(보호자)의 동의를 받습니다.';
+const GAIN = [
+  '매달 아이의 치료 내용을 쉬운 말로 정리한 「월간 치료 요약」',
+  '집에서 하루 5~10분 함께하실 수 있는 「가정 과제」',
+  '(발음 치료 아동) 녹음으로 확인하는 발음 변화'
+];
+const OPTN = '신청하지 않으셔도 지금 받고 계신 치료는 똑같이 진행되며 어떠한 불이익도 없습니다. 항목마다 따로 고르실 수 있습니다.';
+const RECNOTE = '아이의 치료기록지는 이 신청과 상관없이 학부모 앱(또는 요청하시면 종이)으로 보실 수 있습니다. 선생님의 내부 메모는 보이지 않습니다.';
+const SECS = [
+  { h: '가. 월간 치료 요약 · 가정 과제', l: [
+    '1) 목적 : 치료기록지를 바탕으로 월간 요약과 가정 과제를 만들어 보호자께 드림',
+    '2) 항목 : 치료기록지 내용(수업 날짜, 활동 내용, 아동 반응, 치료 목표), 아동 나이(개월 수), 성별 — ※ 아동 이름 · 연락처는 AI에 보내지 않습니다.',
+    '3) 방법 : AI가 초안을 만들고, 담당 선생님이 읽고 고친 뒤에만 보호자께 드립니다.',
+    '4) 보유 : 만든 요약 · 과제는 치료 종결 후 1년까지 보관 후 파기' ] },
+  { h: '나. 발음 녹음 (발음 치료를 받는 아동만 해당)', l: [
+    '1) 목적 : 아이의 발음 정확도를 AI로 분석하여 치료 계획과 진행 확인에 참고',
+    '2) 항목 : 음성 녹음 파일(낱말 · 문장 따라 말하기, 그림 보고 말하기, 대화), 녹음 날짜, 나이(개월 수), 성별',
+    '3) 방법 : 치료 시간 중 치료실 안에서 담당 선생님이 센터 기기로 녹음합니다. 아이가 싫어하거나 불편해하면 바로 멈춥니다. 녹음 파일은 센터 관리 프로그램 안에만 보관하며 개인 휴대폰에 두지 않습니다. 얼굴이 나오는 영상은 찍지 않습니다.',
+    '4) 보유 : 원본 녹음은 치료 종결 후 1년까지 보관 후 파기' ] },
+  { h: '다. 연구 이용', l: [
+    '1) 목적 : 가 · 나의 자료에서 이름 대신 번호를 붙여, 치료 요약 · 가정 과제 · 발음 분석 AI 프로그램을 만들고 개선하는 연구',
+    '2) 보유 : 연구 목적을 이룰 때까지, 최대 5년 후 파기' ] },
+  { h: '라. 민감정보 처리', l: [
+    '치료기록지 내용 · 조음 평가 결과 · 치료 목표와 이를 담은 음성은 건강에 관한 정보(민감정보)에 해당하여 따로 동의를 받습니다.',
+    '※ 가 · 나 · 다 가운데 하나라도 신청하시려면 이 항목에도 동의가 필요합니다.' ] },
+  { h: '마. 앞으로의 AI 분석에 대하여', l: [
+    '· 현재는 자료를 센터 프로그램 안에서 준비 · 보관합니다.',
+    '· AI 분석을 맡을 업체가 정해지면 업체 이름과 맡기는 일을 센터 개인정보 처리방침에 공개하고 보호자님께 따로 알려 드립니다.',
+    '· 자료를 해외로 보내야 하는 경우에는 그때 다시 별도의 동의를 받으며, 동의하지 않으시면 해외로 보내지 않습니다.' ] },
+  { h: '바. 동의 철회', l: [
+    '· 언제든 센터(042-488-6011)에 말씀하시면 항목마다 철회하실 수 있습니다.',
+    '· 철회하시면 그때부터 해당 서비스를 멈추고, 보관 중인 원본 자료를 파기합니다.',
+    '· 이미 연구에 쓰여 다른 자료와 합쳐진 부분은 따로 떼어 지우기 어려울 수 있습니다.' ] },
+  { h: '사. 아동에게 드리는 안내', l: [
+    '녹음 전에 아이에게도 쉬운 말로 설명하고, 아이가 원하지 않으면 녹음하지 않습니다.' ] }
+];
+// 동의 칸 넷 — col: 표 칸 · off: 철회 칸
+const CHOICES = [
+  { key: 'sum', col: 'c_summary',   off: 'summary_off_at',   label: '1) 월간 치료 요약 · 가정 과제 (가)', opts: [['동의', '신청 · 동의함'], ['안함', '하지 않음']] },
+  { key: 'voi', col: 'c_voice',     off: 'voice_off_at',     label: '2) 발음 녹음 (나)',                  opts: [['동의', '신청 · 동의함'], ['안함', '하지 않음'], ['해당없음', '해당 없음']] },
+  { key: 'res', col: 'c_research',  off: 'research_off_at',  label: '3) 연구 이용 (다)',                  opts: [['동의', '동의함'], ['안함', '동의하지 않음']] },
+  { key: 'sen', col: 'c_sensitive', off: 'sensitive_off_at', label: '4) 민감정보 처리 (라)',              opts: [['동의', '동의함'], ['안함', '동의하지 않음']] }
+];
+const RELS = ['모', '부', '조모', '조부', '기타'];
+
+let ME = null, KIDS = [], SIGNS = [], FILTER = 'all';
+let CUR = null, DIRTY = false, SAVING = false, PAD = null;
+
+// 1,000줄씩 나눠 끝까지 읽기
+async function readAll(mk) {
+  let out = [];
+  for (let from = 0; ; from += 1000) {
+    const r = await mk().range(from, from + 999);
+    if (r.error) return { error: r.error };
+    out = out.concat(r.data || []);
+    if (!r.data || r.data.length < 1000) return { data: out };
+  }
+}
+async function loadAll() {
+  const [c, s] = await Promise.all([
+    readAll(() => sb.from('nl_children').select('id, name, birth, status').order('id')),
+    readAll(() => sb.from('nl_ai_consents').select('id, child_id, signed_at, replaced_at, c_summary, c_voice, c_research, c_sensitive, summary_off_at, voice_off_at, research_off_at, sensitive_off_at').order('id', { ascending: false }))
+  ]);
+  const bad = [c, s].find(r => r.error);
+  if (bad) { show('자료를 읽지 못했습니다 — ' + bad.error.message, false); return false; }
+  KIDS = c.data || []; SIGNS = s.data || [];
+  return true;
+}
+function liveKid(k) { return k && !['종결', '타기관이용'].includes(k.status); }
+// 그 아동의 가장 최근 장 (효력 있는 장)
+function curOf(cid) { return SIGNS.find(s => Number(s.child_id) === Number(cid) && !s.replaced_at)
+                         || SIGNS.find(s => Number(s.child_id) === Number(cid)); }
+function chipTxt(s) {
+  return CHOICES.map(c => {
+    const v = s[c.col]; const off = s[c.off];
+    const t = v === '동의' ? (off ? '<span class="x">철회</span>' : '<b>○</b>') : (v === '해당없음' ? '해당없음' : '×');
+    return c.label.slice(0, 2) + t;
+  }).join(' · ');
+}
+
+function drawList() {
+  const q = $('q').value.trim();
+  const rows = KIDS.filter(k => liveKid(k) || curOf(k.id)).filter(k => {
+    if (!q) return true;
+    return /^\d+$/.test(q) ? String(k.id) === q : String(k.name || '').includes(q);
+  });
+  const withS = rows.filter(k => curOf(k.id)), noS = rows.filter(k => !curOf(k.id));
+  $('cnt').textContent = '받음 ' + withS.length + ' · 아직 ' + noS.length;
+  let list = FILTER === 'yes' ? withS : FILTER === 'no' ? noS : noS.concat(withS);
+  if (!list.length) { $('list').innerHTML = '<div class="empty">' + (q ? '찾는 아동이 없습니다.' : '아동이 없습니다.') + '</div>'; return; }
+  $('list').innerHTML = '<div class="grp">' + list.map(k => {
+    const s = curOf(k.id);
+    return '<div class="kid"><span class="nm">' + k.id + '번 ' + esc(k.name || '') + '<span class="bd">' + b6(k.birth) + '</span>'
+      + (liveKid(k) ? '' : ' <span class="bd">· ' + esc(k.status) + '</span>') + '</span>'
+      + (s ? '<span class="done">✓ ' + dotDate(kstDay(s.signed_at)) + ' 받음</span> <span class="chips">' + chipTxt(s) + '</span> <button type="button" data-view="' + s.id + '">보기</button>'
+           : (liveKid(k) ? '<button type="button" class="btn-main" data-take="' + k.id + '">동의서 받기</button>' : ''))
+      + '</div>';
+  }).join('') + '</div>';
+  $('list').querySelectorAll('[data-take]').forEach(b => b.onclick = () => openTake(Number(b.dataset.take)));
+  $('list').querySelectorAll('[data-view]').forEach(b => b.onclick = () => openView(Number(b.dataset.view)));
+}
+
+function buildSnap(k) {
+  return { child_no: k.id, child_name: k.name || '', birth: k.birth || '',
+    title: TITLE, intro: INTRO, gain: GAIN, option: OPTN, record_note: RECNOTE, secs: SECS,
+    choices: CHOICES.map(c => ({ label: c.label, opts: c.opts })) };
+}
+
+// 동의서 그리기 — mode 'take'(받기) / 'view'(받은 것 보기)
+function sheetHtml(sn, mode, s) {
+  const take = mode === 'take';
+  let h = '<div class="sheet">'
+    + '<h2 style="font-size:19px;line-height:1.45;">' + (sn.title || TITLE).map(esc).join('<br>') + '</h2><div class="org">자라는나무 아동발달센터</div>'
+    + '<div>' + esc(sn.intro) + '</div>'
+    + '<h3>신청하시면 받으실 수 있는 것 (모두 무료)</h3><div class="gain">' + (sn.gain || []).map(r => '<div>· ' + esc(r) + '</div>').join('') + '</div>'
+    + '<h3>이 신청은 선택입니다</h3><div>' + esc(sn.option) + '</div>'
+    + '<div class="box">※ 치료기록지 보기 안내 — ' + esc(sn.record_note) + '</div>'
+    + (sn.secs || []).map(x => '<h3>' + esc(x.h) + '</h3><div class="dl">' + x.l.map(r => '<div>' + esc(r) + '</div>').join('') + '</div>').join('')
+    + '<h3>신청 및 동의 여부 <span class="note">(항목마다 골라 주세요)</span></h3>';
+  CHOICES.forEach((c, i) => {
+    const lab = ((sn.choices || [])[i] || c).label || c.label;
+    const opts = ((sn.choices || [])[i] || c).opts || c.opts;
+    if (take) {
+      h += '<div class="crow"><span class="pl">' + esc(lab) + '</span><span class="pick" id="pk_' + c.key + '">'
+        + opts.map(o => '<label><input type="radio" name="' + c.key + '" value="' + o[0] + '"> ' + esc(o[1]) + '</label>').join('') + '</span></div>';
+    } else {
+      const v = s[c.col], off = s[c.off];
+      h += '<div class="crow"><span class="pl">' + esc(lab) + '</span><span>'
+        + opts.map(o => (o[0] === v ? '☑ ' : '☐ ') + esc(o[1])).join(' &nbsp; ')
+        + (off ? ' <span class="off">· ' + dotDate(kstDay(off)) + ' 철회</span>' : '') + '</span></div>';
+    }
+  });
+  if (take) h += '<div class="note" id="senNote" style="display:none;color:#993C1D;margin-top:6px;">4) 민감정보 처리에 동의하지 않으시면 1) ~ 3) 서비스를 받으실 수 없습니다. 1) ~ 3) 을 「하지 않음 · 동의하지 않음 · 해당 없음」으로 골라 주세요.</div>';
+  h += '<div style="margin-top:14px;">위 내용을 충분히 설명 듣고 이해하였으며, 위와 같이 신청 · 동의합니다.</div>'
+    + '<div class="info" style="margin-top:8px;">'
+    + '<span class="k">날짜</span><span>' + korDate(take ? today() : kstDay(s.signed_at)) + '</span>'
+    + '<span class="k">아동 이름</span><span>' + esc(sn.child_name) + '</span>'
+    + '<span class="k">생년월일</span><span>' + esc(dotDate(sn.birth)) + '</span></div>';
+  if (take) {
+    h += '<div class="who"><input type="text" id="gName" maxlength="20" placeholder="보호자 이름" style="width:180px;">'
+      + '<select id="gRel"><option value="">아동과의 관계</option>' + RELS.map(r => '<option>' + r + '</option>').join('') + '</select></div>'
+      + '<div class="pad" id="pad"><canvas id="cv"></canvas><div class="ph" id="ph">여기에 손가락으로 서명해 주세요</div></div>'
+      + '<div class="bar no-print"><button type="button" id="padClr">다시 쓰기</button><span style="flex:1"></span>'
+      + '<button type="button" class="btn-main" id="submitBtn" style="font-size:17px;padding:10px 28px;">제출</button></div>'
+      + '<div class="note no-print" style="text-align:right;margin-top:6px;">제출하면 고칠 수 없게 잠깁니다.</div>';
+  } else {
+    h += '<div class="info"><span class="k">보호자</span><span>' + esc(s.guardian_name) + ' (' + esc(s.guardian_rel) + ')</span>'
+      + '<span class="k">서명</span><span><img class="signimg" id="signImg" alt="서명"></span></div>';
+    const can = CHOICES.filter(c => s[c.col] === '동의' && !s[c.off]);
+    if (CAN_EDIT() && !s.replaced_at && can.length) {
+      h += '<div class="bar no-print"><span class="note">보호자가 철회하시면 그 항목을 눌러 주세요 →</span>'
+        + can.map(c => '<button type="button" data-off="' + c.key + '">' + esc(c.label.slice(0, 2)) + ' 철회</button>').join('')
+        + '</div>';
+    }
+  }
+  return h + '<div style="text-align:right;margin-top:14px;font-weight:600;">자라는나무 아동발달센터 귀중</div></div>';
+}
+function CAN_EDIT() { return ME && [8, 19, 11].includes(Number(ME.id)); }
+
+function openTake(cid) {
+  const k = KIDS.find(x => Number(x.id) === cid); if (!k) return;
+  if (!liveKid(k)) { show('종결 · 타기관이용 아동은 동의서를 받을 수 없습니다.', false); return; }
+  CUR = { mode: 'take', k, snap: buildSnap(k) };
+  hideMsg(); DIRTY = false;
+  $('listBox').style.display = 'none'; $('formBox').style.display = '';
+  $('printBtn').style.display = 'none'; $('againBtn').style.display = 'none';
+  $('oldTag').style.display = 'none'; $('hist').style.display = 'none';
+  document.body.classList.add('signing');
+  $('sheet').innerHTML = sheetHtml(CUR.snap, 'take', null);
+  bindTake();
+  window.scrollTo(0, 0);
+}
+async function openView(sid) {
+  hideMsg();
+  const r = await sb.from('nl_ai_consents').select('*').eq('id', sid).maybeSingle();
+  if (r.error || !r.data) { show('동의서를 읽지 못했습니다' + (r.error ? ' — ' + r.error.message : ''), false); return; }
+  const s = r.data;
+  CUR = { mode: 'view', s };
+  document.body.classList.remove('signing');
+  $('listBox').style.display = 'none'; $('formBox').style.display = '';
+  $('printBtn').style.display = '';
+  const k = KIDS.find(x => Number(x.id) === Number(s.child_id));
+  $('againBtn').style.display = (CAN_EDIT() && !s.replaced_at && liveKid(k)) ? '' : 'none';
+  if (s.replaced_at) { $('oldTag').style.display = ''; $('oldTag').textContent = '이 장은 ' + dotDate(kstDay(s.replaced_at)) + ' 새 동의서로 바뀌었습니다. 지금 효력이 있는 것은 가장 최근 장입니다.'; }
+  else $('oldTag').style.display = 'none';
+  const all = SIGNS.filter(x => Number(x.child_id) === Number(s.child_id));
+  if (all.length > 1) {
+    $('hist').style.display = '';
+    $('hist').innerHTML = '이 아동의 동의서 ' + all.length + '장 — ' + all.map(x => { const t = dotDate(kstDay(x.signed_at)) + ' ' + kstHm(x.signed_at) + (x.replaced_at ? '' : ' (지금)');
+      return x.id === s.id ? '<b>' + t + '</b>' : '<a data-sid="' + x.id + '">' + t + '</a>'; }).join(' ');
+    $('hist').querySelectorAll('[data-sid]').forEach(a => a.onclick = () => openView(Number(a.dataset.sid)));
+  } else $('hist').style.display = 'none';
+  $('sheet').innerHTML = sheetHtml(s.snap || {}, 'view', s);
+  $('signImg').src = s.sign_png;
+  $('sheet').querySelectorAll('[data-off]').forEach(b => b.onclick = () => itemOff(s, b.dataset.off, b));
+  window.scrollTo(0, 0);
+}
+async function itemOff(s, key, btn) {
+  const c = CHOICES.find(x => x.key === key); if (!c) return;
+  let msg = '「' + c.label + '」 동의를 오늘 날짜로 철회합니다.';
+  if (key === 'sen') {
+    const with_ = CHOICES.filter(x => x.key !== 'sen' && s[x.col] === '동의' && !s[x.off]).map(x => x.label.slice(0, 2));
+    if (with_.length) msg += '\n민감정보를 철회하면 ' + with_.join(' · ') + ' 도 함께 철회됩니다.';
+  }
+  if (!confirm(msg + '\n철회하면 되돌릴 수 없습니다. 진행할까요?')) return;
+  btn.disabled = true;
+  const up = {}; up[c.off] = new Date().toISOString();
+  const r = await sb.from('nl_ai_consents').update(up).eq('id', s.id).select('id');
+  if (r.error || !r.data || !r.data.length) { btn.disabled = false; show('철회하지 못했습니다' + (r.error ? ' — ' + r.error.message : ''), false); return; }
+  await loadAll(); await openView(s.id); show('철회했습니다.', true);
+}
+
+function senCheck() {
+  const sh = $('sheet');
+  const sen = sh.querySelector('input[name=sen]:checked');
+  const anyOn = ['sum', 'voi', 'res'].some(k => { const i = sh.querySelector('input[name=' + k + ']:checked'); return i && i.value === '동의'; });
+  const clash = sen && sen.value === '안함' && anyOn;
+  $('senNote').style.display = clash ? '' : 'none';
+  return clash;
+}
+function bindTake() {
+  const sh = $('sheet');
+  sh.querySelectorAll('.pick input').forEach(i => i.addEventListener('change', () => {
+    const p = i.closest('.pick'); p.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+    p.classList.remove('bad'); DIRTY = true; senCheck();
+  }));
+  $('gName').addEventListener('input', () => { $('gName').classList.remove('bad'); DIRTY = true; });
+  $('gRel').addEventListener('change', () => { $('gRel').classList.remove('bad'); DIRTY = true; });
+  PAD = makePad($('cv'), () => { $('ph').style.display = 'none'; $('pad').classList.remove('bad'); DIRTY = true; });
+  $('padClr').onclick = () => { PAD.clear(); $('ph').style.display = ''; };
+  $('submitBtn').onclick = submit;
+}
+
+// 손가락 서명 칸 (그룹 신청서와 같음)
+function makePad(cv, onDraw) {
+  const ctx = cv.getContext('2d'); let drawing = false, used = false, last = null;
+  function size() {
+    const r = cv.getBoundingClientRect(); const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const old = used ? cv.toDataURL() : null;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+    if (old) { const im = new Image(); im.onload = () => ctx.drawImage(im, 0, 0, r.width, r.height); im.src = old; }
+  }
+  function pos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); cv.setPointerCapture(e.pointerId); drawing = true; last = pos(e);
+    ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, Math.PI * 2); ctx.fillStyle = '#111'; ctx.fill(); });
+  cv.addEventListener('pointermove', e => { if (!drawing) return; e.preventDefault(); const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p;
+    if (!used) { used = true; onDraw(); } });
+  const end = () => { drawing = false; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('pointerleave', end);
+  let lastW = 0;
+  function onResize() { if (!cv.isConnected) { window.removeEventListener('resize', onResize); return; }
+    const w = Math.round(cv.getBoundingClientRect().width); if (w && w !== lastW) { lastW = w; size(); } }
+  size(); lastW = Math.round(cv.getBoundingClientRect().width);
+  window.addEventListener('resize', onResize);
+  return {
+    clear() { ctx.clearRect(0, 0, cv.width, cv.height); used = false; },
+    used() { return used; },
+    png() { return cv.toDataURL('image/png'); }
+  };
+}
+
+async function submit() {
+  if (SAVING) return;
+  const sh = $('sheet'); const bad = []; const val = {};
+  CHOICES.forEach(c => {
+    const i = sh.querySelector('input[name=' + c.key + ']:checked');
+    if (i) val[c.col] = i.value; else bad.push(['pk_' + c.key, c.label + ' — 골라 주세요']);
+  });
+  const nm = $('gName').value.trim(), rel = $('gRel').value;
+  if (!nm) bad.push(['gName', '보호자 이름을 적어 주세요']);
+  if (!rel) bad.push(['gRel', '아동과의 관계를 골라 주세요']);
+  if (!PAD.used()) bad.push(['pad', '서명해 주세요']);
+  sh.querySelectorAll('.bad').forEach(x => x.classList.remove('bad'));
+  if (!bad.length && senCheck()) bad.push(['pk_sen', '4) 민감정보에 동의하지 않으시면 1) ~ 3) 을 신청하실 수 없습니다']);
+  if (bad.length) {
+    bad.forEach(b => { const el = $(b[0]); if (el) el.classList.add('bad'); });
+    const first = $(bad[0][0]); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const onlyClash = bad.length === 1 && bad[0][0] === 'pk_sen' && sh.querySelector('input[name=sen]:checked');
+    show((onlyClash ? '고른 답을 다시 확인해 주세요' : '아직 채우지 않은 곳이 있습니다') + '\n· ' + bad.map(b => b[1]).join('\n· '), false, true);
+    return;
+  }
+  const png = PAD.png();
+  if (png.length >= 400000) { show('서명 그림이 너무 큽니다. 「다시 쓰기」 후 조금 작게 서명해 주세요.', false); return; }
+  SAVING = true; $('submitBtn').disabled = true; $('submitBtn').textContent = '제출 중…'; hideMsg();
+  const row = Object.assign({ child_id: CUR.k.id, form_ver: FORM_VER, snap: CUR.snap,
+    guardian_name: nm, guardian_rel: rel, sign_png: png }, val);
+  try {
+    const r = await sb.from('nl_ai_consents').insert(row).select('id');
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.length) throw new Error('저장된 줄이 없습니다 (권한을 확인해 주세요)');
+    DIRTY = false;
+    await loadAll();
+    await openView(r.data[0].id);
+    show('동의서를 받았습니다. 아이패드를 돌려받아 주세요.', true);
+  } catch (e) {
+    show('제출하지 못했습니다 — ' + (e.message || e), false);
+    $('submitBtn').disabled = false; $('submitBtn').textContent = '제출';
+  } finally { SAVING = false; }
+}
+
+$('backBtn').onclick = () => {
+  if (CUR && CUR.mode === 'take' && DIRTY && !confirm('적던 동의서가 저장되지 않았습니다. 목록으로 갈까요?')) return;
+  DIRTY = false; CUR = null; hideMsg(); document.body.classList.remove('signing');
+  $('formBox').style.display = 'none'; $('listBox').style.display = '';
+  drawList(); window.scrollTo(0, 0);
+};
+$('againBtn').onclick = () => {
+  if (!CUR || CUR.mode !== 'view') return;
+  if (!confirm('새 동의서를 받으면 지금 장은 「바뀜」으로 남고, 새 장이 효력을 갖습니다.\n아이패드를 보호자께 드릴까요?')) return;
+  openTake(Number(CUR.s.child_id));
+};
+$('printBtn').onclick = () => window.print();
+$('q').addEventListener('input', drawList);
+$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
+  FILTER = b.dataset.f; $('tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); drawList();
+});
+window.addEventListener('beforeunload', e => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+
+async function afterLogin(user) {
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name, role')
+    .eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { location.replace('index.html'); return; }
+  nlKeep(me.id);
+  ME = me;
+  $('mainBox').style.display = '';
+  $('who').textContent = me.name + ' (' + (me.role || '') + ')';
+  if (!CAN_EDIT()) { $('listBox').innerHTML = '<div class="empty">이 화면은 관리자 · 행정 · 데스크만 씁니다.</div>'; return; }
+  if (await loadAll()) drawList();
+}
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data && data.session) await afterLogin(data.session.user);
+  else location.replace('index.html');
+})();
+</script>
+</body>
+</html>
