@@ -1390,11 +1390,19 @@ async function afterLogin(user){
   (ef || []).forEach(x => EVFEE[x.cnt] = x.fee);
 
   // 수업 · 아동
-  const { data: sc } = await sb.from('nl_therapy_schedules')
-    .select('id, therapy_id, duration, therapist_id, weekday, start_time');
-  const { data: tp } = await sb.from('nl_therapies')
-    .select('id, child_id, therapy_type_id, support_type_id, group_id');
-  const { data: kids } = await sb.from('nl_children').select('id, name');
+  // 1,000줄씩 나눠 끝까지 읽기 (2026-10-11) — 한 번에는 1,000줄까지만 오고 뒤는 조용히 잘린다
+  const readAll = async mk => { let out = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await mk().range(from, from + 999);
+      if (error) { alert('자료를 다 읽지 못했습니다. 새로고침 해 주세요.\n' + error.message); return out; }
+      out = out.concat(data || []);
+      if (!data || data.length < 1000) return out;
+    } };
+  const [sc, tp, kids] = await Promise.all([
+    readAll(() => sb.from('nl_therapy_schedules').select('id, therapy_id, duration, therapist_id, weekday, start_time').order('id')),
+    readAll(() => sb.from('nl_therapies').select('id, child_id, therapy_type_id, support_type_id, group_id').order('id')),
+    readAll(() => sb.from('nl_children').select('id, name').order('id'))
+  ]);
   const tpMap = {}; (tp||[]).forEach(x => { tpMap[x.id] = x; TPTT[x.id] = x.therapy_type_id; });
   (kids||[]).forEach(k => KIDS[k.id] = k.name);
   ROWS = (sc||[]).map(r => {
