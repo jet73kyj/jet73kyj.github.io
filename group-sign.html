@@ -15,6 +15,12 @@
            display:flex; align-items:center; gap:10px; }
   header img.lg { height:22px; display:block; }
   header .bar0 { width:1px; height:16px; background:var(--line); }
+  /* 위 띠 단추 — ☰ 메뉴 · 새로고침도 이 모양을 그대로 받음 (nl-login.js 가 class 를 베낌) */
+  header .hbtn { display:inline-flex; align-items:center; box-sizing:border-box; height:30px; margin:0; background:#fff; color:#B07A4A;
+    text-decoration:none; border:1px solid #ECE8E3; border-radius:8px; padding:0 12px; font-size:13px; font-weight:500;
+    font-family:inherit; line-height:1; cursor:pointer; white-space:nowrap; }
+  header .hbtn:hover { background:var(--camL); }
+  header #nlMenuBtn, header #nlReload { margin-right:0 !important; }
   .container { max-width:900px; margin:0 auto; padding:16px; }
   .sub { font-size:13px; color:var(--dim); margin:0 0 14px; line-height:1.6; }
   .out { margin-top:12px; padding:12px 14px; border-radius:8px; font-size:14px; line-height:1.6; display:none; white-space:pre-wrap; }
@@ -98,8 +104,8 @@
   <span class="bar0"></span>
   <h1 style="margin:0;font-size:15px;font-weight:600;">그룹 수업 신청서</h1>
   <span style="margin-left:auto;font-size:12px;color:#A39C95;" id="who"></span>
-  <a href="forms.html" style="background:#fff;color:#B07A4A;text-decoration:none;border:1px solid #ECE8E3;border-radius:8px;padding:5px 12px;font-size:13px;">서식</a>
-  <a href="index.html" style="background:#fff;color:#B07A4A;text-decoration:none;border:1px solid #ECE8E3;border-radius:8px;padding:5px 12px;font-size:13px;">처음으로</a>
+  <a href="forms.html" class="hbtn">서식</a>
+  <a href="index.html" class="hbtn">처음으로</a>
 </header>
 
 <div class="container">
