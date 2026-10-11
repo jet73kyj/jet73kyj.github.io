@@ -229,6 +229,7 @@
   <div class="card" id="saveCard" style="display:none;">
     <h2>③ 저장</h2>
     <div id="readstat" class="sum"></div>
+    <div id="cmpBox"></div>
     <button id="save" type="button">저장 전</button>
     <div id="msg3" class="out"></div>
   </div>
@@ -332,6 +333,7 @@ function setKind(st) {
   $('mapCard').style.display = 'none';
   $('saveCard').style.display = 'none';
   hide($('msg2')); hide($('msg3'));
+  CMP = null; if ($('cmpBox')) $('cmpBox').innerHTML = '';
 }
 $('kTr').onclick = () => { if (cuLeaveOk()) { CU_DIRTY = false; setKind(3); } };
 $('kAf').onclick = () => { if (cuLeaveOk()) { CU_DIRTY = false; setKind(5); } };
@@ -514,6 +516,7 @@ function parse(aoa) {
   $('saveCard').style.display = 'block';
   CU_DIRTY = true;
   setCuBtn('before');
+  CMP = null; drawCmp(out);
   crossCheck(out).then(n => {
     if (ROWS !== out) return;          // 그 사이 다른 파일을 읽음
     if (n < 0) {
@@ -584,6 +587,70 @@ function kindCheck(rows, mks) {
     if (!tl.some(x => live(x, mine)) && tl.some(x => live(x, other))) wrong++;
   });
   return { known, wrong };
+}
+
+
+// ── 서버와 견줌 — 새 엑셀인지 알려 주기 (2026-10-11 은정님) ──
+//   새 결제 · 이미 저장된 결제 · 서버에만 있는 결제(엑셀 날짜 범위 안) · 엑셀 안에서 겹친 줄 · 마지막으로 올린 때
+//   까닭 — 9월 방과후: 파일 이름은 같았지만 9/30 15:44에 받은 엑셀에는 9/30 결제와 늦게 들어온 9/18 결제가 없었음
+function cmpWhen(ts) {
+  if (!ts) return '';
+  const d = new Date(new Date(ts).getTime() + 9 * 3600 * 1000).toISOString();
+  return Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) + ' ' + d.slice(11, 16);
+}
+function cmpHtml(c) {
+  if (!c) return '';
+  if (c.err) return '<div class="cmpbox cmpwarn">⚠ 서버와 견주지 못했습니다 — ' + esc(c.err) + '</div>';
+  const won_ = n => (Number(n) || 0).toLocaleString('ko-KR') + '원';
+  let h = '<div class="cmpbox"><b>서버와 견줌</b>'
+    + (c.newN ? '<div>· 새 결제 <b>' + c.newN + '건</b> ' + won_(c.newAmt) + ' <span class="cmpdim">← 이번에 처음 들어갑니다</span></div>'
+              : '<div class="cmpsame">· 새 결제 0건 — <b>이미 올린 엑셀과 같습니다</b> (저장할 것 없음)</div>')
+    + '<div>· 이미 저장된 결제 ' + c.oldN + '건 <span class="cmpdim">← 그대로 (겹쳐 쌓이지 않음)</span></div>'
+    + (c.srvOnly.length ? '<div class="cmpwarn">· 서버에만 있는 결제 <b>' + c.srvOnly.length + '건</b> — 엑셀에서 빠졌거나 취소됐거나, 다른 달 · 다른 갈래로 잘못 올린 것일 수 있습니다'
+          + '<br><span class="cmpdim">승인번호 ' + c.srvOnly.slice(0, 12).map(esc).join(', ') + (c.srvOnly.length > 12 ? ' 외 ' + (c.srvOnly.length - 12) + '건' : '') + '</span></div>'
+        : '<div>· 서버에만 있는 결제 0건</div>')
+    + (c.dupN ? '<div class="cmpwarn">· 엑셀 안에서 같은 결제(승인번호 · 날짜)가 두 번 나온 줄 ' + c.dupN + '건 — 한 줄로 저장합니다 (취소 줄이 있으면 취소로)</div>' : '')
+    + (c.last ? '<div class="cmpdim">이 달 · 이 갈래를 마지막으로 올린 때: ' + c.last + '</div>' : '<div class="cmpdim">이 달 · 이 갈래로 처음 올리는 엑셀입니다</div>')
+    + '</div>';
+  return h;
+}
+const CMP_CSS = '.cmpbox{background:#FBF8F4;border:1px solid #EFE6DA;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:13.5px;line-height:1.75}'
+  + '.cmpdim{color:#8a7a6a;font-size:12.5px}.cmpwarn{color:#993C1D}.cmpsame{color:#3B6D11}';
+(function () { const st = document.createElement('style'); st.textContent = CMP_CSS; document.head.appendChild(st); })();
+
+let CMP = null;
+async function cmpCard(rows) {
+  try {
+    const key = r => r.appr_no + '|' + String(r.paid_on).slice(0, 10);
+    const mks = Array.from(new Set(rows.map(r => r.month_key))).sort();
+    const days = rows.map(r => String(r.paid_on).slice(0, 10)).sort();
+    const d0 = days[0], d1 = days[days.length - 1];
+    let srv = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('nl_card_rows').select('appr_no, paid_on, uploaded_at')
+        .in('month_key', mks).eq('support_type_id', ST).range(from, from + 999);
+      if (error) throw error;
+      srv = srv.concat(data || []);
+      if (!data || data.length < 1000) break;
+    }
+    const sk = new Set(srv.map(key)), xk = new Set(), seen = {};
+    let dupN = 0;
+    rows.forEach(r => { const k = key(r); if (seen[k]) dupN++; seen[k] = 1; xk.add(k); });
+    const newRows = rows.filter((r, i) => !sk.has(key(r)) && rows.findIndex(x => key(x) === key(r)) === i);
+    const newAmt = newRows.reduce((a, r) => a + (r.canceled ? 0 : Number(r.amount) || 0), 0);
+    const srvOnly = srv.filter(r => { const d = String(r.paid_on).slice(0, 10); return d >= d0 && d <= d1 && !xk.has(key(r)); }).map(r => r.appr_no);
+    const lastTs = srv.map(r => r.uploaded_at).filter(Boolean).sort().pop();
+    return { newN: newRows.length, newAmt, newKeys: new Set(newRows.map(key)), oldN: xk.size - newRows.length,
+             srvOnly, dupN, last: cmpWhen(lastTs) };
+  } catch (e) { return { err: e.message || String(e) }; }
+}
+async function drawCmp(rows) {
+  $('cmpBox').innerHTML = '<div class="cmpbox cmpdim">서버와 견주는 중…</div>';
+  const c = await cmpCard(rows);
+  if (rows !== ROWS) return c;      // 그 사이 다른 파일을 읽음
+  CMP = c;
+  $('cmpBox').innerHTML = cmpHtml(c);
+  return c;
 }
 
 // ── 짝 맺기 ───────────────────────────────────────
@@ -680,9 +747,15 @@ $('save').onclick = async () => {
     }
 
     // ② 결제 줄을 넣는다
-    const rows = ROWS.map(r => Object.assign({}, r, {
-      child_id: CARDMAP[key(r.person_name, ST)] || null
-    }));
+    // 엑셀 안에서 같은 결제(승인번호 · 날짜)가 두 번 나오면 한 줄로 — 취소 줄이 있으면 취소로 남긴다
+    //   (같은 줄이 한 번에 두 번 가면 서버가 저장 전체를 거절한다)
+    const one = {};
+    ROWS.forEach(r => {
+      const k = r.appr_no + '|' + String(r.paid_on).slice(0, 10);
+      const o = Object.assign({}, r, { child_id: CARDMAP[key(r.person_name, ST)] || null });
+      if (!one[k] || o.canceled) one[k] = o;
+    });
+    const rows = Object.values(one);
 
     let done = 0;
     for (let i = 0; i < rows.length; i += 200) {
@@ -693,6 +766,7 @@ $('save').onclick = async () => {
       done += part.length;
     }
 
+    const newN = (CMP && !CMP.err) ? CMP.newN : null;
     NEWCARDS = [];
     drawMap();
     // 엑셀 줄 수와 바로 견주게 — 달마다 건수 · 사람 수 (2026-10-09)
@@ -704,9 +778,11 @@ $('save').onclick = async () => {
     const sumTxt = Object.keys(bym).sort().map(k => Number(k.slice(5, 7)) + '월 ' + bym[k].n + '건 · '
       + Object.keys(bym[k].p).length + '명').join(' / ');
     show($('msg3'), '✅ ' + done + '줄 저장했습니다. (' + KIND[ST] + ' · ' + sumTxt + ')\n'
+      + (newN != null ? '새로 들어간 결제 ' + newN + '건 · 나머지는 이미 있던 결제입니다.\n' : '')
       + (maps.length ? '성명 ' + maps.length + '명을 아동과 이어 두었습니다. 다음부터는 저절로 붙습니다.\n' : '')
       + '같은 파일을 다시 올려도 중복으로 쌓이지 않습니다.', true);
     cuOk = true;
+    drawCmp(ROWS);
   } catch (e) {
     show($('msg3'), '❌ 저장하지 못했습니다.\n' + (e.message || e), false);
   } finally {
