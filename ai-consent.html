@@ -85,6 +85,12 @@
   .staffonly { font-size:12px; color:#A39C95; }
   .srch { display:flex; gap:8px; align-items:center; margin:0 0 12px; flex-wrap:wrap; }
   .srch input { width:220px; }
+  .kdrop { position:absolute; left:0; top:calc(100% + 4px); z-index:20; min-width:260px; max-height:280px; overflow:auto;
+           background:#fff; border:1px solid #DDD3C7; border-radius:10px; box-shadow:0 6px 20px rgba(0,0,0,.08); }
+  .kdrop div { padding:10px 14px; cursor:pointer; font-size:15px; border-bottom:1px solid #F3EFE9; }
+  .kdrop div:last-child { border-bottom:none; }
+  .kdrop div:hover, .kdrop div.on { background:var(--camL); }
+  .kdrop .none { color:var(--dim); cursor:default; }
   .tabs { display:flex; gap:14px; }
   .tabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:6px 2px; color:#8a7a6a; }
   .tabs button.on { border-bottom-color:#B07A4A; color:#7E5530; font-weight:700; }
@@ -129,18 +135,21 @@
 
 <div class="container">
   <div id="listBox">
-    <div class="sub">치료중 · 대기중 아동입니다. 「동의서 받기」를 누르고 아이패드를 보호자께 드리면, 보호자가 읽고 항목마다 고르고 서명한 뒤 「제출」합니다.<br>
-      제출한 동의서는 고칠 수 없습니다 (항목마다 철회만 됩니다). 다시 신청하시면 「보기」 → 「새 동의서 받기」로 한 장 더 받습니다.</div>
-    <div class="srch">
-      <input type="text" id="q" placeholder="이름 또는 번호" autocomplete="off">
-      <span class="tabs" id="tabs">
-        <button type="button" data-f="all" class="on">전체</button>
-        <button type="button" data-f="no">아직 안 받음</button>
-        <button type="button" data-f="yes">받음</button>
-      </span>
-      <span style="flex:1"></span><span class="chips" id="cnt"></span>
+    <div class="sub">동의서를 받을 아동 이름(또는 번호)을 치고 고른 뒤 「동의서 받기」를 누르세요. 아이패드를 보호자께 드리면, 보호자가 읽고 항목마다 고르고 서명한 뒤 「제출」합니다.<br>
+      치료중 아동만 받을 수 있습니다. 제출한 동의서는 고칠 수 없습니다 (항목마다 철회만 됩니다). 다시 신청하시면 「보기」 → 「새 동의서 받기」로 한 장 더 받습니다.</div>
+    <div class="grp" style="overflow:visible;"><div class="grp-h" style="border-radius:12px 12px 0 0;">동의서 받기</div>
+      <div style="padding:12px 14px;">
+        <div class="srch" style="margin:0;position:relative;">
+          <span>아동 이름</span>
+          <span style="position:relative;"><input type="text" id="kq" placeholder="이름 또는 번호" autocomplete="off">
+            <div id="kdrop" class="kdrop" style="display:none;"></div></span>
+        </div>
+        <div id="kpick" style="margin-top:10px;font-size:15px;"></div>
+      </div>
     </div>
-    <div id="list"></div>
+    <div class="grp"><div class="grp-h" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">받은 동의서 <span id="cnt" style="margin:0;"></span>
+      <span style="flex:1"></span><input type="text" id="q" placeholder="찾기 — 이름 또는 번호" autocomplete="off" style="font-size:16px;padding:6px 10px;width:200px;"></div>
+      <div id="list"></div></div>
   </div>
   <div id="formBox" style="display:none;">
     <div class="tool no-print">
@@ -226,7 +235,7 @@ const CHOICES = [
 ];
 const RELS = ['모', '부', '조모', '조부', '기타'];
 
-let ME = null, KIDS = [], SIGNS = [], FILTER = 'all';
+let ME = null, KIDS = [], SIGNS = [], PICK = null;
 let CUR = null, DIRTY = false, SAVING = false, PAD = null;
 
 // 1,000줄씩 나눠 끝까지 읽기
@@ -249,7 +258,7 @@ async function loadAll() {
   KIDS = c.data || []; SIGNS = s.data || [];
   return true;
 }
-function liveKid(k) { return k && !['종결', '타기관이용'].includes(k.status); }
+function liveKid(k) { return !!k && k.status === '치료중'; }
 // 그 아동의 가장 최근 장 (효력 있는 장)
 function curOf(cid) { return SIGNS.find(s => Number(s.child_id) === Number(cid) && !s.replaced_at)
                          || SIGNS.find(s => Number(s.child_id) === Number(cid)); }
@@ -261,27 +270,45 @@ function chipTxt(s) {
   }).join(' · ');
 }
 
+function matchKid(k, q) { return /^\d+$/.test(q) ? String(k.id) === q : String(k.name || '').includes(q); }
+function kidLine(k) { return k.id + '번 ' + esc(k.name || '') + ' <span class="bd">' + b6(k.birth) + '</span>'; }
+// 받은 동의서 — 받은 장이 있는 아동만
 function drawList() {
   const q = $('q').value.trim();
-  const rows = KIDS.filter(k => liveKid(k) || curOf(k.id)).filter(k => {
-    if (!q) return true;
-    return /^\d+$/.test(q) ? String(k.id) === q : String(k.name || '').includes(q);
-  });
-  const withS = rows.filter(k => curOf(k.id)), noS = rows.filter(k => !curOf(k.id));
-  $('cnt').textContent = '받음 ' + withS.length + ' · 아직 ' + noS.length;
-  let list = FILTER === 'yes' ? withS : FILTER === 'no' ? noS : noS.concat(withS);
-  if (!list.length) { $('list').innerHTML = '<div class="empty">' + (q ? '찾는 아동이 없습니다.' : '아동이 없습니다.') + '</div>'; return; }
-  $('list').innerHTML = '<div class="grp">' + list.map(k => {
+  const all = KIDS.filter(k => curOf(k.id));
+  $('cnt').textContent = '(' + all.length + ')';
+  const list = q ? all.filter(k => matchKid(k, q)) : all;
+  if (!list.length) { $('list').innerHTML = '<div class="empty">' + (q ? '찾는 아동이 없습니다.' : '아직 받은 동의서가 없습니다.') + '</div>'; return; }
+  list.sort((a, b) => String(curOf(b.id).signed_at).localeCompare(String(curOf(a.id).signed_at)));
+  $('list').innerHTML = list.map(k => {
     const s = curOf(k.id);
-    return '<div class="kid"><span class="nm">' + k.id + '번 ' + esc(k.name || '') + '<span class="bd">' + b6(k.birth) + '</span>'
+    return '<div class="kid"><span class="nm">' + kidLine(k)
       + (liveKid(k) ? '' : ' <span class="bd">· ' + esc(k.status) + '</span>') + '</span>'
-      + (s ? '<span class="done">✓ ' + dotDate(kstDay(s.signed_at)) + ' 받음</span> <span class="chips">' + chipTxt(s) + '</span> <button type="button" data-view="' + s.id + '">보기</button>'
-           : (liveKid(k) ? '<button type="button" class="btn-main" data-take="' + k.id + '">동의서 받기</button>' : ''))
+      + '<span class="done">✓ ' + dotDate(kstDay(s.signed_at)) + ' 받음</span> <span class="chips">' + chipTxt(s) + '</span> <button type="button" data-view="' + s.id + '">보기</button>'
       + '</div>';
-  }).join('') + '</div>';
-  $('list').querySelectorAll('[data-take]').forEach(b => b.onclick = () => openTake(Number(b.dataset.take)));
+  }).join('');
   $('list').querySelectorAll('[data-view]').forEach(b => b.onclick = () => openView(Number(b.dataset.view)));
 }
+// 동의서 받기 — 이름을 칠 때만 치료중 아동이 나옴
+function drawDrop() {
+  const q = $('kq').value.trim(); const dd = $('kdrop');
+  if (!q) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+  const hit = KIDS.filter(k => liveKid(k) && matchKid(k, q)).slice(0, 30);
+  dd.innerHTML = hit.length ? hit.map((k, n) => '<div data-k="' + k.id + '"' + (n === 0 ? ' class="on"' : '') + '>' + kidLine(k) + '</div>').join('')
+                            : '<div class="none">치료중 아동 중에 없습니다</div>';
+  dd.style.display = '';
+  dd.querySelectorAll('[data-k]').forEach(d => d.onpointerdown = e => { e.preventDefault(); pickKid(Number(d.dataset.k)); });
+}
+function pickKid(cid) {
+  const k = KIDS.find(x => Number(x.id) === cid); if (!k) return;
+  PICK = k; $('kq').value = k.name || ''; $('kdrop').style.display = 'none';
+  const s = curOf(k.id);
+  $('kpick').innerHTML = '고른 아동: <b>' + kidLine(k) + '</b> &nbsp; '
+    + (s ? '<span class="done">이미 받았습니다 (' + dotDate(kstDay(s.signed_at)) + ')</span> <button type="button" id="kView">보기</button>'
+         : '<button type="button" class="btn-main" id="kTake">동의서 받기</button>');
+  if (s) $('kView').onclick = () => openView(s.id); else $('kTake').onclick = () => openTake(k.id);
+}
+function clearPick() { PICK = null; $('kq').value = ''; $('kpick').innerHTML = ''; $('kdrop').style.display = 'none'; }
 
 function buildSnap(k) {
   return { child_no: k.id, child_name: k.name || '', birth: k.birth || '',
@@ -342,7 +369,7 @@ function CAN_EDIT() { return ME && [8, 19, 11].includes(Number(ME.id)); }
 
 function openTake(cid) {
   const k = KIDS.find(x => Number(x.id) === cid); if (!k) return;
-  if (!liveKid(k)) { show('종결 · 타기관이용 아동은 동의서를 받을 수 없습니다.', false); return; }
+  if (!liveKid(k)) { show('치료중 아동만 동의서를 받을 수 있습니다.', false); return; }
   CUR = { mode: 'take', k, snap: buildSnap(k) };
   hideMsg(); DIRTY = false;
   $('listBox').style.display = 'none'; $('formBox').style.display = '';
@@ -488,7 +515,7 @@ $('backBtn').onclick = () => {
   if (CUR && CUR.mode === 'take' && DIRTY && !confirm('적던 동의서가 저장되지 않았습니다. 목록으로 갈까요?')) return;
   DIRTY = false; CUR = null; hideMsg(); document.body.classList.remove('signing');
   $('formBox').style.display = 'none'; $('listBox').style.display = '';
-  drawList(); window.scrollTo(0, 0);
+  clearPick(); drawList(); window.scrollTo(0, 0);
 };
 $('againBtn').onclick = () => {
   if (!CUR || CUR.mode !== 'view') return;
@@ -497,8 +524,16 @@ $('againBtn').onclick = () => {
 };
 $('printBtn').onclick = () => window.print();
 $('q').addEventListener('input', drawList);
-$('tabs').querySelectorAll('button').forEach(b => b.onclick = () => {
-  FILTER = b.dataset.f; $('tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); drawList();
+$('kq').addEventListener('input', () => { PICK = null; $('kpick').innerHTML = ''; drawDrop(); });
+$('kq').addEventListener('focus', drawDrop);
+$('kq').addEventListener('blur', () => setTimeout(() => { $('kdrop').style.display = 'none'; }, 150));
+$('kq').addEventListener('keydown', e => {
+  const dd = $('kdrop'); const items = [...dd.querySelectorAll('[data-k]')]; if (!items.length || dd.style.display === 'none') return;
+  let n = items.findIndex(x => x.classList.contains('on'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault();
+    n = e.key === 'ArrowDown' ? Math.min(n + 1, items.length - 1) : Math.max(n - 1, 0);
+    items.forEach((x, i) => x.classList.toggle('on', i === n)); items[n].scrollIntoView({ block: 'nearest' }); }
+  else if (e.key === 'Enter') { e.preventDefault(); pickKid(Number(items[Math.max(n, 0)].dataset.k)); }
 });
 window.addEventListener('beforeunload', e => { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
 
