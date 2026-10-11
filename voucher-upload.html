@@ -297,6 +297,7 @@
     <div class="card">
       <h2 id="prevTitle">4. 아동별 내역</h2>
       <div class="scroll"><table id="prev"></table></div>
+      <div id="excBox"></div>
       <div class="foot">
         <button id="save">저장 전</button>
         <span class="grow" id="savehint"></span>
@@ -547,6 +548,8 @@ function parseRows(aoa) {
   }
   ROWS = rows;
   if (!ROWS.length) { show($('msg2'), '읽을 줄이 없습니다.', false); return; }
+  // 대상년월이 빈 줄 (예외결제 등) — 저장 전에 「몇 월분」을 정해야 함 (2026-10-11)
+  ROWS.forEach(r => { r.need_mk = !r.month_key; r.mk_auto = ''; r.mk_touched = false; });
   matchAndDraw();
   CMP = null; drawCmp();
   loadPrevIfNeeded();
@@ -1005,7 +1008,8 @@ async function cmpVou(rows) {
     rows = rows.filter(r => r.appr_no && r.service_date);
     const key = r => r.target_id + '|' + r.appr_no + '|' + String(r.service_date).slice(0, 10);
     const mks = Array.from(new Set(rows.map(r => r.month_key).filter(Boolean))).sort();
-    if (!rows.length || !mks.length) return { err: '승인번호 · 날짜가 있는 줄이 없습니다' };
+    if (!rows.length) return { err: '승인번호 · 날짜가 있는 줄이 없습니다' };
+    if (!mks.length) mks.push('0000-00');
     const days = rows.map(r => String(r.service_date).slice(0, 10)).sort();
     const d0 = days[0], d1 = days[days.length - 1];
     let srv = [];
@@ -1016,6 +1020,14 @@ async function cmpVou(rows) {
       srv = srv.concat(data || []);
       if (!data || data.length < 1000) break;
     }
+    // 대상년월이 빈 줄(예외결제)은 달을 고르기 전이라 승인번호로도 찾는다
+    const blankAp = Array.from(new Set(ROWS.filter(r => r.need_mk && r.appr_no).map(r => r.appr_no)));
+    for (let i = 0; i < blankAp.length; i += 100) {
+      const { data, error } = await sb.from('nl_voucher_rows').select('*').in('appr_no', blankAp.slice(i, i + 100));
+      if (error) throw error;
+      srv = srv.concat(data || []);
+    }
+    { const u = {}; srv = srv.filter(r => { const k = key(r); if (u[k]) return false; u[k] = 1; return true; }); }
     const sk = new Set(srv.map(key)), xk = new Set(), seen = {};
     let dupN = 0;
     rows.forEach(r => { const k = key(r); if (seen[k]) dupN++; seen[k] = 1; xk.add(k); });
@@ -1133,6 +1145,87 @@ function drawResult() {
   $('savehint').textContent = ROWS.length + '줄이 저장됩니다.';
   UP_DIRTY = true;
   setUpBtn('before');
+  drawExc();
+}
+
+// ── 예외결제 — 몇 월분인지 (2026-10-11 은정님) ──
+//   대상년월이 빈 줄은 서식 「예외지급 청구 공문」에서 같은 아동 · 공문 날짜가 결제날 이전 ·
+//   청구월이 결제달 포함 넉 달 안인 것을 찾아, 한 달로 좁혀지면 저절로 채운다. 아니면 고르게 한다
+//   고르기 전에는 저장되지 않는다 (공무원 처리 시기에 따라 당월 · 다음 달 모두 있음)
+let CLAIMS = null;
+async function loadClaims() {
+  if (CLAIMS) return CLAIMS;
+  let all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('nl_gongmun').select('year, no, issued_on, data')
+      .eq('data->>kind', 'claim').range(from, from + 999);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < 1000) break;
+  }
+  CLAIMS = [];
+  all.forEach(g => {
+    const d = g.data || {};
+    for (let n = 0; n < 3; n++) {
+      const cid = Number(d['c' + n + '_cid']), ym = d['c' + n + '_ym'];
+      if (cid && /^\d{4}-\d{2}$/.test(ym || '')) CLAIMS.push({ cid, ym, day: d['c' + n + '_day'] || '',
+        issued: String(g.issued_on || '').slice(0, 10), no: '대가 ' + g.year + '-' + String(g.no).padStart(3, '0') + '호' });
+    }
+  });
+  return CLAIMS;
+}
+function mkBack(mk, n) { const y = Number(mk.slice(0, 4)), m = Number(mk.slice(5, 7)) - n;
+  const d = new Date(y, m - 1, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+async function drawExc() {
+  const box = $('excBox'); if (!box) return;
+  const need = ROWS.filter(r => r.need_mk);
+  if (!need.length) { box.innerHTML = ''; return; }
+  let cl = [], clErr = '', used = {};
+  try {
+    cl = await loadClaims();
+    // 이미 다른 예외결제가 쓴 청구는 빼고 센다 — 아동 · 청구월마다 「공문 줄 수 − 이미 저장된 예외결제 수」
+    const cids = Array.from(new Set(need.map(r => cidOf(r.target_id)).filter(Boolean)));
+    const mine = new Set(need.map(r => r.target_id + '|' + r.appr_no + '|' + r.service_date));
+    for (let i = 0; i < cids.length; i += 100) {
+      const { data, error } = await sb.from('nl_voucher_rows').select('target_id, appr_no, service_date, child_id, month_key, pay_kind')
+        .in('child_id', cids.slice(i, i + 100)).like('pay_kind', '%예외%');
+      if (error) throw error;
+      (data || []).forEach(v => {
+        if (!v.month_key || mine.has(v.target_id + '|' + v.appr_no + '|' + String(v.service_date).slice(0, 10))) return;
+        used[v.child_id + '|' + v.month_key] = (used[v.child_id + '|' + v.month_key] || 0) + 1;
+      });
+    }
+    const cnt = {}; cl.forEach(c => { cnt[c.cid + '|' + c.ym] = (cnt[c.cid + '|' + c.ym] || 0) + 1; });
+    cl = cl.filter(c => (cnt[c.cid + '|' + c.ym] || 0) > (used[c.cid + '|' + c.ym] || 0));
+  } catch (e) { clErr = e.message || String(e); cl = []; }
+  need.forEach(r => {
+    if (r.mk_touched) return;
+    const cid = cidOf(r.target_id), pm = String(r.service_date || '').slice(0, 7);
+    const opts = pm ? [0, 1, 2, 3].map(n => mkBack(pm, n)) : [];
+    const hit = cl.filter(c => cid && c.cid === Number(cid) && opts.includes(c.ym) && (!c.issued || c.issued <= String(r.service_date)));
+    const yms = Array.from(new Set(hit.map(c => c.ym)));
+    if (yms.length === 1) { r.month_key = yms[0]; const c = hit.find(x => x.ym === yms[0]); r.mk_auto = '✓ 공문 ' + c.no + (c.day ? ' (' + Number(c.day.slice(5, 7)) + '월 ' + Number(c.day.slice(8, 10)) + '일분)' : ''); }
+    else { r.month_key = ''; r.mk_auto = !cid ? '⚠ 아동이 아직 이어지지 않았습니다' : yms.length > 1 ? '⚠ 청구 공문이 ' + yms.length + '개입니다 — 골라 주세요' : '⚠ 이 아동 청구 공문이 없습니다 — 직접 골라 주세요'; }
+  });
+  const left = need.filter(r => !r.month_key).length;
+  let h = '<div class="cmpbox' + (left ? ' cmpwarn' : '') + '" style="margin-top:12px;"><b>예외결제 — 몇 월분인지 정해 주세요</b>'
+    + (left ? ' <span>(' + left + '건 남음 · 고르기 전에는 저장되지 않습니다)</span>' : ' <span class="cmpsame">(모두 정함)</span>')
+    + (clErr ? '<div>⚠ 청구 공문을 읽지 못했습니다 — ' + esc(clErr) + '</div>' : '');
+  need.forEach(r => {
+    const i = ROWS.indexOf(r), cid = cidOf(r.target_id), pm = String(r.service_date || '').slice(0, 7);
+    const opts = pm ? [0, 1, 2, 3].map(n => mkBack(pm, n)) : [];
+    if (r.month_key && !opts.includes(r.month_key)) opts.push(r.month_key);
+    h += '<div style="margin-top:6px;color:#2F2926;">' + (cid ? cid + '번 ' + esc(nameOf(r.target_id)) : esc(r.name || r.target_id.slice(-8)))
+      + ' · 결제 ' + esc(String(r.service_date || '').slice(5).replace('-', '/')) + ' · ' + won(r.amount) + '원 · ' + esc(r.pay_kind || '대상년월 없음')
+      + ' → <select class="excpick" data-i="' + i + '"><option value="">— 몇 월분 —</option>'
+      + opts.map(m => '<option value="' + m + '"' + (m === r.month_key ? ' selected' : '') + '>' + Number(m.slice(0, 4)) + '년 ' + Number(m.slice(5, 7)) + '월분</option>').join('')
+      + '</select> <span class="cmpdim">' + esc(r.mk_touched ? '직접 고름' : r.mk_auto) + '</span></div>';
+  });
+  box.innerHTML = h + '</div>';
+  box.querySelectorAll('.excpick').forEach(el => el.onchange = () => {
+    const r = ROWS[Number(el.dataset.i)]; r.month_key = el.value; r.mk_touched = !!el.value; r.mk_auto = '';
+    UP_DIRTY = true; setUpBtn('before'); drawExc();
+  });
 }
 
 // ── 저장 단추 상태 · 나갈 때 묻기 (2026-09-16) ──
@@ -1195,15 +1288,23 @@ $('unmatch') && $('unmatch').addEventListener('change', e => {
   if (!g) return;
   g.child_id = e.target.value ? Number(e.target.value) : null;
   g.how = g.child_id ? '손으로 이음' : '못 찾음';
+  ROWS.forEach(r => { if (r.need_mk && r.target_id === tid && !r.mk_touched) r.month_key = ''; });
   UP_DIRTY = true;
   setUpBtn('before');
   const okN = GROUPS.filter(x => x.child_id).length;
   $('stat').querySelectorAll('.st')[2].querySelector('.v').textContent = okN;
   $('stat').querySelectorAll('.st')[3].querySelector('.v').textContent = GROUPS.length - okN;
+  drawExc();
 });
 
 $('save').onclick = async () => {
   const btn = $('save');
+  const noMk = ROWS.filter(r => r.need_mk && !r.month_key && r.appr_no && r.service_date);
+  if (noMk.length) {
+    show($('msg3'), '❌ 예외결제 ' + noMk.length + '건의 「몇 월분」을 아직 정하지 않았습니다.\n아래 표 밑 「예외결제 — 몇 월분인지 정해 주세요」에서 골라 주세요. (저장하지 않았습니다)', false);
+    $('excBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   setUpBtn('saving');
   try {
     const idOf = {};

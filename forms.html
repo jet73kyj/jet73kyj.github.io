@@ -893,6 +893,7 @@ function infoBind() {
 // ═════════════════════════════════════════════
 let GM = null;            // {id, year, no, date, child}
 let GM_BASE = {}, GM_KIDS = [], GM_DIRTY = false, GM_TAB = 'letter';
+let GM_ALLKIDS = [];   // 예외지급 청구 공문 — 아동 고르기 (종결 아동도 · 2026-10-11)
 let GM_MODE = 'refer', GM_STAFF = [], HIRE_TAB = 'consent', GM_SUB = 'join';   // join 치료지원 입사 · leave 발달재활 퇴사   // 치료지원 제공인력 등록 공문 (2026-10-09)
 const GM_TT = { 1:'심리', 2:'발달', 3:'언어발달' };
 function gmNoText() {
@@ -1041,7 +1042,9 @@ function gmClaimLetter(d) {
   const noTxt = gmNoText() || '대가 ' + (date ? date.slice(0, 4) : '') + ' - ___호';
   let rows = '';
   for (let n = 0; n < 3; n++) {
-    rows += '<tr>' + c('c' + n + '_name') + '<td><input type="text" data-x="rrn" style="width:100%;font-size:11px;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td>'
+    const h = k => '<input type="hidden" data-g="' + k + '" value="' + v(k) + '">';
+    rows += '<tr>' + c('c' + n + '_name').replace('</td>', h('c' + n + '_cid') + h('c' + n + '_ym') + h('c' + n + '_day') + '</td>')
+      + '<td><input type="text" data-x="rrn" style="width:100%;font-size:11px;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td>'
       + c('c' + n + '_org') + c('c' + n + '_bno') + c('c' + n + '_biz') + c('c' + n + '_type') + c('c' + n + '_grade')
       + c('c' + n + '_point') + c('c' + n + '_mon') + c('c' + n + '_why') + '</tr>';
   }
@@ -1077,11 +1080,62 @@ function gmClaimCtl(d) {
 
     +   ' <button type="button" id="gmBaseBtn">기관 공문 정보 저장</button></div>'
     + '<div class="r" style="color:#888;font-size:12px;">주민번호 칸은 인쇄 전에 적는 칸이라 저장되지 않습니다 · 다시 열면 비어 있습니다</div>'
+    + gmClaimPick(d)
     + '</div>';
+}
+// 청구 아동 · 청구월 · 일자 (2026-10-11 은정님) — 화면에서만 · 고르면 표의 성명 · 청구월 칸이 저절로 채워짐
+//   발달 올리기가 예외결제의 「몇 월분」을 이 공문에서 찾는다 (c{n}_cid · c{n}_ym · c{n}_day)
+function gmClaimPick(d) {
+  const opt = sel => '<option value="">— 아동 고르기 —</option>' + GM_ALLKIDS.map(k => '<option value="' + k.id + '"'
+    + (String(sel) === String(k.id) ? ' selected' : '') + '>' + k.id + '번 ' + esc(k.name || '')
+    + (k.birth ? ' (' + String(k.birth).slice(2, 10).replace(/-/g, '') + ')' : '') + (k.status === '치료중' ? '' : ' · ' + esc(k.status || '')) + '</option>').join('');
+  let h = '<div class="r" style="margin-top:8px;"><b>청구 아동</b> <span style="color:#888;font-size:12px;">아동 · 청구월 · 일자(수업한 날)를 고르면 아래 표 성명 · 청구월 칸이 채워집니다 · 발달 올리기가 이 공문으로 예외결제의 달을 찾습니다</span></div>';
+  for (let n = 0; n < 3; n++) {
+    h += '<div class="r gmcl" data-n="' + n + '" style="gap:6px;flex-wrap:wrap;">' + (n + 1) + '. '
+      + '<select class="gmclk" style="max-width:260px;">' + opt(d['c' + n + '_cid']) + '</select>'
+      + ' 청구월 <input type="month" class="gmcly" value="' + esc(d['c' + n + '_ym'] || '') + '">'
+      + ' 일자 <input type="date" class="gmcld" value="' + esc(d['c' + n + '_day'] || '') + '">'
+      + ' <button type="button" class="gmclx" style="padding:3px 8px;">비우기</button></div>';
+  }
+  return h;
+}
+function gmClaimMonTxt(ym, day) {
+  const m = String(ym || '').match(/^\d{4}-(\d{2})$/); if (!m) return '';
+  const dd = String(day || '').match(/^\d{4}-\d{2}-(\d{2})$/);
+  return Number(m[1]) + '월' + (dd ? ' (' + Number(dd[1]) + '일)' : '');
+}
+function gmClaimSync(n) {
+  const row = document.querySelector('.gmcl[data-n="' + n + '"]'), L = $('gmLetter');
+  if (!row || !L) return;
+  const cid = row.querySelector('.gmclk').value, ym = row.querySelector('.gmcly').value, day = row.querySelector('.gmcld').value;
+  const set = (k, v) => { const el = L.querySelector('[data-g="' + k + '"]'); if (el) el.value = v; };
+  const k = GM_ALLKIDS.find(x => String(x.id) === String(cid));
+  set('c' + n + '_cid', cid || ''); set('c' + n + '_ym', ym || ''); set('c' + n + '_day', day || '');
+  if (k) set('c' + n + '_name', k.name || '');
+  if (cid || ym) set('c' + n + '_mon', gmClaimMonTxt(ym, day));
+  GM_DIRTY = true;
+}
+// 저장 전 검사 — 아동을 골랐으면 청구월 · 일자 반드시, 일자는 청구월 안 · 성명만 적고 아동을 안 고르면 막음
+function gmClaimCheck(d) {
+  const bad = [];
+  for (let n = 0; n < 3; n++) {
+    const cid = d['c' + n + '_cid'], ym = d['c' + n + '_ym'], day = d['c' + n + '_day'], nm = String(d['c' + n + '_name'] || '').trim();
+    if (!cid && !ym && !day) { if (nm) bad.push((n + 1) + '번 줄 — 성명만 적혀 있습니다. 「청구 아동」에서 아동을 골라 주세요'); continue; }
+    if (!cid) bad.push((n + 1) + '번 줄 — 아동을 골라 주세요');
+    if (!/^\d{4}-\d{2}$/.test(ym || '')) bad.push((n + 1) + '번 줄 — 청구월을 골라 주세요');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '')) bad.push((n + 1) + '번 줄 — 일자(수업한 날)를 골라 주세요');
+    else if (ym && day.slice(0, 7) !== ym) bad.push((n + 1) + '번 줄 — 일자가 청구월 안의 날이 아닙니다');
+  }
+  if (!bad.length) return true;
+  alert('예외지급 청구 공문을 저장할 수 없습니다.\n\n· ' + bad.join('\n· '));
+  return false;
 }
 async function openClaim(keep) {
   DOC_KIND = 'claimgm'; GM_MODE = 'claim';
   $('dvTitle').textContent = '기관정보 — 예외지급 청구 공문';
+  if (!GM_ALLKIDS.length) {
+    try { const r = await sb.from('nl_children').select('id, name, birth, status').order('id').range(0, 999); GM_ALLKIDS = (r && r.data) || []; } catch (e) {}
+  }
   $('dvHint').textContent = '점선 칸은 고칠 수 있습니다 · 번호는 다른 공문과 같은 줄로 매겨집니다';
   try {
     const b = await sb.from('nl_org_docs').select('data').eq('doc_key', 'gongmun:base').limit(1);
@@ -1332,11 +1386,25 @@ function gmBindRefer() {
     GM_DIRTY = true; gmRender(d);
   };
   $('gmBaseBtn').onclick = gmSaveBase;
+  body.querySelectorAll('.gmcl').forEach(row => {
+    const n = Number(row.dataset.n);
+    row.querySelectorAll('select, input').forEach(el => el.addEventListener('change', () => {
+      const ym = row.querySelector('.gmcly'), dd = row.querySelector('.gmcld');
+      if (el === dd && dd.value && !ym.value) ym.value = dd.value.slice(0, 7);
+      gmClaimSync(n);
+    }));
+    row.querySelector('.gmclx').onclick = () => {
+      row.querySelector('.gmclk').value = ''; row.querySelector('.gmcly').value = ''; row.querySelector('.gmcld').value = '';
+      gmClaimSync(n);
+      const L = $('gmLetter'); ['_name', '_mon'].forEach(sfx => { const el = L && L.querySelector('[data-g="c' + n + sfx + '"]'); if (el) el.value = ''; });
+    };
+  });
 }
 async function gmIssue() {
   const d = gmRead();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || '')) { alert('공문 작성일을 고르세요.'); return; }
   if (!String(d.title || '').trim()) { alert('제목을 적어 주세요.'); return; }
+  if (GM_MODE === 'claim' && !gmClaimCheck(d)) return;
   let nx = '';
   try { const r = await sb.rpc('nl_gongmun_next', { p_year: Number(d.date.slice(0, 4)) }); nx = r && r.data != null ? String(r.data).padStart(3, '0') : ''; } catch (e) {}
   if (!confirm('이 공문을 저장할까요?\n\n번호 : 대가 ' + d.date.slice(0, 4) + ' - ' + (nx || '○○○') + '호 (' + gmDot(d.date) + ')\n\n번호와 작성일은 저장한 뒤 바꿀 수 없습니다.')) return;
@@ -1360,6 +1428,7 @@ async function gmIssue() {
 async function gmUpdate() {
   if (!GM || !GM.id) return;
   const d = gmRead(); d.date = GM.data ? GM.data.date : d.date;
+  if (GM_MODE === 'claim' && !gmClaimCheck(d)) return;
   if (GM_SAVING) return;
   GM_SAVING = true; placeTools();
   try {
@@ -1465,6 +1534,7 @@ function placeTools() {
     const L = $('gmLetter');
     if (L) { L.classList.toggle('locked', lock); L.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); }
     ['gmKid', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
+    document.querySelectorAll('.gmcl select, .gmcl input, .gmcl button').forEach(el => { el.disabled = lock; });
   } else if (DOC_KIND === 'org' || DOC_KIND === 'info') {
     const sh = $(DOC_KIND === 'info' ? 'dsInfo' : 'dsOrg');
     if (!sh) return;
