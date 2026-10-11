@@ -124,6 +124,7 @@ let KSEL = null, KMON = null, TMON = null;
 let AREA = [], AMON = null, TTN = {};
 let MOVE = [], MMON = null;
 let ENDS = [], EMON = null;
+let UNP = [];   // 달마다 자부담 미납 (nl_stats_unpaid · 2026-10-11)
 let NEWB = [], REVW = [], FSUB = 'flow', NBMON = null, EBMON = null;
 // 사업 묶음 — 발달 · 센터 · 치료지원 · 방과후 · 새 지원유형은 제 이름으로 저절로 (2026-10-07)
 function grpOf(st){ st = Number(st); if (st === 1) return '센터'; if (st === 2) return '발달'; if (st === 3 || st === 4) return '치료지원';
@@ -180,9 +181,10 @@ async function load(){
       rpc('nl_stats_newbiz', f, t),
       rpc('nl_stats_review', f, t),
       y > 2026 ? rpc('nl_stats_rev', pf, pt) : Promise.resolve([]),
-      y > 2026 ? rpc('nl_stats_flow', pf, pt) : Promise.resolve([])
+      y > 2026 ? rpc('nl_stats_flow', pf, pt) : Promise.resolve([]),
+      rpc('nl_stats_unpaid', f, t)
     ]);
-    REV = r[0]; TH = r[1]; PAY = r[2]; FLOW = r[3]; AREA = r[4]; MOVE = r[5]; ENDS = r[6]; NEWB = r[7]; REVW = r[8]; REVP = r[9]; FLOWP = r[10];
+    REV = r[0]; TH = r[1]; PAY = r[2]; FLOW = r[3]; AREA = r[4]; MOVE = r[5]; ENDS = r[6]; NEWB = r[7]; REVW = r[8]; REVP = r[9]; FLOWP = r[10]; UNP = r[11];
   } catch (e) {
     $('body').innerHTML = '<div class="err">통계를 가져오지 못했습니다.\n' + esc(e.message) + '</div>';
     return;
@@ -240,6 +242,9 @@ function drawBiz(){
   h += '<tr class="tot"><td class="l">합계</td>' + ms.map(k => '<td>' + man(monTot(k)) + '</td>').join('')
      + '<td>' + man(sumBy(ms, monTot)) + '</td></tr>';
   h += '<tr class="sub"><td class="l">· 자부담</td>' + ms.map(k => '<td>' + man(sumBy(REV.filter(r => r.month_key === k), r => r.self_amt)) + '</td>').join('') + '<td></td></tr>';
+  // 자부담 중 아직 안 받은 돈 — 매출에는 들어 있음 (2026-10-11 은정님)
+  h += '<tr class="sub"><td class="l">· 그중 미납</td>' + ms.map(k => { const u = sumBy(UNP.filter(r => r.month_key === k), r => r.unpaid);
+    return '<td title="' + won(u) + '"' + (u ? ' style="color:#993C1D;"' : '') + '>' + (u ? man(u) : '·') + '</td>'; }).join('') + '<td></td></tr>';
   h += '<tr class="sub"><td class="l">· 정부지원</td>' + ms.map(k => '<td>' + man(sumBy(REV.filter(r => r.month_key === k), r => r.gov_amt)) + '</td>').join('') + '<td></td></tr>';
   h += '<tr class="sub"><td class="l">아동 수</td>' + ms.map(k => '<td>' + new Set(REV.filter(r => r.month_key === k && ((Number(r.self_amt) || 0) + (Number(r.gov_amt) || 0)) > 0).map(r => r.child_id)).size + '</td>').join('') + '<td></td></tr>';
   // 리뷰 할인 — 납부 메모의 [리뷰N] × 5,000원 (자부담에 이미 빠져 있음 · 2026-10-07)
@@ -258,7 +263,8 @@ function drawBiz(){
      + '<div class="note"><span class="nd">*</span> 정부지원 자료가 없는 달 — 발달재활은 「발달 올리기」 엑셀(2026년 7월부터), 치료지원 · 방과후는 「지원 결제 올리기」 카드 결제 엑셀(8월부터)을 <b>올린 달만</b> 셉니다. 엑셀을 아직 안 올린 달은 자부담만입니다.<br>'
      + '치료지원 카드 결제는 그 아동 그 달 언어 · 작업 · 방과후 치료지원 회기 금액 비율로 나눠 사업마다 보여 줍니다. 취소한 결제는 뺍니다.<br>'
      + '숫자에 마우스를 올리면 자부담 · 정부지원이 원 단위로 보입니다. 아동 수는 그 달 매출이 있는 아동입니다.<br>'
-     + '리뷰 할인 — 납부 계산에서 적은 리뷰 건수 × 5,000원 (원 단위 그대로). 자부담에서 이미 빠진 금액입니다.</div></div>';
+     + '리뷰 할인 — 납부 계산에서 적은 리뷰 건수 × 5,000원 (원 단위 그대로). 자부담에서 이미 빠진 금액입니다.<br>'
+     + '그중 미납 — 자부담 가운데 낸 날이 아직 빈 금액 (0원 줄은 뺌). 매출에는 들어 있습니다.</div></div>';
   // 막대 — 달마다 사업 쌓기
   const mx = Math.max(1, ...ms.map(monTot));
   h += '<div class="card"><div class="ct">달별 매출</div><div class="bars">';
