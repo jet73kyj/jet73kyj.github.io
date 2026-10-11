@@ -14,4 +14,4 @@ backup*.json
 
 *.lnk
 *.hwpx
-*.hwp
+*.hwp*.sql
