@@ -2287,6 +2287,19 @@ function thOkForTt(tt, th){
     && Number(r.therapist_id) === Number(th));
 }
 
+// 대기 칸 전용 (2026-10-12) — 표(RULE) 또는 지금 살아 있는 그 영역 요일줄을 맡은 선생님
+//   끝난 줄(끝난날 · 끝난달이 오늘보다 앞)은 세지 않는다
+function thLiveForTt(tt, th){
+  const rule = RULE[Number(tt)];
+  if (!rule) return true;
+  if (rule.indexOf(Number(th)) >= 0) return true;
+  const td = todayKr(), tm = td.slice(0, 7);
+  return ROWS_ALL.some(r => Number(r._tt) === Number(tt)
+    && Number(r.therapist_id) === Number(th)
+    && (!r.to_date || String(r.to_date).slice(0, 10) >= td)
+    && (!r.to_month || String(r.to_month).slice(0, 7) >= tm));
+}
+
 const CAN_SEE = [1,2,3,4,5,6,7,8,19,11];   // 11 = 데스크
 
 let ROWS = [];          // 수업(요일) — 보고 있는 달 것만
@@ -2485,7 +2498,8 @@ function waitOkFor(v, wd, thId){
   const th = Number(thId);
   if (v.ths.length) return v.ths.includes(th);
   if (!v.ars.length) return false;
-  if (!v.ars.some(tt => thOkForTt(tt, th))) return false;
+  // 「맡은 적」은 지금 살아 있는 줄만 셈 (2026-10-12) — 끝난 옛 줄로 다른 영역 선생님 칸에 붙던 것 (58번)
+  if (!v.ars.some(tt => thLiveForTt(tt, th))) return false;
   const t = THDAYS[th];
   if (!t) return true;               // 출근 표가 없는 선생님은 막지 않음
   const r = t[wd];
