@@ -3277,7 +3277,11 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
     q.dataset.picked = o.value;
     box.style.display = 'none';
   }
-  q.addEventListener('focus', () => { q.select(); show(); });
+  // 칸을 누르면 비우고 전체 목록 (지금 아동 이름은 흐린 글자로) — 2026-10-13
+  // (전에는 이름을 남겨 둔 채 골라 두려 했으나 마우스로 누르면 고른 표시가 풀려
+  //  새 이름이 옛 이름 뒤에 붙어 「찾는 아동이 없습니다」가 됐음)
+  const PH = q.placeholder;
+  q.addEventListener('focus', () => { if (q.value) q.placeholder = q.value; q.value = ''; q.dataset.picked = ''; show(); });
   q.addEventListener('input', () => { q.dataset.picked = ''; show(); });
   q.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { if (hits.length) { cur = (cur + 1) % hits.length; mark(); } e.preventDefault(); }
@@ -3296,6 +3300,7 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
   });
   q.addEventListener('blur', () => setTimeout(() => {
     box.style.display = 'none';
+    q.placeholder = PH;
     // 고르지 않고 나가면 지금 고른 아동 이름으로 되돌린다
     const o = sel.options[sel.selectedIndex];
     q.value = (o && o.value !== '') ? o.text : '';
