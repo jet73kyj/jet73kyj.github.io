@@ -708,7 +708,7 @@ async function buildChildList() {
 function drawChildSelect() {
   const keep = $('pChild').value;
   $('pChild').innerHTML = '<option value="">— 아동을 고르세요 —</option>'
-    + CHILDREN.map(c => '<option value="' + c.id + '" data-cid="' + c.id + '">' + esc(c.name)
+    + CHILDREN.map(c => '<option value="' + c.id + '" data-cid="' + c.id + '">' + c.id + '번 ' + esc(c.name)
         + ' · ' + fmtBirth(c.birth)
         + (c.status === '종결' ? ' (종결)' : '') + '</option>').join('');
   if (keep && CHILDREN.some(c => String(c.id) === String(keep))) $('pChild').value = keep;
