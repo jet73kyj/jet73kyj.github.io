@@ -1098,8 +1098,20 @@ function fillFromSlots() {
 let AUTO1 = [];
 function _markManual() {
   const trs = document.querySelectorAll('#statusTbl tbody tr');
+  // 같은 날짜의 시간표 값과 견준다 (2026-10-13 — 결제일로 고친 회차 하나 때문에 뒤 칸이 한 칸씩 밀려 모두 노랑이 되던 것)
+  //   그 칸 날짜가 시간표 회기 중 아직 짝이 없는 날이면 그 회기와, 없으면 그 차례의 시간표 값과 견줌
+  const used = new Set();
+  const pick = i => {
+    const own = AUTO1[i] || { d: '', a: '', b: '' };
+    const dEl = $('s1_provDate_' + (i + 1));
+    const v = _provIso(dEl && dEl.value) || '';
+    if (!v || own.d === v) { used.add(i); return own; }
+    const k = AUTO1.findIndex((x, j) => x && x.d === v && !used.has(j) && (AUTO1[j] || {}).d !== _provIso(($('s1_provDate_' + (j + 1)) || {}).value));
+    if (k >= 0) { used.add(k); return AUTO1[k]; }
+    return own;
+  };
   for (let i = 0; i < SESSIONS; i++) {
-    const au = AUTO1[i] || { d: '', a: '', b: '' };
+    const au = pick(i);
     const tr = trs[i];
     const pv = tr ? tr.querySelector('.st_provDate') : null;
     const dt = $('s1_provDate_' + (i + 1)), st = $('s1_startTime_' + (i + 1)), en = $('s1_endTime_' + (i + 1));
