@@ -1116,10 +1116,15 @@ function _markManual() {
     const pv = tr ? tr.querySelector('.st_provDate') : null;
     const dt = $('s1_provDate_' + (i + 1)), st = $('s1_startTime_' + (i + 1)), en = $('s1_endTime_' + (i + 1));
     const set = (el, man) => { if (!el) return; el.classList.toggle('m1man', man); el.title = man ? '직접 고친 칸 (비우면 시간표 값)' : '처음 값은 시간표에서 옵니다'; };
-    set(dt, (_provIso(dt && dt.value) || '') !== au.d);
-    set(pv, (_provIso(pv && pv.value) || '') !== au.d);
-    set(st, (_to24(st && st.value) || '') !== au.a);
-    set(en, (_to24(en && en.value) || '') !== au.b);
+    // 일정표 제공날짜 = 서비스 제공일자 = 승인일자 이면 맞는 회차 — 시간표와 달라도 흰색 (2026-10-13 은정님)
+    const apM = tr ? String((tr.querySelector('.st_apprDate') || {}).value || '').match(/(\d{4})\D(\d{2})\D(\d{2})/) : null;
+    const apIso = apM ? apM[1] + '-' + apM[2] + '-' + apM[3] : '';
+    const dIso = _provIso(dt && dt.value) || '', pIso = _provIso(pv && pv.value) || '';
+    const okPay = !!dIso && dIso === pIso && dIso === apIso;
+    set(dt, !okPay && dIso !== au.d);
+    set(pv, !okPay && pIso !== au.d);
+    set(st, !okPay && (_to24(st && st.value) || '') !== au.a);
+    set(en, !okPay && (_to24(en && en.value) || '') !== au.b);
     // 승인일자 · 승인번호 (2026-10-06)
     if (tr) {
       const av = AUTOV[i] || { d: '', n: '' };
