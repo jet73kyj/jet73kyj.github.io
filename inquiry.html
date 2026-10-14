@@ -1392,7 +1392,7 @@ function drawTimeline() {
     const last = (i === gs.length - 1);
     let body = g.items.map(e =>
       esc(String(e.eval_date).slice(5, 7) + '월 ' + String(e.eval_date).slice(8, 10) + '일')
-      + ' · ' + esc(evTypeName(e.eval_type_id)) + ' ' + (e.item_cnt || 1) + '개'
+      + ' · ' + esc(evItemText(e))
       + (e.therapist_id ? ' · ' + esc(evThrName(e.therapist_id)) : '')
       + (e.fee ? ' · ' + Number(e.fee).toLocaleString() + '원' : '')
       + (e.status === '예정' ? ' <span style="color:#e65100;">예정</span>' : '')
@@ -1954,13 +1954,63 @@ function pickKid(cid) {
 // ===== 새 문의 등록 창의 평가 줄 =====
 let nvSeq = 0;
 
+// 심리평가는 개수 대신 구성 이름으로 고른다 (2026-10-15 은정님)
+//   값 '1' 심리평가 · '2' 심리 + 지능 · '1i' 지능평가
+//   저장되는 개수(item_cnt)는 1 · 2 · 1 — 위탁수수료는 이 개수로 셈
+//   지능평가는 개수가 심리평가와 같은 1이라, 다시 열 때는 금액(기준표 「지능평가」)으로 가린다
+const PSY_OPTS = [['1', '심리평가'], ['2', '심리 + 지능'], ['1i', '지능평가']];
+function isPsy(tid) {
+  const t = EVTYPES.find(x => x.id === Number(tid));
+  return !!(t && String(t.name).indexOf('심리') >= 0);
+}
+function psyKey(e) {
+  if (!e) return '1';
+  if (Number(e.item_cnt) >= 2) return '2';
+  const iq = EVFEES.find(f => String(f.name).trim() === '지능평가');
+  if (iq && Number(e.fee) === Number(iq.amount)) return '1i';
+  return '1';
+}
+function psyLabel(e) {
+  const k = psyKey(e);
+  const o = PSY_OPTS.find(x => x[0] === k);
+  return o ? o[1] : '심리평가';
+}
+// 목록 · 기록 줄에 쓰는 글 — 심리평가는 구성 이름, 그 밖은 「언어평가 2개」
+function evItemText(e) {
+  if (isPsy(e.eval_type_id)) return psyLabel(e);
+  return evTypeName(e.eval_type_id) + ' ' + (e.item_cnt || 1) + '개';
+}
+// 개수 칸을 종류에 맞춰 다시 채운다 — keep 이 있으면 그 값을 고른다
+function setCntOpts(sel, tid, keep) {
+  if (!sel) return;
+  const psy  = isPsy(tid);
+  const mode = psy ? 'psy' : 'cnt';
+  const cur  = keep != null ? String(keep) : sel.value;
+  if (sel.dataset.mode !== mode) {
+    sel.innerHTML = psy
+      ? PSY_OPTS.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('')
+      : [1, 2, 3].map(v => '<option value="' + v + '">' + v + '개</option>').join('');
+    sel.dataset.mode = mode;
+    sel.style.width = psy ? '120px' : '80px';
+  }
+  const ok = Array.prototype.some.call(sel.options, o => o.value === cur);
+  sel.value = ok ? cur : (psy ? '1' : String(parseInt(cur, 10) || 1));
+  const lb = sel.id ? document.querySelector('label[for="' + sel.id + '"]')
+                    : (sel.parentElement && sel.parentElement.querySelector('label'));
+  if (lb) lb.textContent = psy ? '구성' : (sel.id ? '평가 개수' : '개수');
+}
+
 // 평가 종류·개수로 평가비를 찾는다
-// 기준표 이름 모양: 「언어평가 1개」 「발달평가 2개」 「심리평가 (기본)」
+// 기준표 이름 모양: 「언어평가 1개」 「발달평가 2개」 「심리평가 (기본)」 「지능평가」 「지능평가 + 심리평가」
 function feeOf(tid, cnt) {
   const t  = EVTYPES.find(x => x.id === Number(tid));
   if (!t) return '';
   const tn = String(t.name).trim();          // 예: 언어평가
-  const c  = Number(cnt) || 1;
+  if (String(cnt) === '1i') {                 // 심리평가 구성 「지능평가」
+    const iq = EVFEES.find(f => String(f.name).trim() === '지능평가');
+    return iq ? Number(iq.amount).toLocaleString() : '';
+  }
+  const c  = parseInt(cnt, 10) || 1;
   const same = EVFEES.filter(f => String(f.name || '').indexOf(tn) === 0);
   if (!same.length) return '';
   // 개수가 적힌 것이 있으면 그것으로
@@ -2022,7 +2072,10 @@ function dvAddRow(e) {
     + '</div></div>';
   $('dvRows').insertAdjacentHTML('beforeend', html);
   const box = $('dvRows').lastElementChild;
+  setCntOpts(box.querySelector('.dv_cnt'), box.querySelector('.dv_type').value,
+             e && isPsy(e.eval_type_id) ? psyKey(e) : null);
   const upd = () => {
+    setCntOpts(box.querySelector('.dv_cnt'), box.querySelector('.dv_type').value);
     box.querySelector('.dv_fee').value =
       feeOf(box.querySelector('.dv_type').value, box.querySelector('.dv_cnt').value);
   };
@@ -2154,6 +2207,7 @@ function nvAddRow() {
   $('nvRows').insertAdjacentHTML('beforeend', html);
   const box = $('nvRows').lastElementChild;
   const upd = () => {
+    setCntOpts(box.querySelector('.nv_cnt'), box.querySelector('.nv_type').value);
     box.querySelector('.nv_fee').value =
       feeOf(box.querySelector('.nv_type').value, box.querySelector('.nv_cnt').value);
   };
@@ -2167,6 +2221,7 @@ function nvAddRow() {
 
 // 평가 종류·개수를 고르면 평가비를 자동으로 채운다
 function autoFee() {
+  setCntOpts($('e_cnt'), $('e_type').value);
   $('e_fee').value = feeOf($('e_type').value, $('e_cnt').value);
 }
 $('e_type').addEventListener('change', autoFee);
@@ -2214,7 +2269,7 @@ function drawEvalList() {
       + '<span class="d">' + esc(e.eval_date)
         + (e.eval_time ? ' ' + String(e.eval_time).slice(0,5) : '') + '</span>'
       + '<span class="kn">' + esc(kidName(e.child_id)) + '</span>'
-      + '<span>' + esc(t ? t.name : '') + ' ' + e.item_cnt + '개</span>'
+      + '<span>' + esc(evItemText(e)) + '</span>'
       + '<span class="d">' + esc(th ? th.name : '') + '</span>'
       + '<span class="d">' + esc(e.status) + ' · ' + pay + '</span>'
       + '<span class="amt">' + Number(e.fee || 0).toLocaleString() + '원</span>'
@@ -2235,7 +2290,8 @@ function loadEval(id) {
   $('e_date').value   = e.eval_date || '';
   $('e_time').value   = e.eval_time ? String(e.eval_time).slice(0,5) : '';
   $('e_type').value   = e.eval_type_id || '';
-  $('e_cnt').value    = e.item_cnt || 1;
+  setCntOpts($('e_cnt'), e.eval_type_id,
+             isPsy(e.eval_type_id) ? psyKey(e) : (e.item_cnt || 1));
   $('e_thr').value    = e.therapist_id || '';
   $('e_fee').value    = e.fee ? Number(e.fee).toLocaleString() : '';
   $('e_status').value = e.status || '예정';
@@ -2250,7 +2306,7 @@ function clearEvalForm() {
   evEditId = null;
   $('e_date').value = today();
   $('e_time').value = '';
-  $('e_cnt').value  = '1';
+  setCntOpts($('e_cnt'), $('e_type').value, '1');
   $('e_status').value = '예정';
   $('e_paid').value = '';
   $('e_card').value = '';
@@ -3422,6 +3478,7 @@ function watchFee(boxId, pre) {
      && !t.classList.contains(pre + '_cnt')) return;
     const row = t.closest('.' + pre + 'row');
     if (!row) return;
+    setCntOpts(row.querySelector('.' + pre + '_cnt'), row.querySelector('.' + pre + '_type').value);
     row.querySelector('.' + pre + '_fee').value =
       feeOf(row.querySelector('.' + pre + '_type').value,
             row.querySelector('.' + pre + '_cnt').value);
