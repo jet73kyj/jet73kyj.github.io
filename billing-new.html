@@ -613,12 +613,13 @@ const EVAL_FALLBACK = [
   { id:1, name:'심리평가 (기본)',        amount:180000 },
   { id:2, name:'지능평가 + 심리평가',    amount:250000 },
   { id:3, name:'언어평가 1개',           amount:80000  },
-  { id:4, name:'언어평가 2개',           amount:130000 },
+  { id:4, name:'언어평가 2개',           amount:140000 },
   { id:5, name:'언어평가 3개',           amount:180000 },
   { id:6, name:'발달평가 1개',           amount:80000  },
-  { id:7, name:'발달평가 2개',           amount:130000 },
+  { id:7, name:'발달평가 2개',           amount:140000 },
   { id:8, name:'발달평가 3개',           amount:180000 },
-  { id:9, name:'베일리평가',             amount:250000 }
+  { id:9, name:'베일리평가',             amount:250000 },
+  { id:10, name:'지능평가',              amount:200000 }
 ];
 let EVALFEES = EVAL_FALLBACK.slice();
 // 신규 상담의 평가 표 (2026-09-16)
@@ -2512,8 +2513,10 @@ function evalPreset(childId) {
   let type = null;
   if (rows.length === 1) {
     const w = String(ETYPES[rows[0].eval_type_id] || '').replace(/평가|재활|\s/g, '').slice(0, 2);
+    // 심리평가 갈래에는 「지능평가」도 들어간다 (2026-10-15)
     const hit = EVALFEES.filter(f => Number(f.amount) === amt
-                  && (!w || String(f.name).indexOf(w) >= 0));
+                  && (!w || String(f.name).indexOf(w) >= 0
+                      || (w === '심리' && String(f.name).indexOf('지능') >= 0)));
     if (hit.length === 1) type = hit[0].id;
   }
   return { amt: amt, type: type };
@@ -2537,12 +2540,23 @@ function evalInfoHtml(rows) {
     return '<div class="evinfo">'
       + '<span>📋 신규 상담 평가</span>'
       + '<span>' + esc(ds) + (ts ? ' ' + ts : '') + '</span>'
-      + '<span>' + esc(tn) + ' ' + (Number(v.item_cnt) || 1) + '개</span>'
+      + '<span>' + esc(evItemName(v, tn)) + '</span>'
       + '<span>담당 ' + esc(th) + '</span>'
       + '<span>' + (Number(v.fee) || 0).toLocaleString() + '원</span>'
       + '<span class="evst ' + (done ? 'ok' : '') + '">' + esc(v.status || '예정') + '</span>'
       + '</div>';
   }).join('');
+}
+// 평가 안내 줄 글 — 심리평가는 구성 이름 (신규 상담 화면과 같은 규칙 · 2026-10-15)
+//   개수 2 → 심리 + 지능 / 금액이 기준표 「지능평가」와 같으면 지능평가 / 그 밖 심리평가
+function evItemName(v, tn) {
+  if (String(tn).indexOf('심리') >= 0) {
+    if (Number(v.item_cnt) >= 2) return '심리 + 지능';
+    const iq = EVALFEES.find(f => String(f.name).trim() === '지능평가');
+    if (iq && Number(v.fee) === Number(iq.amount)) return '지능평가';
+    return '심리평가';
+  }
+  return tn + ' ' + (Number(v.item_cnt) || 1) + '개';
 }
 // 체험 수업 — 그 달 금액 합계 (취소 뺌) (2026-09-16)
 function trialSumOf(childId) {
