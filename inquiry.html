@@ -1965,7 +1965,12 @@ function feeOf(tid, cnt) {
   if (!same.length) return '';
   // 개수가 적힌 것이 있으면 그것으로
   let hit = same.find(f => String(f.name).indexOf(c + '개') >= 0);
-  // 개수가 없는 종류(심리평가 등)는 개수 표시 없는 줄로
+  // 개수가 없는 종류(심리평가) — 2개부터는 함께 받는 줄(「지능평가 + 심리평가」) (2026-10-15 은정님)
+  if (!hit && c >= 2) {
+    hit = EVFEES.find(f => String(f.name).indexOf('+') >= 0
+                        && String(f.name).indexOf(tn) > 0);
+  }
+  // 1개는 개수 표시 없는 줄로 (심리평가 (기본))
   if (!hit) hit = same.find(f => !/[0-9]개/.test(String(f.name)));
   if (!hit) hit = same[0];
   return hit ? Number(hit.amount).toLocaleString() : '';
