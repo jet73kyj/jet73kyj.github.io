@@ -667,6 +667,11 @@
         <label for="d_channel">유입경로</label>
         <input id="d_channel" type="text">
       </div>
+      <!-- 생년월일 (2026-10-14 은정님) — 등록 때 빠뜨린 것을 여기서 고친다 · 「저장」 때 아동 표에 -->
+      <div>
+        <label for="d_birth">생년월일 <span id="d_age" style="color:#2e7d32;font-weight:700;"></span></label>
+        <input id="d_birth" type="date">
+      </div>
       <input id="d_area" type="hidden">
       <input id="d_day" type="hidden">
       <input id="d_time" type="hidden">
@@ -1210,6 +1215,8 @@ async function openDetail(id) {
   // 아동 메모 — 등록 때 적은 상담 내용은 아동 표에 있다
   const kk = KIDS.find(k => k.id === r.child_id);
   dkmShow(kk && kk.memo ? kk.memo : '', kk ? kk.memo_at : null);
+  const _bd = kk && kk.birth ? String(kk.birth).slice(0, 10) : '';
+  $('d_birth').value = _bd; $('d_birth').dataset.orig = _bd; drawDAge();
   dsumShow(kk && kk.eval_summary ? kk.eval_summary : '');
   showBox('msgD', '', true); $('msgD').className = 'out';
 
@@ -1284,7 +1291,8 @@ function detPending() {
   const out = [];
   if ($('detBox').style.display === 'none' || !openId) return out;
   const km = $('d_kmemo');
-  if (DET_DIRTY || (km.value.trim() !== (km.dataset.orig || ''))) out.push('윗칸 · 평가 줄 · 아동 메모 (아래 「저장」)');
+  const db = $('d_birth');
+  if (DET_DIRTY || (km.value.trim() !== (km.dataset.orig || '')) || (db.value && db.value !== (db.dataset.orig || ''))) out.push('윗칸 · 평가 줄 · 아동 메모 (아래 「저장」)');
   const lc = $('l_content');
   if (lc.value.trim() && lc.value.trim() !== (lc.dataset.orig || '')) out.push('상담 기록 (「기록 추가」)');
   const ds = $('dsumEdit');
@@ -1779,6 +1787,24 @@ $('saveDet').onclick = async () => {
       const kk = KIDS.find(k => k.id === data.child_id);
       if (kk) kk.memo = km || null;
       $('d_kmemo').dataset.orig = km;
+    }
+
+    // 생년월일이 바뀌었으면 아동 표에도 저장한다 (2026-10-14)
+    //   비우는 것은 받지 않는다 (질문지 · 나이 셈이 생년월일을 씀)
+    const bd = $('d_birth').value;
+    if (bd && bd !== ($('d_birth').dataset.orig || '')) {
+      if (bd > today()) throw new Error('생년월일이 오늘보다 뒤입니다. 다시 확인해 주세요.');
+      const { data: kb, error: eb } = await sb.from('nl_children')
+        .update({ birth: bd, updated_at: new Date().toISOString() })
+        .eq('id', data.child_id).select('id, birth');
+      if (eb) throw new Error('생년월일 저장 실패: ' + eb.message);
+      if (!kb || !kb.length) throw new Error('생년월일 저장 실패: 아동 표가 바뀌지 않았습니다 (권한 확인)');
+      const kk = KIDS.find(k => k.id === data.child_id);
+      if (kk) kk.birth = kb[0].birth;
+      $('d_birth').dataset.orig = bd;
+      $('detTitle').textContent = '문의 ' + data.id + '번 — ' + kidName(data.child_id)
+        + (kidBirth6(data.child_id) ? ' ' + kidBirth6(data.child_id) : '');
+      ikLoad(data.child_id);
     }
 
     // 평가 줄도 함께 저장한다
@@ -3518,6 +3544,13 @@ function drawAge() {
   const t = ageText($('k_birth').value);
   $('k_age').textContent = t ? '만 ' + t : '';
 }
+// 열기 창 생년월일 나이 (2026-10-14)
+function drawDAge() {
+  const t = ageText($('d_birth').value);
+  $('d_age').textContent = t ? '만 ' + t : '';
+}
+$('d_birth').addEventListener('input',  drawDAge);
+$('d_birth').addEventListener('change', drawDAge);
 $('k_birth').addEventListener('input',  drawAge);
 $('k_birth').addEventListener('change', drawAge);
 
