@@ -724,8 +724,6 @@
             <label for="l_way">방법</label>
             <select id="l_way">
               <option value="전화">전화</option>
-              <option value="문자">문자</option>
-              <option value="카카오톡">카카오톡</option>
               <option value="방문">방문</option>
               <option value="기타">기타</option>
             </select>
@@ -1238,6 +1236,7 @@ async function openDetail(id) {
   ikLoad(r.child_id);
 
   logEditClear();
+  LOGEDIT = LOGDRAFT = LOGORIG = null;
   tlTab('log', true);
   $('l_date').value = today();
   $('l_content').value = '';
@@ -1295,6 +1294,7 @@ function detPending() {
   if (DET_DIRTY || (km.value.trim() !== (km.dataset.orig || '')) || (db.value && db.value !== (db.dataset.orig || ''))) out.push('윗칸 · 평가 줄 · 아동 메모 (아래 「저장」)');
   const lc = $('l_content');
   if (lc.value.trim() && lc.value.trim() !== (lc.dataset.orig || '')) out.push('상담 기록 (「기록 추가」)');
+  if (logInlineDirty()) out.push('고치던 상담 기록 (그 줄 「저장」)');
   const ds = $('dsumEdit');
   if (ds.value.trim() !== (ds.dataset.orig || '')) out.push('평가 요약 (「요약 저장」)');
   const tn = window.NLTrials ? NLTrials.pendingN() : 0;
@@ -1308,11 +1308,11 @@ function detLeaveOk() {
     + '\n\n그래도 나갈까요? (적어 둔 내용은 사라집니다)');
 }
 $('detBox').addEventListener('input', e => {
-  if (e.target.closest('#logForm, #dsumEdit, #trForm')) return;
+  if (e.target.closest('#logForm, #dsumEdit, #trForm, .logInline')) return;
   detMarkDirty();
 });
 $('detBox').addEventListener('change', e => {
-  if (e.target.closest('#logForm, #dsumEdit, #trForm')) return;
+  if (e.target.closest('#logForm, #dsumEdit, #trForm, .logInline')) return;
   if (e.target.matches('.dv_st')) return;
   detMarkDirty();
 });
@@ -1337,6 +1337,38 @@ function addDraft() {
 }
 
 let LOGS = [];   // 이 문의의 상담 기록
+// 상담 기록 한 줄을 그 줄 바로 아래에서 고친다 (2026-10-15 은정님)
+//   LOGEDIT 고치는 줄 번호 · LOGDRAFT 적고 있는 값 (다시 그려도 남게) · LOGORIG 처음 값
+const LOG_WAYS = ['전화', '방문', '기타'];
+let LOGEDIT = null, LOGDRAFT = null, LOGORIG = null, LOGSAVING = false;
+function logInlineDirty() {
+  if (!LOGEDIT || !LOGDRAFT || !LOGORIG) return false;
+  return LOGDRAFT.log_date !== LOGORIG.log_date || LOGDRAFT.way !== LOGORIG.way
+      || LOGDRAFT.content.trim() !== LOGORIG.content.trim();
+}
+function logInlineHtml() {
+  const d = LOGDRAFT;
+  const ways = LOG_WAYS.indexOf(d.way) >= 0 || !d.way ? LOG_WAYS : LOG_WAYS.concat([d.way]);
+  return '<div class="logInline" style="margin:4px 0 10px 94px; padding:10px 12px;'
+    + ' border:1px solid #d9cbb8; border-radius:8px; background:#fbf8f3;">'
+    + '<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end;">'
+    + '<div><label style="font-size:12px;">날짜</label>'
+    +   '<input class="li_date" type="date" style="width:150px;" value="' + ikEsc(d.log_date) + '"></div>'
+    + '<div><label style="font-size:12px;">방법</label>'
+    +   '<select class="li_way" style="width:110px;">'
+    +   ways.map(w => '<option value="' + ikEsc(w) + '"' + (w === d.way ? ' selected' : '') + '>'
+                    + esc(w) + '</option>').join('')
+    +   '</select></div></div>'
+    + '<div style="margin-top:8px;"><label style="font-size:12px;">내용</label>'
+    +   '<textarea class="li_text" rows="3" style="width:100%; box-sizing:border-box;'
+    +   ' resize:vertical;">' + esc(d.content) + '</textarea></div>'
+    + '<div style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:8px;">'
+    +   '<span class="li_msg" style="flex:1; font-size:12.5px; color:#c62828;"></span>'
+    +   '<button type="button" class="tab li_cancel" style="width:auto; margin:0; padding:5px 14px;">나가기</button>'
+    +   '<button type="button" class="tab li_save" style="width:auto; margin:0; padding:5px 14px;'
+    +   ' background:#B07A4A; color:#fff; border-color:#B07A4A;">저장</button>'
+    + '</div></div>';
+}
 
 async function loadLogs(id) {
   $('tl').innerHTML = '<div class="lognone">불러오는 중...</div>';
@@ -1384,6 +1416,7 @@ function drawTimeline() {
       + (l.staff_id ? ' <span style="color:#999; font-size:12.5px;">· ' + l.staff_id + '번</span>' : ''),
       '<button type="button" class="tab tlLogEdit" data-id="' + l.id
       + '" style="padding:3px 9px; font-size:12px;">수정</button>')
+      + (LOGEDIT === l.id && LOGDRAFT ? logInlineHtml() : '')
   }));
 
   // 평가 묶음 (한 달 안이면 한 묶음). 요약은 가장 최근 묶음에 붙는다
@@ -1456,6 +1489,48 @@ function drawTimeline() {
   $('tl').querySelectorAll('.tlEvEdit').forEach(b => b.onclick = () => tlTab('ev'));
   $('tl').querySelectorAll('.tlTrEdit').forEach(b => b.onclick = () => tlTab('tr'));
   $('tl').querySelectorAll('.tlLogEdit').forEach(b => b.onclick = () => logEdit(Number(b.dataset.id)));
+  const li = $('tl').querySelector('.logInline');
+  if (li) {
+    const sync = () => {
+      LOGDRAFT.log_date = li.querySelector('.li_date').value;
+      LOGDRAFT.way      = li.querySelector('.li_way').value;
+      LOGDRAFT.content  = li.querySelector('.li_text').value;
+    };
+    li.addEventListener('input', sync);
+    li.addEventListener('change', sync);
+    li.querySelector('.li_cancel').onclick = () => {
+      if (logInlineDirty() && !confirm('고친 내용을 버리고 나갈까요?')) return;
+      LOGEDIT = LOGDRAFT = LOGORIG = null;
+      drawTimeline();
+    };
+    li.querySelector('.li_save').onclick = () => logInlineSave(li);
+  }
+}
+
+async function logInlineSave(li) {
+  if (LOGSAVING || !LOGEDIT) return;
+  const msg = li.querySelector('.li_msg');
+  const content = String(LOGDRAFT.content || '').trim();
+  if (!content) { msg.textContent = '내용을 적으세요.'; return; }
+  if (!LOGDRAFT.log_date) { msg.textContent = '날짜를 넣으세요.'; return; }
+  const btn = li.querySelector('.li_save');
+  LOGSAVING = true; btn.disabled = true; btn.textContent = '저장 중…'; msg.textContent = '';
+  try {
+    const row = { log_date: LOGDRAFT.log_date, way: LOGDRAFT.way, content: content };
+    const { data, error } = await sb.from('nl_inquiry_logs').update(row)
+      .eq('id', LOGEDIT).select('id, log_date, way, content, staff_id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄이 없습니다. 권한을 확인해 주세요.');
+    const k = LOGS.findIndex(x => x.id === LOGEDIT);
+    if (k >= 0) LOGS[k] = data[0];
+    LOGEDIT = LOGDRAFT = LOGORIG = null;
+    drawTimeline();
+  } catch (e) {
+    msg.textContent = '❌ 저장하지 못했습니다 — ' + e.message;
+    btn.disabled = false; btn.textContent = '저장';
+  } finally {
+    LOGSAVING = false;
+  }
 }
 
 // ── 아래 고정 칸 — 갈래 바꾸기 ──
@@ -1479,14 +1554,14 @@ $('tabTr').onclick  = () => tlTab('tr');
 function logEdit(lid) {
   const l = LOGS.find(x => x.id === lid);
   if (!l) return;
-  tlTab('log');
-  $('l_date').value    = l.log_date || today();
-  $('l_way').value     = l.way || '전화';
-  $('l_content').value = l.content || '';
-  $('l_content').dataset.orig = (l.content || '').trim();
-  $('addLog').dataset.editId = String(lid);
-  $('addLog').textContent = '고쳐 저장';
-  showBox('msgL', '고치는 중입니다. 저장하면 그 줄이 바뀝니다.', true);
+  if (LOGEDIT === lid) return;
+  if (logInlineDirty() && !confirm('고치던 상담 기록이 저장되지 않았습니다. 버리고 이 줄을 고칠까요?')) return;
+  LOGORIG  = { log_date: String(l.log_date || today()), way: l.way || '전화', content: l.content || '' };
+  LOGDRAFT = Object.assign({}, LOGORIG);
+  LOGEDIT  = lid;
+  drawTimeline();
+  const ta = $('tl').querySelector('.logInline .li_text');
+  if (ta) ta.focus();
 }
 function logEditClear() {
   delete $('addLog').dataset.editId;
