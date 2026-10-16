@@ -371,7 +371,16 @@ function drawPair(rs) {
           ? '<b>' + dm(r.makeup_date) + ' ' + hm(r.makeup_time) + '</b>'
             + (r.makeup_therapist_id ? ' · ' + esc(THRS[r.makeup_therapist_id] || '') + ' 선생님' : '')
           : '<span class="none2">아직 안 정함</span>')
-      + '</div>';
+      + '</div>'
+      // 선생님 확정 표시 — 두 선생님이 각자 누르고 서로 본다 (2026-10-16)
+      + (r.state === '신청'
+          ? '<div class="rqline" style="font-size:13px;">선생님 확정 · '
+            + (r.th_ok_at
+                ? '<b style="color:#2c7a3f;">✓ ' + esc(THRS[r.th_ok_by] || '') + ' 선생님 '
+                  + hm(new Date(r.th_ok_at).toTimeString()) + '</b>'
+                : '<span style="color:#b07a1c;">⏳ 아직</span>')
+            + '</div>'
+          : '');
   });
   h += '<div class="why">' + esc(rs[0].reason || '') + '</div>';
   const w1 = rs.find(r => r.state === '신청');
@@ -379,10 +388,22 @@ function drawPair(rs) {
   if (u1) {
     h += undoBtn(u1, true);
   } else if (w1) {
-    h += '<div class="rqbtns">'
-      + '<button data-ok="' + w1.id + '">두 건 함께 확정</button>'
-      + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
-      + '</div>';
+    if (TEACHER && ME) {
+      // 선생님 — 내 줄만 확정 · 둘 다 확정되면 서버가 묶음을 확정한다 (nl_abs_pair_ok)
+      const mineRow = r => Number((SESS[r.session_id] || {}).therapist_id) === Number(ME.id) || Number(r.makeup_therapist_id) === Number(ME.id);
+      const myWait = rs.filter(r => r.state === '신청' && mineRow(r) && !r.th_ok_at);
+      h += '<div class="rqbtns">'
+        + (myWait.length
+            ? '<button data-ok="' + myWait[0].id + '">내 보강 확정</button>'
+            : '<span style="font-size:13px;color:#2c7a3f;align-self:center;">내 확정 끝 · 다른 선생님 확정을 기다립니다</span>')
+        + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
+        + '</div>';
+    } else {
+      h += '<div class="rqbtns">'
+        + '<button data-ok="' + w1.id + '">두 건 함께 확정</button>'
+        + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
+        + '</div>';
+    }
   } else {
     const memo = rs.map(r => r.staff_memo).filter(Boolean)[0];
     if (memo) h += '<div class="rqline" style="color:#888;font-size:13px;">센터 메모 · ' + esc(memo) + '</div>';
@@ -398,7 +419,7 @@ async function loadAll() {
     .from('nl_absence_requests')
     .select('id, child_id, session_id, reason, makeup_date, makeup_time,'
           + ' makeup_therapist_id, state, staff_memo, pair_key, staff_id, account_id,'
-          + ' decided_by, decided_at, undo_prev_state')
+          + ' decided_by, decided_at, undo_prev_state, th_ok_at, th_ok_by')
     .order('id', { ascending: false });
   if (error) { show($('msg2'), '❌ 신청을 불러오지 못했습니다.\n' + error.message, false); return; }
   REQS = data || [];
@@ -426,7 +447,9 @@ async function loadAll() {
   // 선생님 계정 — 내 수업(또는 내 보강 자리) 요청 · 내 발추 요청만 (2026-10-05)
   if (TEACHER && ME) {
     const mine = r => Number((SESS[r.session_id] || {}).therapist_id) === Number(ME.id) || Number(r.makeup_therapist_id) === Number(ME.id);
-    REQS = REQS.filter(mine);
+    // 두 수업 묶음은 한 줄이라도 내 것이면 두 줄 모두 보여 준다 (2026-10-16 은정님 — 서로 일정을 보고 협의)
+    const myPairs = new Set(REQS.filter(r => r.pair_key && mine(r)).map(r => r.pair_key));
+    REQS = REQS.filter(r => mine(r) || (r.pair_key && myPairs.has(r.pair_key)));
     X8REQS = X8REQS.filter(x => Number(x.therapist_id) === Number(ME.id));
   }
   draw();
@@ -441,7 +464,8 @@ async function doConfirm(id) {
   if (r.pair_key) {
     // 두 수업 묶음 — 둘 다 보여 주고 함께 확정 (2026-09-22)
     const rs = pairItems(REQS.filter(x => x.pair_key === r.pair_key && x.state === '신청'));
-    m += '두 수업 묶음 · 둘 다 되거나 둘 다 안 됩니다\n\n';
+    m += '두 수업 묶음 · 둘 다 되거나 둘 다 안 됩니다\n'
+       + (TEACHER ? '선생님 두 분이 모두 확정하시면 보강이 잡히고 학부모께 알림이 갑니다\n\n' : '\n');
     rs.forEach(x => {
       const sx = SESS[x.session_id] || {};
       m += '결석 · ' + dm(sx.plan_date) + ' ' + hm(sx.start_time)
@@ -460,7 +484,10 @@ async function doConfirm(id) {
   const btn = document.querySelector('button[data-ok="' + id + '"]');
   if (btn) { btn.disabled = true; btn.textContent = '확정 중…'; }
   try {
-    const { data, error } = await sb.rpc('nl_absence_confirm', { p_req_id: id });
+    // 묶음은 nl_abs_pair_ok — 선생님은 내 줄만 확정 표시, 둘 다 되면 묶음 확정 / 관리자는 바로 확정 (2026-10-16)
+    const { data, error } = r.pair_key
+      ? await sb.rpc('nl_abs_pair_ok', { p_req: id })
+      : await sb.rpc('nl_absence_confirm', { p_req_id: id });
     if (error) throw error;
     // 창구가 「확정했습니다.」가 아닌 글을 돌려주면 확정이 안 된 것이다 (2026-09-11)
     //   보기: 「확정하지 못했습니다 — 09/21(월) 09:50 : 월요일은 선생님 출근 요일이 아닙니다 …」
@@ -468,7 +495,7 @@ async function doConfirm(id) {
     //   「확정했습니다. (이미 잡아 두신 보강을 그대로 씁니다)」도 성공이다 (2026-09-16)
     //   전에는 글자가 「확정했습니다.」와 똑같을 때만 성공으로 봐서, 확정됐는데 빨간 칸이 떴다
     const res = String(data || '');
-    if (res.indexOf('확정했습니다') !== 0) {
+    if (res.indexOf('확정했습니다') !== 0 && res.indexOf('내 보강을 확정했습니다') !== 0) {
       show($('msg2'), '❌ ' + (res || '확정하지 못했습니다.'), false);
       alert(res || '확정하지 못했습니다.');
       await loadAll();
@@ -478,7 +505,7 @@ async function doConfirm(id) {
     await loadAll();
   } catch (e) {
     show($('msg2'), '❌ 확정하지 못했습니다.\n' + (e.message || e), false);
-    if (btn) { btn.disabled = false; btn.textContent = r.pair_key ? '두 건 함께 확정' : '확정하기'; }
+    if (btn) { btn.disabled = false; btn.textContent = r.pair_key ? (TEACHER ? '내 보강 확정' : '두 건 함께 확정') : '확정하기'; }
   }
 }
 
@@ -545,13 +572,23 @@ async function doReject(id) {
   try {
     // 「신청」 상태일 때만 반려한다 — 이미 확정·취소된 것을 덮지 않게 (2026-09-21)
     // 누른 사람도 남긴다
-    const { data: upd, error } = await sb.from('nl_absence_requests')
-      .update({ state: '반려', staff_memo: why || null,
-                decided_by: ME ? ME.id : null,
-                decided_at: new Date().toISOString() })
-      .eq(pk ? 'pair_key' : 'id', pk || id).eq('state', '신청')
-      .select('id');
-    if (error) throw error;
+    // 묶음은 서버 창구로 — 다른 선생님 줄도 함께 반려해야 하므로 (2026-10-16)
+    let upd, error;
+    if (pk) {
+      const rr2 = await sb.rpc('nl_abs_pair_no', { p_req: id, p_memo: why || null });
+      if (rr2.error) throw rr2.error;
+      const t2 = String(rr2.data || '');
+      if (t2 !== '반려했습니다.' && t2 !== '이미 처리된 신청입니다.') throw new Error(t2);
+      upd = (t2 === '반려했습니다.') ? [1] : [];
+    } else {
+      ({ data: upd, error } = await sb.from('nl_absence_requests')
+        .update({ state: '반려', staff_memo: why || null,
+                  decided_by: ME ? ME.id : null,
+                  decided_at: new Date().toISOString() })
+        .eq('id', id).eq('state', '신청')
+        .select('id'));
+      if (error) throw error;
+    }
     if (!upd || !upd.length) {
       show($('msg2'), '⚠️ 이미 처리된 신청입니다. 목록을 새로 불러왔습니다.', false);
       alert('이미 처리된 신청입니다.\n(학부모 취소 또는 다른 분이 확정·반려)');
