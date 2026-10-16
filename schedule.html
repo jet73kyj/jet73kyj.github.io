@@ -10861,7 +10861,30 @@ function pairDates(){
 // ── 알림 (2026-09-15) — 홈에 안 들어오셔도 시간표에서 보이게 ──
 let ALERTS = [];
 
-function alDraw(list, title) {
+// 알림 글의 「○번 아동」 · 「○번 이름」을 아동 이름으로 (2026-10-16 은정님)
+//   글은 서버 장치가 적은 그대로 두고 보일 때만 바꾼다 · 선생님 번호(「1번 ○○ 선생님」)는 그대로
+const AL_NAME = {};
+async function alFixNames(list){
+  const ids = [...new Set(list.map(a => a.child_id).filter(x => x != null && AL_NAME[x] === undefined))];
+  for (let i = 0; i < ids.length; i += 200) {
+    try {
+      const { data } = await sb.from('nl_children').select('id, name').in('id', ids.slice(i, i + 200));
+      (data || []).forEach(c => { AL_NAME[c.id] = c.name || null; });
+    } catch (e) {}
+  }
+  ids.forEach(i => { if (AL_NAME[i] === undefined) AL_NAME[i] = null; });
+  list.forEach(a => {
+    const nm = a.child_id != null ? AL_NAME[a.child_id] : null;
+    if (!nm || a._nm) return;
+    const q = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let b = String(a.body || '');
+    b = b.replace(new RegExp('(^|[^0-9])' + a.child_id + '번 ' + q, 'g'), '$1' + nm);
+    b = b.replace(new RegExp('(^|[^0-9])' + a.child_id + '번 아동', 'g'), '$1' + nm);
+    a.body = b; a._nm = true;
+  });
+}
+async function alDraw(list, title) {
+  await alFixNames(list || []);
   $('alTitle').textContent = title;
   if (!list.length) {
     $('alRows').innerHTML = '<div style="padding:22px 0; text-align:center; color:#999;">'
@@ -10881,7 +10904,7 @@ function alDraw(list, title) {
 
 async function loadAlerts(pop) {
   const { data, error } = await sb.from('nl_alerts')
-    .select('id, kind, body, created_at')
+    .select('id, kind, body, created_at, child_id')
     .is('read_at', null)
     .order('id', { ascending: false })
     .limit(50);
@@ -10896,7 +10919,7 @@ async function loadAlerts(pop) {
 $('bell').onclick = async () => {
   if (ALERTS.length) { alDraw(ALERTS, '새 알림 ' + ALERTS.length + '건'); return; }
   const { data } = await sb.from('nl_alerts')
-    .select('id, kind, body, created_at')
+    .select('id, kind, body, created_at, child_id')
     .order('id', { ascending: false }).limit(15);
   alDraw(data || [], '지난 알림');
 };
