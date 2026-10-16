@@ -5256,6 +5256,7 @@ function drawDay(){
 
           // 쪼갠 보강(10·20·30분)은 그 날 정규 줄 안에 작게 붙인다 (2026-09-08)
           const splitOf = {};
+          const splitMk = {};   // 날짜#아동 — 조각을 보강 줄에 접은 날
           for (let i2 = lines.length - 1; i2 >= 0; i2--) {
             const L3 = lines[i2];
             if ((L3.kind === 'mk' || L3.kind === 'mn')
@@ -5263,7 +5264,14 @@ function drawDay(){
               const hasRun = lines.some(function(v){
                 return v.kind === 'run' && v.d === L3.d
                   && v.x && Number(v.x.child_id) === Number(L3.x.child_id); });
-              if (hasRun) {
+              // 40분 보강 줄 앞뒤에 붙은 조각도 그 보강 줄 안에 접는다 (2026-10-16 · 80번 26일)
+              const hasMk40 = !hasRun && lines.some(function(v){
+                return (v.kind === 'mk' || v.kind === 'mn') && v.d === L3.d && v.x
+                  && Number(v.x.minutes || 40) === 40
+                  && Number(v.x.child_id) === Number(L3.x.child_id)
+                  && v.x.status !== '결석' && v.x.status !== '휴무'; });
+              if (hasRun || hasMk40) {
+                if (hasMk40) (splitMk[L3.d + '#' + L3.x.child_id] = true);
                 (splitOf[L3.d] = splitOf[L3.d] || []).push(L3.x);
                 lines.splice(i2, 1);
               }
@@ -5358,6 +5366,9 @@ function drawDay(){
                 && from.month_key && from.month_key !== mon;
               // 원래 수업 일자는 이름 옆에 한 번만 적는다 (아래 칸은 갈래만)
               const tag = (L2.kind === 'mk') ? '보강' : '직접';
+              // 이 40분 보강 줄에 접어 둔 조각이 있으면 함께 그린다 (2026-10-16)
+              const _mkHost = Number(x.minutes || 40) === 40 && splitMk[L2.d + '#' + x.child_id]
+                && x.status !== '결석' && x.status !== '휴무';
               // 완료면 흰 바탕. 결석·휴무는 회색. 아직 안 한 평가는 핑크
               const mkCls = (x.status === '완료') ? 'ln-done'
                           : (x.status === '결석') ? 'ln-abs'
@@ -5369,12 +5380,14 @@ function drawDay(){
                 + '<span class="d">' + day + '</span>'
                 + hmTag(x, s, t.id, wd)
                 + '<span class="n">🔁 '
+                + (_mkHost ? splitPieces(x, splitOf[L2.d], x.child_id, true) : '')
                 + ((x.status === '결석' || x.status === '휴무') ? '<span class="ln-cut">' + nm + '</span>' : nm)
                 + '<span class="rno">'
                 + ((isMk(x) || isPrevMn(x)) ? mnLabel(x)
                    : (L2.kind === 'mn' && !x.run_no) ? ''
                    : monNo(mon) + '-' + x.run_no) + '</span>'
-                + splitTag(x) + minTag(x) + fillTag(x) + '</span>'
+                + splitTag(x) + minTag(x) + fillTag(x)
+                + (_mkHost ? splitPieces(x, splitOf[L2.d], x.child_id, false) : '') + '</span>'
                 + '<span class="brk"></span>'
                 + '<span class="go">' + tag + '</span>'
                 + '<span class="s">' + stWord(x) + '</span>'
@@ -8574,7 +8587,8 @@ function splitPieces(x, arr, cid, before){
       return '<span class="splitin" data-sid="' + v.id + '" title="쪼개서 보강">'
         + (before ? '<b class="bfhm">' + h12(String(v.start_time).slice(0,5))
                     + ' 시작</b> · ' : '')
-        + mnLabel(v) + ' <b>+' + Number(v.minutes) + '</b></span>';
+        // 수업 뒤 「+10」만 적는다 (2026-10-16 은정님 — 몇 일분은 안 적음)
+        + '<b>+' + Number(v.minutes) + '</b></span>';
     }).join('');
 }
 
