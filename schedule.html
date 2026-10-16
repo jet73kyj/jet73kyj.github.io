@@ -1758,6 +1758,23 @@
         <div id="ed_wks" class="wks"></div>
       </div>
     </div>
+    <!-- 치료 종류 · 사업이 바뀌는 날부터 새 수업으로 (2026-10-16 · 58번) — 서버 nl_split_therapy 한 번 -->
+    <div id="edSplitBox" style="display:none;background:#EFF4F9;border:1px solid #D3E0EC;border-left:3px solid #5A86B0;border-radius:8px;padding:10px 12px;margin:10px 0 4px;font-size:13px;line-height:1.7;color:#2f4a63;">
+      <div style="font-weight:800;font-size:14px;color:#2f5f8f;">치료 종류(또는 사업)가 바뀝니다</div>
+      <div>지난 기록이 있어 이 수업은 그대로 두고, <b>바뀌는 날부터 새 수업</b>으로 이어 갑니다.<br>
+        위 칸(선생님 · 요일 · 시간 · 사업 · 치료 종류 · 회기 방식)이 새 수업이 됩니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px;">
+        <label for="ed_spFrom" style="margin:0;font-weight:700;white-space:nowrap;">바뀌는 날</label>
+        <input id="ed_spFrom" type="date" style="width:auto !important;margin:0 !important;">
+        <span style="font-size:12px;color:#6b7f8f;">(처음 값: 다음 달 1일)</span>
+      </div>
+      <div style="font-weight:700;margin-top:8px;">이렇게 됩니다</div>
+      <div id="ed_spPrev" style="background:#fff;border:1px solid #D3E0EC;border-radius:6px;padding:7px 10px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:9px;">
+        <button id="ed_spOut" class="pbtn grey" style="width:auto !important;margin:0 !important;">나가기</button>
+        <button id="ed_spGo" class="pbtn ok-btn" style="width:auto !important;margin:0 !important;">이날부터 바꾸기</button>
+      </div>
+    </div>
     <div class="pbtns">
       <button id="edSave" class="pbtn ok-btn">저장</button>
       <button id="edFrom" class="pbtn" style="display:none;">이번 달부터 바꾸기</button>
@@ -5735,6 +5752,19 @@ $('adSave').onclick = async () => {
     //   전에는 「보고 있는 달」만 깔고 오류도 말없이 넘겨, 두 달에 걸친 주를 보다 넣으면
     //   시작 달이 안 깔렸다 (148번 10월 시작 · 회기 없음)
     //   → 그 요일줄만 시작 달부터 석 달을 깔고, 실패하면 알린다
+    // 아동이 「치료중」이 아니면 회기 깔기가 건너뛴다 → 말없이 0줄 (2026-10-16 · 58번)
+    try {
+      const ck = await sb.from('nl_children').select('status').eq('id', cid).single();
+      if (!ck.error && ck.data && ck.data.status !== '치료중') {
+        if (confirm(cid + '번 아동은 지금 「' + ck.data.status + '」입니다.\n'
+          + '치료중이 아니면 회기가 깔리지 않습니다.\n\n'
+          + '확인 = 아동을 「치료중」으로 바꾸고 회기 깔기\n취소 = 상태 그대로 (회기 없음)')) {
+          const up = await sb.from('nl_children').update({ status: '치료중' }).eq('id', cid).select('id');
+          if (up.error || !(up.data || []).length) alert('❌ 아동 상태를 바꾸지 못했습니다.\n' + (up.error ? up.error.message : '권한 확인'));
+          else { const kk = KIDS.find(k => k.id === cid); if (kk) kk.status = '치료중'; }
+        }
+      }
+    } catch (e) {}
     const _lay = await layNewSchedule(sc.id, sc.from_date);
     admsg(_lay.ok
       ? '✅ 넣었습니다. 회기 ' + _lay.months.join(' · ') + ' 깔았습니다. 아동 상태가 대기중이면 치료중으로 바꾸셔야 계속 보입니다.'
@@ -5837,6 +5867,7 @@ function openEd(scId){
   const r = ROWS.find(x => x.id === scId) || ROWS_ALL.find(x => x.id === scId);
   if (!r) return;
   edRow = r;
+  closeSplitBox(false);   // 지난 창의 「이날부터 바꾸기」 상자 닫기 (2026-10-16)
   edWk = [r._w1 !== false, r._w2 !== false, r._w3 !== false, r._w4 !== false];
   drawEdWks();
   $('edTitle').textContent = '[' + (r._cid || '') + '] ' + (r._name || '')
@@ -5915,7 +5946,7 @@ function showSplitBox() {
 }
 $('ed_st2').addEventListener('change', showSplitBox);
 
-$('edClose').onclick = () => { if (!egLeaveOk()) return; $('edBox').style.display='none'; edRow=null; };
+$('edClose').onclick = () => { if (!egLeaveOk()) return; closeSplitBox(false); $('edBox').style.display='none'; edRow=null; };
 
 // ===== 1:1 → 그룹으로 바꾸기 (2026-10-08 은정님) =====
 //   기존 아동의 그 요일 · 시각 · 선생님 · 분 그대로 그룹반을 만들고, 함께 들어올 아동을 넣는다
@@ -6432,16 +6463,90 @@ async function edTtGuard(){
     .in('status', ['완료', '결석', '보강']).limit(1);
   if (q.error) { alert('지난 기록을 확인하지 못해 저장하지 않았습니다.\n' + q.error.message); return false; }
   if ((q.data || []).length) {
-    alert('이 수업은 지난 기록이 있어 치료 종류를 바꿀 수 없습니다.\n'
-      + '바꾸면 지난 회기 · 기록지 · 통계까지 모두 「' + (TTYPE[_ntt] || '') + '」로 바뀝니다.'
-      + (_ntt !== Number($('ed_tt').value) ? '\n(치료지원 · 방과후 사업은 치료 종류가 언어 · 작업으로 정해집니다)' : '') + '\n\n'
-      + '치료 종류가 바뀌는 날부터는 이 수업을 「이 수업 종결」로 끝내고, 새 수업으로 넣어 주세요.\n'
-      + '(처음부터 잘못 적은 것이면 Claude 에게 말씀해 주세요)');
-    $('ed_tt').value = String(edRow._tt || 1); $('ed_st2').value = String(edRow.support_type_id || 1);
+    // 막지 않고 「이날부터 바꾸기」 상자를 연다 (2026-10-16)
+    openSplitBox();
     return false;
   }
   return true;
 }
+// ===== 이날부터 새 수업으로 (2026-10-16 · 58번) =====
+//   지난 기록이 있는 수업의 치료 종류 · 사업을 바꾸면, 서버 nl_split_therapy 가 한 번에
+//   새 수업 · 새 요일줄 → 바뀌는 날 뒤 옛 예정·휴무·쉼·결석 지움 → 옛 수업 전날 종결 → 아동 치료중 → 석 달 회기
+//   하나라도 막히면 아무것도 안 바뀐다. 미리보기(p_preview)로 먼저 보여 준다
+function edNextM1(){
+  const d = new Date(); let y = d.getFullYear(), m = d.getMonth() + 2;
+  if (m > 12) { m = 1; y++; }
+  return y + '-' + String(m).padStart(2, '0') + '-01';
+}
+function edSpArgs(preview){
+  edSyncTime();
+  const st = Number($('ed_st2').value);
+  const tt = [3, 6].includes(st) ? 1 : [4, 7].includes(st) ? 2 : Number($('ed_tt').value);
+  return { p_schedule_id: edRow.id, p_from: $('ed_spFrom').value || null, p_support: st, p_tt: tt,
+           p_therapist: Number($('ed_th').value), p_weekday: $('ed_wd').value,
+           p_time: $('ed_t1').value || String(edRow.start_time || '').slice(0, 5),
+           p_dur: Number($('ed_t2').value) || 40, p_count_mode: $('ed_cnt').value, p_preview: preview };
+}
+let ED_SP_SEQ = 0;
+async function edSpPreview(){
+  if (!edRow || $('edSplitBox').style.display === 'none') return;
+  const seq = ++ED_SP_SEQ, box = $('ed_spPrev'), go = $('ed_spGo');
+  box.textContent = '확인 중…'; go.disabled = true;
+  let r;
+  try { r = await sb.rpc('nl_split_therapy', edSpArgs(true)); }
+  catch (e) { r = { error: { message: '서버에 닿지 못했습니다' } }; }
+  if (seq !== ED_SP_SEQ) return;
+  if (r.error) {
+    box.innerHTML = '<span style="color:#b23b2b;font-weight:700;">⚠ ' + esc(r.error.message) + '</span>';
+    return;
+  }
+  box.innerHTML = esc(String(r.data || '')).split(' / ').join('<br>')
+    + '<br><span style="color:#6b7f8f;">아동 상태는 「치료중」 · 새 선생님께 수업배정 알림이 갑니다</span>';
+  go.disabled = false;
+}
+function openSplitBox(){
+  const ap = String($('ed_apply').value || '').trim();
+  if (!$('ed_spFrom').value) $('ed_spFrom').value = ap || edNextM1();
+  $('edSplitBox').style.display = 'block';
+  document.querySelector('#edBox .pbtns').style.display = 'none';
+  $('edSplitBox').scrollIntoView({ block: 'nearest' });
+  edSpPreview();
+}
+function closeSplitBox(revert){
+  ED_SP_SEQ++;
+  $('edSplitBox').style.display = 'none';
+  $('ed_spFrom').value = '';
+  $('ed_spPrev').textContent = '';
+  document.querySelector('#edBox .pbtns').style.display = '';
+  if (revert && edRow) {
+    $('ed_tt').value = String(edRow._tt || 1);
+    $('ed_st2').value = String(edRow.support_type_id || 1);
+  }
+}
+$('ed_spOut').onclick = () => closeSplitBox(true);
+['ed_spFrom', 'ed_st2', 'ed_tt', 'ed_cnt', 'ed_th', 'ed_wd', 'ed_t1', 'ed_t2'].forEach(id => {
+  const el = $(id); if (el) el.addEventListener('change', edSpPreview);
+});
+$('ed_spGo').onclick = async () => {
+  if (!edRow) return;
+  const a = edSpArgs(false);
+  if (!a.p_from) { alert('바뀌는 날을 적어 주세요.'); return; }
+  if (!confirm('[' + (edRow._cid || '') + '] ' + (edRow._name || '') + '\n\n'
+    + $('ed_spPrev').innerText + '\n\n이대로 바꿀까요?')) return;
+  const b = $('ed_spGo'); b.disabled = true; b.textContent = '바꾸는 중…';
+  try {
+    const { data, error } = await sb.rpc('nl_split_therapy', a);
+    if (error) { alert('❌ 바꾸지 못했습니다. 아무것도 바뀌지 않았습니다.\n' + error.message); return; }
+    alert('✅ ' + data);
+    const cid = edRow._cid;
+    closeSplitBox(false);
+    $('edBox').style.display = 'none'; edRow = null;
+    await loadMonth(); draw();
+    if (typeof ovlNotice === 'function') ovlNotice(cid);
+  } catch (e) {
+    alert('❌ 바꾸지 못했습니다.\n' + (e.message || e));
+  } finally { b.disabled = false; b.textContent = '이날부터 바꾸기'; }
+};
 $('edSave').onclick = async () => {
   if (!edRow) return;
   if (egPending()) {
