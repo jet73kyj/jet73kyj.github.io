@@ -3848,6 +3848,21 @@ function mkTail(x){
     + findBtn(x, mk);
 }
 
+// 주간 · 하루 보기 — 쪼개기 조각을 같은 칸 그 아동 40분 수업 카드 안에 「+10」으로 접는다 (2026-10-16)
+//   요일별 보기(splitOf)와 같은 모양 · 붙을 수업(예정 · 완료 · 보강)이 없으면 조각 카드를 그대로 그린다
+function foldParts(list){
+  list.forEach(x => { x._parts = null; });
+  const parts = list.filter(x => x.makeup_for && Number(x.minutes || 40) < 40);
+  if (!parts.length) return list;
+  const hosts = list.filter(x => Number(x.minutes || 40) >= 40
+    && ['예정', '완료', '보강'].includes(x.status) && !pieceFilled(x));
+  const used = new Set();
+  parts.forEach(p => {
+    const h = hosts.find(h0 => Number(h0.child_id) === Number(p.child_id));
+    if (h) { (h._parts = h._parts || []).push(p); used.add(p.id); }
+  });
+  return list.filter(x => !used.has(x.id));
+}
 function drawWeek(){
   buildMkOf();
   buildSplit();
@@ -3950,7 +3965,7 @@ function drawWeek(){
               + s.no + '_' + th3.id + '_' + d + '_' + ds2
               + '" title="보강 넣기">＋보강</button>'
             : '';
-          return '<td class="cell">' + plus2 + grpJoin(list, x => {
+          return '<td class="cell">' + plus2 + grpJoin(foldParts(list), x => {
             // 시간표 보기와 같은 모양으로 그린다 (ln 계열)
             const cls = pieceFilled(x) ? 'ln-abs'
                       : x.status === '완료' ? 'ln-done'
@@ -3969,11 +3984,13 @@ function drawWeek(){
               + ' data-cid="' + (x.child_id || '') + '">'
               + '<span class="d">' + dayNo(x.plan_date) + '일</span>'
               + hmTag(x, s, th3.id, d)
-              + '<span class="n">' + (isMk(x) ? '🔁 ' : '') + nm
+              + '<span class="n">' + (isMk(x) ? '🔁 ' : '')
+              + splitPieces(x, x._parts, x.child_id, true) + nm
               + '<span class="rno">'
               + ((isMk(x) || isPrevMn(x)) ? mnLabel(x)
                  : (!x.run_no ? '' : monNo(mon) + '-' + x.run_no)) + '</span>'
-              + splitTag(x) + minTag(x) + fillTag(x) + '</span>'
+              + splitTag(x) + minTag(x) + fillTag(x)
+              + splitPieces(x, x._parts, x.child_id, false) + '</span>'
               + '<span class="brk"></span>'
               + mkTail(x)
               + '<span class="s">' + stWord(x) + '</span>'
@@ -4536,7 +4553,7 @@ function drawOne(){
               + s.no + '_' + th3.id + '_' + wd + '_' + oneDate
               + '" title="보강 넣기">＋보강</button>'
             : '';
-          return '<td class="cell">' + plus2 + grpJoin(list, x => {
+          return '<td class="cell">' + plus2 + grpJoin(foldParts(list), x => {
             const cls = pieceFilled(x) ? 'ln-abs'
                       : x.status === '완료' ? 'ln-done'
                       : x.status === '결석' ? 'ln-abs'
@@ -4553,11 +4570,13 @@ function drawOne(){
               + ' data-kid="' + esc(x._name || '') + '"'
               + ' data-cid="' + (x.child_id || '') + '">'
               + hmTag(x, s, th3.id, wd)
-              + '<span class="n">' + (isMk(x) ? '🔁 ' : '') + nm
+              + '<span class="n">' + (isMk(x) ? '🔁 ' : '')
+              + splitPieces(x, x._parts, x.child_id, true) + nm
               + '<span class="rno">'
               + ((isMk(x) || isPrevMn(x)) ? mnLabel(x)
                  : (!x.run_no ? '' : monNo(mon) + '-' + x.run_no)) + '</span>'
-              + splitTag(x) + minTag(x) + fillTag(x) + '</span>'
+              + splitTag(x) + minTag(x) + fillTag(x)
+              + splitPieces(x, x._parts, x.child_id, false) + '</span>'
               + '<span class="brk"></span>'
               + mkTail(x)
               + '<span class="s">' + stWord(x) + '</span>'
