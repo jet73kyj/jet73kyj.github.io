@@ -3678,7 +3678,7 @@ function drawFind(){
         .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', id);
       if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
       s.status = nx;
-      await loadNeed();
+      await reloadAfterMk();
       draw();
     };
   });
@@ -5518,7 +5518,7 @@ $('gbody').addEventListener('click', async e => {
     if (error) { alert('지우지 못했습니다.\n' + error.message); return; }
     SESS = SESS.filter(x => x.id !== id);
     // 상자 셋 · 찾기 창도 다시 센다 (2026-10-01 전체 점검)
-    await loadNeed();
+    await reloadAfterMk();
     draw();
     return;
   }
@@ -7901,7 +7901,7 @@ $('mnDel').onclick = async () => {
   mnmsg('✅ 보강을 취소했습니다.', true);
   $('mnBox').style.display = 'none';
   // 상자 셋도 바로 다시 센다 (2026-10-01)
-  await loadNeed();
+  await reloadAfterMk();
   draw();
 };
 
@@ -8141,7 +8141,7 @@ $('mnSave').onclick = async () => {
     $('mn_tp').innerHTML='<option value="">아동을 먼저 고르세요</option>';
     $('mn_memo').value=''; mnKid=null; mnEditId=null; PLAN_MK=null;
     // 상자 셋 · 찾기 창 「이 미정」도 바로 다시 센다 (2026-10-01)
-    await loadNeed();
+    await reloadAfterMk();
     draw();
   } catch (e) {
     mnmsg('❌ 저장하지 못했습니다.\n' + e.message, false);
@@ -8995,7 +8995,7 @@ async function findTap(sid, isPlus){
     .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', sid);
   if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
   s.status = nx;
-  await loadNeed();
+  await reloadAfterMk();
   draw();
   drawFind();
   const b = $('findRows').querySelector('.fb[data-sid="' + sid + '"]');
@@ -9712,7 +9712,7 @@ async function mkSaveRun() {
     }
     mkmsg('✅ 보강을 ' + dayNo(d) + '일 ' + slotHm12(slot, th, wdOf(d)) + '으로 잡았습니다.', true);
     $('mkDel').style.display = '';
-    await loadNeed();   // 상자를 다시 세게 한다 (2026-09-19)
+    await reloadAfterMk();   // 상자를 다시 세게 한다 (2026-09-19)
     draw();
   } catch (e) {
     // 서버 장치가 출근 요일·시각으로 막았으면 알림 창으로 알린다 (2026-09-11)
@@ -9768,7 +9768,7 @@ $('mkDel').onclick = async () => {
   PREV = PREV.filter(x => x.id !== old.id);
   mkmsg('✅ 보강을 취소했습니다.', true);
   $('mkDel').style.display = 'none';
-  await loadNeed();
+  await reloadAfterMk();
   draw();
 };
 
@@ -9991,6 +9991,11 @@ async function autoDone(){
   } catch (e) {}
 }
 
+// 보강을 잡거나 지우거나 상태를 바꾸면 서버 장치가 쪼개기 조각을 함께 옮긴다 (2026-10-16)
+//   그래서 그 뒤에는 그 달 회기를 다시 읽는다 (loadMonth 끝에서 loadNeed 도 부름) · 못 읽으면 상자만 다시 셈
+async function reloadAfterMk(){
+  try { await loadMonth(); } catch (e) { await loadNeed(); }
+}
 async function loadMonth(){
   await autoDone();
   await applyMonthFilter();
