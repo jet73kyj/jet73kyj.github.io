@@ -2620,7 +2620,7 @@ function wlSlotText(w){
   const th = (w.nl_waitlist_ths || []).map(x => Number(x.therapist_id)).sort((a, b) => a - b);
   const ar = (w.nl_waitlist_areas || []).map(x => (TTYPES.find(t => Number(t.id) === Number(x.therapy_type_id)) || {}).name || '').filter(Boolean);
   return esc(wlGroupsText(ss))
-    + (th.length ? ' <span style="color:#8a6116;">· 선생님 ' + th.map(n => n + '번').join('·') + '</span>'
+    + (th.length ? ' <span style="color:#8a6116;">· 선생님 ' + th.map(n => { const t = THRS.find(x => Number(x.id) === n); return t ? esc(t.name) : n + '번'; }).join('·') + '</span>'
        : ar.length ? ' <span style="color:#8a6116;">· 영역 ' + ar.map(esc).join('·') + '</span>'
        : ((w.kind || '자리') === '자리' ? ' <span style="color:#c62828;">· 선생님·영역 없음 (시간표에 안 보임)</span>' : ''));
 }
@@ -3675,7 +3675,7 @@ function ageText(b) {
   let m = (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth());
   if (n.getDate() < d.getDate()) m--;
   if (m < 0) return '';
-  return Math.floor(m / 12) + '년 ' + (m % 12) + '개월';
+  return Math.floor(m / 12) + '년 ' + (m % 12) + '개월 (' + m + '개월)';
 }
 function drawAge() {
   const t = ageText($('k_birth').value);
