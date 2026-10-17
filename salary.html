@@ -920,8 +920,15 @@ $('sl_pdf').onclick = async () => {
   box.style.cssText = 'padding:16px;background:#fff;color:#2F2926;font-family:inherit;';
   box.innerHTML = '<div style="text-align:center;font-size:18px;font-weight:bold;margin-bottom:6px;">자라는나무 급여명세서 발송 내역 · ' + y + '년</div>'
     + '<div style="text-align:right;font-size:12px;color:#777;margin-bottom:10px;">뽑은 날 ' + slDate(new Date()) + '</div>' + $('slTable').outerHTML;
-  await html2pdf().set({ margin: 10, filename: '급여명세서 발송내역 ' + y + '.pdf', image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, backgroundColor: '#ffffff' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(box).save();
+  // 화면을 아래로 내린 채 그리면 빈 종이가 나옴 (2026-10-17) — 잠깐 맨 위로 올려 그린 뒤 되돌림
+  const sy = window.scrollY;
+  $('sl_pdf').disabled = true; $('sl_pdf').textContent = '만드는 중…';
+  try {
+    window.scrollTo(0, 0);
+    await html2pdf().set({ margin: 10, filename: '급여명세서 발송내역 ' + y + '.pdf', image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(box).save();
+  } catch (e) { alert('PDF를 만들지 못했습니다.\n' + (e && e.message ? e.message : '')); }
+  finally { window.scrollTo(0, sy); $('sl_pdf').disabled = false; $('sl_pdf').textContent = 'PDF 내려받기'; }
 };
 
 // ── 보낸 상태 · 지금 보내기 (2026-10-05) — nl_salary_share 가장 늦은 판 · nl_salary_send(달, 직원) ──
@@ -974,12 +981,14 @@ $('pdf').onclick = async () => {
     if (!window.html2pdf) { alert('PDF 도구를 불러오지 못했습니다. 인터넷 연결을 확인하거나 「인쇄」를 써 주세요.'); return; }
   }
   $('pdf').disabled = true; $('pdf').textContent = '만드는 중…';
+  const sy = window.scrollY;
   try {
+    window.scrollTo(0, 0);
     await html2pdf().set({ margin: 10, filename: fname, image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, backgroundColor: '#ffffff' }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } })
+      html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } })
       .from($('paper')).save();
   } catch (e) { alert('PDF를 만들지 못했습니다. 「인쇄」를 써 주세요.\n' + (e && e.message ? e.message : '')); }
-  finally { $('pdf').disabled = false; $('pdf').textContent = 'PDF 내려받기'; }
+  finally { window.scrollTo(0, sy); $('pdf').disabled = false; $('pdf').textContent = 'PDF 내려받기'; }
 };
 
 $('prt').onclick = () => {
