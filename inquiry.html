@@ -2050,29 +2050,55 @@ function psyLabel(e) {
   const o = PSY_OPTS.find(x => x[0] === k);
   return o ? o[1] : '심리평가';
 }
+// 발달평가는 「1개 · 2개 · 3개 · 베일리」 중에서 고른다 (2026-10-17 은정님)
+//   베일리는 개수가 없어 개수 1로 저장 — 다시 열 때는 금액(기준표 「베일리평가」)으로 가린다
+const DEV_OPTS = [['1', '1개'], ['2', '2개'], ['3', '3개'], ['1b', '베일리']];
+function isDev(tid) {
+  const t = EVTYPES.find(x => x.id === Number(tid));
+  return !!(t && String(t.name).indexOf('발달') >= 0);
+}
+function bayleyFee() {
+  const f = EVFEES.find(x => String(x.name).indexOf('베일리') >= 0);
+  return f ? Number(f.amount) : null;
+}
+function devKey(e) {
+  if (!e) return '1';
+  const c = Number(e.item_cnt) || 1;
+  const b = bayleyFee();
+  if (c === 1 && b != null && Number(e.fee) === b) return '1b';
+  return String(c);
+}
+// 다시 열 때 구성 칸에 고를 값
+function evKey(e) {
+  if (!e) return null;
+  if (isPsy(e.eval_type_id)) return psyKey(e);
+  if (isDev(e.eval_type_id)) return devKey(e);
+  return String(e.item_cnt || 1);
+}
 // 목록 · 기록 줄에 쓰는 글 — 심리평가는 구성 이름, 그 밖은 「언어평가 2개」
 function evItemText(e) {
   if (isPsy(e.eval_type_id)) return psyLabel(e);
+  if (isDev(e.eval_type_id) && devKey(e) === '1b') return '베일리평가';
   return evTypeName(e.eval_type_id) + ' ' + (e.item_cnt || 1) + '개';
 }
 // 개수 칸을 종류에 맞춰 다시 채운다 — keep 이 있으면 그 값을 고른다
 function setCntOpts(sel, tid, keep) {
   if (!sel) return;
   const psy  = isPsy(tid);
-  const mode = psy ? 'psy' : 'cnt';
+  const dev  = !psy && isDev(tid);
+  const mode = psy ? 'psy' : (dev ? 'dev' : 'cnt');
   const cur  = keep != null ? String(keep) : sel.value;
   if (sel.dataset.mode !== mode) {
-    sel.innerHTML = psy
-      ? PSY_OPTS.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('')
-      : [1, 2, 3].map(v => '<option value="' + v + '">' + v + '개</option>').join('');
+    const opts = psy ? PSY_OPTS : (dev ? DEV_OPTS : [['1', '1개'], ['2', '2개'], ['3', '3개']]);
+    sel.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
     sel.dataset.mode = mode;
-    sel.style.width = psy ? '120px' : '80px';
+    sel.style.width = (psy || dev) ? '120px' : '80px';
   }
   const ok = Array.prototype.some.call(sel.options, o => o.value === cur);
-  sel.value = ok ? cur : (psy ? '1' : String(parseInt(cur, 10) || 1));
+  sel.value = ok ? cur : (psy ? '1' : String(Math.min(3, parseInt(cur, 10) || 1)));
   const lb = sel.id ? document.querySelector('label[for="' + sel.id + '"]')
                     : (sel.parentElement && sel.parentElement.querySelector('label'));
-  if (lb) lb.textContent = psy ? '구성' : (sel.id ? '평가 개수' : '개수');
+  if (lb) lb.textContent = (psy || dev) ? '구성' : (sel.id ? '평가 개수' : '개수');
 }
 
 // 평가 종류·개수로 평가비를 찾는다
@@ -2081,6 +2107,10 @@ function feeOf(tid, cnt) {
   const t  = EVTYPES.find(x => x.id === Number(tid));
   if (!t) return '';
   const tn = String(t.name).trim();          // 예: 언어평가
+  if (String(cnt) === '1b') {                 // 발달평가 구성 「베일리」 (2026-10-17)
+    const b = bayleyFee();
+    return b != null ? b.toLocaleString() : '';
+  }
   if (String(cnt) === '1i') {                 // 심리평가 구성 「지능평가」
     const iq = EVFEES.find(f => String(f.name).trim() === '지능평가');
     return iq ? Number(iq.amount).toLocaleString() : '';
@@ -2148,7 +2178,7 @@ function dvAddRow(e) {
   $('dvRows').insertAdjacentHTML('beforeend', html);
   const box = $('dvRows').lastElementChild;
   setCntOpts(box.querySelector('.dv_cnt'), box.querySelector('.dv_type').value,
-             e && isPsy(e.eval_type_id) ? psyKey(e) : null);
+             e ? evKey(e) : null);
   const upd = () => {
     setCntOpts(box.querySelector('.dv_cnt'), box.querySelector('.dv_type').value);
     box.querySelector('.dv_fee').value =
@@ -2366,7 +2396,7 @@ function loadEval(id) {
   $('e_time').value   = e.eval_time ? String(e.eval_time).slice(0,5) : '';
   $('e_type').value   = e.eval_type_id || '';
   setCntOpts($('e_cnt'), e.eval_type_id,
-             isPsy(e.eval_type_id) ? psyKey(e) : (e.item_cnt || 1));
+             evKey(e));
   $('e_thr').value    = e.therapist_id || '';
   $('e_fee').value    = e.fee ? Number(e.fee).toLocaleString() : '';
   $('e_status').value = e.status || '예정';

@@ -2516,7 +2516,8 @@ function evalPreset(childId) {
     // 심리평가 갈래에는 「지능평가」도 들어간다 (2026-10-15)
     const hit = EVALFEES.filter(f => Number(f.amount) === amt
                   && (!w || String(f.name).indexOf(w) >= 0
-                      || (w === '심리' && String(f.name).indexOf('지능') >= 0)));
+                      || (w === '심리' && String(f.name).indexOf('지능') >= 0)
+                      || (w === '발달' && String(f.name).indexOf('베일리') >= 0)));
     if (hit.length === 1) type = hit[0].id;
   }
   return { amt: amt, type: type };
@@ -2555,6 +2556,11 @@ function evItemName(v, tn) {
     const iq = EVALFEES.find(f => String(f.name).trim() === '지능평가');
     if (iq && Number(v.fee) === Number(iq.amount)) return '지능평가';
     return '심리평가';
+  }
+  // 발달평가 — 개수 1이고 금액이 기준표 「베일리평가」와 같으면 베일리 (2026-10-17)
+  if (String(tn).indexOf('발달') >= 0 && (Number(v.item_cnt) || 1) === 1) {
+    const by = EVALFEES.find(f => String(f.name).indexOf('베일리') >= 0);
+    if (by && Number(v.fee) === Number(by.amount)) return '베일리평가';
   }
   return tn + ' ' + (Number(v.item_cnt) || 1) + '개';
 }
