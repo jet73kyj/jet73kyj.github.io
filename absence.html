@@ -263,7 +263,7 @@ function drawX8(r) {
   return h + '</div>';
 }
 // ── 확인 창 — 핸드폰 실수 막기 (2026-10-07 은정님) ──────────────
-//   크게 보여 주고, 확정 · 반려 단추는 3초 지나야 눌린다
+//   크게 보여 주고, 확정 · 반려 단추는 1초 지나야 눌린다 (2026-10-18 3초 → 1초)
 //   ask 가 있으면 까닭 칸 — 비워도 됨 · 취소면 null
 function sure(o) {
   return new Promise(resolve => {
@@ -276,19 +276,14 @@ function sure(o) {
       +   (o.ask ? '<textarea id="sureWhy" rows="3" placeholder="' + esc(o.ask) + '" style="width:100%;box-sizing:border-box;margin-top:12px;font:inherit;font-size:15px;padding:10px;border:1px solid #DDD6CE;border-radius:10px;"></textarea>' : '')
       +   '<div style="display:flex;gap:10px;margin-top:16px;">'
       +     '<button type="button" id="sureNo" style="flex:1;padding:14px;font-size:16px;border-radius:10px;border:1px solid #CFC8C0;background:#fff;color:#2F2926;margin:0;">취소</button>'
-      +     '<button type="button" id="sureOk" disabled style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:none;color:#fff;margin:0;background:' + (o.danger ? '#D8684A' : '#B07A4A') + ';opacity:.45;">' + esc(o.ok) + ' (3)</button>'
+      +     '<button type="button" id="sureOk" disabled style="flex:1;padding:14px;font-size:16px;font-weight:700;border-radius:10px;border:none;color:#fff;margin:0;background:' + (o.danger ? '#D8684A' : '#B07A4A') + ';opacity:.45;">' + esc(o.ok) + '</button>'
       +   '</div>'
       + '</div>';
     document.body.appendChild(bg);
     const ok = bg.querySelector('#sureOk'), no = bg.querySelector('#sureNo');
-    let n = 3;
-    const tick = setInterval(() => {
-      n--;
-      if (n > 0) { ok.textContent = o.ok + ' (' + n + ')'; return; }
-      clearInterval(tick);
-      ok.textContent = o.ok; ok.disabled = false; ok.style.opacity = '1';
-    }, 1000);
-    const done = v => { clearInterval(tick); bg.remove(); resolve(v); };
+    // 숫자는 감추고 1초만 흐리게 잠갔다가 풂 (2026-10-18 은정님 · 자라는나무 링크와 같게)
+    const tick = setTimeout(() => { ok.disabled = false; ok.style.opacity = '1'; }, 1000);
+    const done = v => { clearTimeout(tick); bg.remove(); resolve(v); };
     no.onclick = () => done(null);
     ok.onclick = () => {
       if (ok.disabled) return;
