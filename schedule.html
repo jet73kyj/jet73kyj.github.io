@@ -11405,8 +11405,37 @@ function ovlTag(id){
   return '<small class="fovlt">겹침 · ' + l.map(o => esc(h12(o.hm) + ' ' + o.child + '번 ' + o.kind
     + (o.same ? '' : ' (같은 아동)'))).join(', ') + '</small>';
 }
+// 보강이 이미 잡힌 자리라 정규 수업을 깔지 않은 날 알림 (2026-10-19)
+//   서버 장치 trg_s2_mk_slot_skip 이 건너뛸 때 nl_sess_skips 에 한 줄씩 남김
+//   그 보강이 아직 그 자리에 있는 날만 · 오늘부터
+async function skipNotice(cid){
+  try {
+    const today = todayKr();
+    const { data: sk, error } = await sb.from('nl_sess_skips')
+      .select('plan_date, start_time, therapist_id, blocker_id, blocker_child')
+      .eq('child_id', Number(cid)).gte('plan_date', today).order('plan_date').order('start_time');
+    if (error || !sk || !sk.length) return;
+    const ids = [...new Set(sk.map(r => r.blocker_id).filter(Boolean))];
+    const { data: bl } = ids.length
+      ? await sb.from('nl_sessions').select('id, plan_date, start_time, status, child_id').in('id', ids)
+      : { data: [] };
+    const live = new Map((bl || []).filter(b => ['보강', '완료'].includes(b.status)).map(b => [b.id, b]));
+    const rows = sk.filter(r => { const b = live.get(r.blocker_id); return b && String(b.plan_date) === String(r.plan_date); });
+    if (!rows.length) return;
+    const lines = rows.slice(0, 12).map(r => {
+      const d = String(r.plan_date);
+      return '· ' + Number(d.slice(5, 7)) + '/' + Number(d.slice(8, 10)) + '(' + wdOf(d) + ') '
+        + h12(String(r.start_time).slice(0, 5)) + ' — ' + r.blocker_child + '번 보강이 있음 · '
+        + thName(r.therapist_id) + ' 선생님';
+    });
+    alert('⚠️ 보강이 이미 잡혀 있어 ' + cid + '번 정규 수업을 넣지 못한 날이 ' + rows.length + '일 있습니다.\n\n'
+      + lines.join('\n') + (rows.length > 12 ? '\n…' : '')
+      + '\n\n이 날 ' + cid + '번 수업은 시간표에 없습니다.\n보강을 다른 자리로 옮기거나, ' + cid + '번 수업을 다른 날로 잡아 주세요.');
+  } catch (e) { /* 알림만 못 띄움 */ }
+}
 async function ovlNotice(cid){
   if (!cid) return;
+  await skipNotice(cid);   // 보강 자리라 정규 수업을 넣지 못한 날 — 꼭 알림 (2026-10-19)
   try {
     const today = todayKr();
     const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
