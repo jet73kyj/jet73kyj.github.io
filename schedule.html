@@ -9553,7 +9553,8 @@ async function mkSaveRun() {
   // (교시가 아니라 실제 시각으로 견준다. 15:10 과 14:20 은 다른 시각)
   if (Number($('mk_min').value) === 40
       && slot && String(d) === String(mkSess.plan_date)
-      && (slotHm(slot, th, wdOf(d)) + ':00') === String(mkSess.start_time)) {
+      // 직접 시각이 있으면 그것으로 견준다 (2026-10-19)
+      && ((mkHm || slotHm(slot, th, wdOf(d))) + ':00') === String(mkSess.start_time)) {
     mkmsg('결석한 날(' + dayNo(mkSess.plan_date) + '일 '
       + String(mkSess.start_time).slice(0,5) + ')과 똑같은 날·똑같은 시각입니다.\n'
       + '다른 날이나 다른 시각을 고르세요.', false);
@@ -9729,7 +9730,8 @@ async function mkSaveRun() {
       SESS.push(data);
       if (data.month_key !== mon) PREV.push(data);
     }
-    mkmsg('✅ 보강을 ' + dayNo(d) + '일 ' + slotHm12(slot, th, wdOf(d)) + '으로 잡았습니다.', true);
+    // 알림 글도 실제 저장한 시각으로 (직접 시각 우선 · 2026-10-19 — 전에는 늘 교시 시각을 보여 줌)
+    mkmsg('✅ 보강을 ' + dayNo(d) + '일 ' + h12(String(row.start_time).slice(0, 5)) + '으로 잡았습니다.', true);
     $('mkDel').style.display = '';
     await reloadAfterMk();   // 상자를 다시 세게 한다 (2026-09-19)
     draw();
