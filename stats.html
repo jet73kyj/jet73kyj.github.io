@@ -90,6 +90,7 @@
     <button class="tab" data-t="flow">신규·종결</button>
     <button class="tab" data-t="area">치료 영역</button>
     <button class="tab" data-t="move">사업 이동</button>
+    <button class="tab" data-t="age">연령대</button>
   </div>
   <div id="body"><div class="load">불러오는 중…</div></div>
 </div>
@@ -206,6 +207,7 @@ function draw(){
   else if (TAB === 'th') drawTh();
   else if (TAB === 'flow') drawFlowTab();
   else if (TAB === 'move') drawMove();
+  else if (TAB === 'age') drawAge();
   else drawArea();
 }
 
@@ -676,9 +678,44 @@ function drawArea(){
   $('amon').onchange = () => { AMON = $('amon').value; drawArea(); };
 }
 
+// ⑧ 연령대 — 그 달 수업이 있는 아동의 만 나이 (그 달 1일 기준) · 서버 nl_stats_age (2026-10-20 은정님)
+let AGE = {}, AGMON = null, AGSEQ = 0;
+const AGCOL = { 1:'#F4D88A', 2:'#EDBF5F', 3:'#EBA287', 4:'#93CBA0', 5:'#A9C4E0', 6:'#B4A4E2', 7:'#EDA9BE', 9:'#C4BDB5' };
+async function drawAge(){
+  const now = nowMk(), ms = [];
+  for (let m = 1; m <= 12; m++) { const k = mkOf(YEAR, m); if (k <= now && k >= '2026-08') ms.push(k); }
+  if (!ms.length) { $('body').innerHTML = '<div class="card">연령대는 회기 자료가 있는 2026년 8월부터 셉니다. 이 해에는 자료가 없습니다.</div>'; return; }
+  if (ms.indexOf(AGMON) < 0) AGMON = ms[ms.length - 1];
+  const mk = AGMON, seq = ++AGSEQ;
+  if (!AGE[mk]) {
+    $('body').innerHTML = '<div class="load">불러오는 중…</div>';
+    const { data, error } = await sb.rpc('nl_stats_age', { p_month: mk });
+    if (seq !== AGSEQ || TAB !== 'age') return;
+    if (error) { $('body').innerHTML = '<div class="err">연령대를 가져오지 못했습니다.\n' + esc(error.message) + '</div>'; return; }
+    AGE[mk] = data || [];
+  }
+  const rows = AGE[mk];
+  const arr = rows.filter(r => Number(r.kids) > 0 && Number(r.sort_no) !== 9).map(r => ({ k: Number(r.sort_no), n: Number(r.kids), t: r.age_band }));
+  const tot = sumBy(arr, o => o.n);
+  let h = '<div class="card"><div class="ct">연령대별 아동 수 &nbsp; <select id="agmon">'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === mk ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div>'
+        + '<div style="display:flex;gap:28px;align-items:center;flex-wrap:wrap;">'
+        + pieHtml(arr, k => AGCOL[k] || '#ccc', tot, '아동')
+        + '<table style="width:auto;min-width:280px;"><tr><th class="l">연령대</th><th>아동</th><th>비율</th></tr>'
+        + rows.map(r => { const n = Number(r.kids);
+            return '<tr' + (n ? '' : ' class="sub"') + '><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:' + (AGCOL[r.sort_no] || '#ccc') + ';margin-right:6px"></i>' + esc(r.age_band) + '</td>'
+              + '<td>' + n + '명</td><td>' + (n && tot && Number(r.sort_no) !== 9 ? '<b>' + Math.round(n / tot * 1000) / 10 + '%</b>' : '·') + '</td></tr>'; }).join('')
+        + '<tr class="tot"><td class="l">합계</td><td>' + tot + '명</td><td>100%</td></tr></table></div>'
+        + '<div class="note">그 달 몫 회기(예정 · 완료 · 결석 · 보강)가 하나라도 있는 아동입니다. 나이는 그 달 1일 기준 만 나이입니다.<br>'
+        + '생년월일 없음 — 아동 목록에 생년월일이 비어 있는 아동입니다 (원에는 넣지 않음).</div></div>';
+  $('body').innerHTML = h;
+  $('agmon').onchange = () => { AGMON = $('agmon').value; drawAge(); };
+}
+
 document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => { TAB = b.dataset.t; draw(); });
 $('home').onclick = () => { location.href = 'index.html'; };
-$('yr').onchange = () => { YEAR = Number($('yr').value); KSEL = null; KMON = null; TMON = null; AMON = null; MMON = null; EMON = null; NBMON = null; EBMON = null; load(); };
+$('yr').onchange = () => { YEAR = Number($('yr').value); KSEL = null; KMON = null; TMON = null; AMON = null; MMON = null; EMON = null; NBMON = null; EBMON = null; AGMON = null; AGE = {}; load(); };
 
 (async () => {
   const { data } = await sb.auth.getSession();
