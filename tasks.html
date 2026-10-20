@@ -111,6 +111,7 @@
   .mres label { font-size:12px; color:#3B5E44; font-weight:600; padding-top:7px; }
   .mres textarea { flex:1 1 320px; min-height:46px; }
   .mres .mm { font-size:12.5px; font-weight:600; padding-top:7px; }
+  .mres .rtxt { flex:1 1 320px; font-size:13px; color:#3B5E44; white-space:pre-wrap; line-height:1.6; padding-top:6px; }
   .kf button.on.ns1 { background:#F1EFE8; border-color:#C4BDB5; } .kf button.on.ns2 { background:#FAEEDA; border-color:#E8C9A6; } .kf button.on.ns3 { background:#EAF3DE; border-color:#9FC48A; }
 </style>
 </head>
@@ -191,6 +192,7 @@ const NSTATES = ['접수', '처리 중', '끝'];
 const NSCL = { '접수':'ns1', '처리 중':'ns2', '끝':'ns3' };
 let ME_ID = null, NOTES = [], NMSG = null, MKIND = 'all';
 let MTASKS = [], MNOTES = [], MOFF = {}, PREV = [];
+const MRES_EDIT = new Set();   // 처리 결과를 고치는 중인 민원 (저장된 글을 다시 칸으로 연 것)
 let KIDS = [];   // 아동 이름으로 고르기 (2026-10-10 은정님 — 번호를 외울 수 없음)
 function kidOf(id){ return KIDS.find(k => Number(k.id) === Number(id)); }
 function kidLabel(id){ const k = kidOf(id); if (!k) return id == null ? '' : id + '번 아동'; const b = String(k.birth || '').replace(/-/g, ''); return k.name + (b.length >= 8 ? ' ' + b.slice(2, 8) : ''); }
@@ -450,8 +452,13 @@ function monthNotesHtml(){
       + '<div class="ln">' + esc(n.content) + '</div>'
       + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
       + (comp
-          ? '<div class="mres"><label>처리 결과</label><textarea data-mres="' + n.id + '" maxlength="2000" placeholder="해결 방법을 적어 주세요">' + esc(n.result || '') + '</textarea>'
-            + '<button type="button" class="pri" data-msave="' + n.id + '">저장</button><span class="mm" id="mm' + n.id + '"></span></div>'
+          ? (n.result && !MRES_EDIT.has(n.id)
+              ? '<div class="mres"><label>처리 결과</label><div class="rtxt">' + esc(n.result) + '</div>'
+                + '<button type="button" class="lnk" data-medit="' + n.id + '">고치기</button><span class="mm" id="mm' + n.id + '"></span></div>'
+              : '<div class="mres"><label>처리 결과</label><textarea data-mres="' + n.id + '" maxlength="2000" placeholder="해결 방법을 적어 주세요">' + esc(n.result || '') + '</textarea>'
+                + '<button type="button" class="pri" data-msave="' + n.id + '">저장</button>'
+                + (n.result ? '<button type="button" data-mcancel="' + n.id + '">그만</button>' : '')
+                + '<span class="mm" id="mm' + n.id + '"></span></div>')
           : (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : ''))
       + '</div>';
   }).join('');
@@ -544,6 +551,13 @@ function bindMonth(){
     e.preventDefault(); const d = el.dataset.goday; if (d === DAY) return; if (!leaveOk()) return; FORM = null; DAY = d; load();
     setTimeout(() => { const c = $('dayCard'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300);
   });
+  const redraw = (keepMsg) => {
+    const drafts = {}; document.querySelectorAll('textarea[data-mres]').forEach(el => { drafts[el.dataset.mres] = el.value; });
+    $('mlist').innerHTML = monthNotesHtml();
+    document.querySelectorAll('textarea[data-mres]').forEach(el => { if (drafts[el.dataset.mres] != null) el.value = drafts[el.dataset.mres]; });
+    bindMonth();
+    if (keepMsg) { const mm = $('mm' + keepMsg.id); if (mm) { mm.textContent = keepMsg.t; mm.style.color = '#2e7d32'; } }
+  };
   const setLocal = (id, row) => { [MNOTES, NOTES].forEach(L => { const x = L.find(y => y.id === id); if (x) Object.assign(x, row); }); };
   document.querySelectorAll('button[data-ms]').forEach(b => b.onclick = async () => {
     const id = Number(b.dataset.ms), n = MNOTES.find(x => x.id === id); if (!n || n.state === b.dataset.s || b.disabled) return;
@@ -566,7 +580,19 @@ function bindMonth(){
     if (error || !data || !data.length) { mm.textContent = '❌ 저장하지 못했습니다'; mm.style.color = '#c62828'; alert('처리 결과를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return; }
     setLocal(id, { result: data[0].result });
     el.value = data[0].result || '';
-    mm.textContent = '✓ 저장했습니다'; mm.style.color = '#2e7d32';
+    MRES_EDIT.delete(id);
+    redraw({ id: id, t: '✓ 저장했습니다' });
+  });
+  document.querySelectorAll('button[data-medit]').forEach(b => b.onclick = () => {
+    MRES_EDIT.add(Number(b.dataset.medit)); redraw();
+    const el = document.querySelector('textarea[data-mres="' + b.dataset.medit + '"]'); if (el) el.focus();
+  });
+  document.querySelectorAll('button[data-mcancel]').forEach(b => b.onclick = () => {
+    const id = Number(b.dataset.mcancel), n = MNOTES.find(x => x.id === id);
+    const el = document.querySelector('textarea[data-mres="' + id + '"]');
+    if (n && el && el.value.trim() !== (n.result || '') && !confirm('고친 처리 결과를 저장하지 않고 그만둘까요?')) return;
+    if (el) el.value = n ? (n.result || '') : '';
+    MRES_EDIT.delete(id); redraw();
   });
   document.querySelectorAll('textarea[data-mres]').forEach(el => el.oninput = () => { const mm = $('mm' + el.dataset.mres); if (mm) mm.textContent = ''; });
 }
