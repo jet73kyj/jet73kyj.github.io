@@ -207,6 +207,16 @@
             border-radius:10px; background:#4a7c59; color:#fff;
             font-size:15px; font-weight:700; cursor:pointer; }
   .popmore { text-align:center; font-size:12.5px; color:#9aa19c; margin-top:10px; }
+  /* 공지 첨부 — 사진은 바로 · PDF 는 이름 (2026-10-20) */
+  .ntimgs { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+  .ntimg { display:block; max-width:100%; border-radius:8px; border:1px solid #ECE8E3; cursor:zoom-in; }
+  .ntpdf { display:inline-flex; align-items:center; gap:6px; margin-top:8px; margin-right:6px; padding:7px 12px;
+           border:1px solid #E4E0DA; border-radius:10px; background:#FBF5EE; color:#7E5530;
+           font-size:13.5px; text-decoration:none; cursor:pointer; }
+  .imgwrap { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:200;
+             display:flex; align-items:center; justify-content:center; padding:10px; }
+  .imgwrap img { max-width:100%; max-height:100%; border-radius:6px; }
+  .imgwrap .x { position:absolute; top:12px; right:14px; color:#fff; font-size:26px; line-height:1; cursor:pointer; }
   .tabs button { flex:1; background:#fff; color:var(--ink2);
                  border:1px solid var(--line); padding:11px; font-size:15px; }
   .tabs button.on { background:var(--acc); color:#fff; border-color:var(--acc);
@@ -1041,7 +1051,7 @@ async function reload() {
   else if (TAB === 'pay') await loadPay();
   else if (TAB === 'rec') await loadRecords();
   else if (TAB === 'nw')  await loadNews();
-  else                    await loadNotices();
+  else                  { try { await fetchNotices(); } catch (e) {} await loadNotices(); }
 }
 
 // ── 소식 ───────────────────────────────────────────────
@@ -1342,6 +1352,7 @@ function showShot(url){
 // ── 공지사항 ───────────────────────────────────────────
 let NOTICES = [];      // 지금 볼 수 있는 공지
 let READIDS = {};      // 이미 읽은 공지 번호
+let NFILES = {};       // 공지 번호 -> 첨부 [{ id, file_path, file_name, mime, url }]
 
 // 공지와 「읽음」을 가져온다
 async function fetchNotices() {
@@ -1353,11 +1364,59 @@ async function fetchNotices() {
   // 고정 공지가 맨 위 (2026-10-06)
   NOTICES = (data || []).slice().sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0) || b.id - a.id);
 
+  // 첨부 — 사진은 한 시간짜리 주소를 미리 받아 둠 · PDF 는 누를 때 (2026-10-20)
+  NFILES = {};
+  try {
+    if (NOTICES.length) {
+      const { data: fl } = await sb.from('nl_notice_files')
+        .select('id, notice_id, file_path, file_name, mime, sort_no')
+        .in('notice_id', NOTICES.map(n => n.id)).order('sort_no').order('id');
+      const imgs = (fl || []).filter(f => f.mime !== 'application/pdf');
+      const urls = {};
+      if (imgs.length) {
+        const { data: su } = await sb.storage.from('nl-notices').createSignedUrls(imgs.map(f => f.file_path), 3600);
+        (su || []).forEach(u => { if (u && u.signedUrl) urls[u.path] = u.signedUrl; });
+      }
+      (fl || []).forEach(f => { f.url = urls[f.file_path] || null; (NFILES[f.notice_id] = NFILES[f.notice_id] || []).push(f); });
+    }
+  } catch (e) { NFILES = {}; }
+
   READIDS = {};
   try {
     const { data: rd } = await sb.from('nl_notice_reads').select('notice_id');
     (rd || []).forEach(r => { READIDS[r.notice_id] = true; });
   } catch (e) {}
+}
+
+// 첨부 그리기 — 사진은 바로 보이고 누르면 크게 · PDF 는 이름 단추
+function filesHtml(nid) {
+  const fl = NFILES[nid] || [];
+  if (!fl.length) return '';
+  const im = fl.filter(f => f.mime !== 'application/pdf' && f.url);
+  const pd = fl.filter(f => f.mime === 'application/pdf');
+  return (im.length ? '<div class="ntimgs">' + im.map(f => '<img class="ntimg" alt="" src="' + esc(f.url) + '" data-big="' + f.id + '">').join('') + '</div>' : '')
+       + (pd.length ? '<div>' + pd.map(f => '<a class="ntpdf" data-pdf="' + f.id + '">📄 ' + esc(f.file_name) + '</a>').join('') + '</div>' : '');
+}
+function fileOf(fid) {
+  let f = null;
+  Object.keys(NFILES).forEach(k => NFILES[k].forEach(x => { if (x.id === fid) f = x; }));
+  return f;
+}
+function bindFiles(root) {
+  root.querySelectorAll('img[data-big]').forEach(el => el.onclick = () => {
+    const w = document.createElement('div'); w.className = 'imgwrap';
+    w.innerHTML = '<span class="x">✕</span><img alt="" src="' + esc(el.getAttribute('src')) + '">';
+    w.onclick = () => w.remove();
+    document.body.appendChild(w);
+  });
+  root.querySelectorAll('a[data-pdf]').forEach(el => el.onclick = async e => {
+    e.preventDefault();
+    const f = fileOf(Number(el.dataset.pdf)); if (!f) return;
+    const w = window.open('', '_blank');
+    const { data, error } = await sb.storage.from('nl-notices').createSignedUrl(f.file_path, 600);
+    if (error || !data) { if (w) w.close(); alert('파일을 열지 못했습니다. 잠시 뒤 다시 눌러 주세요.'); return; }
+    if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+  });
 }
 
 // 안 읽은 공지가 있으면 갈래 단추에 빨간 점을 붙인다
@@ -1389,10 +1448,12 @@ function loadNotices() {
       + '<div class="nthead">' + (n.is_pinned ? '<span class="pintag">📌 꼭 읽어 주세요</span>' : '') + '<span class="nttitle">' + esc(n.title) + '</span>'
       + (unread ? '<span class="dot">새 글</span>' : '') + '</div>'
       + '<div class="ntbody">' + esc(n.body) + '</div>'
+      + filesHtml(n.id)
       + '<div class="ntday">' + esc(n.start_on) + '</div>'
       + '</div>';
   });
   $('ntlist').innerHTML = h;
+  bindFiles($('ntlist'));
 
   // 목록을 열면 다 읽은 것으로 본다
   NOTICES.forEach(n => markRead(n.id));
@@ -1416,11 +1477,13 @@ function showPopups() {
       + '<div class="poptag">안내 말씀</div>'
       + '<div class="poptitle">' + esc(n.title) + '</div>'
       + '<div class="popbody">' + esc(n.body) + '</div>'
+      + filesHtml(n.id)
       + '<div class="popday">' + esc(n.start_on) + '</div>'
       + '<button class="popbtn">확인했습니다</button>'
       + (left ? '<div class="popmore">안내가 ' + left + '개 더 있습니다</div>' : '')
       + '</div>';
     document.body.appendChild(w);
+    bindFiles(w);
     w.querySelector('.popbtn').onclick = async () => {
       await markRead(n.id);
       w.remove();
