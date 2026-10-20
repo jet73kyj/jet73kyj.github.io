@@ -104,6 +104,14 @@
   .tc .lg { margin:8px 0 0 36px; font-size:12.5px; } .tc .lg summary { color:var(--cam); cursor:pointer; }
   .glab { font-size:12px; font-weight:700; color:var(--cam); margin:12px 0 6px; } .glab.red { color:var(--coral); }
   .kf button { padding:3px 9px; font-size:12px; } .kf button.on { background:var(--camL); border-color:var(--camB); }
+  /* 이 달 업무일지 — 늘 펼침 · 민원 처리 결과 바로 적기 (2026-10-20 은정님) */
+  .mhead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .mhead .cnt { font-size:12.5px; color:var(--dim); } .mhead .cnt b { color:#A32D2D; }
+  .mres { margin-top:6px; display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap; }
+  .mres label { font-size:12px; color:#3B5E44; font-weight:600; padding-top:7px; }
+  .mres textarea { flex:1 1 320px; min-height:46px; }
+  .mres .mm { font-size:12.5px; font-weight:600; padding-top:7px; }
+  .kf button.on.ns1 { background:#F1EFE8; border-color:#C4BDB5; } .kf button.on.ns2 { background:#FAEEDA; border-color:#E8C9A6; } .kf button.on.ns3 { background:#EAF3DE; border-color:#9FC48A; }
 </style>
 </head>
 <body>
@@ -215,12 +223,20 @@ function memoDraft(){
     return t && !el.dataset.saving && el.value.trim() !== (t.result || '');
   });
 }
+// 이 달 모아 보기에서 적고 저장 안 한 처리 결과
+function resDraft(){
+  return [...document.querySelectorAll('textarea[data-mres]')].some(el => {
+    const n = MNOTES.find(x => x.id === Number(el.dataset.mres));
+    return n && el.value.trim() !== (n.result || '');
+  });
+}
 function leaveOk(){
+  if (resDraft()) { if (!confirm('저장하지 않은 민원 처리 결과가 있습니다.\n저장하지 않고 넘어갈까요?')) return false; }
   if (memoDraft()) { if (!confirm('저장하지 않은 보완 메모가 있습니다.\n저장하지 않고 넘어갈까요?')) return false; }
   if (!noteDraft()) return true;
   return confirm('저장하지 않은 업무일지가 있습니다.\n저장하지 않고 넘어갈까요?');
 }
-window.addEventListener('beforeunload', e => { if (noteDraft() || memoDraft()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (noteDraft() || memoDraft() || resDraft()) { e.preventDefault(); e.returnValue = ''; } });
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function today(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function dlab(d){ const x = new Date(d + 'T00:00:00'); return (x.getMonth()+1) + '/' + x.getDate() + '(' + WD[x.getDay()] + ')'; }
@@ -425,13 +441,26 @@ function staffHtml(){
 function monthNotesHtml(){
   const ml = MNOTES.filter(n => (WHO === 'all' || Number(n.staff_id) === Number(WHO)) && (MKIND === 'all' || n.kind === MKIND));
   if (!ml.length) return '<span class="dim">없습니다.</span>';
-  return ml.map(n => '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
+  return ml.map(n => {
+    const comp = isComplaint(n.kind);
+    return '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
       + '<a href="#" data-goday="' + n.note_date + '" style="color:var(--cam)">' + dlab(n.note_date) + '</a> ' + (n.note_time ? hm(n.note_time) : '')
       + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + esc(kidLabel(n.child_id)) : '')
-      + (isComplaint(n.kind) && n.state ? ' <span class="bdg ' + (NSCL[n.state] || 'ns1') + '">' + esc(n.state) + '</span>' : '')
+      + (comp ? ' <span class="kf" style="display:inline-flex;margin-left:6px">' + NSTATES.map(s => '<button type="button" data-ms="' + n.id + '" data-s="' + s + '" class="' + (n.state === s ? 'on ' + (NSCL[s] || '') : '') + '">' + s + '</button>').join('') + '</span>' : '')
       + '<div class="ln">' + esc(n.content) + '</div>'
       + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
-      + (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : '') + '</div>').join('');
+      + (comp
+          ? '<div class="mres"><label>처리 결과</label><textarea data-mres="' + n.id + '" maxlength="2000" placeholder="해결 방법을 적어 주세요">' + esc(n.result || '') + '</textarea>'
+            + '<button type="button" class="pri" data-msave="' + n.id + '">저장</button><span class="mm" id="mm' + n.id + '"></span></div>'
+          : (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : ''))
+      + '</div>';
+  }).join('');
+}
+function monthHeadCnt(){
+  const ml = MNOTES.filter(n => (WHO === 'all' || Number(n.staff_id) === Number(WHO)) && isComplaint(n.kind));
+  if (!ml.length) return '';
+  const open = ml.filter(n => n.state !== '끝').length;
+  return '민원 ' + ml.length + '건' + (open ? ' · <b>처리 안 됨 ' + open + '</b>' : ' · 모두 끝');
 }
 
 function draw(){
@@ -501,13 +530,46 @@ function draw(){
      + '<span id="rmsg"></span></div>'
      + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다. 날짜 상자의 반복하는 일 칸 「✕」로도 「이 날 것만 / 반복 자체」를 골라 지울 수 있습니다.</div></details>';
   if (IS_BOSS) h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
-  h += '<details class="card fold" data-fold="mnotes"' + (FOLD.mnotes ? ' open' : '') + '><summary class="ct">이 달 업무일지 모아 보기</summary>'
-     + '<div class="kf" style="margin-bottom:8px">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</div>'
-     + '<div id="mlist">' + monthNotesHtml() + '</div></details>';
+  h += '<div class="card" id="mnCard"><div class="mhead"><span class="ct" style="margin:0">이 달 업무일지 모아 보기</span>'
+     + '<span class="kf">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</span>'
+     + '<span class="cnt" id="mcnt">' + monthHeadCnt() + '</span></div>'
+     + '<div id="mlist">' + monthNotesHtml() + '</div></div>';
   $('body').innerHTML = h;
   bind();
 }
 
+// 이 달 모아 보기 — 날짜로 가기 · 민원 상태 · 처리 결과 저장 (2026-10-20)
+function bindMonth(){
+  document.querySelectorAll('#mlist [data-goday]').forEach(el => el.onclick = e => {
+    e.preventDefault(); const d = el.dataset.goday; if (d === DAY) return; if (!leaveOk()) return; FORM = null; DAY = d; load();
+    setTimeout(() => { const c = $('dayCard'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300);
+  });
+  const setLocal = (id, row) => { [MNOTES, NOTES].forEach(L => { const x = L.find(y => y.id === id); if (x) Object.assign(x, row); }); };
+  document.querySelectorAll('button[data-ms]').forEach(b => b.onclick = async () => {
+    const id = Number(b.dataset.ms), n = MNOTES.find(x => x.id === id); if (!n || n.state === b.dataset.s || b.disabled) return;
+    b.disabled = true;
+    const { data, error } = await sb.from('nl_work_notes').update({ state: b.dataset.s }).eq('id', id).select('id, state');
+    b.disabled = false;
+    if (error || !data || !data.length) { alert('상태를 바꾸지 못했습니다.\n' + (error ? error.message : '바뀐 줄을 돌려받지 못했습니다')); return; }
+    setLocal(id, { state: data[0].state });
+    b.parentNode.querySelectorAll('button[data-ms]').forEach(x => { x.className = x.dataset.s === data[0].state ? 'on ' + (NSCL[x.dataset.s] || '') : ''; });
+    if ($('mcnt')) $('mcnt').innerHTML = monthHeadCnt();
+  });
+  document.querySelectorAll('button[data-msave]').forEach(b => b.onclick = async () => {
+    const id = Number(b.dataset.msave), n = MNOTES.find(x => x.id === id); if (!n || b.disabled) return;
+    const el = document.querySelector('textarea[data-mres="' + id + '"]'), mm = $('mm' + id);
+    const v = el.value.trim();
+    if (v === (n.result || '')) { mm.textContent = '바뀐 것이 없습니다'; mm.style.color = 'var(--dim)'; return; }
+    b.disabled = true; b.textContent = '저장 중…'; mm.textContent = '';
+    const { data, error } = await sb.from('nl_work_notes').update({ result: v || null }).eq('id', id).select('id, result');
+    b.disabled = false; b.textContent = '저장';
+    if (error || !data || !data.length) { mm.textContent = '❌ 저장하지 못했습니다'; mm.style.color = '#c62828'; alert('처리 결과를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return; }
+    setLocal(id, { result: data[0].result });
+    el.value = data[0].result || '';
+    mm.textContent = '✓ 저장했습니다'; mm.style.color = '#2e7d32';
+  });
+  document.querySelectorAll('textarea[data-mres]').forEach(el => el.oninput = () => { const mm = $('mm' + el.dataset.mres); if (mm) mm.textContent = ''; });
+}
 function bind(){
   const goDay = d => { if (d === DAY) return; if (!leaveOk()) return; FORM = null; DAY = d; load(); };
   const shift = k => { const x = new Date(DAY + 'T00:00:00'); x.setDate(x.getDate() + k); return ymd(x); };
@@ -522,11 +584,13 @@ function bind(){
   if ($('wsel')) $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } FORM = null; WHO = $('wsel').value; draw(); };
   document.querySelectorAll('details.fold').forEach(dt => dt.addEventListener('toggle', () => { FOLD[dt.dataset.fold] = dt.open; saveFold(); }));
   document.querySelectorAll('button[data-mk]').forEach(b => b.onclick = () => {
+    if (resDraft() && !confirm('저장하지 않은 민원 처리 결과가 있습니다.\n저장하지 않고 넘어갈까요?')) return;
     MKIND = b.dataset.mk;
     document.querySelectorAll('button[data-mk]').forEach(x => x.classList.toggle('on', x.dataset.mk === MKIND));
     $('mlist').innerHTML = monthNotesHtml();
-    document.querySelectorAll('#mlist [data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday); });
+    bindMonth();
   });
+  bindMonth();
   if ($('remake')) $('remake').onclick = async () => {
     if (!leaveOk()) return;
     const { data, error } = await sb.rpc('nl_make_tasks', { p_date: DAY });
