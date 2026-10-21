@@ -2122,12 +2122,17 @@ function drawKid(c) {
       // 저장된 회기 표시는 줄 순서로 맞춘다. 저장한 뒤 줄 수가 바뀌었으면(요일 변경 등) 쓰지 않는다 (2026-10-03 · 34번 10월)
       if (savedCnt && savedCnt.length !== g.items.length) savedCnt = null;
       // 적용단가 — 이번 달 저장분이 없으면 지난달 것을 이어받는다
-      const apList = unitsOf(sv[g.support_type_id]) || unitsOf(lastM[g.support_type_id]);
+      //   요일줄 번호로 짝지은 표시 [요일줄단가11:54000] 가 있으면 그것을 쓴다 (2026-10-21 · 49번)
+      //   옛 표시 [적용단가a,b,c] 는 줄 차례라, 수업을 고쳐 차례가 바뀌면 단가가 다른 줄로 옮겨 갔다
+      const apSrc  = [sv[g.support_type_id], lastM[g.support_type_id]].find(p => unitMapOf(p) || unitsOf(p));
+      const apMap  = unitMapOf(apSrc);
+      const apList = apMap ? null : unitsOf(apSrc);
       g.items.forEach((it, i) => {
         const cnt = (savedCnt && savedCnt[i] != null && !isNaN(savedCnt[i]))
                     ? savedCnt[i] : it.count;
         // 그룹 수업은 그룹 1회 금액 그대로 — 지난달 1:1 줄의 적용단가를 줄 차례로 이어받지 않는다 (2026-10-09)
-        const ap = (!it.group && apList && apList[i] > 0) ? apList[i] : '';
+        const apv = apMap ? (apMap[it.sched_id] || 0) : (apList ? (apList[i] || 0) : 0);
+        const ap = (!it.group && apv > 0) ? apv : '';
         b += '<div class="r line' + (ap ? ' hasap' : '') + '" data-st="' + g.support_type_id + '"'
           + ' data-sched="' + (it.sched_id || '') + '"'
           + ' data-th="' + (it.therapist_id || '') + '" data-dur="' + (it.dur || 40) + '"'
@@ -2377,6 +2382,7 @@ function memoOf(p, isBank) {
   }
   m = m.replace(/\s*\[회기[0-9,]+\]/g, '')
        .replace(/\s*\[적용단가[0-9,]+\]/g, '')
+       .replace(/\s*\[요일줄단가[0-9:,]+\]/g, '')
        .replace(/\s*\[발추치료사\d+\]/g, '')
        .replace(/\s*\[발추방식[123]\]/g, '')
        .replace(/\s*\[본인부담\d+\]/g, '')
@@ -2468,6 +2474,17 @@ function refundOf(p) {
 function selfOvOf(p) {
   const m = String((p && p.memo) || '').match(/\[본인부담(\d+)\]/);
   return m ? Number(m[1]) : 0;
+}
+// 저장된 메모에서 요일줄마다 적용단가를 꺼낸다  [요일줄단가11:54000,240:50000] → {11:54000, 240:50000}
+function unitMapOf(p) {
+  const m = String((p && p.memo) || '').match(/\[요일줄단가([0-9:,]+)\]/);
+  if (!m) return null;
+  const o = {};
+  m[1].split(',').forEach(x => {
+    const kv = x.split(':');
+    if (kv.length === 2 && kv[0] && Number(kv[1]) > 0) o[kv[0]] = parseInt(kv[1], 10);
+  });
+  return Object.keys(o).length ? o : null;
 }
 // 저장된 메모에서 적용단가 목록을 꺼낸다  [적용단가54000,0,0]
 function unitsOf(p) {
@@ -2972,7 +2989,7 @@ async function saveKid(childId, btn, only) {
     // 승인번호 칸에 이미 붙어 있는 표시는 지우고 새로 붙인다
     // (안 그러면 저장할 때마다 [리뷰4]가 계속 쌓인다)
     let memo2 = String(memo)
-      .replace(/\s*\[(리뷰|회기|적용단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불)[^\]]*\]/g, '')
+      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불)[^\]]*\]/g, '')
       .trim();
     {
       const rv0 = box.querySelector('.rv');
@@ -3001,14 +3018,18 @@ async function saveKid(childId, btn, only) {
       const es = box.querySelector('.evsel');
       if (es && es.value) memo2 += ' [평가유형' + es.value + ']';
     } else {
-      const cs = [], us = [];
+      const cs = [], us = [], uk = [];
       box.querySelectorAll('.line[data-st="' + p.st + '"]').forEach(tr => {
         cs.push(numOf(tr.querySelector('.cnt').value));
         const a = tr.querySelector('.apu');
-        us.push(a ? numOf(a.value) : 0);
+        const v = a ? numOf(a.value) : 0;
+        us.push(v);
+        if (v > 0 && tr.dataset.sched) uk.push(tr.dataset.sched + ':' + v);
       });
       if (cs.length) memo2 += ' [회기' + cs.join(',') + ']';
       if (us.some(x => x > 0)) memo2 += ' [적용단가' + us.join(',') + ']';
+      // 요일줄 번호와 짝지어 함께 적는다 — 줄 차례가 바뀌어도 단가가 옮겨 가지 않게 (2026-10-21)
+      if (uk.length) memo2 += ' [요일줄단가' + uk.join(',') + ']';
     }
     const coEl = box.querySelector('.corow[data-st="' + p.st + '"] .co');
     return {
