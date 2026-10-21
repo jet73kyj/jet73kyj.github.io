@@ -2425,7 +2425,8 @@ async function loadPay() {
   const SAVEDK = {};
   (cur || []).forEach(r => { if (Number(r.amount) > 0) SAVEDK[r.child_id] = true; });
   const mmP = (+CURMK.slice(5, 7)) + '월';
-  const pendHtml = KIDS.filter(k => !SAVEDK[k.id]).map(k =>
+  let pendHtml = '';   // 그 달 회기가 있는 자녀만 — 아래 회기를 읽은 뒤 채움
+  const pendOf = (hasSes) => KIDS.filter(k => !SAVEDK[k.id] && hasSes[k.id]).map(k =>
     '<div class="needlock">' + (KIDS.length > 1 ? esc(k.name) + ' 아동 · ' : '')
     + (FIXK[k.id]
         ? esc(mmP) + '에 내실 교육비가 없습니다.'
@@ -2452,6 +2453,12 @@ async function loadPay() {
     .in('child_id', ids).eq('month_key', CURMK);
   // 「보강 없음」으로 뺀 날은 교육비 회수에서도 뺀다 (2026-09-09)
   if (ses) ses = ses.filter(r => !r.no_makeup);
+  // 저장 전 「정리 중」 안내는 그 달 수업(취소 뺌)이 있는 자녀에게만 (2026-10-21)
+  {
+    const HS = {};
+    (ses || []).forEach(r => { if (r.status !== '취소') HS[r.child_id] = true; });
+    pendHtml = pendOf(HS);
+  }
 
   // 치료 종류 이름
   const tids2 = [...new Set((ses || []).map(r => r.therapy_id).filter(Boolean))];
