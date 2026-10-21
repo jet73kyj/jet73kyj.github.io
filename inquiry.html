@@ -577,7 +577,7 @@
       </div>
       <div>
         <label for="e_time">평가 시간</label>
-        <input id="e_time" type="time" style="min-width:150px;">
+        <select id="e_time" style="min-width:150px;"></select>
       </div>
       <div>
         <label for="e_type">평가 종류</label>
@@ -932,6 +932,24 @@ function show(text, ok) {
 function showBox(id, text, ok) {
   $(id).textContent = text;
   $(id).className = 'out ' + (ok ? 'ok' : 'err');
+}
+// ===== 평가 시간 고르는 칸 (2026-10-21) =====
+//   오전 9:00 ~ 오후 7:40 · 10분 단위 · 밤 · 새벽 시각은 없음
+//   10분 단위가 아닌 옛 시각은 목록에 그대로 더해 보인다
+function evH12(v) {
+  const p = String(v || '').split(':'); const h = Number(p[0]), m = p[1] || '00';
+  if (isNaN(h)) return v;
+  return (h < 12 ? '오전 ' : '오후 ') + (h % 12 === 0 ? 12 : h % 12) + ':' + m;
+}
+function evTimeOpts(cur) {
+  cur = cur ? String(cur).slice(0, 5) : '';
+  const opts = [];
+  for (let n = 9 * 60; n <= 19 * 60 + 40; n += 10)
+    opts.push(String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'));
+  if (cur && opts.indexOf(cur) < 0) { opts.push(cur); opts.sort(); }
+  return '<option value="">— 시간 —</option>' + opts.map(function (v) {
+    return '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + evH12(v) + '</option>';
+  }).join('');
 }
 function esc(s) {
   return String(s == null ? '' : s)
@@ -2153,8 +2171,8 @@ function dvAddRow(e) {
     +   '<input class="dv_date" type="date" style="width:140px;" value="'
     +   esc(e && e.eval_date || '') + '"></div>'
     + '<div><label style="font-size:12px;">시간</label>'
-    +   '<input class="dv_time" type="time" style="width:150px;padding:8px 10px;" value="'
-    +   esc(e && e.eval_time ? String(e.eval_time).slice(0,5) : '') + '"></div>'
+    +   '<select class="dv_time" style="width:150px;">'
+    +   evTimeOpts(e && e.eval_time) + '</select></div>'
     + '<div><label style="font-size:12px;">평가 종류</label>'
     +   '<select class="dv_type" style="width:130px;">' + typeOpt + '</select></div>'
     + '<div><label style="font-size:12px;">개수</label>'
@@ -2291,7 +2309,7 @@ function nvAddRow() {
     + '<div><label style="font-size:12px;">평가 날짜</label>'
     +   '<input class="nv_date" type="date" style="width:140px;"></div>'
     + '<div><label style="font-size:12px;">시간</label>'
-    +   '<input class="nv_time" type="time" style="width:150px;padding:8px 10px;"></div>'
+    +   '<select class="nv_time" style="width:150px;">' + evTimeOpts('') + '</select></div>'
     + '<div><label style="font-size:12px;">평가 종류</label>'
     +   '<select class="nv_type" style="width:130px;">' + typeOpt + '</select></div>'
     + '<div><label style="font-size:12px;">개수</label>'
@@ -2330,6 +2348,7 @@ function autoFee() {
   $('e_fee').value = feeOf($('e_type').value, $('e_cnt').value);
 }
 $('e_type').addEventListener('change', autoFee);
+$('e_time').innerHTML = evTimeOpts('');
 $('e_cnt').addEventListener('change', autoFee);
 
 // 평가 목록 그리기
@@ -2393,7 +2412,7 @@ function loadEval(id) {
   if (!e) return;
   evEditId = id;
   $('e_date').value   = e.eval_date || '';
-  $('e_time').value   = e.eval_time ? String(e.eval_time).slice(0,5) : '';
+  $('e_time').innerHTML = evTimeOpts(e.eval_time);
   $('e_type').value   = e.eval_type_id || '';
   setCntOpts($('e_cnt'), e.eval_type_id,
              evKey(e));
@@ -2410,7 +2429,7 @@ function loadEval(id) {
 function clearEvalForm() {
   evEditId = null;
   $('e_date').value = today();
-  $('e_time').value = '';
+  $('e_time').innerHTML = evTimeOpts('');
   setCntOpts($('e_cnt'), $('e_type').value, '1');
   $('e_status').value = '예정';
   $('e_paid').value = '';
