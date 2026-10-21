@@ -349,7 +349,10 @@ function reqTag(st) {
 }
 function drawPair(rs) {
   rs = pairItems(rs);
-  const wait = rs.some(r => r.state === '신청');
+  // 「보강신청」(결석은 확정 · 보강 자리만 요청)도 묶음으로 확정 · 반려 (2026-10-21)
+  const isW = st => st === '신청' || st === '보강신청';
+  const mkPair = rs.some(r => r.state === '보강신청') && !rs.some(r => r.state === '신청');
+  const wait = rs.some(r => isW(r.state));
   const states = [...new Set(rs.map(r => r.state))];
   let h = '<div class="rq' + (wait ? ' wait' : '') + '">'
     + '<div class="rqhead"><span class="rqkid">' + esc(kidName(rs[0].child_id)) + '</span>'
@@ -368,7 +371,7 @@ function drawPair(rs) {
           : '<span class="none2">아직 안 정함</span>')
       + '</div>'
       // 선생님 확정 표시 — 두 선생님이 각자 누르고 서로 본다 (2026-10-16)
-      + (r.state === '신청'
+      + (isW(r.state)
           ? '<div class="rqline" style="font-size:13px;">선생님 확정 · '
             + (r.th_ok_at
                 ? '<b style="color:#2c7a3f;">✓ ' + esc(THRS[r.th_ok_by] || '') + ' 선생님 '
@@ -378,7 +381,7 @@ function drawPair(rs) {
           : '');
   });
   h += '<div class="why">' + esc(rs[0].reason || '') + '</div>';
-  const w1 = rs.find(r => r.state === '신청');
+  const w1 = rs.find(r => isW(r.state));
   const u1 = rs.every(r => canUndo(r)) ? rs[0] : null;
   if (u1) {
     h += undoBtn(u1, true);
@@ -386,17 +389,17 @@ function drawPair(rs) {
     if (TEACHER && ME) {
       // 선생님 — 내 줄만 확정 · 둘 다 확정되면 서버가 묶음을 확정한다 (nl_abs_pair_ok)
       const mineRow = r => Number((SESS[r.session_id] || {}).therapist_id) === Number(ME.id) || Number(r.makeup_therapist_id) === Number(ME.id);
-      const myWait = rs.filter(r => r.state === '신청' && mineRow(r) && !r.th_ok_at);
+      const myWait = rs.filter(r => isW(r.state) && mineRow(r) && !r.th_ok_at);
       h += '<div class="rqbtns">'
         + (myWait.length
             ? '<button data-ok="' + myWait[0].id + '">내 보강 확정</button>'
             : '<span style="font-size:13px;color:#2c7a3f;align-self:center;">내 확정 끝 · 다른 선생님 확정을 기다립니다</span>')
-        + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
+        + '<button class="btn-no" data-no="' + w1.id + '">' + (mkPair ? '두 건 함께 보강 반려' : '두 건 함께 반려') + '</button>'
         + '</div>';
     } else {
       h += '<div class="rqbtns">'
-        + '<button data-ok="' + w1.id + '">두 건 함께 확정</button>'
-        + '<button class="btn-no" data-no="' + w1.id + '">두 건 함께 반려</button>'
+        + '<button data-ok="' + w1.id + '">' + (mkPair ? '두 건 함께 보강 확정' : '두 건 함께 확정') + '</button>'
+        + '<button class="btn-no" data-no="' + w1.id + '">' + (mkPair ? '두 건 함께 보강 반려' : '두 건 함께 반려') + '</button>'
         + '</div>';
     }
   } else {
@@ -458,12 +461,12 @@ async function doConfirm(id) {
   let m = kidName(r.child_id) + '\n\n';
   if (r.pair_key) {
     // 두 수업 묶음 — 둘 다 보여 주고 함께 확정 (2026-09-22)
-    const rs = pairItems(REQS.filter(x => x.pair_key === r.pair_key && x.state === '신청'));
+    const rs = pairItems(REQS.filter(x => x.pair_key === r.pair_key && (x.state === '신청' || x.state === '보강신청')));
     m += '두 수업 묶음 · 둘 다 되거나 둘 다 안 됩니다\n'
        + (TEACHER ? '선생님 두 분이 모두 확정하시면 보강이 잡히고 학부모께 알림이 갑니다\n\n' : '\n');
     rs.forEach(x => {
       const sx = SESS[x.session_id] || {};
-      m += '결석 · ' + dm(sx.plan_date) + ' ' + hm(sx.start_time)
+      m += '결석 · ' + dm(sx.plan_date) + ' ' + hm(sx.start_time) + (x.state === '보강신청' ? ' (확정됨)' : '')
          + '  →  보강 · ' + (x.makeup_date ? dm(x.makeup_date) + ' ' + hm(x.makeup_time) : '아직 안 정함') + '\n';
     });
     m += '\n시간표에 반영할까요?';
@@ -500,7 +503,7 @@ async function doConfirm(id) {
     await loadAll();
   } catch (e) {
     show($('msg2'), '❌ 확정하지 못했습니다.\n' + (e.message || e), false);
-    if (btn) { btn.disabled = false; btn.textContent = r.pair_key ? (TEACHER ? '내 보강 확정' : '두 건 함께 확정') : '확정하기'; }
+    if (btn) { btn.disabled = false; btn.textContent = r.pair_key ? (TEACHER ? '내 보강 확정' : (r.state === '보강신청' ? '두 건 함께 보강 확정' : '두 건 함께 확정')) : '확정하기'; }
   }
 }
 
@@ -553,13 +556,15 @@ setInterval(() => { try { if (REQS.some(canUndo) || document.querySelector('butt
 // ── 반려 ───────────────────────────────────────────
 async function doReject(id) {
   const rr = REQS.find(x => x.id === id) || {};
-  if (rr.state === '보강신청') return doRejectMk(rr);
+  if (rr.state === '보강신청' && !rr.pair_key) return doRejectMk(rr);
   const pk = rr.pair_key || null;   // 두 수업 묶음이면 함께 반려 (2026-09-22)
+  const mkp = rr.state === '보강신청';   // 묶음 보강 반려 — 결석은 그대로 · 보강 칸만 비움 (2026-10-21)
   const sx0 = SESS[rr.session_id] || {};
-  const why = await sure({ title: (pk ? '두 수업 묶음을 함께 ' : '이 요청을 ') + '반려할까요?', ok: '반려', danger: true,
+  const why = await sure({ title: (pk ? '두 수업 묶음을 함께 ' : '이 요청을 ') + (mkp ? '보강 반려할까요?' : '반려할까요?'), ok: '반려', danger: true,
     body: kidName(rr.child_id) + '\n결석 · ' + dm(sx0.plan_date) + ' ' + hm(sx0.start_time)
         + (rr.makeup_date ? '\n보강 · ' + dm(rr.makeup_date) + ' ' + hm(rr.makeup_time) : '')
-        + '\n\n학부모께는 따로 연락해 주셔야 합니다.',
+        + (mkp ? '\n\n결석은 그대로 남고, 보강 자리만 비웁니다.\n학부모가 다른 시간으로 다시 요청하실 수 있습니다.'
+               : '\n\n학부모께는 따로 연락해 주셔야 합니다.'),
     ask: '반려 까닭 (비워도 됩니다)' });
   if (why === null) return;
   const btn = document.querySelector('button[data-no="' + id + '"]');
@@ -594,7 +599,7 @@ async function doReject(id) {
     await loadAll();
   } catch (e) {
     show($('msg2'), '❌ 반려하지 못했습니다.\n' + (e.message || e), false);
-    if (btn) { btn.disabled = false; btn.textContent = pk ? '두 건 함께 반려' : '반려'; }
+    if (btn) { btn.disabled = false; btn.textContent = pk ? (mkp ? '두 건 함께 보강 반려' : '두 건 함께 반려') : '반려'; }
   }
 }
 
