@@ -1146,8 +1146,32 @@ document.addEventListener('click', e => {
   an.dispatchEvent(new Event('input', { bubbles: true }));
   _apprWarn();
 });
+// 소급결제 · 일괄결제 회차 — 특이사항에 사유를 적게 안내 (2026-10-22 은정님 · 사업안내 196쪽)
+//   일괄결제 = 지난 수업 몫을 「소급결제」를 누르지 않고 연달아 결제한 것 (바우처 시스템 표기)
+//   특이사항을 적으면 사라짐
+function _sogWarn() {
+  const md = iso => Number(String(iso).slice(5, 7)) + '/' + Number(String(iso).slice(8, 10));
+  document.querySelectorAll('#statusTbl tbody tr').forEach(tr => {
+    const w = tr.querySelector('.sogWarn'); if (!w) return;
+    const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
+    const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
+    const v = no ? (VOUCHER || []).find(x => String(x.appr_no || '').trim() === no) : null;
+    const kind = v ? String(v.pay_kind || '') : '';
+    if (!v || note || !/소급|일괄/.test(kind)) { w.style.display = 'none'; w.innerHTML = ''; return; }
+    const m = String(v.paid_at || '').match(/[T ](\d{2}:\d{2})/);
+    const when = (v.service_date ? md(v.service_date) : '') + (m ? ' ' + m[1] : '');
+    w.innerHTML = '⚠ 이 결제(' + esc(when) + ' · ' + esc(kind) + ')는 지난 수업 몫을 결제한 것인가요 (소급결제)?<br>'
+      + '맞으면 특이사항에 사유를 꼭 적어 주세요 (예: 카드 미소지로 9/2 수업을 9/3 결제)'
+      + (/일괄/.test(kind) ? '<br>· 앞으로는 단말기에서 「소급결제」를 누르고 결제해 주세요' : '');
+    w.style.display = 'block';
+  });
+}
+document.addEventListener('input', e => {
+  if (e.target && e.target.classList && (e.target.classList.contains('st_note') || e.target.classList.contains('st_apprNo'))) { try { _sogWarn(); } catch (er) {} }
+});
 function _markManual() {
-  try { _apprWarn(); } catch (e) {}   // 승인번호 빈 회차 빨간 글 (2026-10-22)
+  try { _apprWarn(); } catch (e) {}
+  try { _sogWarn(); } catch (e) {}   // 소급 · 일괄결제 특이사항 안내 (2026-10-22)   // 승인번호 빈 회차 빨간 글 (2026-10-22)
   const trs = document.querySelectorAll('#statusTbl tbody tr');
   // 같은 날짜의 시간표 값과 견준다 (2026-10-13 — 결제일로 고친 회차 하나 때문에 뒤 칸이 한 칸씩 밀려 모두 노랑이 되던 것)
   //   그 칸 날짜가 시간표 회기 중 아직 짝이 없는 날이면 그 회기와, 없으면 그 차례의 시간표 값과 견줌
@@ -3227,6 +3251,7 @@ function buildStatusRows(existing) {
         <textarea class="st_result" style="min-height:100px;">${r.result||''}</textarea>
         <div style="font-size:10px;color:#666;margin-top:6px;">특이사항 :</div>
         <textarea class="st_note" style="min-height:40px;">${r.note||''}</textarea>
+        <div class="sogWarn no-print" style="display:none;color:#B5651D;font-size:10.5px;line-height:1.45;margin-top:3px;"></div>
       </td>`;
     // 저장해 둔 「이용자 상태」를 다시 켜 준다
     //   (이것이 없어서 저장은 됐는데 다시 열면 안 보였다)
