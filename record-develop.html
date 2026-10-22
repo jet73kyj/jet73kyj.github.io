@@ -1362,6 +1362,7 @@ document.addEventListener('click', e => {
 //   같은 달 안 수업일 ≠ 결제일 → 특이사항에 구체적 사유 + [소급결제] 단추
 //   누른 표시는 「제공일|결제일」 — 날짜가 바뀌거나 특이사항을 비우면 풀림
 //   결제가 다른 달이면 소급결제가 안 됨 (그 달 안에서만) → 사실 확인서
+const SOG_FROM = '2026-09';   // [소급결제]는 9월 기록지부터 (8월은 특이사항만 · 2026-10-23 은정님)
 function _sogKey(tr) {
   const prov = _provIso((tr.querySelector('.st_provDate') || {}).value);
   const am = String((tr.querySelector('.st_apprDate') || {}).value || '').match(/(\d{4})\D(\d{2})\D(\d{2})/);
@@ -1381,7 +1382,7 @@ function _sogWarn() {
     const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
     const k = _sogKey(tr);
     if (/^(예외|포기$)/.test(no)) { w.style.display = 'none'; w.innerHTML = ''; return; }
-    if (k.prov && k.appr && k.prov !== k.appr) {
+    if (k.prov && k.appr && k.prov !== k.appr && mkNow() >= SOG_FROM) {
       if (k.prov.slice(0, 7) !== k.appr.slice(0, 7)) {
         w.innerHTML = '결제(' + md(k.appr) + ')가 수업(' + md(k.prov) + ')과 다른 달 — 소급결제는 그 달 안에서만 됩니다. 위 「사실 확인서」를 작성해 주세요.';
         w.className = 'sogWarn no-print sbad'; w.style.display = 'block'; return;
@@ -2591,7 +2592,7 @@ function rcLocal() {
     }
     // 18 제공일자 ≠ 승인일자 (특이사항이 비었을 때)
     const isEx = /^예외/.test(String(tr.querySelector('.st_apprNo').value || '').trim());   // 예외결제는 결제일이 다름 (2026-10-22)
-    if (prov && appr && prov !== appr && !_sogOk(tr) && !isEx) {   // 특이사항 + [소급결제]까지 (2026-10-23 은정님)
+    if (prov && appr && prov !== appr && !(mkNow() < SOG_FROM ? note : _sogOk(tr)) && !isEx) {   // 특이사항 + [소급결제]까지 (2026-10-23 은정님)
       out.push({ item_no: 18, i, f: ['prov','appr'], on_date: prov,
         msg: '결제일 ' + md(appr) + ' · 제공일자 ' + md(prov) + ' — 수정 필요', detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
         + ' · 승인일자 ' + mmdd(appr) });
