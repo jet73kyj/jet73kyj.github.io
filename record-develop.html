@@ -148,6 +148,8 @@
   .loginbox #btn { background:#B07A4A !important; }
   .ok { background:#F8F1E8; color:#7E5530; }
   /* ===== 꾸밈 B 끝 ===== */
+.apprWarn button { width:auto !important; margin:3px 4px 0 0 !important; padding:2px 8px !important; font-size:11px !important;
+  background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px !important; cursor:pointer; }
 </style>
 <style>
 /* ===== 변경 계약서 [서식 10호] (2026-10-09) ===== */
@@ -1096,7 +1098,25 @@ function fillFromSlots() {
 }
 // 시간표 값과 다른 칸은 노랑 (2026-10-06)
 let AUTO1 = [];
+// 승인번호 빈 회차 — 제공일자가 있는데 승인번호가 비면 빨간 글 · 예외지급 · 포기 단추 (2026-10-22 은정님)
+function _apprWarn() {
+  document.querySelectorAll('#statusTbl tbody tr').forEach((tr, i) => {
+    const w = tr.querySelector('.apprWarn'); if (!w) return;
+    const x = rcRowInfo(i);
+    w.style.display = (x && x.prov && !x.no) ? 'block' : 'none';
+  });
+}
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('.apprPick');
+  if (!b) return;
+  const an = b.closest('td').querySelector('.st_apprNo');
+  if (!an || an.readOnly) return;
+  an.value = b.dataset.v;
+  an.dispatchEvent(new Event('input', { bubbles: true }));
+  _apprWarn();
+});
 function _markManual() {
+  try { _apprWarn(); } catch (e) {}   // 승인번호 빈 회차 빨간 글 (2026-10-22)
   const trs = document.querySelectorAll('#statusTbl tbody tr');
   // 같은 날짜의 시간표 값과 견준다 (2026-10-13 — 결제일로 고친 회차 하나 때문에 뒤 칸이 한 칸씩 밀려 모두 노랑이 되던 것)
   //   그 칸 날짜가 시간표 회기 중 아직 짝이 없는 날이면 그 회기와, 없으면 그 차례의 시간표 값과 견줌
@@ -2515,7 +2535,7 @@ function rcRuleLocal() {
     if (x.prov && x.prov.slice(0, 7) !== mk)
       out.push({ item_no: 23, i, f: ['prov'], on_date: x.prov,
         msg: '제공일자(' + Number(x.prov.slice(5, 7)) + '/' + Number(x.prov.slice(8, 10)) + ')가 ' + month + '월이 아닙니다 — 제공일자는 그 달만 됩니다' });
-    if (x.no) (seen[x.no] = seen[x.no] || []).push(i);
+    if (x.no && !/^(예외지급|포기)$/.test(x.no)) (seen[x.no] = seen[x.no] || []).push(i);   // 예외지급 · 포기는 여러 회차 가능 (2026-10-22)
   }
   Object.keys(seen).forEach(no => {
     const ks = seen[no];
@@ -3128,6 +3148,7 @@ function buildStatusRows(existing) {
         <input type="text" class="st_apprDate" value="${r.apprDate||''}">
         <div style="font-size:10px;color:#666;margin-top:4px;">승인번호</div>
         <input type="text" class="st_apprNo" value="${r.apprNo||''}">
+        <div class="apprWarn no-print" style="display:none;color:#c0392b;font-size:10px;line-height:1.4;margin-top:3px;">승인번호가 없습니다.<br>예외지급 · 포기이면 눌러 주세요<br><button type="button" class="apprPick" data-v="예외지급">예외지급</button><button type="button" class="apprPick" data-v="포기">포기</button></div>
       </td>
       <td>
         <div style="font-size:10px;margin-bottom:3px;">- 계절에 맞는 옷 (
