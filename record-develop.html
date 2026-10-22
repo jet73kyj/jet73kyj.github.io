@@ -715,6 +715,8 @@ async function buildChildList() {
       seen[c.id] = true;
       CHILDREN.push(c);
     });
+    // 그 달 발달재활 회기(보강 포함)를 맡은 선생님에게도 보이게 (2026-10-22 · 66번 9/29 — 담당이 바뀌기 전 달 보강)
+    if (!allView) await addMySessKids(mv, seen);
     CHILDREN.sort((a,b) => (a.name||'').localeCompare(b.name||''));
     return;
   } catch (e) { /* 서버를 못 부르면 아래 옛 셈으로 */ }
@@ -731,7 +733,23 @@ async function buildChildList() {
     seen[c.id] = true;
     CHILDREN.push(c);
   });
+  if (!allView) await addMySessKids(mv, seen);
   CHILDREN.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+// 그 달 몫 발달재활 회기를 내가 맡은 아동 (요일줄 담당이 아니어도 — 보강을 맡은 선생님)
+async function addMySessKids(mv, seen) {
+  try {
+    const { data, error } = await sb.from('nl_sessions').select('child_id')
+      .eq('therapist_id', ME.id).eq('support_type_id', 2).eq('month_key', mv)
+      .neq('status', '취소').range(0, 999);
+    if (error) return;
+    (data || []).forEach(r => {
+      const c = KIDS[r.child_id];
+      if (!c || seen[c.id]) return;
+      seen[c.id] = true;
+      CHILDREN.push(c);
+    });
+  } catch (e) {}
 }
 
 function drawChildSelect() {
