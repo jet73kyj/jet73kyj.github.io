@@ -93,6 +93,13 @@
   .rc button { padding:4px 10px; font-size:12px; }
   .rc button.saved { background:#EAF4EC; border-color:#9CC7A6; color:#2E6B3E; }
   .rcview { font-size:12px; color:var(--tx); }
+  .rcst { font-size:12px; color:var(--tx); margin:0 0 4px; flex-basis:100%; }
+  .rcst.dim { color:var(--dim); }
+  .rcst.wait { color:#B4580E; font-weight:700; background:#FFF1E2; border-radius:5px; padding:2px 6px; display:inline-block; }
+  .rcmemo { font-size:12px; color:#6D4C41; background:#FFF8E1; padding:3px 7px; border-radius:5px; margin-top:4px; }
+  .rc input.rcMemo { width:100%; }
+  .rcMsg { font-size:11px; color:var(--dim); }
+  .rcMsg.good { color:#2E6B3E; } .rcMsg.bad { color:var(--coralT); }
   .okline { margin:0 0 4px; }
   .okline button { padding:4px 14px; font-size:12px; border-radius:6px; cursor:pointer; }
   .okline .rcOk { background:#fff; color:#2E6B3E; border:1px solid #9CC7A6; font-weight:700; }
@@ -265,8 +272,9 @@ function isDone(r){
   if (r.item_no === 9) return true;
   if (r.item_no === 25) return false;   // 센터가 장을 정리하면 사라짐 (2026-10-22)
   if (isChecked(r)) return true;        // 원장 [확인] — 확인한 내용과 같을 때만 (2026-10-22)
-  if (devDone(r)) return true;
+  // 선생님 「작성 끝 · 서명 받음」은 제출 대기 — 원장 · 행정이 종이를 보고 [확인]해야 끝 (2026-10-22 은정님)
   if (isList(r)) return false;
+  // 아래는 옛 처리(사례 고르기)로 끝낸 줄 — 다시 나타나지 않게 그대로 둠
   const x = RES[rkey(r)];
   if (!x || !x.case_id) return false;
   const c = CASES.find(c => c.id === x.case_id);
@@ -364,28 +372,32 @@ function caseOpts(sel){
   return h + (g ? '</optgroup>' : '');
 }
 
+// 처리 결과 칸 (2026-10-22 은정님) — 사례 고르기 · 서류 받음 · 저장 단추 없앰
+//   [확인] + 메모(칸을 벗어나면 저절로 저장) · 메모는 선생님 화면에도 보임
+//   선생님이 기록지에서 사실 확인서 「작성 끝」 · 변경 계약서 「서명 받음」 → 주황 「제출 대기」
+function rcState(r){
+  const x = RES[rkey(r)] || {};
+  const dd = devDone(r);
+  if (dd && !isChecked(r))
+    return '<div class="rcst wait">제출 대기 · ' + (dd.type === '변경계약' ? '변경 계약서 서명 받음' : '사실 확인서 작성 끝')
+         + (dd.done_on ? ' ' + esc(String(dd.done_on).slice(5, 10).replace('-', '/')) : '') + '</div>';
+  if (r.item_no === 25) return '<div class="rcst dim">센터가 장을 정리하면 사라짐</div>';
+  if (isList(r)) return '<div class="rcst dim">선생님이 고치면 사라짐</div>';
+  if (x.case_id && !x.checked_at) {   // 옛 처리 기록
+    const c = CASES.find(c => c.id === x.case_id);
+    if (c) return '<div class="rcst">' + esc(c.name) + (x.doc_done ? ' · 서류 받음' : '') + '</div>';
+  }
+  return '';
+}
 function rcCell(r, i){
   const x = RES[rkey(r)] || {};
   if (r.item_no === 9) return '<span class="rcview">참고</span>';
-  const dd = devDone(r);
-  if (dd) return '<span class="rcview" style="color:#2E6B3E;">' + (dd.type === '변경계약' ? '변경 계약서 서명 받음' : '사실 확인서 작성 끝')
-                + (dd.done_on ? ' · ' + esc(String(dd.done_on).slice(5, 10).replace('-', '/')) : '') + '</span>';
-  if (r.item_no === 25) return '<span class="rcview" style="color:var(--dim);">센터가 장을 정리하면 사라짐</span>';
-  if (isList(r)) return '<span class="rcview" style="color:var(--dim);">선생님이 고치면 사라짐</span>' + okHtml(r, i);
-  if (!isAdmin()) {
-    const c = CASES.find(c => c.id === x.case_id);
-    return '<span class="rcview">' + (c ? esc(c.name) + (x.doc_done ? ' · 서류 받음' : '') : '')
-         + (x.memo ? ' · ' + esc(x.memo) : '') + '</span>' + okHtml(r, i);
-  }
-  // 서류 받음은 [확인] 옆 (2026-10-22 은정님) — 저장은 그대로 아래 「저장」이 함께 한다
-  const doc = '<label><input type="checkbox" class="rcDoc"' + (x.doc_done ? ' checked' : '') + '> 서류 받음</label>';
-  const ok = okHtml(r, i);
-  return '<div class="rc" data-i="' + i + '">'
-    + (ok ? ok.replace(/<\/div>$/, ' ' + doc + '</div>') : '<div class="okline">' + doc + '</div>')
-    + '<select class="rcCase">' + caseOpts(x.case_id) + '</select>'
-    + '<input type="text" class="rcMemo" maxlength="300" placeholder="메모" value="' + esc(x.memo || '') + '">'
-    + '<button class="rcSave' + (x.case_id || x.memo ? ' saved' : '') + '">' + (x.case_id || x.memo ? '✓ 저장됨' : '저장') + '</button>'
-    + '</div>';
+  const st = rcState(r), ok = okHtml(r, i);
+  if (!isAdmin())
+    return st + ok + (x.memo ? '<div class="rcmemo">메모 · ' + esc(x.memo) + '</div>' : '');
+  return '<div class="rc" data-i="' + i + '">' + st + ok
+    + '<input type="text" class="rcMemo" maxlength="300" placeholder="메모 (선생님께도 보임)" value="' + esc(x.memo || '') + '">'
+    + '<span class="rcMsg"></span></div>';
 }
 
 function draw(){
@@ -508,8 +520,8 @@ function draw(){
   }
 
   h += '<div class="legend">발달재활 — 결제 시각은 바우처 「결제일시」, 수업 시작은 시간표 회기 시각입니다. '
-     + '사례를 고르고 저장하면 「남은 것」에서 빠집니다. 발달 기록지에서 변경 계약서(10호)를 「서명 받음」, 사실 확인서(27호)를 「작성 끝」으로 하면 저절로 처리 끝이 됩니다. 사유서 · 변경계약서는 「서류 받음」까지, '
-     + '특이사항 기재 사례는 기록지 그 회차 특이사항이 적혀 있어야 끝납니다. '
+     + '선생님이 발달 기록지에서 사실 확인서(27호)를 「작성 끝」, 변경 계약서(10호)를 「서명 받음」으로 하면 「제출 대기」가 됩니다. '
+     + '종이 서류를 보고 [확인]을 누르면 「남은 것」에서 빠집니다. 메모는 칸을 벗어나면 저장되고 선생님 화면에도 보입니다. '
      + '기록지 점검(10~14 · 18)과 치료지원(31~34) · 미작성(41)은 목록만 — 선생님이 기록지를 고치면 저절로 사라집니다. '
      + '미작성은 치료지원 한 달 세 회, 발달재활 · 센터는 수업한 회수만큼이며 기한은 다음 달 15일입니다.</div>';
   $('body').innerHTML = h;
@@ -552,13 +564,9 @@ function draw(){
     if (ok) { if (m) { m.textContent = '✓ 복사됨'; setTimeout(() => { m.textContent = ''; }, 2500); } }
     else { prompt('복사가 막혀 있습니다. 아래 글을 Ctrl+C 로 복사해 주세요.', txt); }
   });
-  document.querySelectorAll('.rc').forEach(box => {
-    const btn = box.querySelector('.rcSave');
-    box.querySelectorAll('select, input').forEach(el => {
-      el.addEventListener('input', () => { btn.textContent = '저장'; btn.classList.remove('saved'); });
-      el.addEventListener('change', () => { btn.textContent = '저장'; btn.classList.remove('saved'); });
-    });
-    btn.onclick = () => saveRc(box);
+  document.querySelectorAll('.rc .rcMemo').forEach(el => {
+    el.addEventListener('change', () => saveMemo(el.closest('.rc'), el));
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
   });
 }
 
@@ -601,30 +609,36 @@ document.addEventListener('click', e => {
   setChecked(b.dataset.i, b.classList.contains('rcOk'), b);
 });
 
-async function saveRc(box){
-  const r = ROWS[Number(box.dataset.i)];
-  const btn = box.querySelector('.rcSave');
-  const caseId = Number(box.querySelector('.rcCase').value) || null;
-  const memo = box.querySelector('.rcMemo').value.trim() || null;
-  const c = CASES.find(x => x.id === caseId);
-  if (c && c.name === '직접 적기' && !memo) { alert('「직접 적기」는 메모를 적어 주세요.'); return; }
-  btn.disabled = true; btn.textContent = '저장 중…';
+async function saveMemo(box, el){
+  const r = ROWS[Number(box.dataset.i)]; if (!r) return;
+  const msg = box.querySelector('.rcMsg');
+  const memo = el.value.trim() || null;
+  const old = (RES[rkey(r)] || {}).memo || null;
+  if (memo === old) { RC_TYPING = false; return; }
+  el.disabled = true; msg.textContent = '저장 중…'; msg.className = 'rcMsg';
   const row = { child_id: r.child_id, month_key: $('mon').value, item_no: r.item_no,
-                item_key: r.item_key || '', case_id: caseId,
-                doc_done: box.querySelector('.rcDoc').checked, memo: memo,
+                item_key: r.item_key || '', memo: memo,
                 updated_by: ME.id, updated_at: new Date().toISOString() };
   const { data, error } = await sb.from('nl_rc_results')
     .upsert(row, { onConflict: 'child_id,month_key,item_no,item_key' }).select();
-  btn.disabled = false;
+  el.disabled = false;
   if (error || !data || !data.length) {
-    btn.textContent = '저장';
-    alert('저장하지 못했습니다.\n' + (error ? error.message : '돌려받은 줄이 없습니다.'));
+    msg.textContent = '저장 못 함'; msg.className = 'rcMsg bad';
+    alert('메모를 저장하지 못했습니다.\n' + (error ? error.message : '돌려받은 줄이 없습니다.'));
     return;
   }
   RES[rkey(r)] = data[0];
-  RC_TYPING = false;   // 저장했으면 다시 점검해도 됨
-  draw();
+  RC_TYPING = false;
+  msg.textContent = '✓ 저장됨'; msg.className = 'rcMsg good';
+  setTimeout(() => { if (msg.textContent === '✓ 저장됨') msg.textContent = ''; }, 2000);
 }
+// 메모를 적다 다른 칸을 누르지 않고 나가면 묻기
+window.addEventListener('beforeunload', e => {
+  const el = document.activeElement;
+  if (!el || !el.classList || !el.classList.contains('rcMemo')) return;
+  const box = el.closest('.rc'), r = box && ROWS[Number(box.dataset.i)];
+  if (r && (el.value.trim() || null) !== ((RES[rkey(r)] || {}).memo || null)) { e.preventDefault(); e.returnValue = ''; }
+});
 
 $('run').onclick = run;
 // 다른 탭(기록지)에서 고치고 돌아오면 저절로 다시 점검 (2026-10-22 은정님 — F5 를 눌러야만 반영되던 것)
