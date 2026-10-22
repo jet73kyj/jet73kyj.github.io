@@ -291,6 +291,8 @@
   <span id="pCount" style="font-size:14px;color:#5F5E5A;white-space:nowrap;"></span>
   <span id="pInfo"></span>
 </div>
+<!-- 아동 단추 (2026-10-22 은정님) — 고칠 것이 있는 아동은 빨강 · 서류는 주황 · 지난달 남은 것도 끝날 때까지 -->
+<div id="kbBox" class="no-print"></div>
 
 <div class="container">
 
@@ -764,7 +766,157 @@ function drawChildSelect() {
   // 단추 줄 아동 수 — 종결·타기관이용은 빼고 센다 (2026-09-19)
   const _live = CHILDREN.filter(c => c.status !== '종결' && c.status !== '타기관이용').length;
   $('pCount').textContent = '아동 ' + _live + '명';
+  if (!KB_SKIP) kbLoad();
 }
+
+// ═════════════════════════════════════════════
+// 아동 단추 (2026-10-22 은정님)
+//   빨강 = 기록지를 고쳐야 함 (고치면 사라짐)
+//   주황 = 서류를 챙겨야 함 (사실 확인서 · 변경 계약서)
+//   옅은 주황 = 제출 대기 (선생님 작성 끝 · 서명 받음 → 원장 · 행정 [확인] 기다림)
+//   셈은 기록지 점검(nl_record_check)과 같음 · 원장 [확인]한 줄 · 참고(9) · 센터 정리(25)는 뺌
+//   지난달까지 남은 것은 2026-09 부터 끝날 때까지 맨 위에 (최근 여섯 달)
+// ═════════════════════════════════════════════
+const KB_FROM = '2026-09';
+let KB = {}, KB_REQ = 0, KB_NAME = {}, KB_LAST = null, KB_SKIP = false;
+function _kbMon(k, d) { const y = +k.slice(0, 4), m = +k.slice(5, 7) - 1 + d; return new Date(y, m, 1).getFullYear() + '-' + String(new Date(y, m, 1).getMonth() + 1).padStart(2, '0'); }
+function _kbToday() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7); }
+const KB_LIST = n => (n >= 10 && n <= 14) || n === 18;      // 기록지를 고치면 사라짐
+async function kbMonth(k) {
+  const [a, b, c] = await Promise.all([
+    sb.rpc('nl_record_check', { p_month: k }),
+    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, checked_at, checked_detail').eq('month_key', k),
+    sb.from('nl_rc_cases').select('id, grp, need_doc')
+  ]);
+  if (a.error) throw a.error;
+  const res = {}, cs = {};
+  (b.data || []).forEach(x => { res[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
+  (c.data || []).forEach(x => { cs[x.id] = x; });
+  let rows = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }))
+    .filter(r => r.item_no !== 9 && r.item_no !== 25);
+  if (!_isAllView(ME.role)) rows = rows.filter(r => Number(r.therapist_id) === Number(ME.id));
+  rows = rows.filter(r => {
+    const x = res[r.child_id + '|' + r.item_no + '|' + (r.item_key || '')];
+    if (x && x.checked_at && String(x.checked_detail || '') === String(r.detail || '')) return false;   // 원장 확인
+    if (x && x.case_id && !KB_LIST(r.item_no)) {                                                       // 옛 처리
+      const cc = cs[x.case_id];
+      if (cc && (cc.grp === '특이사항 기재' || !cc.need_doc || x.doc_done)) return false;
+    }
+    return true;
+  });
+  // 선생님이 끝낸 서식 — 기록지 점검 devDone 과 같은 맞춤
+  const kids = [...new Set(rows.map(r => r.child_id))], docs = {};
+  for (let i = 0; i < kids.length; i += 200) {
+    const { data } = await sb.from('nl_dev_docs').select('child_id, doc_type, doc_key, data')
+      .in('child_id', kids.slice(i, i + 200)).in('doc_type', ['변경계약', '사실확인']).eq('done', true);
+    (data || []).forEach(x => { (docs[x.child_id] = docs[x.child_id] || []).push(x); });
+  }
+  const done = r => {
+    const ds = docs[r.child_id] || [], d = r.on_date ? String(r.on_date).slice(0, 10) : '';
+    if (r.item_no === 15) return ds.some(x => x.doc_type === '변경계약' && x.doc_key === '본인부담금:' + k + '-01');
+    if (r.item_no === 16) return ds.some(x => x.doc_type === '변경계약' && String(x.doc_key).indexOf('담당:' + k) === 0);
+    if ([1, 8, 18].includes(r.item_no) && d)
+      return ds.some(x => x.doc_type === '사실확인' && String(x.doc_key).indexOf(k + ':') === 0
+                          && x.data && (x.data.day === d || x.data.appr === d));
+    return false;
+  };
+  const out = {};
+  rows.forEach(r => {
+    const o = out[r.child_id] || (out[r.child_id] = { fix: 0, doc: 0, wait: 0, th: {} });
+    if (done(r)) o.wait++;
+    else if (KB_LIST(r.item_no)) o.fix++;
+    else o.doc++;
+    if (r.therapist_id) o.th[r.therapist_id] = 1;
+  });
+  return out;
+}
+async function kbLoad() {
+  const box = $('kbBox'); if (!box || !ME) return;
+  const req = ++KB_REQ, mv = $('pMonth').value || mkNow(), now = _kbToday();
+  const months = [];
+  for (let k = _kbMon(now, -6) < KB_FROM ? KB_FROM : _kbMon(now, -6); k < now; k = _kbMon(k, 1)) if (k !== mv) months.push(k);
+  months.push(mv);
+  if (!box.innerHTML) box.innerHTML = '<div class="kbnote">고칠 것을 세고 있습니다…</div>';
+  const got = await Promise.all(months.map(k => kbMonth(k).then(v => [k, v]).catch(e => [k, null, e])));
+  if (req !== KB_REQ) return;
+  KB = {}; got.forEach(([k, v]) => { KB[k] = v; });
+  // 지난달 남은 것 중 목록에 없는 아동 이름
+  const need = [];
+  got.forEach(([k, v]) => { if (v) Object.keys(v).forEach(id => { if (!KIDS[id] && !KB_NAME[id]) need.push(Number(id)); }); });
+  if (need.length) {
+    const { data } = await sb.from('nl_children').select('id, name, birth, status').in('id', [...new Set(need)]);
+    (data || []).forEach(x => { KB_NAME[x.id] = x; });
+    if (req !== KB_REQ) return;
+  }
+  kbDraw(months, got);
+}
+function _kbKid(id) { return KIDS[id] || KB_NAME[id] || { id: id, name: id + '번' }; }
+function _kbBtn(k, id, o, cur) {
+  const c = _kbKid(id);
+  let cls = 'kb', tag = '';
+  if (o && o.fix) { cls += ' fix'; tag = '고치기 ' + o.fix; }
+  if (o && o.doc) { if (!o.fix) cls += ' doc'; tag += (tag ? ' · ' : '') + '서류 ' + o.doc; }
+  if (o && o.wait && !o.fix && !o.doc) { cls += ' wait'; tag = '제출 대기 ' + o.wait; }
+  if (String(childId) === String(id) && k === (($('pMonth').value) || mkNow()) && LOADED) cls += ' on';
+  const th = (_isAllView(ME.role) && o) ? Object.keys(o.th).map(t => THERAPISTS[t] || '').filter(Boolean).join('·') : '';
+  return '<button type="button" class="' + cls + '" data-k="' + k + '" data-c="' + id + '">'
+    + esc(c.name || '') + (c.status === '종결' ? ' (종결)' : '')
+    + (tag ? ' <b>' + tag + '</b>' : '') + (th ? '<small>' + esc(th) + '</small>' : '') + '</button>';
+}
+function kbDraw(months, got) {
+  const box = $('kbBox'), mv = $('pMonth').value || mkNow(), mon = k => Number(k.slice(5, 7)) + '월';
+  KB_LAST = [months, got];
+  let h = '';
+  const past = got.filter(([k, v]) => k !== mv);
+  const pastBad = past.filter(([k, v]) => v && Object.keys(v).length);
+  const errs = got.filter(([k, v]) => !v);
+  if (pastBad.length) {
+    h += '<div class="kbpast"><div class="kbhd">⚠ 지난 달에 끝나지 않은 것이 있습니다 — 모두 고칠 때까지 여기 남습니다</div>';
+    pastBad.forEach(([k, v]) => {
+      const ids = Object.keys(v).sort((a, b) => (v[b].fix - v[a].fix) || (v[b].doc - v[a].doc) || String(_kbKid(a).name).localeCompare(String(_kbKid(b).name)));
+      h += '<div class="kbrow"><span class="kbm">' + mon(k) + '</span>' + ids.map(id => _kbBtn(k, id, v[id], false)).join('') + '</div>';
+    });
+    h += '</div>';
+  }
+  const cur = (got.find(([k]) => k === mv) || [])[1] || null;
+  const ids = CHILDREN.map(c => String(c.id));
+  if (cur) Object.keys(cur).forEach(id => { if (ids.indexOf(id) < 0) ids.push(id); });
+  const bad = ids.filter(id => cur && cur[id]), ok = ids.filter(id => !(cur && cur[id]));
+  bad.sort((a, b) => (cur[b].fix - cur[a].fix) || (cur[b].doc - cur[a].doc) || String(_kbKid(a).name).localeCompare(String(_kbKid(b).name)));
+  h += '<div class="kbcur"><div class="kbhd">' + mon(mv) + ' 기록지</div>';
+  if (bad.length) h += '<div class="kbrow"><span class="kbm">살펴볼 아동</span>' + bad.map(id => _kbBtn(mv, id, cur[id], true)).join('') + '</div>';
+  if (ok.length) h += '<div class="kbrow"><span class="kbm">' + (bad.length ? '나머지 아동' : '아동') + '</span>' + ok.map(id => _kbBtn(mv, id, null, true)).join('') + '</div>';
+  if (!ids.length) h += '<div class="kbnote">이 달 발달재활 아동이 없습니다.</div>';
+  h += '<div class="kbnote"><span class="kb fix">빨강</span> 기록지를 고쳐 주세요 '
+     + '<span class="kb doc">주황</span> 사실 확인서 · 변경 계약서를 챙겨 주세요 '
+     + '<span class="kb wait">제출 대기</span> 작성 끝 — 센터 확인을 기다림'
+     + (errs.length ? ' · <span style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</span>' : '') + '</div></div>';
+  box.innerHTML = h;
+}
+document.addEventListener('click', async e => {
+  const b = e.target && e.target.closest && e.target.closest('#kbBox button.kb[data-c]');
+  if (!b) return;
+  const k = b.dataset.k, cid = b.dataset.c;
+  if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n그래도 다른 기록지를 불러올까요?\n(적어 둔 내용은 사라집니다)')) return;
+  if (typeof chgPendingN === 'function' && chgPendingN() && !confirm('변경 계약서에 저장하지 않은 글이 있습니다.\n\n그래도 다른 기록지를 불러올까요?')) return;
+  DIRTY = false;
+  if (typeof CHG !== 'undefined') CHG.forEach(c => { c.dirty = false; });
+  const mvChanged = $('pMonth').value !== k;
+  if (mvChanged) { $('pMonth').value = k; await buildChildList(); }
+  if (!CHILDREN.some(c => String(c.id) === String(cid))) { CHILDREN.push(_kbKid(cid)); }
+  KB_SKIP = !mvChanged; drawChildSelect(); KB_SKIP = false;
+  $('pChild').value = String(cid);
+  const o = $('pChild').options[$('pChild').selectedIndex], q = $('pChildQ');
+  if (q && o) q.value = o.text;
+  await loadOne();
+  const sh = document.querySelector('.container'); if (sh) sh.scrollIntoView({ block: 'start' });
+});
+// 기록지 점검 탭에서 [확인] 하고 돌아오면 단추 다시 셈
+let KB_HID = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { KB_HID = Date.now(); return; }
+  if (KB_HID && Date.now() - KB_HID > 2000 && ME) kbLoad();
+});
 
 // ─────────────────────────────────────────────
 // 한 아동 · 한 달 불러오기
@@ -862,6 +1014,7 @@ async function loadOne() {
     $('pInfo').textContent = mk + ' · 바우처 ' + VOUCHER.length + '건'
       + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
     loadRcBox(cid, mk);
+    if (KB_LAST) kbDraw(KB_LAST[0], KB_LAST[1]);   // 지금 아동 단추 테두리 (2026-10-22)
     loadChg(cid, mk);
     fcLoadDocs(cid, mk);
     rpLoad(cid, mk);
@@ -2885,6 +3038,7 @@ async function saveRecord() {
     DIRTY = false;
     setSaveBtn('done');
     loadRcBox(childId, mk);          // 저장 뒤 서버 점검 다시 받기 (2026-10-02)
+    kbLoad();                        // 아동 단추 색도 다시 (2026-10-22)
   } catch (e) {
     alert('❌ 저장하지 못했습니다.\n' + e.message);
     setSaveBtn('before');
@@ -3390,6 +3544,28 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
   #pChildList div.on, #pChildList div:hover { background:#F8F1E8; }
   #pChildList .none { color:#999; cursor:default; }
   @media print { .kidpickwrap { display:none !important; } }
+  /* 아동 단추 (2026-10-22) */
+  #kbBox { max-width:1200px; margin:10px auto 0; padding:0 16px; }
+  #kbBox .kbpast { background:#FDECEA; border:1px solid #F2B8B0; border-radius:10px; padding:10px 12px; margin-bottom:10px; }
+  #kbBox .kbcur { background:#fff; border:1px solid #ECE8E3; border-radius:10px; padding:10px 12px; }
+  #kbBox .kbhd { font-size:13px; font-weight:700; color:#5F5E5A; margin-bottom:6px; }
+  #kbBox .kbpast .kbhd { color:#B3261E; }
+  #kbBox .kbrow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
+  #kbBox .kbm { font-size:12px; color:#8a837c; min-width:70px; }
+  #kbBox button.kb { width:auto !important; margin:0 !important; padding:5px 11px; font-size:13px; border-radius:16px;
+                     border:1px solid #D9D3CC; background:#fff; color:#2F2926; cursor:pointer; line-height:1.35; text-align:center; }
+  #kbBox button.kb b { font-weight:700; margin-left:3px; }
+  #kbBox button.kb small { display:block; font-size:10.5px; opacity:.8; }
+  #kbBox .kb.fix { background:#D93A2B; border-color:#D93A2B; color:#fff; }
+  #kbBox .kb.doc { background:#F28C28; border-color:#F28C28; color:#fff; }
+  #kbBox .kb.wait { background:#FFF1E2; border-color:#F3B77A; color:#B4580E; }
+  #kbBox .kb.on { outline:3px solid #B07A4A; outline-offset:1px; }
+  #kbBox .kbnote { font-size:12px; color:#8a837c; margin-top:6px; line-height:1.9; }
+  #kbBox .kbnote .kb { padding:1px 8px; font-size:11px; border-radius:10px; border:1px solid #D9D3CC; display:inline-block; }
+  #kbBox .kbnote .kb.fix { background:#D93A2B; color:#fff; border-color:#D93A2B; }
+  #kbBox .kbnote .kb.doc { background:#F28C28; color:#fff; border-color:#F28C28; }
+  #kbBox .kbnote .kb.wait { background:#FFF1E2; color:#B4580E; border-color:#F3B77A; }
+  @media print { #kbBox { display:none !important; } }
 </style>
 <script>
 (function () {
