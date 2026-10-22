@@ -272,6 +272,7 @@ function noteOf(r){
 }
 
 async function run(){
+  RC_TYPING = false;
   const k = $('mon').value;
   $('body').innerHTML = '<div class="load">' + monNo(k) + '월 기록지를 점검하고 있습니다…</div>';
   const [a, b, c, lg, st] = await Promise.all([
@@ -571,10 +572,23 @@ async function saveRc(box){
     return;
   }
   RES[rkey(r)] = data[0];
+  RC_TYPING = false;   // 저장했으면 다시 점검해도 됨
   draw();
 }
 
 $('run').onclick = run;
+// 다른 탭(기록지)에서 고치고 돌아오면 저절로 다시 점검 (2026-10-22 은정님 — F5 를 눌러야만 반영되던 것)
+//   처리 결과 칸에 적는 중이면 다시 그리지 않음 (적은 글이 지워지지 않게)
+let RC_TYPING = false, RC_HID = 0, RC_RUNNING = false;
+document.addEventListener('input', e => { if (e.target && e.target.closest && e.target.closest('#body')) RC_TYPING = true; });
+document.addEventListener('change', e => { if (e.target && e.target.closest && e.target.closest('#body')) RC_TYPING = true; });
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) { RC_HID = Date.now(); return; }
+  if (!RC_HID || Date.now() - RC_HID < 2000 || RC_TYPING || RC_RUNNING || !ME) return;
+  RC_RUNNING = true;
+  const y = window.scrollY;
+  try { await run(); window.scrollTo(0, y); } finally { RC_RUNNING = false; }
+});
 $('mon').onchange = run;
 $('pdf').onclick = () => window.print();
 $('kidQ').addEventListener('input', () => { if (ROWS.length || $('body').querySelector('.sum')) draw(); });
