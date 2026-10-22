@@ -1375,7 +1375,7 @@ async function afterLogin(user){
   }
 
   const { data: ths } = await sb.from('nl_therapists')
-    .select('id, name').lte('id', 7).order('id');
+    .select('id, name').eq('role', '치료사').eq('active', true).order('id');   // 2026-10-22 1~7번 고정 → 역할 치료사
   THS = ths || [];
   $('th').innerHTML = THS.map(t =>
     '<option value="'+t.id+'">'+t.id+'번 '+esc(t.name)+' 치료사</option>').join('');
