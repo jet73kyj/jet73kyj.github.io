@@ -1637,6 +1637,7 @@ function fcCases() {
     const tr = trs[i]; if (!tr) continue;
     const no = String(tr.querySelector('.st_apprNo').value || '').trim();
     if (!no) continue;
+    if (/^(예외|포기$)/.test(no)) continue;   // 예외결제 · 포기 회는 사실 확인서 필요 없음 (2026-10-22 은정님)
     const prov = _provIso(tr.querySelector('.st_provDate').value);
     const am = String(tr.querySelector('.st_apprDate').value || '')
                  .match(/(\d{4})\D(\d{2})\D(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
@@ -1853,7 +1854,7 @@ function fcPrint(i) {
 // ═════════════════════════════════════════════
 // 발달재활서비스 제공(중간/종결) 보고서 [서식 11-1호] (2026-10-09 은정님)
 //   6월 기록지 = 중간 보고서 (1~6월) · 12월 기록지 = 종결 보고서 (7~12월)
-//   발달재활 수업이 이 달에 끝나면 이 달 기록지에 종결 보고서
+//   (수업이 끝난 달에 띄우던 종결 보고서는 뺌 — 매년 12월에 작성 · 2026-10-22 은정님)
 //   기록지에서 채울 수 있는 칸은 자동 · 고친 글이 앞섬 · 문서 안에서 저장 · 「작성 끝」
 //   담기 nl_dev_docs (doc_type 중간보고 / 종결보고 · doc_key = 연도 또는 종결 달)
 // ═════════════════════════════════════════════
@@ -1869,11 +1870,9 @@ function rpDot(iso) { return iso ? iso.replace(/-/g, '.') : ''; }
 async function rpLoad(cid, mk) {
   const req = RP_REQ;
   const y = year, m = month;
-  // 이 달에 끝나는 발달재활 수업이 있으면 종결 보고서
-  const endHere = (TL || []).map(t => String(t.ended_on || '')).filter(d => d.slice(0, 7) === mk).sort().pop() || '';
+  // 종결 보고서는 매년 12월에만 (2026-10-22 은정님 — 수업이 끝난 달에 띄우던 것 뺌)
   let type = null, key = '', from = '', to = '';
-  if (endHere) { type = '종결보고'; key = mk; to = endHere; from = (m <= 6 ? y + '-01-01' : y + '-07-01'); }
-  else if (m === 6)  { type = '중간보고'; key = String(y); from = y + '-01-01'; to = rpIsoLast(y, 6); }
+  if (m === 6)  { type = '중간보고'; key = String(y); from = y + '-01-01'; to = rpIsoLast(y, 6); }
   else if (m === 12) { type = '종결보고'; key = String(y); from = y + '-07-01'; to = rpIsoLast(y, 12); }
   if (!type) return;
   // 수업을 이 기간 중에 시작했으면 그 날부터
