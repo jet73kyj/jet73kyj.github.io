@@ -293,6 +293,7 @@
 </div>
 <!-- 아동 단추 (2026-10-22 은정님) — 고칠 것이 있는 아동은 빨강 · 서류는 주황 · 지난달 남은 것도 끝날 때까지 -->
 <div id="kbBox" class="no-print"></div>
+<div id="kbBack" class="no-print" style="display:none;"><button type="button" id="kbBackBtn">‹ 아동 목록</button><span id="kbBackTxt"></span></div>
 
 <div class="container">
 
@@ -670,6 +671,7 @@ async function afterLogin(user) {
   drawChildSelect();
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
+  kbView('list');
   if (LAST && LAST.cid && CHILDREN.some(c => String(c.id) === String(LAST.cid))) {
     $('pChild').value = String(LAST.cid);
     const o = $('pChild').options[$('pChild').selectedIndex], q = $('pChildQ');
@@ -681,6 +683,10 @@ async function afterLogin(user) {
 // 보던 자리(아동 · 달 · 내린 자리)를 이 탭에 적어 둔다
 function _rdRemember() {
   if (!LOADED || !childId) return;
+  if (typeof KB_VIEW !== 'undefined' && KB_VIEW === 'list') {   // 단추 화면에서 새로고침 → 단추 화면 그대로
+    try { sessionStorage.setItem('nl_rd_last', JSON.stringify({ mv: mkNow() })); } catch (e) {}
+    return;
+  }
   try { sessionStorage.setItem('nl_rd_last', JSON.stringify({ cid: childId, mv: mkNow(), y: Math.round(window.scrollY || 0) })); } catch (e) {}
 }
 window.addEventListener('pagehide', _rdRemember);
@@ -850,18 +856,28 @@ async function kbLoad() {
   }
   kbDraw(months, got);
 }
+// 첫 화면은 단추만 · 단추를 누르면 기록지만 (2026-10-22 은정님)
+let KB_VIEW = 'list';
+function kbView(v) {
+  KB_VIEW = v;
+  const cont = document.querySelector('.container');
+  $('kbBox').style.display = v === 'list' ? '' : 'none';
+  $('kbBack').style.display = v === 'sheet' ? '' : 'none';
+  if (cont) cont.style.display = v === 'sheet' ? '' : 'none';
+  if (v === 'sheet' && child) $('kbBackTxt').textContent = month + '월 · ' + (child.name || '');
+}
 function _kbKid(id) { return KIDS[id] || KB_NAME[id] || { id: id, name: id + '번' }; }
 function _kbBtn(k, id, o, cur) {
   const c = _kbKid(id);
   let cls = 'kb', tag = '';
-  if (o && o.fix) { cls += ' fix'; tag = '고치기 ' + o.fix; }
-  if (o && o.doc) { if (!o.fix) cls += ' doc'; tag += (tag ? ' · ' : '') + '서류 ' + o.doc; }
-  if (o && o.wait && !o.fix && !o.doc) { cls += ' wait'; tag = '제출 대기 ' + o.wait; }
+  if (o && o.fix) { cls += ' fix'; tag = String(o.fix + o.doc); }
+  else if (o && o.doc) { cls += ' doc'; tag = String(o.doc); }
+  else if (o && o.wait) { cls += ' wait'; tag = String(o.wait); }
   if (String(childId) === String(id) && k === (($('pMonth').value) || mkNow()) && LOADED) cls += ' on';
   const th = (_isAllView(ME.role) && o) ? Object.keys(o.th).map(t => THERAPISTS[t] || '').filter(Boolean).join('·') : '';
   return '<button type="button" class="' + cls + '" data-k="' + k + '" data-c="' + id + '">'
-    + esc(c.name || '') + (c.status === '종결' ? ' (종결)' : '')
-    + (tag ? ' <b>' + tag + '</b>' : '') + (th ? '<small>' + esc(th) + '</small>' : '') + '</button>';
+    + '<span class="nm">' + esc(c.name || '') + (c.status === '종결' ? '<i>종결</i>' : '') + '</span>'
+    + (tag ? '<b>' + tag + '</b>' : '') + (th ? '<small>' + esc(th) + '</small>' : '') + '</button>';
 }
 function kbDraw(months, got) {
   const box = $('kbBox'), mv = $('pMonth').value || mkNow(), mon = k => Number(k.slice(5, 7)) + '월';
@@ -870,27 +886,26 @@ function kbDraw(months, got) {
   const past = got.filter(([k, v]) => k !== mv);
   const pastBad = past.filter(([k, v]) => v && Object.keys(v).length);
   const errs = got.filter(([k, v]) => !v);
+  const ord = v => (a, b) => ((v[b].fix ? 2 : v[b].doc ? 1 : 0) - (v[a].fix ? 2 : v[a].doc ? 1 : 0))
+                            || String(_kbKid(a).name).localeCompare(String(_kbKid(b).name));
   if (pastBad.length) {
-    h += '<div class="kbpast"><div class="kbhd">⚠ 지난 달에 끝나지 않은 것이 있습니다 — 모두 고칠 때까지 여기 남습니다</div>';
+    h += '<div class="kbpast"><div class="kbhd">⚠ 지난 달 남은 것 — 다 고칠 때까지 남습니다</div>';
     pastBad.forEach(([k, v]) => {
-      const ids = Object.keys(v).sort((a, b) => (v[b].fix - v[a].fix) || (v[b].doc - v[a].doc) || String(_kbKid(a).name).localeCompare(String(_kbKid(b).name)));
-      h += '<div class="kbrow"><span class="kbm">' + mon(k) + '</span>' + ids.map(id => _kbBtn(k, id, v[id], false)).join('') + '</div>';
+      h += '<div class="kbm">' + mon(k) + '</div><div class="kbgrid">'
+         + Object.keys(v).sort(ord(v)).map(id => _kbBtn(k, id, v[id])).join('') + '</div>';
     });
     h += '</div>';
   }
   const cur = (got.find(([k]) => k === mv) || [])[1] || null;
   const ids = CHILDREN.map(c => String(c.id));
   if (cur) Object.keys(cur).forEach(id => { if (ids.indexOf(id) < 0) ids.push(id); });
-  const bad = ids.filter(id => cur && cur[id]), ok = ids.filter(id => !(cur && cur[id]));
-  bad.sort((a, b) => (cur[b].fix - cur[a].fix) || (cur[b].doc - cur[a].doc) || String(_kbKid(a).name).localeCompare(String(_kbKid(b).name)));
+  const bad = ids.filter(id => cur && cur[id]).sort(cur ? ord(cur) : undefined);
+  const ok = ids.filter(id => !(cur && cur[id]));
   h += '<div class="kbcur"><div class="kbhd">' + mon(mv) + ' 기록지</div>';
-  if (bad.length) h += '<div class="kbrow"><span class="kbm">살펴볼 아동</span>' + bad.map(id => _kbBtn(mv, id, cur[id], true)).join('') + '</div>';
-  if (ok.length) h += '<div class="kbrow"><span class="kbm">' + (bad.length ? '나머지 아동' : '아동') + '</span>' + ok.map(id => _kbBtn(mv, id, null, true)).join('') + '</div>';
-  if (!ids.length) h += '<div class="kbnote">이 달 발달재활 아동이 없습니다.</div>';
-  h += '<div class="kbnote"><span class="kb fix">빨강</span> 기록지를 고쳐 주세요 '
-     + '<span class="kb doc">주황</span> 사실 확인서 · 변경 계약서를 챙겨 주세요 '
-     + '<span class="kb wait">제출 대기</span> 작성 끝 — 센터 확인을 기다림'
-     + (errs.length ? ' · <span style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</span>' : '') + '</div></div>';
+  if (ids.length) h += '<div class="kbgrid">' + bad.map(id => _kbBtn(mv, id, cur[id])).join('') + ok.map(id => _kbBtn(mv, id, null)).join('') + '</div>';
+  else h += '<div class="kbnote">이 달 발달재활 아동이 없습니다.</div>';
+  h += '<div class="kbnote"><span class="kb fix">빨강</span>기록지 고치기 <span class="kb doc">주황</span>서류 챙기기 <span class="kb wait">옅은 주황</span>센터 확인 기다림'
+     + (errs.length ? '<br><span style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</span>' : '') + '</div></div>';
   box.innerHTML = h;
 }
 document.addEventListener('click', async e => {
@@ -909,7 +924,18 @@ document.addEventListener('click', async e => {
   const o = $('pChild').options[$('pChild').selectedIndex], q = $('pChildQ');
   if (q && o) q.value = o.text;
   await loadOne();
-  const sh = document.querySelector('.container'); if (sh) sh.scrollIntoView({ block: 'start' });
+  if (KB_VIEW === 'sheet') window.scrollTo(0, 0);
+});
+// 「‹ 아동 목록」 — 다시 단추 화면
+document.addEventListener('click', e => {
+  if (!(e.target && e.target.closest && e.target.closest('#kbBackBtn'))) return;
+  if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n저장하지 않고 아동 목록으로 갈까요?\n(적어 둔 내용은 사라집니다)')) return;
+  if (typeof chgPendingN === 'function' && chgPendingN() && !confirm('변경 계약서에 저장하지 않은 글이 있습니다.\n\n그래도 아동 목록으로 갈까요?')) return;
+  DIRTY = false;
+  if (typeof CHG !== 'undefined') CHG.forEach(c => { c.dirty = false; });
+  kbView('list');
+  window.scrollTo(0, 0);
+  kbLoad();
 });
 // 기록지 점검 탭에서 [확인] 하고 돌아오면 단추 다시 셈
 let KB_HID = 0;
@@ -1015,6 +1041,7 @@ async function loadOne() {
       + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
     loadRcBox(cid, mk);
     if (KB_LAST) kbDraw(KB_LAST[0], KB_LAST[1]);   // 지금 아동 단추 테두리 (2026-10-22)
+    kbView('sheet');
     loadChg(cid, mk);
     fcLoadDocs(cid, mk);
     rpLoad(cid, mk);
@@ -3544,27 +3571,38 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
   #pChildList div.on, #pChildList div:hover { background:#F8F1E8; }
   #pChildList .none { color:#999; cursor:default; }
   @media print { .kidpickwrap { display:none !important; } }
-  /* 아동 단추 (2026-10-22) */
-  #kbBox { max-width:1200px; margin:10px auto 0; padding:0 16px; }
-  #kbBox .kbpast { background:#FDECEA; border:1px solid #F2B8B0; border-radius:10px; padding:10px 12px; margin-bottom:10px; }
-  #kbBox .kbcur { background:#fff; border:1px solid #ECE8E3; border-radius:10px; padding:10px 12px; }
-  #kbBox .kbhd { font-size:13px; font-weight:700; color:#5F5E5A; margin-bottom:6px; }
+  /* 아동 단추 (2026-10-22) — 같은 넓이 칸 · 핸드폰 한 줄 3개 */
+  #kbBox { max-width:1200px; margin:10px auto 0; padding:0 12px; }
+  #kbBox .kbpast { background:#FDECEA; border:1px solid #F2B8B0; border-radius:10px; padding:10px; margin-bottom:10px; }
+  #kbBox .kbcur { background:#fff; border:1px solid #ECE8E3; border-radius:10px; padding:10px; }
+  #kbBox .kbhd { font-size:14px; font-weight:700; color:#5F5E5A; margin-bottom:8px; }
   #kbBox .kbpast .kbhd { color:#B3261E; }
-  #kbBox .kbrow { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0; }
-  #kbBox .kbm { font-size:12px; color:#8a837c; min-width:70px; }
-  #kbBox button.kb { width:auto !important; margin:0 !important; padding:5px 11px; font-size:13px; border-radius:16px;
-                     border:1px solid #D9D3CC; background:#fff; color:#2F2926; cursor:pointer; line-height:1.35; text-align:center; }
-  #kbBox button.kb b { font-weight:700; margin-left:3px; }
-  #kbBox button.kb small { display:block; font-size:10.5px; opacity:.8; }
+  #kbBox .kbm { font-size:12px; font-weight:700; color:#B3261E; margin:6px 0 4px; }
+  #kbBox .kbgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); gap:6px; }
+  #kbBox button.kb { width:100% !important; margin:0 !important; min-height:44px; padding:6px 8px; font-size:14px; border-radius:10px;
+                     border:1px solid #D9D3CC; background:#fff; color:#2F2926; cursor:pointer; line-height:1.3;
+                     display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; }
+  #kbBox button.kb .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  #kbBox button.kb .nm i { font-style:normal; font-size:10.5px; opacity:.75; margin-left:3px; }
+  #kbBox button.kb b { font-weight:700; font-size:12px; min-width:20px; padding:1px 6px; border-radius:10px; background:rgba(255,255,255,.3); }
+  #kbBox button.kb small { flex-basis:100%; font-size:10.5px; opacity:.85; }
   #kbBox .kb.fix { background:#D93A2B; border-color:#D93A2B; color:#fff; }
   #kbBox .kb.doc { background:#F28C28; border-color:#F28C28; color:#fff; }
   #kbBox .kb.wait { background:#FFF1E2; border-color:#F3B77A; color:#B4580E; }
-  #kbBox .kb.on { outline:3px solid #B07A4A; outline-offset:1px; }
-  #kbBox .kbnote { font-size:12px; color:#8a837c; margin-top:6px; line-height:1.9; }
-  #kbBox .kbnote .kb { padding:1px 8px; font-size:11px; border-radius:10px; border:1px solid #D9D3CC; display:inline-block; }
+  #kbBox .kb.wait b { background:#F3B77A; color:#fff; }
+  #kbBox .kbnote { font-size:12px; color:#8a837c; margin-top:10px; line-height:2; }
+  #kbBox .kbnote .kb { padding:1px 8px; font-size:11px; border-radius:8px; border:1px solid #D9D3CC; display:inline-block; margin:0 4px 0 8px; }
+  #kbBox .kbnote .kb:first-child { margin-left:0; }
   #kbBox .kbnote .kb.fix { background:#D93A2B; color:#fff; border-color:#D93A2B; }
   #kbBox .kbnote .kb.doc { background:#F28C28; color:#fff; border-color:#F28C28; }
   #kbBox .kbnote .kb.wait { background:#FFF1E2; color:#B4580E; border-color:#F3B77A; }
+  @media (max-width:600px) { #kbBox .kbgrid { grid-template-columns:repeat(3, 1fr); } #kbBox button.kb { font-size:13px; padding:6px 4px; } }
+  #kbBack { position:sticky; top:0; z-index:40; max-width:1200px; margin:8px auto 0; padding:8px 12px; background:#fff;
+            border-bottom:1px solid #ECE8E3; display:flex; align-items:center; gap:10px; }
+  #kbBack button { width:auto !important; margin:0 !important; padding:7px 14px; font-size:14px; border-radius:8px;
+                   border:1px solid #C9A27E; background:#fff; color:#B07A4A; font-weight:700; cursor:pointer; }
+  #kbBackTxt { font-size:14px; font-weight:700; color:#2F2926; }
+  @media print { #kbBack { display:none !important; } }
   @media print { #kbBox { display:none !important; } }
 </style>
 <script>
