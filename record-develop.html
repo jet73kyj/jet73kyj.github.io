@@ -1129,7 +1129,7 @@ function fillFromSlots() {
 }
 // 시간표 값과 다른 칸은 노랑 (2026-10-06)
 let AUTO1 = [];
-// 승인번호 빈 회차 — 제공일자가 있는데 승인번호가 비면 빨간 글 · 예외지급 · 포기 단추 (2026-10-22 은정님)
+// 승인번호 빈 회차 — 제공일자가 있는데 승인번호가 비면 빨간 글 · 예외결제 · 포기 단추 (2026-10-22 은정님)
 function _apprWarn() {
   document.querySelectorAll('#statusTbl tbody tr').forEach((tr, i) => {
     const w = tr.querySelector('.apprWarn'); if (!w) return;
@@ -1348,7 +1348,7 @@ function _statusRows() {
       // ↓ 이 두 칸만 바우처가 주인이다. 바우처에 값이 없으면 저장된 것을 쓴다
       // 승인일자 칸은 시:분:초까지 글 그대로 state_json.apprAt 에 둔다 (표 칸은 날짜뿐이라 · 2026-10-06)
       apprDate: man ? ((r.state_json || {}).apprAt || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : ''))
-                    : (v.ex ? '' : (v.apprDate || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : ''))),
+                    : (v.apprDate || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : '')),
       exNo: v.exNo || '',
       apprNo:   man ? (r.voucher_no || '') : (v.apprNo || r.voucher_no || ''),
       cloth: (r.state_json||{}).cloth || '', sock: (r.state_json||{}).sock || '',
@@ -2301,7 +2301,8 @@ function rcLocal() {
         + [!prov && '제공일자 빈칸', !st && '시작 빈칸', !en && '종료 빈칸'].filter(Boolean).join(' · ') });
     }
     // 18 제공일자 ≠ 승인일자 (특이사항이 비었을 때)
-    if (prov && appr && prov !== appr && !note) {   // 결제일 대안 → 없으면 사실 확인서 (2026-10-10 은정님)
+    const isEx = /^예외/.test(String(tr.querySelector('.st_apprNo').value || '').trim());   // 예외결제는 결제일이 다름 (2026-10-22)
+    if (prov && appr && prov !== appr && !note && !isEx) {   // 결제일 대안 → 없으면 사실 확인서 (2026-10-10 은정님)
       out.push({ item_no: 18, i, f: ['prov','appr'], on_date: prov,
         msg: '결제일 ' + md(appr) + ' · 제공일자 ' + md(prov) + ' — 수정 필요', detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
         + ' · 승인일자 ' + mmdd(appr) });
@@ -2567,7 +2568,7 @@ function rcRuleLocal() {
     if (x.prov && x.prov.slice(0, 7) !== mk)
       out.push({ item_no: 23, i, f: ['prov'], on_date: x.prov,
         msg: '제공일자(' + Number(x.prov.slice(5, 7)) + '/' + Number(x.prov.slice(8, 10)) + ')가 ' + month + '월이 아닙니다 — 제공일자는 그 달만 됩니다' });
-    if (x.no && !/^(예외지급|포기)$/.test(x.no)) (seen[x.no] = seen[x.no] || []).push(i);   // 예외지급 · 포기는 여러 회차 가능 (2026-10-22)
+    if (x.no && !/^(예외|포기$)/.test(x.no)) (seen[x.no] = seen[x.no] || []).push(i);   // 예외지급 · 포기는 여러 회차 가능 (2026-10-22)
   }
   Object.keys(seen).forEach(no => {
     const ks = seen[no];
@@ -2580,7 +2581,7 @@ function rcRuleLocal() {
 // ── 기록지 안 빨간 표시 (2026-10-09 은정님) — 노란 상자 글 대신 그 자리에 ──
 const RC_SAY = {
   2:'같은 아동 결제가 40분 안에 둘', 3:'그날 수업보다 결제가 많음', 4:'선생님 결제가 다른 아동 결제와 40분 안',
-  5:'승인번호 이상', 6:'한 주 3회 이상', 7:'결제 · 예외지급이 4회보다 적음 (수업 포기)', 8:'결제 금액 오류',
+  5:'승인번호 이상', 6:'한 주 3회 이상', 7:'결제 · 예외결제가 4회보다 적음 (수업 포기)', 8:'결제 금액 오류',
   9:'예외 · 일괄 결제 (참고)', 10:'같은 시간에 다른 아동 기록지가 있음', 11:'일정표 날짜와 승인일자가 다름',
   13:'바우처 승인번호와 다름', 14:'기록지 없음'
 };
@@ -2702,16 +2703,15 @@ function _apprStamp(v) {
 // 바우처 결제내역에서 승인일자·승인번호 자동 채움
 function _prefillStatusFromVoucher() {
   const rows = VOUCHER.slice(0, SESSIONS).map(v => {
-    // 예외결제(예외지급)는 결제 시각이 없다 — 승인일자 비움 · 승인번호 「예외지급」 (2026-10-22 은정님)
-    //   엑셀 번호는 마우스를 올리면 보임
+    // 예외결제는 결제 시각이 없다 — 승인일자 = 예외결제일(날짜만) · 승인번호 = 「예외결제 번호」 (2026-10-22 은정님)
     const ex = String(v.pay_kind || '').includes('예외');
     return {
     // 서비스 제공일자는 손으로 적는 칸이라 비워 둔다
     provDate: '',
     ex: ex,
     exNo: ex ? ('예외결제 ' + (v.appr_no || '') + (v.service_date ? ' · ' + Number(String(v.service_date).slice(5, 7)) + '/' + Number(String(v.service_date).slice(8, 10)) : '')) : '',
-    apprDate: ex ? '' : _apprStamp(v),
-    apprNo:   ex ? '예외지급' : (v.appr_no || ''),
+    apprDate: ex ? (v.service_date ? String(v.service_date).slice(0, 10).replace(/-/g, '.') : '') : _apprStamp(v),
+    apprNo:   ex ? ('예외결제 ' + (v.appr_no || '')).trim() : (v.appr_no || ''),
     cloth:'', sock:'', wear:'', face:'', health:'', result:'', note:''
     };
   });
@@ -3188,7 +3188,7 @@ function buildStatusRows(existing) {
         <input type="text" class="st_apprDate" value="${r.apprDate||''}">
         <div style="font-size:10px;color:#666;margin-top:4px;">승인번호</div>
         <input type="text" class="st_apprNo" value="${r.apprNo||''}"${r.exNo ? ' title="' + r.exNo + '"' : ''}>
-        <div class="apprWarn no-print" style="display:none;color:#c0392b;font-size:10px;line-height:1.4;margin-top:3px;">승인번호가 없습니다.<br>예외지급 · 포기이면 눌러 주세요<br><button type="button" class="apprPick" data-v="예외지급">예외지급</button><button type="button" class="apprPick" data-v="포기">포기</button></div>
+        <div class="apprWarn no-print" style="display:none;color:#c0392b;font-size:10px;line-height:1.4;margin-top:3px;">승인번호가 없습니다.<br>예외결제 · 포기이면 눌러 주세요<br><button type="button" class="apprPick" data-v="예외결제">예외결제</button><button type="button" class="apprPick" data-v="포기">포기</button></div>
       </td>
       <td>
         <div style="font-size:10px;margin-bottom:3px;">- 계절에 맞는 옷 (
