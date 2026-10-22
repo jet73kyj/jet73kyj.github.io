@@ -1104,8 +1104,11 @@ function fillFromSlots() {
     const sv = it.service_date ? String(it.service_date).slice(0, 10) : '';
     const sa = _hm(it.start_time) || '', sb = _hm(it.end_time) || '';
     let d = ad, a = aa, b = ab;
+    // 승인번호 「포기」 = 수업 없는 회 — 제공일자 · 시각을 비운 채 둠 (2026-10-22 은정님)
+    const giveUp = String(it.voucher_no || '').trim() === '포기';
+    if (giveUp) { d = ''; a = ''; b = ''; }
     // 저장된 날짜가 있으면 그 값이 우선 (2026-10-10 쪼개기 회차의 「옛 자동 값 버림」 규칙은 없앰)
-    if (sv) {
+    if (sv && !giveUp) {
       d = sv;
       a = sa || (sv === ad ? aa : '');
       b = sb || (sv === ad ? ab : '');
@@ -1168,7 +1171,7 @@ function _markManual() {
     const apM = tr ? String((tr.querySelector('.st_apprDate') || {}).value || '').match(/(\d{4})\D(\d{2})\D(\d{2})/) : null;
     const apIso = apM ? apM[1] + '-' + apM[2] + '-' + apM[3] : '';
     const dIso = _provIso(dt && dt.value) || '', pIso = _provIso(pv && pv.value) || '';
-    const okPay = !!dIso && dIso === pIso && dIso === apIso;
+    const okPay = (!!dIso && dIso === pIso && dIso === apIso) || _rowGiveUp(i);   // 포기 회는 노랑 안 칠함
     set(dt, !okPay && dIso !== au.d);
     set(pv, !okPay && pIso !== au.d);
     set(st, !okPay && (_to24(st && st.value) || '') !== au.a);
@@ -1345,7 +1348,8 @@ function _statusRows() {
       // ↓ 이 두 칸만 바우처가 주인이다. 바우처에 값이 없으면 저장된 것을 쓴다
       // 승인일자 칸은 시:분:초까지 글 그대로 state_json.apprAt 에 둔다 (표 칸은 날짜뿐이라 · 2026-10-06)
       apprDate: man ? ((r.state_json || {}).apprAt || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : ''))
-                    : (v.apprDate || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : '')),
+                    : (v.ex ? '' : (v.apprDate || (r.voucher_date ? String(r.voucher_date).replace(/-/g,'.') : ''))),
+      exNo: v.exNo || '',
       apprNo:   man ? (r.voucher_no || '') : (v.apprNo || r.voucher_no || ''),
       cloth: (r.state_json||{}).cloth || '', sock: (r.state_json||{}).sock || '',
       wear:  (r.state_json||{}).wear  || '', face: (r.state_json||{}).face || '',
@@ -2697,13 +2701,20 @@ function _apprStamp(v) {
 
 // 바우처 결제내역에서 승인일자·승인번호 자동 채움
 function _prefillStatusFromVoucher() {
-  const rows = VOUCHER.slice(0, SESSIONS).map(v => ({
+  const rows = VOUCHER.slice(0, SESSIONS).map(v => {
+    // 예외결제(예외지급)는 결제 시각이 없다 — 승인일자 비움 · 승인번호 「예외지급」 (2026-10-22 은정님)
+    //   엑셀 번호는 마우스를 올리면 보임
+    const ex = String(v.pay_kind || '').includes('예외');
+    return {
     // 서비스 제공일자는 손으로 적는 칸이라 비워 둔다
     provDate: '',
-    apprDate: _apprStamp(v),
-    apprNo:   v.appr_no || '',
+    ex: ex,
+    exNo: ex ? ('예외결제 ' + (v.appr_no || '') + (v.service_date ? ' · ' + Number(String(v.service_date).slice(5, 7)) + '/' + Number(String(v.service_date).slice(8, 10)) : '')) : '',
+    apprDate: ex ? '' : _apprStamp(v),
+    apprNo:   ex ? '예외지급' : (v.appr_no || ''),
     cloth:'', sock:'', wear:'', face:'', health:'', result:'', note:''
-  }));
+    };
+  });
   while (rows.length < SESSIONS) rows.push({});
   return rows;
 }
@@ -2938,6 +2949,7 @@ function _calEntries() {
   const out = [];
   for (let k = 0; k < SESSIONS; k++) {
     const sl = (SLOTS || [])[k] || {};
+    if (_rowGiveUp(k)) continue;   // 포기 회는 달력에 안 그림 (2026-10-22)
     const iso = _provIso(($('s1_provDate_' + (k + 1)) || {}).value);
     if (!iso) { if (sl.split && sl.iso) out.push({ iso: sl.iso, hm: sl.hm || '', end: '', k: k }); continue; }
     const a = _to24(($('s1_startTime_' + (k + 1)) || {}).value);
@@ -3175,7 +3187,7 @@ function buildStatusRows(existing) {
         <div style="font-size:10px;color:#666;margin-top:4px;">승인일자</div>
         <input type="text" class="st_apprDate" value="${r.apprDate||''}">
         <div style="font-size:10px;color:#666;margin-top:4px;">승인번호</div>
-        <input type="text" class="st_apprNo" value="${r.apprNo||''}">
+        <input type="text" class="st_apprNo" value="${r.apprNo||''}"${r.exNo ? ' title="' + r.exNo + '"' : ''}>
         <div class="apprWarn no-print" style="display:none;color:#c0392b;font-size:10px;line-height:1.4;margin-top:3px;">승인번호가 없습니다.<br>예외지급 · 포기이면 눌러 주세요<br><button type="button" class="apprPick" data-v="예외지급">예외지급</button><button type="button" class="apprPick" data-v="포기">포기</button></div>
       </td>
       <td>
@@ -3404,6 +3416,7 @@ document.addEventListener('change', e => {
     i = trs.indexOf(t.closest('tr')); k = 'provDate';
   }
   if (i < 0 || !AUTO1[i]) return;
+  if (_rowGiveUp(i)) return;      // 포기 회는 비운 채 (2026-10-22)
   const au = AUTO1[i];
   const v = k === 'provDate' ? (au.d ? au.d.replace(/-/g, '.') : '') : (k === 'startTime' ? (au.a ? _hm12(au.a) : '') : (au.b ? _hm12(au.b) : ''));
   if (!v) return;
@@ -3423,11 +3436,17 @@ function _calPop(html) {
   w.id = '_calPop';
   w.className = 'no-print';
   w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.12);z-index:6000;display:flex;align-items:center;justify-content:center;';
-  w.innerHTML = '<div style="background:#fff;border-radius:12px;padding:18px 20px;width:340px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.2);font-size:13px;">' + html + '</div>';
+  w.innerHTML = '<div style="background:#fff;border-radius:12px;padding:18px 20px;width:430px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.2);font-size:13px;">' + html + '</div>';
   document.body.appendChild(w);
   return w;
 }
 function _calClose() { document.getElementById('_calPop')?.remove(); }
+// 그 회차 승인번호가 「포기」인가 (수업 없는 회)
+function _rowGiveUp(i) {
+  const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
+  const an = tr && tr.querySelector('.st_apprNo');
+  return !!an && String(an.value || '').trim() === '포기';
+}
 // 달력 창 「적용」 = 칸에 넣고 바로 저장 (2026-10-22 은정님 — 「적용」만 누르고 저장 단추를 안 눌러 새로고침하면 되돌아가던 것)
 function _calSave() {
   if (!LOADED || SAVING) return;
@@ -3451,6 +3470,7 @@ function openCalEdit(k, isoPre) {
     '<div id="_cpMsg" style="color:#c62828;font-size:12px;min-height:16px;"></div>' +
     '<div style="display:flex;gap:6px;margin-top:6px;">' +
     '<button type="button" id="_cpAuto" style="flex:1.3;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px;cursor:pointer;">시간표 값으로</button>' +
+    '<button type="button" id="_cpGive" style="flex:1.3;background:#fff;border:1px solid #e0b4ad;color:#c0392b;border-radius:6px;padding:8px;cursor:pointer;">포기 (수업 없음)</button>' +
     '<button type="button" id="_cpNo" style="flex:1;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px;cursor:pointer;">취소</button>' +
     '<button type="button" id="_cpOk" style="flex:1;background:#B07A4A;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:700;cursor:pointer;">적용</button></div>');
   // 시작을 고치면 종료가 +50분으로 따라감 (종료는 다시 고칠 수 있음)
@@ -3459,6 +3479,18 @@ function openCalEdit(k, isoPre) {
     if (a) $('_cpB').value = _hm12(_addMin(a, VOUCH_MIN));
   });
   $('_cpNo').onclick = _calClose;
+  // 포기 — 날짜 · 시각 비움 + 승인번호 「포기」 + 바로 저장 (2026-10-22 은정님)
+  $('_cpGive').onclick = () => {
+    if (!confirm((k + 1) + '회차를 「포기 (수업 없음)」로 바꿀까요?\n\n제공일자 · 시각이 비워지고 승인번호 칸에 「포기」가 적힌 뒤 바로 저장됩니다.')) return;
+    const tr = document.querySelectorAll('#statusTbl tbody tr')[k];
+    const an = tr && tr.querySelector('.st_apprNo');
+    if (an) { an.value = '포기'; an.dispatchEvent(new Event('input', { bubbles: true })); }
+    _calFire(dt, '');
+    _calFire(st, '');
+    if (en) _calFire(en, '');
+    _calClose();
+    _calSave();
+  };
   $('_cpAuto').onclick = () => {
     const au = (typeof AUTO1 !== 'undefined' && AUTO1[k]) || { d: '', a: '', b: '' };
     _calFire(dt, au.d ? au.d.replace(/-/g, '.') : '');
