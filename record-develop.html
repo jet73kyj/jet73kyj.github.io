@@ -1232,19 +1232,28 @@ function _provIso(v) {
   if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
   return y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
 }
-function _hm12(hm) {                       // '16:00' -> '4:00'
+function _hm12(hm) {                       // '16:00' -> '4:00' · '08:10' -> '오전 8:10' (2026-10-22)
   const m = String(hm || '').match(/(\d{1,2}):(\d{2})/);
   if (!m) return '';
-  let h = Number(m[1]); if (h > 12) h -= 12;
+  let h = Number(m[1]);
+  if (h >= 1 && h <= 8) return '오전 ' + h + ':' + m[2];   // 아침 1~8시는 「오전」을 붙여야 다시 읽을 때 오후로 안 바뀜
+  if (h >= 21) return '오후 ' + (h - 12) + ':' + m[2];   // 9시 넘은 저녁도 다시 읽을 때 안 바뀌게
+  if (h > 12) h -= 12;
   return h + ':' + m[2];
 }
 function _to24(v, ref) {                   // '4:00' -> '16:00' (오후 수업 시각에 맞춤)
-  const m = String(v || '').match(/(\d{1,2}):(\d{2})/);
+  const t = String(v || '');
+  const m = t.match(/(\d{1,2}):(\d{2})/);
   if (!m) return null;
   let h = Number(m[1]);
-  if (h >= 1 && h <= 8) h += 12;           // 1~8시는 오후 (센터 운영 9:00~20:20)
+  // 「오전 8:10」 · 「08:10」 처럼 적으면 오전 그대로 (2026-10-22 은정님 — 8:10 이 20:10 으로 바뀌던 것)
+  const am = /오전|am/i.test(t) || /^\s*0\d:/.test(t);
+  const pm = /오후|pm/i.test(t);
+  if (!am && h >= 1 && h <= 8) h += 12;    // 그 밖의 1~8시는 오후 (센터 운영 9:00~20:20)
+  if (pm && h < 12) h = h <= 8 ? h : h + 12;
   return String(h).padStart(2,'0') + ':' + m[2];
 }
+
 function _addMin(hm, add) {
   const m = String(hm || '').match(/(\d{1,2}):(\d{2})/);
   if (!m) return null;
