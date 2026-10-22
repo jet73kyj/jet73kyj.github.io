@@ -92,6 +92,11 @@
   .rc button { padding:4px 10px; font-size:12px; }
   .rc button.saved { background:#EAF4EC; border-color:#9CC7A6; color:#2E6B3E; }
   .rcview { font-size:12px; color:var(--tx); }
+  .okline { margin:0 0 4px; }
+  .okline button { padding:4px 14px; font-size:12px; border-radius:6px; cursor:pointer; }
+  .okline .rcOk { background:#fff; color:#2E6B3E; border:1px solid #9CC7A6; font-weight:700; }
+  .okline .rcUnok { background:#fff; color:var(--dim); border:1px solid var(--line); }
+  .okdone { font-size:12px; color:#2E6B3E; font-weight:700; }
   .legend { font-size:12px; color:var(--dim); line-height:1.9; margin-top:14px; }
   /* 치료사별 한눈에 (2026-10-09) */
   .ovt tr.ovr { cursor:pointer; }
@@ -99,7 +104,7 @@
   .ovt tr.ovr.on td { background:#FBF5EE; font-weight:600; }
   #kindTabs { flex-wrap:wrap; align-items:center; }
   @media print {
-    .hd button, .hd select, .tabs2, .rc button, .legend, #thAll, .smsCopy, .smsMsg { display:none !important; }
+    .hd button, .hd select, .tabs2, .rc button, .okline button, .legend, #thAll, .smsCopy, .smsMsg { display:none !important; }
     body { background:#fff; }
     .card { border:none; padding:0; }
     .rc select, .rc input { border:none; }
@@ -257,6 +262,7 @@ function devDone(r){
 function isDone(r){
   if (r.item_no === 9) return true;
   if (r.item_no === 25) return false;   // 센터가 장을 정리하면 사라짐 (2026-10-22)
+  if (isChecked(r)) return true;        // 원장 [확인] — 확인한 내용과 같을 때만 (2026-10-22)
   if (devDone(r)) return true;
   if (isList(r)) return false;
   const x = RES[rkey(r)];
@@ -278,7 +284,7 @@ async function run(){
   const [a, b, c, lg, st] = await Promise.all([
     sb.rpc('nl_record_check', { p_month: k }),
     sb.from('nl_rc_cases').select('id, grp, name, need_doc, sort_no').eq('active', true).order('sort_no'),
-    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo').eq('month_key', k),
+    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo, checked_at, checked_by, checked_detail').eq('month_key', k),
     // 치료지원 결제 빨강 · 미작성 (발달재활 · 치료지원 · 센터) — 2026-10-09
     sb.rpc('nl_log_check', { p_month: k }),
     isAdmin() ? sb.rpc('nl_rc_stats', { p_year: Number(k.slice(0, 4)) }) : Promise.resolve({ data: null })
@@ -363,13 +369,13 @@ function rcCell(r, i){
   if (dd) return '<span class="rcview" style="color:#2E6B3E;">' + (dd.type === '변경계약' ? '변경 계약서 서명 받음' : '사실 확인서 작성 끝')
                 + (dd.done_on ? ' · ' + esc(String(dd.done_on).slice(5, 10).replace('-', '/')) : '') + '</span>';
   if (r.item_no === 25) return '<span class="rcview" style="color:var(--dim);">센터가 장을 정리하면 사라짐</span>';
-  if (isList(r)) return '<span class="rcview" style="color:var(--dim);">선생님이 고치면 사라짐</span>';
+  if (isList(r)) return '<span class="rcview" style="color:var(--dim);">선생님이 고치면 사라짐</span>' + okHtml(r, i);
   if (!isAdmin()) {
     const c = CASES.find(c => c.id === x.case_id);
     return '<span class="rcview">' + (c ? esc(c.name) + (x.doc_done ? ' · 서류 받음' : '') : '')
-         + (x.memo ? ' · ' + esc(x.memo) : '') + '</span>';
+         + (x.memo ? ' · ' + esc(x.memo) : '') + '</span>' + okHtml(r, i);
   }
-  return '<div class="rc" data-i="' + i + '">'
+  return okHtml(r, i) + '<div class="rc" data-i="' + i + '">'
     + '<select class="rcCase">' + caseOpts(x.case_id) + '</select>'
     + '<label><input type="checkbox" class="rcDoc"' + (x.doc_done ? ' checked' : '') + '> 서류 받음</label>'
     + '<input type="text" class="rcMemo" maxlength="300" placeholder="메모" value="' + esc(x.memo || '') + '">'
@@ -391,7 +397,7 @@ function draw(){
   const n41 = ROWS.filter(r => r.item_no === 41).length;
 
   let h = '<div class="sum">' + monNo(k) + '월 · 남은 점검 <b>' + left.length + '건</b>'
-        + ' · 처리 끝 ' + ROWS.filter(r => counted(r) && !isList(r) && isDone(r)).length + '건'
+        + ' · 처리 끝 ' + ROWS.filter(r => counted(r) && (!isList(r) || isChecked(r)) && isDone(r)).length + '건'
         + (isAdmin() && nList ? ' <button id="sendRc" style="margin-left:8px;">발달 기록지 · 선생님께 알림</button>'
                                 + '<span id="sendRcMsg" style="font-size:12px;margin-left:8px;"></span>' : '')
         + (isAdmin() && n41 ? ' <button id="sendLog" style="margin-left:8px;">미작성 · 선생님께 알림</button>'
@@ -550,6 +556,45 @@ function draw(){
     btn.onclick = () => saveRc(box);
   });
 }
+
+// ── 원장 [확인] (2026-10-22 은정님) ──
+//   특이사항을 보고 맞으면 [확인] → 그 줄은 「남은 것」에서 사라짐
+//   확인한 내용(detail)과 지금 내용이 같을 때만 숨김 — 기록지를 또 고쳐 내용이 바뀌면 다시 나타남
+function isChecked(r){
+  const x = RES[rkey(r)];
+  return !!(x && x.checked_at && String(x.checked_detail || '') === String(r.detail || ''));
+}
+function okHtml(r, i){
+  const x = RES[rkey(r)] || {};
+  if (isChecked(r)) {
+    const d = String(x.checked_at).slice(5, 10).replace('-', '/');
+    return '<div class="okline"><span class="okdone">✓ 확인함 · ' + esc(d) + '</span>'
+      + (isAdmin() ? ' <button type="button" class="rcUnok" data-i="' + i + '">확인 취소</button>' : '') + '</div>';
+  }
+  return isAdmin() ? '<div class="okline"><button type="button" class="rcOk" data-i="' + i + '">확인</button></div>' : '';
+}
+async function setChecked(i, on, btn){
+  const r = ROWS[Number(i)]; if (!r) return;
+  if (btn) { btn.disabled = true; btn.textContent = on ? '확인 중…' : '취소 중…'; }
+  const row = { child_id: r.child_id, month_key: $('mon').value, item_no: r.item_no, item_key: r.item_key || '',
+                checked_at: on ? new Date().toISOString() : null, checked_by: on ? ME.id : null,
+                checked_detail: on ? String(r.detail || '') : null,
+                updated_by: ME.id, updated_at: new Date().toISOString() };
+  const { data, error } = await sb.from('nl_rc_results')
+    .upsert(row, { onConflict: 'child_id,month_key,item_no,item_key' }).select();
+  if (error || !data || !data.length) {
+    if (btn) { btn.disabled = false; btn.textContent = on ? '확인' : '확인 취소'; }
+    alert('저장하지 못했습니다.\n' + (error ? error.message : '돌려받은 줄이 없습니다.'));
+    return;
+  }
+  RES[rkey(r)] = data[0];
+  const y = window.scrollY; draw(); window.scrollTo(0, y);
+}
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('.rcOk, .rcUnok');
+  if (!b || !isAdmin()) return;
+  setChecked(b.dataset.i, b.classList.contains('rcOk'), b);
+});
 
 async function saveRc(box){
   const r = ROWS[Number(box.dataset.i)];
