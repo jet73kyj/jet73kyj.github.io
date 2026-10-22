@@ -5774,7 +5774,11 @@ $('adSave').onclick = async () => {
       from_date: $('ad_start').value || null,
       to_date:   $('ad_end').value   || null
     }).select().single();
-    if (e2) throw e2;
+    if (e2) {
+      // 요일줄이 막히면(수업 시간 겹침 등) 방금 만든 수업 줄도 지운다 — 빈 껍데기 수업이 남지 않게 (2026-10-22)
+      await sb.from('nl_therapies').delete().eq('id', th.id);
+      throw e2;
+    }
 
     const kid = KIDS.find(k => k.id === cid);
     sc._cid = cid; sc._tt = tt; sc.support_type_id = st;
