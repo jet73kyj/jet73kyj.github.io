@@ -1795,7 +1795,7 @@ function openCardEdit(){
 }
 async function saveCard(){
   const v = id => $(id).value.trim();
-  const rrn = v('ct_rrn'), acc = v('ct_acc');
+  const rrn = rrnFmt(v('ct_rrn')), acc = v('ct_acc');
   if (rrn && !/^\d{6}-\d{7}$/.test(rrn)) { alert('주민번호는 000000-0000000 모양으로 적어 주세요.'); return; }
   if (acc && !/^[0-9-]{6,30}$/.test(acc)) { alert('계좌번호는 숫자와 - 만 적어 주세요.'); return; }
   const lics = Array.from($('ct_lics').querySelectorAll('.ctlic'))
@@ -1940,6 +1940,16 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
     location.replace('index.html');
   }
 })();
+// 주민번호 칸 — 숫자만 치면 여섯 자리 뒤에 「-」 저절로 (2026-10-22)
+function rrnFmt(x){
+  const d = String(x || '').replace(/\D/g, '').slice(0, 13);
+  return d.length > 6 ? d.slice(0, 6) + '-' + d.slice(6) : d;
+}
+document.addEventListener('input', e => {
+  if (!e.target || e.target.id !== 'ct_rrn') return;
+  const f = rrnFmt(e.target.value);
+  if (f !== e.target.value) e.target.value = f;
+});
 </script>
 </body>
 </html>
