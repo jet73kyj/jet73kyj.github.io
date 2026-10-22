@@ -3468,6 +3468,45 @@ function _calFire(el, v) {
   el.value = v;
   el.dispatchEvent(new Event('input', { bubbles: true }));
 }
+// 고치기 창 시각 칸 — [오전][오후] 단추 + 숫자 칸 (2026-10-22 은정님 — 8:10 이 늘 오후로 들어가던 것)
+//   칸에는 12시간 숫자만 (8:10) · 오전 · 오후는 단추가 정함
+function _apRow(f, cur, box) {
+  const h24 = _to24(cur || '');
+  const ap = h24 ? (Number(h24.slice(0, 2)) < 12 ? 'am' : 'pm') : 'pm';
+  let shown = '';
+  if (h24) { let h = Number(h24.slice(0, 2)); if (h > 12) h -= 12; if (h === 0) h = 12; shown = h + ':' + h24.slice(3, 5); }
+  const bt = (v, t) => '<button type="button" class="_ap" data-f="' + f + '" data-v="' + v + '" style="padding:6px 8px;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;' +
+    (v === ap ? 'background:#B07A4A;color:#fff;border:1px solid #B07A4A;font-weight:700;' : 'background:#fff;color:#4A433F;border:1px solid #ccc;') + '">' + t + '</button>';
+  return '<div style="display:flex;gap:4px;align-items:center;margin:3px 0 8px;">' + bt('am', '오전') + bt('pm', '오후') +
+    '<input id="_cp' + f + '" type="text" data-ap="' + ap + '" value="' + shown + '" style="' + box + 'margin:0;min-width:0;"></div>';
+}
+function _apSet(f, v) {
+  const inp = $('_cp' + f); if (!inp) return;
+  inp.dataset.ap = v;
+  document.querySelectorAll('#_calPop ._ap[data-f="' + f + '"]').forEach(b => {
+    const on = b.dataset.v === v;
+    b.style.background = on ? '#B07A4A' : '#fff'; b.style.color = on ? '#fff' : '#4A433F';
+    b.style.borderColor = on ? '#B07A4A' : '#ccc'; b.style.fontWeight = on ? '700' : '400';
+  });
+}
+// 칸 숫자 + 오전 · 오후 → 24시간 '08:10' (없으면 null)
+function _apVal(f) {
+  const inp = $('_cp' + f); if (!inp) return null;
+  const m = String(inp.value || '').match(/(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  let h = Number(m[1]); const mm = Number(m[2]);
+  if (h > 23 || mm > 59) return null;
+  if (h <= 12) { if (inp.dataset.ap === 'pm' && h < 12) h += 12; if (inp.dataset.ap === 'am' && h === 12) h = 0; }
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+// 시작에 맞춰 종료 = 시작 + 50분 (오전 · 오후 단추도 함께)
+function _apFollow() {
+  const a = _apVal('A'); if (!a) return;
+  const b = _addMin(a, VOUCH_MIN); let h = Number(b.slice(0, 2));
+  _apSet('B', h < 12 ? 'am' : 'pm');
+  if (h > 12) h -= 12; if (h === 0) h = 12;
+  $('_cpB').value = h + ':' + b.slice(3, 5);
+}
 function openCalEdit(k, isoPre) {
   const dt = $('s1_provDate_' + (k + 1)), st = $('s1_startTime_' + (k + 1)), en = $('s1_endTime_' + (k + 1));
   if (!dt) return;
@@ -3476,19 +3515,24 @@ function openCalEdit(k, isoPre) {
   const w = _calPop(
     '<div style="font-weight:700;color:#6b5a48;margin-bottom:10px;">' + (k + 1) + '회차 고치기</div>' +
     '<label>날짜 (예 2026-09-12)</label><input id="_cpD" type="text" inputmode="numeric" value="' + iso + '" style="' + box + '">' +
-    '<div style="display:flex;gap:8px;"><div style="flex:1"><label>시작 (예 2:50)</label><input id="_cpA" type="text" value="' + ((st && st.value) || '') + '" style="' + box + '"></div>' +
-    '<div style="flex:1"><label>종료</label><input id="_cpB" type="text" value="' + ((en && en.value) || '') + '" style="' + box + '"></div></div>' +
+    '<div style="display:flex;gap:10px;"><div style="flex:1"><label>시작 (예 2:50)</label>' + _apRow('A', st && st.value, box) + '</div>' +
+    '<div style="flex:1"><label>종료</label>' + _apRow('B', en && en.value, box) + '</div></div>' +
     '<div id="_cpMsg" style="color:#c62828;font-size:12px;min-height:16px;"></div>' +
     '<div style="display:flex;gap:6px;margin-top:6px;">' +
     '<button type="button" id="_cpAuto" style="flex:1.3;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px;cursor:pointer;">시간표 값으로</button>' +
     '<button type="button" id="_cpGive" style="flex:1.3;background:#fff;border:1px solid #e0b4ad;color:#c0392b;border-radius:6px;padding:8px;cursor:pointer;">포기 (수업 없음)</button>' +
     '<button type="button" id="_cpNo" style="flex:1;background:#fff;border:1px solid #ccc;border-radius:6px;padding:8px;cursor:pointer;">취소</button>' +
     '<button type="button" id="_cpOk" style="flex:1;background:#B07A4A;color:#fff;border:none;border-radius:6px;padding:8px;font-weight:700;cursor:pointer;">적용</button></div>');
-  // 시작을 고치면 종료가 +50분으로 따라감 (종료는 다시 고칠 수 있음)
-  $('_cpA').addEventListener('input', () => {
-    const a = _to24($('_cpA').value);
-    if (a) $('_cpB').value = _hm12(_addMin(a, VOUCH_MIN));
+  // 오전 · 오후 단추 (2026-10-22 은정님) — 누른 쪽이 카멜색
+  w.querySelectorAll('._ap').forEach(b => b.onclick = () => {
+    _apSet(b.dataset.f, b.dataset.v);
+    if (b.dataset.f === 'A') _apFollow();
   });
+  // 시작을 고치면 종료가 +50분으로 따라감 (종료는 다시 고칠 수 있음) · 오전 · 오후도 함께
+  //   칸에 「오전」 · 「오후」 글자를 적으면 단추가 따라감
+  const _apTyped = f => { const t = $('_cp' + f).value; if (/오전|am/i.test(t)) _apSet(f, 'am'); else if (/오후|pm/i.test(t)) _apSet(f, 'pm'); };
+  $('_cpA').addEventListener('input', () => { _apTyped('A'); _apFollow(); });
+  $('_cpB').addEventListener('input', () => _apTyped('B'));
   $('_cpNo').onclick = _calClose;
   // 포기 — 날짜 · 시각 비움 + 승인번호 「포기」 + 바로 저장 (2026-10-22 은정님)
   $('_cpGive').onclick = () => {
@@ -3519,7 +3563,7 @@ function openCalEdit(k, isoPre) {
       $('_cpMsg').textContent = '날짜를 2026-09-12 모양으로 적어 주세요'; return;
     }
     d = m[1] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[3]).padStart(2, '0');
-    const a = _to24($('_cpA').value), b = _to24($('_cpB').value);
+    const a = _apVal('A'), b = _apVal('B');
     if (String($('_cpA').value || '').trim() && !a) { $('_cpMsg').textContent = '시작 시각을 2:50 모양으로 적어 주세요'; return; }
     if (String($('_cpB').value || '').trim() && !b) { $('_cpMsg').textContent = '종료 시각을 3:40 모양으로 적어 주세요'; return; }
     _calFire(dt, d.replace(/-/g, '.'));
