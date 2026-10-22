@@ -285,8 +285,10 @@ function devDone(r){
                         && ((x.data && (x.data.day === d || x.data.appr === d)))) || null;
   return null;
 }
+function isWriting(r){ return r.item_no === 41 && /작성 중/.test(String(r.detail || '')); }
 function isDone(r){
   if (r.item_no === 9) return true;
+  if (isWriting(r)) return true;        // 기한 전 미작성 = 작성 중 · 오류로 안 봄 (2026-10-23 은정님)
   if (r.item_no === 25) return false;   // 센터가 장을 정리하면 사라짐 (2026-10-22)
   if (isChecked(r)) return true;        // 원장 [확인] — 확인한 내용과 같을 때만 (2026-10-22)
   // 선생님 「작성 끝 · 서명 받음」은 제출 대기 — 원장 · 행정이 종이를 보고 [확인]해야 끝 (2026-10-22 은정님)
@@ -401,7 +403,7 @@ function lineText(r){
 function lineHtml(r, i){
   const it = ITEM[r.item_no] || ['?','g0'];
   const st = r.item_no === 9 ? '' : rcState(r).replace(/^<div class="rcst dim">(선생님이 고치면 사라짐|센터가 장을 정리하면 사라짐)<\/div>$/, '');
-  const ok = r.item_no === 9 ? '' : okHtml(r, i).replace(/^<div class="okline">|<\/div>$/g, '');
+  const ok = (r.item_no === 9 || isWriting(r)) ? '' : okHtml(r, i).replace(/^<div class="okline">|<\/div>$/g, '');
   // 딱지 · 글 · [확인] 세 칸으로 줄 맞춤 (2026-10-22 은정님)
   return '<div class="ln' + (isDone(r) ? ' lndone' : '') + '">'
     + '<span class="lntag"><span class="it ' + it[1] + '">' + esc(it[0]) + '</span></span>'
@@ -462,7 +464,7 @@ function draw(){
   const hit = r => !q || (/^\d+$/.test(q) ? Number(r.child_id) === Number(q)
                                           : String(KIDNM[r.child_id] || '').indexOf(q) >= 0);
   const kindHit = r => KINDV === '전체' || (KINDV === '미작성' ? r.item_no === 41 : r.kind === KINDV);
-  const counted = r => r.item_no !== 9;
+  const counted = r => r.item_no !== 9 && !isWriting(r);
   const left = ROWS.filter(r => !isDone(r) && counted(r));
   const base = (VIEW === 'left' ? ROWS.filter(r => !isDone(r)) : ROWS).filter(hit).filter(kindHit);
   const list = base.filter(r => !THF || Number(r.therapist_id || 0) === THF);
