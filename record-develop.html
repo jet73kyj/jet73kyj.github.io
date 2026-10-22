@@ -2548,8 +2548,9 @@ function rcSugHtml(r, i) {
 // 서버 겹침 글의 「고치는 법」이 이 아동 · 이 회차면 「이대로 고치기」 단추 (2026-10-22)
 //   다른 아동을 고쳐야 하면 글만 (그 아동 기록지에서 고침)
 function rcSug10(r, i) {
-  const m = String(r.detail || '').match(/고치는 법 — (\d+)번 [^\n]*?발달재활 수업 시작을 (오[전후]) (\d+):(\d+)/);
-  if (!m || Number(m[1]) !== Number($('pChild').value) || !r.on_date) return '';
+  const m = String(r.detail || '').match(/(?:^|\n)(\d+)번 ([^\n]*?)수업 시작을 (오[전후]) (\d+):(\d+)/);
+  if (!m || Number(m[1]) !== Number($('pChild').value) || !r.on_date || m[2].indexOf('치료지원') >= 0) return '';
+  m.splice(2, 1);
   const s = (Number(m[3]) % 12 + (m[2] === '오후' ? 12 : 0)) * 60 + Number(m[4]);
   const d = String(r.on_date).slice(0, 10);
   SUG[i] = { fix: { d: d, s: s, e: s + 50 }, text: '' };
