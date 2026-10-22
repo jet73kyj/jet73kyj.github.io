@@ -81,13 +81,14 @@
   .g2 { background:#E6F0FA; color:#2E5E8C; }   /* 나 기록지 */
   .g3 { background:#F1ECFA; color:#5B3E96; }   /* 다 서류 */
   .g0 { background:#EEF1F4; color:#5A6B7B; }   /* 참고 */
-  td.det { line-height:1.5; white-space:pre-wrap; min-width:380px; }   /* 내용 칸 넓게 (2026-10-22) */
+  td.det { line-height:1.5; white-space:pre-wrap; min-width:460px; }   /* 내용 칸 넓게 (2026-10-22) */
   tr.done td { color:#B7B0A9; }
   tr.done td .it { opacity:.55; }
-  .rc { display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-width:180px; max-width:240px; }
-  .rc select { max-width:230px; font-size:12px; padding:4px 6px; }
+  .rc { display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-width:150px; max-width:180px; }
+  .rc .okline { flex-basis:100%; display:flex; gap:8px; align-items:center; margin:0; }
+  .rc select { max-width:175px; font-size:12px; padding:4px 6px; }
   .rc input[type=text] { font:inherit; font-size:12px; padding:4px 7px; border:1px solid var(--line);
-                         border-radius:6px; width:150px; }
+                         border-radius:6px; width:110px; }
   .rc label { font-size:12px; color:var(--tx); white-space:nowrap; }
   .rc button { padding:4px 10px; font-size:12px; }
   .rc button.saved { background:#EAF4EC; border-color:#9CC7A6; color:#2E6B3E; }
@@ -375,9 +376,12 @@ function rcCell(r, i){
     return '<span class="rcview">' + (c ? esc(c.name) + (x.doc_done ? ' · 서류 받음' : '') : '')
          + (x.memo ? ' · ' + esc(x.memo) : '') + '</span>' + okHtml(r, i);
   }
-  return okHtml(r, i) + '<div class="rc" data-i="' + i + '">'
+  // 서류 받음은 [확인] 옆 (2026-10-22 은정님) — 저장은 그대로 아래 「저장」이 함께 한다
+  const doc = '<label><input type="checkbox" class="rcDoc"' + (x.doc_done ? ' checked' : '') + '> 서류 받음</label>';
+  const ok = okHtml(r, i);
+  return '<div class="rc" data-i="' + i + '">'
+    + (ok ? ok.replace(/<\/div>$/, ' ' + doc + '</div>') : '<div class="okline">' + doc + '</div>')
     + '<select class="rcCase">' + caseOpts(x.case_id) + '</select>'
-    + '<label><input type="checkbox" class="rcDoc"' + (x.doc_done ? ' checked' : '') + '> 서류 받음</label>'
     + '<input type="text" class="rcMemo" maxlength="300" placeholder="메모" value="' + esc(x.memo || '') + '">'
     + '<button class="rcSave' + (x.case_id || x.memo ? ' saved' : '') + '">' + (x.case_id || x.memo ? '✓ 저장됨' : '저장') + '</button>'
     + '</div>';
