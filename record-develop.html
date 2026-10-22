@@ -2548,9 +2548,11 @@ function rcSugHtml(r, i) {
 // 서버 겹침 글의 「고치는 법」이 이 아동 · 이 회차면 「이대로 고치기」 단추 (2026-10-22)
 //   다른 아동을 고쳐야 하면 글만 (그 아동 기록지에서 고침)
 function rcSug10(r, i) {
-  const m = String(r.detail || '').match(/(?:^|\n)(\d+)번 ([^\n]*?)수업 시작을 (오[전후]) (\d+):(\d+)/);
-  if (!m || Number(m[1]) !== Number($('pChild').value) || !r.on_date || m[2].indexOf('치료지원') >= 0) return '';
-  m.splice(2, 1);
+  // 마지막 줄 「(아동 이름) [발달] 수업 시작을 오후 5:30으로 바꿔 주세요」 — 이 아동 이름 · 발달일 때만 (2026-10-22)
+  const cid = Number($('pChild').value);
+  const nm = String((KIDS[cid] && KIDS[cid].name) || RCKID[cid] || '').trim();
+  const m = String(r.detail || '').match(/\n([^\n]+?) 수업 시작을 (오[전후]) (\d+):(\d+)/);
+  if (!m || !nm || !r.on_date || (m[1] !== nm && m[1] !== nm + ' 발달')) return '';
   const s = (Number(m[3]) % 12 + (m[2] === '오후' ? 12 : 0)) * 60 + Number(m[4]);
   const d = String(r.on_date).slice(0, 10);
   SUG[i] = { fix: { d: d, s: s, e: s + 50 }, text: '' };
@@ -2649,7 +2651,7 @@ function rcRuleLocal() {
 const RC_SAY = {
   2:'같은 아동 결제가 40분 안에 둘', 3:'그날 수업보다 결제가 많음', 4:'선생님 결제가 다른 아동 결제와 40분 안',
   5:'승인번호 이상', 6:'한 주 3회 이상', 7:'결제 · 예외결제가 4회보다 적음 (수업 포기)', 8:'결제 금액 오류',
-  9:'예외 · 일괄 결제 (참고)', 10:'기록지 시간 겹침', 11:'일정표 날짜와 승인일자가 다름',
+  9:'예외 · 일괄 결제 (참고)', 10:'시간 겹침', 11:'일정표 날짜와 승인일자가 다름',
   13:'바우처 승인번호와 다름', 14:'기록지 없음'
 };
 const RC_FIELDS = { 2:['appr','no'], 3:['appr'], 4:['appr'], 5:['no'], 8:['appr','no'], 10:['start','end'], 13:['no'] };
