@@ -99,7 +99,10 @@
   .rcmemo { font-size:12px; color:#6D4C41; background:#FFF8E1; padding:3px 7px; border-radius:5px; margin-top:4px; }
   .rc input.rcMemo { width:100%; }
   .rcMsg { font-size:11px; color:var(--dim); }
-  .ln { padding:4px 0; border-bottom:1px dashed #EEE7DF; line-height:1.6; }
+  .ln { padding:5px 0; border-bottom:1px dashed #EEE7DF; line-height:1.6;
+        display:grid; grid-template-columns:150px 1fr auto; column-gap:10px; align-items:start; }
+  .ln .lntag { padding-top:1px; }
+  .ln .lntx { min-width:0; }
   .ln:last-of-type { border-bottom:none; }
   .ln .lnd { font-weight:600; }
   .ln .it { white-space:nowrap; max-width:none !important; width:auto !important; display:inline-block; overflow:visible; margin-right:4px; }
@@ -399,10 +402,12 @@ function lineHtml(r, i){
   const it = ITEM[r.item_no] || ['?','g0'];
   const st = r.item_no === 9 ? '' : rcState(r).replace(/^<div class="rcst dim">(선생님이 고치면 사라짐|센터가 장을 정리하면 사라짐)<\/div>$/, '');
   const ok = r.item_no === 9 ? '' : okHtml(r, i).replace(/^<div class="okline">|<\/div>$/g, '');
+  // 딱지 · 글 · [확인] 세 칸으로 줄 맞춤 (2026-10-22 은정님)
   return '<div class="ln' + (isDone(r) ? ' lndone' : '') + '">'
-    + '<span class="it ' + it[1] + '">' + esc(it[0]) + '</span> '
-    + (r.on_date && lineText(r).indexOf(md(r.on_date)) < 0 ? '<b class="lnd">' + md(r.on_date) + '</b> ' : '')
-    + esc(lineText(r)) + (ok ? ' <span class="lnok">' + ok + '</span>' : '') + st + '</div>';
+    + '<span class="lntag"><span class="it ' + it[1] + '">' + esc(it[0]) + '</span></span>'
+    + '<span class="lntx">' + (r.on_date && lineText(r).indexOf(md(r.on_date)) < 0 ? '<b class="lnd">' + md(r.on_date) + '</b> ' : '')
+    + esc(lineText(r)) + st + '</span>'
+    + '<span class="lnok">' + ok + '</span></div>';
 }
 function grpCell(gr){
   const r0 = gr[0], ix = gr.map(r => ROWS.indexOf(r)).join(',');
