@@ -1178,9 +1178,12 @@ function _pairVouchers() {
     .map(v => ({ v, d: dOf(v.apprDate), t: String(v.apprDate || '') }))
     .sort((a, b) => a.t.localeCompare(b.t));
   const used = new Set(), give = {};
-  rows.forEach(r => {                                                // ① 같은 날
+  // ① 같은 날 — 정상결제를 먼저 (소급 · 일괄결제는 다른 날 몫일 수 있어 뒤로 · 2026-10-23 120번)
+  const isLate = p => /소급|일괄/.test(String(p.v.kind || ''));
+  rows.forEach(r => {
     if (!r.d) return;
-    const k = pool.findIndex((p, j) => !used.has(j) && p.d === r.d);
+    let k = pool.findIndex((p, j) => !used.has(j) && p.d === r.d && !isLate(p));
+    if (k < 0) k = pool.findIndex((p, j) => !used.has(j) && p.d === r.d);
     if (k >= 0) { used.add(k); give[r.i] = pool[k].v; }
   });
   const restR = rows.filter(r => !give[r.i]).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999') || a.i - b.i);
@@ -3065,6 +3068,7 @@ function _prefillStatusFromVoucher() {
     exNo: ex ? ('예외결제 ' + (v.appr_no || '') + (v.service_date ? ' · ' + Number(String(v.service_date).slice(5, 7)) + '/' + Number(String(v.service_date).slice(8, 10)) : '')) : '',
     apprDate: ex ? (v.service_date ? String(v.service_date).slice(0, 10).replace(/-/g, '.') : '') : _apprStamp(v),
     apprNo:   ex ? ('예외결제 ' + (v.appr_no || '')).trim() : (v.appr_no || ''),
+    kind: String(v.pay_kind || ''),
     cloth:'', sock:'', wear:'', face:'', health:'', result:'', note:''
     };
   });
