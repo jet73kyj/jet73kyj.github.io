@@ -660,11 +660,28 @@ async function afterLogin(user) {
   CH_RAW.forEach(r => { if (r.nl_children) KIDS[r.nl_children.id] = r.nl_children; });
 
   $('pMonth').value = mkNow();
+  // 새로고침해도 보던 기록지 그대로 (2026-10-22 은정님) — 이 탭에서만 기억 · 탭을 닫으면 잊음
+  let LAST = null;
+  try { LAST = JSON.parse(sessionStorage.getItem('nl_rd_last') || 'null'); } catch (e) {}
+  if (LAST && /^\d{4}-\d{2}$/.test(LAST.mv || '')) $('pMonth').value = LAST.mv;
   await buildChildList();
   drawChildSelect();
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
+  if (LAST && LAST.cid && CHILDREN.some(c => String(c.id) === String(LAST.cid))) {
+    $('pChild').value = String(LAST.cid);
+    const o = $('pChild').options[$('pChild').selectedIndex], q = $('pChildQ');
+    if (q && o) q.value = o.text;
+    await loadOne();
+    if (LAST.y > 0) setTimeout(() => window.scrollTo(0, LAST.y), 50);
+  }
 }
+// 보던 자리(아동 · 달 · 내린 자리)를 이 탭에 적어 둔다
+function _rdRemember() {
+  if (!LOADED || !childId) return;
+  try { sessionStorage.setItem('nl_rd_last', JSON.stringify({ cid: childId, mv: mkNow(), y: Math.round(window.scrollY || 0) })); } catch (e) {}
+}
+window.addEventListener('pagehide', _rdRemember);
 
 // 고른 달에 발달재활 수업이 있던 아동을 모은다
 //   종결 아동도 그 달에 수업이 있었으면 넣는다 (지난 달 기록지를 써야 하므로)
@@ -831,6 +848,7 @@ async function loadOne() {
     fcLoadDocs(cid, mk);
     rpLoad(cid, mk);
     plLoad(cid, mk);
+    _rdRemember();
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
