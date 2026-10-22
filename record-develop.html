@@ -1358,23 +1358,64 @@ document.addEventListener('click', e => {
 // 소급결제 · 일괄결제 회차 — 특이사항에 사유를 적게 안내 (2026-10-22 은정님 · 사업안내 196쪽)
 //   일괄결제 = 지난 수업 몫을 「소급결제」를 누르지 않고 연달아 결제한 것 (바우처 시스템 표기)
 //   특이사항을 적으면 사라짐
+// [소급결제] (2026-10-23 은정님 · 사업안내 195~196쪽)
+//   같은 달 안 수업일 ≠ 결제일 → 특이사항에 구체적 사유 + [소급결제] 단추
+//   누른 표시는 「제공일|결제일」 — 날짜가 바뀌거나 특이사항을 비우면 풀림
+//   결제가 다른 달이면 소급결제가 안 됨 (그 달 안에서만) → 사실 확인서
+function _sogKey(tr) {
+  const prov = _provIso((tr.querySelector('.st_provDate') || {}).value);
+  const am = String((tr.querySelector('.st_apprDate') || {}).value || '').match(/(\d{4})\D(\d{2})\D(\d{2})/);
+  const appr = am ? am[1] + '-' + am[2] + '-' + am[3] : null;
+  return { prov, appr, key: prov && appr ? prov + '|' + appr : '' };
+}
+function _sogOk(tr) {
+  const k = _sogKey(tr);
+  const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
+  return !!(k.key && note && tr.dataset.sog === k.key);
+}
 function _sogWarn() {
   const md = iso => Number(String(iso).slice(5, 7)) + '/' + Number(String(iso).slice(8, 10));
   document.querySelectorAll('#statusTbl tbody tr').forEach(tr => {
     const w = tr.querySelector('.sogWarn'); if (!w) return;
     const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
     const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
+    const k = _sogKey(tr);
+    if (/^(예외|포기$)/.test(no)) { w.style.display = 'none'; w.innerHTML = ''; return; }
+    if (k.prov && k.appr && k.prov !== k.appr) {
+      if (k.prov.slice(0, 7) !== k.appr.slice(0, 7)) {
+        w.innerHTML = '결제(' + md(k.appr) + ')가 수업(' + md(k.prov) + ')과 다른 달 — 소급결제는 그 달 안에서만 됩니다. 위 「사실 확인서」를 작성해 주세요.';
+        w.className = 'sogWarn no-print sbad'; w.style.display = 'block'; return;
+      }
+      if (_sogOk(tr)) {
+        w.innerHTML = '✓ 소급결제 (' + md(k.prov) + ' 수업 · ' + md(k.appr) + ' 결제) <button type="button" class="sogBtn sogOff">풀기</button>';
+        w.className = 'sogWarn no-print sok'; w.style.display = 'block'; return;
+      }
+      w.innerHTML = '소급결제 — 특이사항에 구체적 사유를 반드시 기재.<br>작성 후 <button type="button" class="sogBtn sogOn">소급결제</button> 단추를 눌러 주세요.'
+        + (note ? '' : '<span class="sogTip"> (사유를 먼저 적어 주세요)</span>');
+      w.className = 'sogWarn no-print sneed'; w.style.display = 'block'; return;
+    }
+    // 날짜는 같은데 바우처가 소급 · 일괄결제인 회 — 사유만 안내 (2026-10-22)
     const v = no ? (VOUCHER || []).find(x => String(x.appr_no || '').trim() === no) : null;
     const kind = v ? String(v.pay_kind || '') : '';
     if (!v || note || !/소급|일괄/.test(kind)) { w.style.display = 'none'; w.innerHTML = ''; return; }
-    const m = String(v.paid_at || '').match(/[T ](\d{2}:\d{2})/);
-    const when = (v.service_date ? md(v.service_date) : '') + (m ? ' ' + m[1] : '');
-    w.innerHTML = '⚠ 이 결제(' + esc(when) + ' · ' + esc(kind) + ')는 지난 수업 몫을 결제한 것인가요 (소급결제)?<br>'
-      + '맞으면 특이사항에 사유를 꼭 적어 주세요 (예: 카드 미소지로 9/2 수업을 9/3 결제)'
+    w.innerHTML = '⚠ 이 결제(' + esc(kind) + ')는 지난 수업 몫을 결제한 것인가요 (소급결제)? 맞으면 특이사항에 사유를 꼭 적어 주세요'
       + (/일괄/.test(kind) ? '<br>· 앞으로는 단말기에서 「소급결제」를 누르고 결제해 주세요' : '');
-    w.style.display = 'block';
+    w.className = 'sogWarn no-print sneed'; w.style.display = 'block';
   });
 }
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('.sogBtn');
+  if (!b) return;
+  const tr = b.closest('tr'); if (!tr) return;
+  if (b.classList.contains('sogOn')) {
+    const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
+    if (!note) { alert('특이사항에 사유를 먼저 적어 주세요.\n(예: 카드 미소지로 9/12 수업을 9/19 결제)'); const t = tr.querySelector('.st_note'); if (t) t.focus(); return; }
+    tr.dataset.sog = _sogKey(tr).key;
+  } else tr.dataset.sog = '';
+  if (typeof markDirty === 'function') markDirty(); else { DIRTY = true; if (typeof setSaveBtn === 'function') setSaveBtn('before'); }
+  _sogWarn();
+  try { rcDraw(); } catch (er) {}
+});
 document.addEventListener('input', e => {
   if (e.target && e.target.classList && (e.target.classList.contains('st_note') || e.target.classList.contains('st_apprNo'))) { try { _sogWarn(); } catch (er) {} }
 });
@@ -1597,7 +1638,8 @@ function _statusRows() {
       cloth: (r.state_json||{}).cloth || '', sock: (r.state_json||{}).sock || '',
       wear:  (r.state_json||{}).wear  || '', face: (r.state_json||{}).face || '',
       health:(r.state_json||{}).health|| '',
-      result: r.reaction || '', note: r.staff_memo || ''
+      result: r.reaction || '', note: r.staff_memo || '',
+      sog: (r.state_json || {}).sog || ''          // [소급결제] 누른 표시 「제공일|결제일」 (2026-10-23)
     };
   });
 }
@@ -1891,7 +1933,9 @@ function fcCases() {
     const v = VOUCHER.find(x => String(x.appr_no || '').trim() === no) || null;
     const vname = v ? String(v.therapist_name || '').trim() : '';
     const why = [];
-    if (prov && appr && prov !== appr) why.push('date');
+    // 같은 달 수업일 ≠ 결제일은 소급결제 — 특이사항 + [소급결제] (사업안내 195~196쪽 · 2026-10-23 은정님)
+    //   사실 확인서는 결제가 다른 달일 때만
+    if (prov && appr && prov !== appr && prov.slice(0, 7) !== appr.slice(0, 7)) why.push('date');
     if (vname && tname && vname.replace(/\s/g, '') !== tname.replace(/\s/g, '')) why.push('th');
     const amt = (RCSRV || []).filter(r => Number(r.item_no) === 8
                   && r.on_date && String(r.on_date).slice(0, 10) === appr);   // 날짜 없는 금액 항목은 회차에 안 붙임
@@ -2470,7 +2514,7 @@ const RC_ITEM = {
   6:'주 3회 이상', 7:'수업 포기', 8:'결제금액 불일치', 9:'예외 · 일괄 (참고)',
   10:'시간 겹침', 11:'일정표 ↔ 승인일자', 14:'미작성',
   15:'변경계약서 · 본인부담금', 16:'변경계약서 · 담당 변경', 18:'제공일자 ≠ 승인일자', 19:'쪼개기 보강 공란', 20:'시간 겹침', 21:'제공시간 50분 아님', 22:'승인번호 두 번', 23:'다른 달 날짜',
-  24:'다른 날 결제 (사실 확인서)'
+  24:'다른 날 결제'
 };
 async function loadRcBox(cid, mk) {
   const box = $('rcBox');
@@ -2547,7 +2591,7 @@ function rcLocal() {
     }
     // 18 제공일자 ≠ 승인일자 (특이사항이 비었을 때)
     const isEx = /^예외/.test(String(tr.querySelector('.st_apprNo').value || '').trim());   // 예외결제는 결제일이 다름 (2026-10-22)
-    if (prov && appr && prov !== appr && !note && !isEx) {   // 결제일 대안 → 없으면 사실 확인서 (2026-10-10 은정님)
+    if (prov && appr && prov !== appr && !_sogOk(tr) && !isEx) {   // 특이사항 + [소급결제]까지 (2026-10-23 은정님)
       out.push({ item_no: 18, i, f: ['prov','appr'], on_date: prov,
         msg: '결제일 ' + md(appr) + ' · 제공일자 ' + md(prov) + ' — 수정 필요', detail: (i + 1) + '회째 · 제공일자 ' + mmdd(prov)
         + ' · 승인일자 ' + mmdd(appr) });
@@ -3047,7 +3091,8 @@ async function saveRecord() {
         state_json: tr ? { cloth:sel(tr,'cloth'), sock:sel(tr,'sock'), wear:sel(tr,'wear'),
                            face:sel(tr,'face'), health:sel(tr,'health'),
                            apprMan: _apprIsMan(i, tr),                   // 승인 칸 직접 고침 (2026-10-06)
-                           apprAt: _apprIsMan(i, tr) ? (String(tr.querySelector('.st_apprDate').value || '').trim() || null) : null } : null,
+                           apprAt: _apprIsMan(i, tr) ? (String(tr.querySelector('.st_apprDate').value || '').trim() || null) : null,
+                           sog: _sogOk(tr) ? tr.dataset.sog : null } : null,   // [소급결제] (2026-10-23)
         // 결석 · 보강은 시간표에서 관리 — 기록지 회차는 수업한 회만 (2026-10-02)
         status: '출석',
         absent_reason: null,
@@ -3442,6 +3487,7 @@ function buildStatusRows(existing) {
   const rows = existing && existing.length ? existing : [{},{},{},{}];
   rows.forEach((r,idx) => {
     const tr = document.createElement('tr');
+    tr.dataset.sog = r.sog || '';
     tr.innerHTML = `
       <td>
         <div style="font-size:10px;color:#666;">서비스 제공일자</div>
@@ -3478,7 +3524,7 @@ function buildStatusRows(existing) {
         <textarea class="st_result" style="min-height:100px;">${r.result||''}</textarea>
         <div style="font-size:10px;color:#666;margin-top:6px;">특이사항 :</div>
         <textarea class="st_note" style="min-height:40px;">${r.note||''}</textarea>
-        <div class="sogWarn no-print" style="display:none;color:#B5651D;font-size:10.5px;line-height:1.45;margin-top:3px;"></div>
+        <div class="sogWarn no-print" style="display:none;"></div>
       </td>`;
     // 저장해 둔 「이용자 상태」를 다시 켜 준다
     //   (이것이 없어서 저장은 됐는데 다시 열면 안 보였다)
@@ -3614,6 +3660,16 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
                    border:1px solid #C9A27E; background:#fff; color:#B07A4A; font-weight:700; cursor:pointer; }
   #kbBackTxt { font-size:14px; font-weight:700; color:#2F2926; }
   @media print { #kbBack { display:none !important; } }
+  /* [소급결제] (2026-10-23) */
+  .sogWarn { font-size:10.5px; line-height:1.5; margin-top:3px; padding:3px 6px; border-radius:5px; }
+  .sogWarn.sneed { color:#B5651D; background:#FFF4E5; }
+  .sogWarn.sok { color:#2E6B3E; background:#EAF4EC; }
+  .sogWarn.sbad { color:#B3261E; background:#FDECEA; }
+  .sogWarn button { width:auto !important; margin:0 2px !important; padding:1px 8px; font-size:10.5px; border-radius:5px; cursor:pointer; }
+  .sogWarn .sogOn { background:#B5651D; color:#fff; border:1px solid #B5651D; font-weight:700; }
+  .sogWarn .sogOff { background:#fff; color:#666; border:1px solid #ccc; }
+  .sogWarn .sogTip { color:#999; }
+  @media print { .sogWarn { display:none !important; } }
   @media print { #kbBox { display:none !important; } }
 </style>
 <script>
