@@ -381,6 +381,20 @@ async function afterLogin(user) {
   drawKidList();
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
+  // 주소로 아동 · 달을 받으면 그 기록지 (기록지 점검 [기록지 열기] · 2026-10-22)
+  const _q = new URLSearchParams(location.search), _qc = _q.get('c'), _qm = _q.get('m'), _qs = _q.get('s');
+  if (/^\d+$/.test(_qc || '') && /^\d{4}-\d{2}$/.test(_qm || '')) {
+    if ($('pMonth').value !== _qm) { $('pMonth').value = _qm; await buildPairs(); drawKidList(); }
+    const _qt = _q.get('t');
+    let i = PAIRS.findIndex(p => String(p.child.id) === _qc && (!_qt || (p.ths || []).map(String).includes(_qt)));
+    if (i < 0) i = PAIRS.findIndex(p => String(p.child.id) === _qc);
+    if (i >= 0 && PAIRS[i].dup && $('pAll') && !$('pAll').checked) { $('pAll').checked = true; drawKidList(); }
+    if (i >= 0) {
+      $('pChild').value = String(i);
+      const o = $('pChild').options[$('pChild').selectedIndex], qq = $('pChildQ'); if (qq && o) qq.value = o.text;
+      await loadOne();
+    } else alert(Number(_qm.slice(5)) + '월 목록에 그 아동이 없습니다.');
+  }
 }
 
 // 셈은 서버 한 곳 — nl_live_rows(달, 유예개월) 가 「그 달에 살아 있던 수업」을 돌려준다 (2026-09-19)

@@ -666,8 +666,12 @@ async function afterLogin(user) {
   // 새로고침해도 보던 기록지 그대로 (2026-10-22 은정님) — 이 탭에서만 기억 · 탭을 닫으면 잊음
   let LAST = null;
   try { LAST = JSON.parse(sessionStorage.getItem('nl_rd_last') || 'null'); } catch (e) {}
+  // 주소로 아동 · 달을 받으면 그 기록지 (기록지 점검 [기록지 열기] · 2026-10-22)
+  const _q = new URLSearchParams(location.search);
+  if (/^\d+$/.test(_q.get('c') || '') && /^\d{4}-\d{2}$/.test(_q.get('m') || '')) LAST = { cid: _q.get('c'), mv: _q.get('m') };
   if (LAST && /^\d{4}-\d{2}$/.test(LAST.mv || '')) $('pMonth').value = LAST.mv;
   await buildChildList();
+  if (LAST && LAST.cid && !CHILDREN.some(c => String(c.id) === String(LAST.cid)) && KIDS[LAST.cid]) CHILDREN.push(KIDS[LAST.cid]);
   drawChildSelect();
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
@@ -837,7 +841,7 @@ async function kbMonth(k) {
   return out;
 }
 async function kbLoad() {
-  const box = $('kbBox'); if (!box || !ME) return;
+  const box = $('kbBox'); if (!box || !ME || _isAllView(ME.role)) return;
   const req = ++KB_REQ, mv = $('pMonth').value || mkNow(), now = _kbToday();
   const months = [];
   for (let k = _kbMon(now, -6) < KB_FROM ? KB_FROM : _kbMon(now, -6); k < now; k = _kbMon(k, 1)) if (k !== mv) months.push(k);
@@ -859,6 +863,13 @@ async function kbLoad() {
 // 첫 화면은 단추만 · 단추를 누르면 기록지만 (2026-10-22 은정님)
 let KB_VIEW = 'list';
 function kbView(v) {
+  // 원장 · 행정은 단추 없이 전처럼 (기록지 점검의 [기록지 열기]로 들어옴 · 2026-10-22 은정님)
+  if (ME && _isAllView(ME.role)) {
+    KB_VIEW = 'sheet';
+    $('kbBox').style.display = 'none'; $('kbBack').style.display = 'none';
+    const c0 = document.querySelector('.container'); if (c0) c0.style.display = '';
+    return;
+  }
   KB_VIEW = v;
   const cont = document.querySelector('.container');
   $('kbBox').style.display = v === 'list' ? '' : 'none';

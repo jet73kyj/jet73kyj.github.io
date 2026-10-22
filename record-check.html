@@ -99,6 +99,9 @@
   .rcmemo { font-size:12px; color:#6D4C41; background:#FFF8E1; padding:3px 7px; border-radius:5px; margin-top:4px; }
   .rc input.rcMemo { width:100%; }
   .rcMsg { font-size:11px; color:var(--dim); }
+  a.rcopen { display:inline-block; margin:2px 0 4px; font-size:12px; color:#0c447c; background:#e3f0fb; border:1px solid #85b7eb;
+             border-radius:6px; padding:3px 9px; text-decoration:none; white-space:nowrap; }
+  @media print { a.rcopen { display:none !important; } }
   .rcMsg.good { color:#2E6B3E; } .rcMsg.bad { color:var(--coralT); }
   .okline { margin:0 0 4px; }
   .okline button { padding:4px 14px; font-size:12px; border-radius:6px; cursor:pointer; }
@@ -389,10 +392,18 @@ function rcState(r){
   }
   return '';
 }
+// [기록지 열기] — 새 탭에 그 아동 · 그 달 기록지 (2026-10-22 은정님) · 닫고 돌아오면 점검이 다시 셈
+function openLink(r){
+  const f = r.kind === '치료지원' ? 'record-support.html' : r.kind === '센터' ? 'record-center.html' : 'record-develop.html';
+  let u = f + '?c=' + encodeURIComponent(r.child_id) + '&m=' + encodeURIComponent($('mon').value);
+  if (r.kind === '치료지원' && r.support_type_id) u += '&s=' + encodeURIComponent(r.support_type_id);
+  if (r.kind === '센터' && r.therapist_id) u += '&t=' + encodeURIComponent(r.therapist_id);
+  return '<a class="rcopen" href="' + u + '" target="_blank" rel="noopener">기록지 열기 ↗</a>';
+}
 function rcCell(r, i){
   const x = RES[rkey(r)] || {};
-  if (r.item_no === 9) return '<span class="rcview">참고</span>';
-  const st = rcState(r), ok = okHtml(r, i);
+  if (r.item_no === 9) return '<span class="rcview">참고</span>' + (r.child_id ? openLink(r) : '');
+  const st = rcState(r), ok = okHtml(r, i) + (r.child_id ? openLink(r) : '');
   if (!isAdmin())
     return st + ok + (x.memo ? '<div class="rcmemo">메모 · ' + esc(x.memo) + '</div>' : '');
   return '<div class="rc" data-i="' + i + '">' + st + ok
