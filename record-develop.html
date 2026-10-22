@@ -1401,6 +1401,8 @@ document.addEventListener('click', e => {
   an.value = b.dataset.v;
   an.dispatchEvent(new Event('input', { bubbles: true }));
   _apprWarn();
+  if (typeof SAVING !== 'undefined' && SAVING) return;
+  saveRecord();                                   // [예외결제] · [포기]도 바로 저장 (2026-10-23)
 });
 // 소급결제 · 일괄결제 회차 — 특이사항에 사유를 적게 안내 (2026-10-22 은정님 · 사업안내 196쪽)
 //   일괄결제 = 지난 수업 몫을 「소급결제」를 누르지 않고 연달아 결제한 것 (바우처 시스템 표기)
@@ -2692,7 +2694,7 @@ function rcDraw() {
 //   규칙  ① 기록지 한 회 = 시작부터 50분  ② 1:1 — 선생님 · 아동 50분이 겹치면 안 됨
 //         ③ 카드 결제는 시작 30분 뒤부터
 //   겹침은 발달재활 · 치료지원(언어 · 작업)끼리만 (센터 · 방과후 시간은 써도 됨) — 서버 nl_dev_busy 한 곳
-//   찾으면 「이대로 고치기」 → 제공날짜 · 시작 · 종료 칸에 넣음 (저장은 선생님이)
+//   찾으면 「이대로 고치기」 → 제공날짜 · 시작 · 종료 칸에 넣고 바로 저장 (2026-10-23)
 //   못 찾으면 경우를 가려 사실 확인서 예시를 미리 고름 (SUG[i].ex)
 // ═════════════════════════════════════════════
 let BUSY = {};             // '날짜|선생님' -> 바쁜 시간 줄 (또는 'loading')
@@ -2856,13 +2858,16 @@ document.addEventListener('click', e => {
   if (!g || !g.fix) return;
   const hm = n => _hm12(_hhmm(n));
   if (!confirm((i + 1) + '회째를 ' + g.fix.d + ' ' + _t12(g.fix.s) + '~' + _t12(g.fix.e)
-               + ' 로 고칠까요?\n(제공날짜 · 시작 · 종료 칸이 바뀝니다. 저장은 「저장」을 눌러야 됩니다)')) return;
+               + ' 로 고칠까요?\n(제공날짜 · 시작 · 종료 칸이 바뀌고 바로 저장됩니다)')) return;
   _calFire($('s1_provDate_' + (i + 1)), g.fix.d.replace(/-/g, '.'));
   _calFire($('s1_startTime_' + (i + 1)), hm(g.fix.s));
   _calFire($('s1_endTime_' + (i + 1)), hm(g.fix.e));
   const tr = document.querySelectorAll('#statusTbl tbody tr')[i];
   const sp = tr && tr.querySelector('.st_provDate');
   if (sp && _provIso(sp.value) !== g.fix.d) _calFire(sp, g.fix.d.replace(/-/g, '.'));
+  // 바로 저장 — 새로고침해도 안 풀리게 (2026-10-23 은정님 · [소급결제] · 달력 「적용」과 같게)
+  if (typeof SAVING !== 'undefined' && SAVING) return;
+  saveRecord();
 });
 (function () {
   const st = document.createElement('style');
