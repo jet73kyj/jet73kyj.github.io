@@ -1463,6 +1463,9 @@ document.addEventListener('click', e => {
   if (typeof markDirty === 'function') markDirty(); else { DIRTY = true; if (typeof setSaveBtn === 'function') setSaveBtn('before'); }
   _sogWarn();
   try { rcDraw(); } catch (er) {}
+  // 누르는 순간 바로 저장 — 새로고침해도 안 풀리게 (2026-10-23 은정님 · 달력 「적용」과 같게)
+  if (typeof SAVING !== 'undefined' && SAVING) return;
+  saveRecord();
 });
 document.addEventListener('input', e => {
   if (e.target && e.target.classList && (e.target.classList.contains('st_note') || e.target.classList.contains('st_apprNo'))) { try { _sogWarn(); } catch (er) {} }
