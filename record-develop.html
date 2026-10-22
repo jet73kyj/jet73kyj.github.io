@@ -2381,10 +2381,11 @@ function rcDraw() {
   rcClearMarks();
   if (RCSRV === null) { fcRefresh(); return; }
   // 15 · 16 (변경 계약서)은 위 붉은 상자가 맡는다
-  const ov = rcOverlapLocal();
-  const ovRows = new Set(ov.map(r => r.i));
+  // 같은 회차에 서버 겹침(10번 · 선생님 · 날짜 · 아동 · 사업 · 고치는 법)이 있으면 서버 글을 쓴다 (2026-10-22)
+  //   화면 겹침(20번)은 서버가 아직 못 본 회차(저장 전 고친 칸)만
+  const srvOv = new Set(RCSRV.filter(r => Number(r.item_no) === 10).map(r => rcRowOf(r)).filter(i => i != null));
+  const ov = rcOverlapLocal().filter(r => !srvOv.has(r.i));
   const rows = RCSRV.filter(r => !RC_LOCAL.has(Number(r.item_no)) && ![15, 16].includes(Number(r.item_no)))
-    .filter(r => !(Number(r.item_no) === 10 && ovRows.has(rcRowOf(r))))   // 같은 겹침은 한 번만
     .concat(rcLocal()).concat(ov).concat(rcRuleLocal());
   let bad = 0;
   rows.forEach(r => { if (rcPlace(r)) bad++; });
@@ -2518,6 +2519,7 @@ const FC_EXNAME = { 1:'카드 미소지 — 다음 타임에 소급 결제', 2:'
 function rcSugHtml(r, i) {
   const n = Number(r.item_no);
   if (i == null) return '';
+  if (n === 10) return rcSug10(r, i);
   if (n === 3) return '<div class="rcsug">→ 2타임 연속 수업이면 오류가 아닙니다. 둘째 결제가 둘째 시작 30분 뒤면 사유서(예시 3 · '
                       + FC_EXNAME[3] + ')를 남겨 주세요</div>';
   if (![1, 12, 18, 19, 20].includes(n) || RC_SUGSHOWN[i]) return '';
@@ -2542,6 +2544,17 @@ function rcSugHtml(r, i) {
       + ' · 승인번호 ' + esc(x.no) + ' — 결제 앞 50분이 비지 않습니다. 실제 수업한 날짜와 시간을 적어 주세요</div>';
   }
   return '<div class="rcsug">→ ' + esc(g.text) + '</div>';
+}
+// 서버 겹침 글의 「고치는 법」이 이 아동 · 이 회차면 「이대로 고치기」 단추 (2026-10-22)
+//   다른 아동을 고쳐야 하면 글만 (그 아동 기록지에서 고침)
+function rcSug10(r, i) {
+  const m = String(r.detail || '').match(/고치는 법 — (\d+)번 [^\n]*?발달재활 수업 시작을 (오[전후]) (\d+):(\d+)/);
+  if (!m || Number(m[1]) !== Number($('pChild').value) || !r.on_date) return '';
+  const s = (Number(m[3]) % 12 + (m[2] === '오후' ? 12 : 0)) * 60 + Number(m[4]);
+  const d = String(r.on_date).slice(0, 10);
+  SUG[i] = { fix: { d: d, s: s, e: s + 50 }, text: '' };
+  return '<div class="rcsug">→ ' + (i + 1) + '회째를 ' + _hhmm(s) + '~' + _hhmm(s + 50)
+       + ' 로 <button type="button" class="rcfix" data-rcfix="' + i + '">이대로 고치기</button></div>';
 }
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-rcfix]');
@@ -2635,7 +2648,7 @@ function rcRuleLocal() {
 const RC_SAY = {
   2:'같은 아동 결제가 40분 안에 둘', 3:'그날 수업보다 결제가 많음', 4:'선생님 결제가 다른 아동 결제와 40분 안',
   5:'승인번호 이상', 6:'한 주 3회 이상', 7:'결제 · 예외결제가 4회보다 적음 (수업 포기)', 8:'결제 금액 오류',
-  9:'예외 · 일괄 결제 (참고)', 10:'같은 시간에 다른 아동 기록지가 있음', 11:'일정표 날짜와 승인일자가 다름',
+  9:'예외 · 일괄 결제 (참고)', 10:'기록지 시간 겹침', 11:'일정표 날짜와 승인일자가 다름',
   13:'바우처 승인번호와 다름', 14:'기록지 없음'
 };
 const RC_FIELDS = { 2:['appr','no'], 3:['appr'], 4:['appr'], 5:['no'], 8:['appr','no'], 10:['start','end'], 13:['no'] };
