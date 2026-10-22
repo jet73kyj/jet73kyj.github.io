@@ -1274,6 +1274,7 @@ function _provIso(v) {
   if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
   return y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
 }
+const _t12 = n => _hm12(_hhmm(n));          // 분 → 「6:20」 모양 (점검 글 · 2026-10-22)
 function _hm12(hm) {                       // '16:00' -> '4:00' · '08:10' -> '오전 8:10' (2026-10-22)
   const m = String(hm || '').match(/(\d{1,2}):(\d{2})/);
   if (!m) return '';
@@ -2474,8 +2475,8 @@ function rcSuggest(i) {
   if (own.length && !(x.prov === D && x.st === own[0])) {
     const s0 = own[0];
     return { fix: { d: D, s: s0, e: s0 + 50 },
-             text: md(D) + ' ' + _hhmm(s0) + ' 에 이 아동 발달 수업이 있습니다 — ' + md(D) + ' ' + _hhmm(s0) + '~' + _hhmm(s0 + 50)
-                   + ' 로 고치면 해결됩니다 (결제 ' + _hhmm(P) + ' · 시작 ' + (P - s0) + '분 뒤)'
+             text: md(D) + ' ' + _t12(s0) + ' 에 이 아동 발달 수업이 있습니다 — ' + md(D) + ' ' + _t12(s0) + '~' + _t12(s0 + 50)
+                   + ' 로 고치면 해결됩니다 (결제 ' + _t12(P) + ' · 시작 ' + (P - s0) + '분 뒤)'
                    + (P > s0 + 50 + 60 ? ' · 수업 끝나고 ' + (P - s0 - 50) + '분 뒤 결제라 소급 결제면 사실 확인서(예시 1)도 남겨 주세요' : '') };
   }
   // 나) 결제 시각에서 거꾸로 빈 50분 찾기 — 이 회차 자기 수업 줄은 뺀다
@@ -2498,7 +2499,7 @@ function rcSuggest(i) {
   const hit = cand.find(c => c >= 9 * 60 && c + 50 <= 20 * 60 + 20 && free(c));
   if (hit != null) {
     return { fix: { d: D, s: hit, e: hit + 50 },
-             text: md(D) + ' ' + _hhmm(hit) + '~' + _hhmm(hit + 50) + ' 로 고치면 해결됩니다 (결제 ' + _hhmm(P)
+             text: md(D) + ' ' + _t12(hit) + '~' + _t12(hit + 50) + ' 로 고치면 해결됩니다 (결제 ' + _t12(P)
                    + ' · 시작 ' + (P - hit) + '분 뒤 · 선생님 · 아동 시간 비어 있음)' };
   }
   // 다) 빈 자리가 없음 → 경우 가리기 (사실 확인서 예시)
@@ -2556,7 +2557,7 @@ function rcSug10(r, i) {
   const s = (Number(m[3]) % 12 + (m[2] === '오후' ? 12 : 0)) * 60 + Number(m[4]);
   const d = String(r.on_date).slice(0, 10);
   SUG[i] = { fix: { d: d, s: s, e: s + 50 }, text: '' };
-  return '<div class="rcsug">→ ' + (i + 1) + '회째를 ' + _hhmm(s) + '~' + _hhmm(s + 50)
+  return '<div class="rcsug">→ ' + (i + 1) + '회째를 ' + _t12(s) + '~' + _t12(s + 50)
        + ' 로 <button type="button" class="rcfix" data-rcfix="' + i + '">이대로 고치기</button></div>';
 }
 document.addEventListener('click', e => {
@@ -2565,7 +2566,7 @@ document.addEventListener('click', e => {
   const i = Number(b.dataset.rcfix), g = SUG[i];
   if (!g || !g.fix) return;
   const hm = n => _hm12(_hhmm(n));
-  if (!confirm((i + 1) + '회째를 ' + g.fix.d + ' ' + _hhmm(g.fix.s) + '~' + _hhmm(g.fix.e)
+  if (!confirm((i + 1) + '회째를 ' + g.fix.d + ' ' + _t12(g.fix.s) + '~' + _t12(g.fix.e)
                + ' 로 고칠까요?\n(제공날짜 · 시작 · 종료 칸이 바뀝니다. 저장은 「저장」을 눌러야 됩니다)')) return;
   _calFire($('s1_provDate_' + (i + 1)), g.fix.d.replace(/-/g, '.'));
   _calFire($('s1_startTime_' + (i + 1)), hm(g.fix.s));
@@ -2609,15 +2610,15 @@ function rcOverlapLocal() {
       .forEach(r => {
         const a = _m(r.st), b = _m(r.en);
         if (a == null || b == null || !(x.st < b && en > a)) return;
-        hits.push((r.mine ? '이 아동 ' : '선생님 다른 아동 ') + (RC_ST[r.support_type_id] || '') + ' ' + _hhmm(a) + '~' + _hhmm(b));
+        hits.push((r.mine ? '이 아동 ' : '선생님 다른 아동 ') + (RC_ST[r.support_type_id] || '') + ' ' + _t12(a) + '~' + _t12(b));
       });
     for (let k = 0; k < SESSIONS; k++) if (k !== i) {
       const y = rcRowInfo(k);
       if (y && y.prov === x.prov && y.st != null && x.st < y.st + 50 && en > y.st)
-        hits.push('이 아동 ' + (k + 1) + '회째 기록지 ' + _hhmm(y.st) + '~' + _hhmm(y.st + 50));
+        hits.push('이 아동 ' + (k + 1) + '회째 기록지 ' + _t12(y.st) + '~' + _t12(y.st + 50));
     }
     if (hits.length) out.push({ item_no: 20, i, f: ['start', 'end'], on_date: x.prov,
-      msg: _hhmm(x.st) + '~' + _hhmm(en) + ' 이 겹칩니다 — ' + [...new Set(hits)].join(' · ') });
+      msg: _t12(x.st) + '~' + _t12(en) + ' 이 겹칩니다 — ' + [...new Set(hits)].join(' · ') });
   }
   return out;
 }
@@ -2633,7 +2634,7 @@ function rcRuleLocal() {
     const en = _m(_to24(($('s1_endTime_' + (i + 1)) || {}).value));
     if (x.st != null && en != null && en - x.st !== 50)
       out.push({ item_no: 21, i, f: ['start', 'end'], on_date: x.prov,
-        msg: '제공시간이 ' + (en - x.st) + '분입니다 — 시작부터 50분 (' + _hhmm(x.st) + '~' + _hhmm(x.st + 50) + ')이어야 합니다' });
+        msg: '제공시간이 ' + (en - x.st) + '분입니다 — 시작부터 50분 (' + _t12(x.st) + '~' + _t12(x.st + 50) + ')이어야 합니다' });
     if (x.prov && x.prov.slice(0, 7) !== mk)
       out.push({ item_no: 23, i, f: ['prov'], on_date: x.prov,
         msg: '제공일자(' + Number(x.prov.slice(5, 7)) + '/' + Number(x.prov.slice(8, 10)) + ')가 ' + month + '월이 아닙니다 — 제공일자는 그 달만 됩니다' });
@@ -3060,7 +3061,7 @@ function buildCalendar() {
         let evtDefault = '';
         const _iso = mkc + '-' + String(day).padStart(2, '0');
         _calEntries().filter(sl => sl.iso === _iso).forEach(sl => {
-          const t = sl.hm ? sl.hm + '~' + (sl.end || _addMin(sl.hm, VOUCH_MIN)) : '';
+          const t = sl.hm ? _hm12(sl.hm) + '~' + _hm12(sl.end || _addMin(sl.hm, VOUCH_MIN)) : '';   // 6:20 모양으로 (2026-10-22)
           evtDefault += `<div class="evt-item" data-k="${sl.k}" title="${sl.k + 1}회차 — 눌러서 날짜 · 시각 고치기"><div class="evt-svc" style="color:#1b5e20;font-weight:bold;">${svcType}</div>${t ? `<div class="evt-time">${t}</div>` : ''}</div>`;
         });
         // 결석/보강 단추는 뺐다 — 결석 · 보강은 시간표에서 (2026-10-02)
