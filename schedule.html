@@ -2322,7 +2322,7 @@ const CAN_SEE = [1,2,3,4,5,6,7,8,19,11];   // 11 = 데스크
 let ROWS = [];          // 수업(요일) — 보고 있는 달 것만
 let ROWS_ALL = [];      // 수업(요일) 전체
 let THS  = [];          // 화면에 보이는 치료사
-let THS_ALL = [];       // 치료사 1~7 전부
+let THS_ALL = [];       // 재직 치료사 전부 (역할 치료사)
 let SESS = [];          // 그 달 회기 전체
 // 상자(결석·모자란·넘어온) 셈에만 쓰는 자료 — 치료사가 맡은 아동의 다른 수업까지
 let BOX_SESS = [], BOX_ROWS = [];
@@ -4724,8 +4724,8 @@ function drawSideTh(){
       const p = b.dataset.pick;
       // 언어치료(심리 포함) = 1·2·3 / 작업치료(작업·전산·감통) = 4·6·7
       if (p === 'all')  THPICK = new Set(ids);
-      if (p === 'lang') THPICK = new Set(ids.filter(i => [1,2,3].includes(i)));
-      if (p === 'sens') THPICK = new Set(ids.filter(i => [4,6,7].includes(i)));
+      if (p === 'lang') THPICK = new Set(ids.filter(i => RULE[1].concat(RULE[7] || []).includes(i)));
+      if (p === 'sens') THPICK = new Set(ids.filter(i => RULE[2].concat(RULE[3], RULE[4]).includes(i)));
       drawSideTh();
       draw();
     });
@@ -8807,9 +8807,7 @@ function mkThSetup(s, has) {
   const cur = has ? Number(has.therapist_id) : orig;
   // 2026-09-15 은정님 정함 — 보강 선생님은 치료 종류와 상관없이 1~7번 누구나 고를 수 있다
   //   (고를 수 없는 사람에게는 원래 선생님만 보이게 칸을 잠근다)
-  const list = (THS_ALL.length ? THS_ALL : THS)
-    .filter(t => Number(t.id) >= 1 && Number(t.id) <= 7
-              || Number(t.id) === orig || Number(t.id) === cur);
+  const list = (THS_ALL.length ? THS_ALL : THS);   // 2026-10-22 재직 치료사 누구나
   sel.innerHTML = list.map(t => '<option value="' + t.id + '">'
     + esc(t.name) + (Number(t.id) === orig ? ' (원래 선생님)' : '') + '</option>').join('');
   sel.value = String(cur);
@@ -10581,16 +10579,17 @@ function unpaidTag(cid){
 
 async function afterLogin(user){
   const { data: me, error: e1 } = await sb.from('nl_therapists')
-    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+    .select('id, name, role, active').eq('login_email', user.email.toLowerCase()).maybeSingle();
   if (e1)  { show('❌ 직원 조회 실패\n'+e1.message, false); return; }
   if (!me) { show('⚠️ 직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.', false); return; }
   nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
-  if (CAN_SEE.indexOf(me.id) < 0) { show('이 화면을 볼 권한이 없습니다.', false); return; }
+  const IS_TH = (me.role === '치료사' && me.active === true);   // 2026-10-22 1~7번 고정 → 역할 치료사
+  if (CAN_SEE.indexOf(me.id) < 0 && !IS_TH) { show('이 화면을 볼 권한이 없습니다.', false); return; }
 
   // 권한을 먼저 정한다 (아래에서 걸러낼 때 쓰이므로 순서가 중요)
   CAN_EDIT = (me.id === 8 || me.id === 19 || me.id === 11);   // 관리자·행정·데스크
   try { $('grpBtn').style.display = CAN_EDIT ? '' : 'none'; } catch (e) {}   // 그룹 관리 (2026-10-02)
-  MY_TH = (me.id >= 1 && me.id <= 7) ? me.id : null;  // 치료사는 자기 것만
+  MY_TH = IS_TH ? me.id : null;  // 치료사는 자기 것만 (2026-10-22 역할로)
   if (MY_TH) document.body.classList.add('isth');   // 선생님 계정은 상자 대신 맨 위 줄 (2026-10-03)
   IS_BOSS = (me.id === 8);
   ME_ID = Number(me.id);
@@ -10606,8 +10605,17 @@ async function afterLogin(user){
     try { await sb.rpc('nl_sess_backup_today'); } catch (e) {}
   }
 
-  const { data: ths } = await sb.from('nl_therapists').select('id, name').lte('id',7).order('id');
+  const { data: ths } = await sb.from('nl_therapists').select('id, name').eq('role', '치료사').eq('active', true).order('id');
   THS_ALL = ths || [];
+  // 담당 표(RULE)에 위탁계약 「치료 영역」을 더한다 (2026-10-22 · 못 읽으면 고정 표 그대로)
+  try {
+    const { data: ar } = await sb.from('nl_th_areas').select('therapist_id, therapy_type_id');
+    (ar || []).forEach(x => {
+      const tt = Number(x.therapy_type_id), th = Number(x.therapist_id);
+      if (!RULE[tt]) return;   // 표에 없는 종류(일상 등)는 누구나 — 그대로 둔다
+      if (RULE[tt].indexOf(th) < 0) RULE[tt].push(th);
+    });
+  } catch (e) {}
   THS = THS_ALL;
 
   const { data: sc, error: e3 } = await sb.from('nl_therapy_schedules')
