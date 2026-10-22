@@ -99,6 +99,17 @@
   .rcmemo { font-size:12px; color:#6D4C41; background:#FFF8E1; padding:3px 7px; border-radius:5px; margin-top:4px; }
   .rc input.rcMemo { width:100%; }
   .rcMsg { font-size:11px; color:var(--dim); }
+  .ln { padding:4px 0; border-bottom:1px dashed #EEE7DF; line-height:1.6; }
+  .ln:last-of-type { border-bottom:none; }
+  .ln .lnd { font-weight:600; }
+  .ln .it { white-space:nowrap; max-width:none !important; width:auto !important; display:inline-block; overflow:visible; margin-right:4px; }
+  .ln .lnok { white-space:nowrap; }
+  .ln .lnok button { padding:2px 10px; font-size:12px; border-radius:6px; cursor:pointer; }
+  .ln .lnok .rcOk { background:#fff; color:#2E6B3E; border:1px solid #9CC7A6; font-weight:700; }
+  .ln .lnok .rcUnok { background:#fff; color:var(--dim); border:1px solid var(--line); }
+  .ln .rcst { display:block; margin:2px 0 0; }
+  .ln .rcst.wait { display:inline-block; }
+  .ln.lndone { color:#B7B0A9; }
   a.rcopen { display:inline-block; margin:2px 0 4px; font-size:12px; color:#0c447c; background:#e3f0fb; border:1px solid #85b7eb;
              border-radius:6px; padding:3px 9px; text-decoration:none; white-space:nowrap; }
   @media print { a.rcopen { display:none !important; } }
@@ -375,6 +386,35 @@ function caseOpts(sel){
   return h + (g ? '</optgroup>' : '');
 }
 
+// 점검 한 줄 — 항목 · 날짜 · 내용 · 상태 · [확인] (2026-10-22 은정님)
+//   글에서 기록지 이름 · 「고치면 사라짐」 같은 겹치는 말은 뺀다 (상태 줄이 말해 줌)
+function lineText(r){
+  let d = rcNamed(r, id => KIDNM[id] || '', id => THNM[id] || '');
+  d = d.replace(/\s*\((?:누가기록지에서 )?그 회를 고치면 사라짐\)\s*$/, '');
+  if (r.item_no === 41 && r.kind) d = d.replace(new RegExp('^' + r.kind + '\\s*·\\s*'), '');
+  if (r.item_no >= 31 && r.item_no <= 34) d = d.replace(/\s*—\s*[^—]+$/, '');   // 끝의 「— 결제가 이름」은 딱지와 같음
+  return d;
+}
+function lineHtml(r, i){
+  const it = ITEM[r.item_no] || ['?','g0'];
+  const st = r.item_no === 9 ? '' : rcState(r).replace(/^<div class="rcst dim">(선생님이 고치면 사라짐|센터가 장을 정리하면 사라짐)<\/div>$/, '');
+  const ok = r.item_no === 9 ? '' : okHtml(r, i).replace(/^<div class="okline">|<\/div>$/g, '');
+  return '<div class="ln' + (isDone(r) ? ' lndone' : '') + '">'
+    + '<span class="it ' + it[1] + '">' + esc(it[0]) + '</span> '
+    + (r.on_date && lineText(r).indexOf(md(r.on_date)) < 0 ? '<b class="lnd">' + md(r.on_date) + '</b> ' : '')
+    + esc(lineText(r)) + (ok ? ' <span class="lnok">' + ok + '</span>' : '') + st + '</div>';
+}
+function grpCell(gr){
+  const r0 = gr[0], ix = gr.map(r => ROWS.indexOf(r)).join(',');
+  const memos = [...new Set(gr.map(r => (RES[rkey(r)] || {}).memo).filter(Boolean))];
+  const fixes = gr.some(r => isList(r) && r.item_no !== 25) ? '<div class="rcst dim">선생님이 기록지를 고치면 사라짐</div>' : '';
+  if (!isAdmin())
+    return fixes + (r0.child_id ? openLink(r0) : '') + (memos.length ? '<div class="rcmemo">메모 · ' + memos.map(esc).join(' / ') + '</div>' : '');
+  return '<div class="rc" data-is="' + ix + '">' + fixes + (r0.child_id ? openLink(r0) : '')
+    + '<input type="text" class="rcMemo" maxlength="300" placeholder="메모 (선생님께도 보임)" value="' + esc(memos.join(' / ')) + '">'
+    + '<span class="rcMsg"></span></div>';
+}
+
 // 처리 결과 칸 (2026-10-22 은정님) — 사례 고르기 · 서류 받음 · 저장 단추 없앰
 //   [확인] + 메모(칸을 벗어나면 저절로 저장) · 메모는 선생님 화면에도 보임
 //   선생님이 기록지에서 사실 확인서 「작성 끝」 · 변경 계약서 「서명 받음」 → 주황 「제출 대기」
@@ -478,18 +518,22 @@ function draw(){
         ? (Number(kk) ? kk + '번 ' + esc(THNM[kk] || '') + ' 선생님' : '담당 미상')
         : esc(kk) + ' 기록지';
       h += '<div class="card"><div class="thhd">' + title + '<span class="n">' + rs.length + '건</span></div>'
-         + '<table><tr><th>' + (GROUPV === 'th' ? '기록지' : '선생님') + '</th><th>아동</th><th>날짜</th><th>항목</th><th>내용</th><th>처리 결과</th></tr>';
-      rs.forEach(r => {
-        const i = ROWS.indexOf(r), it = ITEM[r.item_no] || ['?','g0'];
-        h += '<tr' + (isDone(r) ? ' class="done"' : '') + '>'
-          + '<td style="white-space:nowrap;">' + (GROUPV === 'th' ? esc(r.kind || '') : (r.therapist_id ? r.therapist_id + '번 ' + esc(THNM[r.therapist_id] || '') : '—')) + '</td>'
-          + '<td class="cid">' + r.child_id + '번 ' + esc(KIDNM[r.child_id] || '') + '</td>'
-          + '<td>' + md(r.on_date) + '</td>'
-          + '<td><span class="it ' + it[1] + '">' + esc(it[0]) + '</span></td>'
-          + '<td class="det">' + esc(rcNamed(r, id => KIDNM[id] || '', id => THNM[id] || ''))
-          + (noteOf(r).length ? '<div style="margin-top:4px;font-size:12px;color:#6D4C41;background:#FFF8E1;padding:3px 7px;border-radius:5px;">특이사항 · '
-             + noteOf(r).map(esc).join('<br>') + '</div>' : '') + '</td>'
-          + '<td>' + rcCell(r, i) + '</td></tr>';
+         + '<table><tr><th>' + (GROUPV === 'th' ? '기록지' : '선생님') + '</th><th>아동</th><th>점검 내용</th><th>처리 결과</th></tr>';
+      // 같은 아동 · 같은 기록지 · 같은 선생님은 한 줄로 (2026-10-22 은정님)
+      //   이름 · [기록지 열기] · 메모는 한 번 · 점검 줄마다 [확인]
+      const gk = {}, gord = [];
+      rs.forEach(r => { const q = r.child_id + '|' + (r.kind || '') + '|' + (r.therapist_id || 0);
+                        if (!gk[q]) { gk[q] = []; gord.push(q); } gk[q].push(r); });
+      gord.forEach(q => {
+        const gr = gk[q], r0 = gr[0];
+        const notes = [...new Set([].concat(...gr.map(noteOf)))];
+        h += '<tr' + (gr.every(isDone) ? ' class="done"' : '') + '>'
+          + '<td style="white-space:nowrap;">' + (GROUPV === 'th' ? esc(r0.kind || '') : (r0.therapist_id ? r0.therapist_id + '번 ' + esc(THNM[r0.therapist_id] || '') : '—')) + '</td>'
+          + '<td class="cid">' + r0.child_id + '번 ' + esc(KIDNM[r0.child_id] || '') + '</td>'
+          + '<td class="det">' + gr.map(r => lineHtml(r, ROWS.indexOf(r))).join('')
+          + (notes.length ? '<div style="margin-top:4px;font-size:12px;color:#6D4C41;background:#FFF8E1;padding:3px 7px;border-radius:5px;">특이사항 · '
+             + notes.map(esc).join('<br>') + '</div>' : '') + '</td>'
+          + '<td>' + grpCell(gr) + '</td></tr>';
       });
       h += '</table></div>';
     });
@@ -621,24 +665,25 @@ document.addEventListener('click', e => {
 });
 
 async function saveMemo(box, el){
-  const r = ROWS[Number(box.dataset.i)]; if (!r) return;
+  const rs = String(box.dataset.is || box.dataset.i || '').split(',').map(Number).map(i => ROWS[i]).filter(Boolean);
+  if (!rs.length) return;
   const msg = box.querySelector('.rcMsg');
   const memo = el.value.trim() || null;
-  const old = (RES[rkey(r)] || {}).memo || null;
+  const old = [...new Set(rs.map(r => (RES[rkey(r)] || {}).memo).filter(Boolean))].join(' / ') || null;
   if (memo === old) { RC_TYPING = false; return; }
   el.disabled = true; msg.textContent = '저장 중…'; msg.className = 'rcMsg';
-  const row = { child_id: r.child_id, month_key: $('mon').value, item_no: r.item_no,
-                item_key: r.item_key || '', memo: memo,
-                updated_by: ME.id, updated_at: new Date().toISOString() };
+  const now = new Date().toISOString();
+  const rows = rs.map(r => ({ child_id: r.child_id, month_key: $('mon').value, item_no: r.item_no,
+                              item_key: r.item_key || '', memo: memo, updated_by: ME.id, updated_at: now }));
   const { data, error } = await sb.from('nl_rc_results')
-    .upsert(row, { onConflict: 'child_id,month_key,item_no,item_key' }).select();
+    .upsert(rows, { onConflict: 'child_id,month_key,item_no,item_key' }).select();
   el.disabled = false;
-  if (error || !data || !data.length) {
+  if (error || !data || data.length !== rows.length) {
     msg.textContent = '저장 못 함'; msg.className = 'rcMsg bad';
-    alert('메모를 저장하지 못했습니다.\n' + (error ? error.message : '돌려받은 줄이 없습니다.'));
+    alert('메모를 저장하지 못했습니다.\n' + (error ? error.message : '돌려받은 줄 수가 맞지 않습니다.'));
     return;
   }
-  RES[rkey(r)] = data[0];
+  data.forEach(x => { RES[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
   RC_TYPING = false;
   msg.textContent = '✓ 저장됨'; msg.className = 'rcMsg good';
   setTimeout(() => { if (msg.textContent === '✓ 저장됨') msg.textContent = ''; }, 2000);
@@ -647,8 +692,10 @@ async function saveMemo(box, el){
 window.addEventListener('beforeunload', e => {
   const el = document.activeElement;
   if (!el || !el.classList || !el.classList.contains('rcMemo')) return;
-  const box = el.closest('.rc'), r = box && ROWS[Number(box.dataset.i)];
-  if (r && (el.value.trim() || null) !== ((RES[rkey(r)] || {}).memo || null)) { e.preventDefault(); e.returnValue = ''; }
+  const box = el.closest('.rc'); if (!box) return;
+  const rs = String(box.dataset.is || '').split(',').map(Number).map(i => ROWS[i]).filter(Boolean);
+  const old = [...new Set(rs.map(r => (RES[rkey(r)] || {}).memo).filter(Boolean))].join(' / ') || null;
+  if (rs.length && (el.value.trim() || null) !== old) { e.preventDefault(); e.returnValue = ''; }
 });
 
 $('run').onclick = run;
