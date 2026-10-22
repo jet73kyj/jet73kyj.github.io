@@ -1153,6 +1153,50 @@ function drawAll(saved) {
   buildCalendar();
   buildStatusRows(_statusRows());
   fillFromSlots();
+  _pairVouchers();
+}
+
+// 결제 짝 맞추기 (2026-10-23 은정님) — 차례대로 넣지 않고
+//   ① 제공일자와 같은 날 결제를 먼저 짝 (같은 날 둘이면 결제 시각 차례)
+//   ② 남은 결제를 남은 회차에 날짜 차례로 → 날짜가 다른 회차만 남아 [소급결제]를 물음
+//   직접 고친 승인 칸(노랑)은 건드리지 않음 · 짝이 바뀌면 「저장 전」
+function _pairVouchers() {
+  const trs = [...document.querySelectorAll('#statusTbl tbody tr')];
+  const vo = _prefillStatusFromVoucher().filter(v => v && v.apprNo);
+  const dOf = x => { const m = String(x || '').match(/(\d{4})\D*(\d{2})\D*(\d{2})/); return m ? m[1] + '-' + m[2] + '-' + m[3] : ''; };
+  const rows = [];
+  trs.forEach((tr, i) => {
+    if (i >= SESSIONS) return;
+    if (_apprIsMan(i, tr)) return;                                   // 직접 고친 칸은 그대로
+    const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
+    if (/^포기$/.test(no)) return;
+    rows.push({ i, tr, d: _provIso((tr.querySelector('.st_provDate') || {}).value) || '' });
+  });
+  const manNos = new Set(trs.filter((tr, i) => i < SESSIONS && _apprIsMan(i, tr))
+    .map(tr => String((tr.querySelector('.st_apprNo') || {}).value || '').trim()).filter(Boolean));
+  const pool = vo.filter(v => !manNos.has(String(v.apprNo).trim()))
+    .map(v => ({ v, d: dOf(v.apprDate), t: String(v.apprDate || '') }))
+    .sort((a, b) => a.t.localeCompare(b.t));
+  const used = new Set(), give = {};
+  rows.forEach(r => {                                                // ① 같은 날
+    if (!r.d) return;
+    const k = pool.findIndex((p, j) => !used.has(j) && p.d === r.d);
+    if (k >= 0) { used.add(k); give[r.i] = pool[k].v; }
+  });
+  const restR = rows.filter(r => !give[r.i]).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999') || a.i - b.i);
+  const restP = pool.map((p, j) => j).filter(j => !used.has(j));
+  restR.forEach((r, n) => { if (n < restP.length) give[r.i] = pool[restP[n]].v; });   // ② 남은 것끼리 날짜 차례
+  let changed = false;
+  rows.forEach(r => {
+    const v = give[r.i] || { apprDate: '', apprNo: '' };
+    const ad = r.tr.querySelector('.st_apprDate'), an = r.tr.querySelector('.st_apprNo');
+    if (!ad || !an) return;
+    if (String(an.value || '').trim() !== String(v.apprNo || '').trim() || dOf(ad.value) !== dOf(v.apprDate)) changed = true;
+    ad.value = v.apprDate || ''; an.value = v.apprNo || '';
+    AUTOV[r.i] = { d: v.apprDate || '', n: v.apprNo || '' };
+  });
+  if (changed && ITEMS.length) SLOTCHG = true;                        // 저장된 짝과 달라짐 → 「저장 전」
+  try { _markManual(); } catch (e) {}
 }
 
 // ── 일정표 날짜 ↔ 바우처 승인일자 (2026-10-02 은정님 정함 · 9/2 「제공일자는 바우처에서 안 끌어옴」을 바꿈) ──
