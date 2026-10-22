@@ -432,7 +432,7 @@ async function afterLogin(user) {
       } })(),
     sb.from('nl_therapies').select('id, child_id, support_type_id, ended_on').eq('support_type_id', 2),
     sb.from('nl_therapy_schedules').select('therapy_id, therapist_id'),
-    sb.from('nl_therapists').select('id, name').lte('id', 7)
+    sb.from('nl_therapists').select('id, name').eq('role', '치료사').eq('active', true)
   ]);
   if (c.error) { show($('msg'), '❌ 아동 조회 실패\n' + c.error.message, false); return; }
 

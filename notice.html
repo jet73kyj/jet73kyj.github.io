@@ -496,7 +496,7 @@ async function afterLogin(user) {
   // 치료사 목록
   try {
     const { data: th } = await sb.from('nl_therapists')
-      .select('id, name').lte('id', 7).order('id');
+      .select('id, name').eq('role', '치료사').eq('active', true).order('id');
     (th || []).forEach(t => {
       THRS[t.id] = t.name;
       const o = document.createElement('option');

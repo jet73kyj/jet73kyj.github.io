@@ -2597,7 +2597,7 @@ function clearWlForm(){
 // 희망 선생님 체크 칸 (2026-10-08) — 수업 맡는 선생님만
 function wlThList(){
   const a = THRS.filter(t => t.role === '치료사');
-  return a.length ? a : THRS.filter(t => t.id <= 7);
+  return a;   // 2026-10-22 역할 치료사만
 }
 function wlThDraw(sel){
   $('w_ths').innerHTML = wlThList().map(t =>
@@ -4026,7 +4026,7 @@ async function afterLogin(user) {
   $('e_type').innerHTML = EVTYPES.map(t =>
     '<option value="' + t.id + '">' + esc(t.name) + '</option>').join('');
   $('e_thr').innerHTML = '<option value="">— 담당 고르기 —</option>'
-    + THRS.filter(t => t.id <= 7).map(t =>
+    + THRS.filter(t => t.role === '치료사').map(t =>
         '<option value="' + t.id + '">' + esc(t.name) + '</option>').join('');
 
   $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨';

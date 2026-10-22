@@ -813,7 +813,7 @@ async function afterLogin(user) {
   // 수업 줄에 쓸 목록 — 치료사·이미 찬 자리
   try {
     const [th, sc] = await Promise.all([
-      sb.from('nl_therapists').select('id, name').lte('id', 7).order('id'),
+      sb.from('nl_therapists').select('id, name').eq('role', '치료사').eq('active', true).order('id'),
       sb.from('nl_therapy_schedules')
         .select('weekday, start_time, therapist_id, nl_therapies!inner(ended_on)')
     ]);
@@ -872,7 +872,7 @@ async function afterLogin(user) {
   //    11번 데스크는 보기 전용 + 연락처까지 (전화 응대 자리)
   CAN_EDIT = [8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || '');
   CAN_TEL  = CAN_EDIT || Number(me.id) === 11;
-  CAN_TH   = !CAN_EDIT && Number(me.id) >= 1 && Number(me.id) <= 7;
+  CAN_TH   = !CAN_EDIT && me.role === '치료사';   // 2026-10-22 1~7번 고정 → 역할
   DOCN = {};
   if (CAN_TH) {
     // 표 잠금이 담당 아동 것만 내려준다

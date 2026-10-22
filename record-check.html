@@ -652,7 +652,7 @@ $('home').onclick = () => { location.href = 'index.html'; };
   nlKeep(me.id);
   ME = me;
   const id = Number(me.id);
-  if (!(ADMIN.indexOf(id) >= 0 || (id >= 1 && id <= 7))) {
+  if (!(ADMIN.indexOf(id) >= 0 || me.role === '치료사')) {   // 2026-10-22 역할로
     $('body').innerHTML = '<div class="err">이 화면을 볼 권한이 없습니다.</div>';
     return;
   }

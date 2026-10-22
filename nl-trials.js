@@ -65,7 +65,7 @@
     if (TYPES && THS && FEES) return;
     const [tt, th, tf] = await Promise.all([
       SB.from('nl_therapy_types').select('*').order('id'),
-      SB.from('nl_therapists').select('id, name, active').lte('id', 7).order('id'),
+      SB.from('nl_therapists').select('id, name, active').eq('role', '치료사').eq('active', true).order('id'),
       SB.from('nl_therapist_fees').select('therapist_id, from_month, fee_40, fee_50, fee_60')
     ]);
     TYPES = (tt.data || []).filter(x => x.active !== false);
