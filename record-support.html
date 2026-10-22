@@ -504,6 +504,8 @@ async function buildPairs() {
       PAIRS.push({ child: c, support_type_id: Number(r.support_type_id),
                    therapy_id: r.therapy_id, therapy_type_id: r.therapy_type_id });
     });
+    // 그 달 회기(보강 포함)를 맡은 선생님에게도 보이게 (2026-10-22 · 요일줄 담당이 아니어도)
+    if (!allView) await addMySessPairs(mv, seen);
     PAIRS.sort((a,b) => (a.child.name||'').localeCompare(b.child.name||'')
                      || a.support_type_id - b.support_type_id);
     return;
@@ -524,8 +526,31 @@ async function buildPairs() {
     PAIRS.push({ child: c, support_type_id: r.support_type_id,
                  therapy_id: r.id, therapy_type_id: r.therapy_type_id });
   });
+  if (!allView) await addMySessPairs(mv, seen);
   PAIRS.sort((a,b) => (a.child.name||'').localeCompare(b.child.name||'')
                    || a.support_type_id - b.support_type_id);
+}
+// 그 달 몫 회기를 내가 맡은 아동 · 사업 (요일줄 담당이 아니어도 — 보강을 맡은 선생님)
+async function addMySessPairs(mv, seen) {
+  try {
+    const { data, error } = await sb.from('nl_sessions').select('child_id, support_type_id, therapy_id')
+      .eq('therapist_id', ME.id).in('support_type_id', SUPPORTS).eq('month_key', mv)
+      .in('status', ['예정', '완료', '결석', '보강']).range(0, 999);
+    if (error) return;
+    (data || []).forEach(r => {
+      const c = KIDS[r.child_id];
+      if (!c) return;
+      const k = c.id + '-' + r.support_type_id;
+      if (seen[k]) return;
+      const tp = TPRAW.find(x => String(x.id) === String(r.therapy_id))
+              || TPRAW.find(x => x.nl_children && String(x.nl_children.id) === String(c.id)
+                                 && Number(x.support_type_id) === Number(r.support_type_id));
+      if (!tp) return;
+      seen[k] = true;
+      PAIRS.push({ child: c, support_type_id: Number(r.support_type_id),
+                   therapy_id: tp.id, therapy_type_id: tp.therapy_type_id });
+    });
+  } catch (e) {}
 }
 
 function drawPairSelect() {
