@@ -497,7 +497,8 @@ function draw(){
   // ① 달력
   let h = '<div class="card"><div class="ct"><button type="button" id="mprev">‹</button><span>' + y + '년 ' + mo + '월</span><button type="button" id="mnext">›</button>'
     + (IS_BOSS ? '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>' : '')
-    + '<span style="flex:1"></span><button type="button" id="gotoday">오늘</button></div>'
+    + '<span style="flex:1"></span><a href="work-guides.html" target="_blank" title="업무 안내서 (새 탭)" style="display:inline-block;padding:6px 12px;border:1px solid var(--line,#ECE8E3);border-radius:8px;background:#fff;color:var(--cam,#B07A4A);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">📖 업무 안내서</a>'
+    + '<button type="button" id="gotoday">오늘</button></div>'
     + calHtml()
     + '<div class="note">날짜를 누르면 아래에 그 날 할 일이 나옵니다. 칸 숫자 — 끝냄/할 일 (미룬 일은 뺌) · 일지 · 민원. 초록 = 다 끝냄 · 주황 = 남은 일 · 빨강 = 지난 날 남은 일이나 못 함</div></div>';
   // ② 고른 날
