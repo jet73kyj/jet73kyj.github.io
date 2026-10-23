@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>업무 안내서 - 나무링크</title>
+<!-- 업무 안내서 (2026-10-23 은정님) — 업무 절차를 한 곳에 적어 두고, 할 일 목록 「📖 안내」에서 펼쳐 봄
+     표 nl_work_guides (category · title · body · sort_no) · 늘 하는 일 nl_task_rules.guide_id 로 이음
+     보기 = 8 · 19 · 10 · 11번 / 쓰기 · 고치기 · 지우기 = 원장님(8번)만 (서버 잠금도 같음)
+     주소 끝 #g번호 — 그 안내서를 펼친 채 엶
+     사진 · 서식 파일은 「서식」 화면에 두고, 안내 글에는 서식 이름만 적음
+-->
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --coral:#D8684A; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg); margin:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; } .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; } .hd .who { font-size:12px; color:var(--dim); } .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:900px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 12px; font-size:13px; background:var(--sf); color:var(--tx); border:1px solid #CFC8C0; cursor:pointer; }
+  button:hover { background:var(--camL); } button.pri { background:var(--cam); color:#fff; border-color:var(--cam); }
+  button.grey { border-color:var(--line); color:var(--cam); }
+  button.red { color:#c62828; border-color:#efc9c9; }
+  input, select, textarea { font:inherit; font-size:13px; padding:6px 8px; border-radius:8px; border:1px solid #DDD6CE; background:#fff; box-sizing:border-box; }
+  textarea { width:100%; min-height:260px; resize:vertical; line-height:1.7; }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .tabs { display:flex; gap:18px; border-bottom:1px solid var(--line); margin-bottom:12px; flex-wrap:wrap; }
+  .tabs button { border:none; border-radius:0; background:none; padding:8px 0; color:var(--dim); border-bottom:2px solid transparent; }
+  .tabs button.on { color:var(--tx); border-bottom-color:var(--cam); font-weight:600; }
+  .tabs button:hover { background:none; color:var(--tx); }
+  .g { border-top:1px solid #F0EEEA; }
+  .g:first-child { border-top:none; }
+  .g .h { display:flex; align-items:center; gap:10px; padding:11px 4px; cursor:pointer; border-radius:8px; }
+  .g .h:hover { background:#FBF5EE; }
+  .g .h .ar { color:var(--cam); width:12px; flex:none; }
+  .g .h .tt { flex:1 1 auto; font-weight:600; font-size:14px; }
+  .g .h .meta { font-size:12px; color:var(--dim); white-space:nowrap; }
+  .g .b { padding:4px 4px 14px 26px; font-size:13.5px; line-height:1.8; white-space:pre-wrap; }
+  .g.on .h { background:var(--camL); }
+  .g.hit .h { outline:2px solid var(--camB); }
+  .bdg { display:inline-block; border-radius:6px; padding:1px 7px; font-size:12px; background:#F1EFE8; color:#444441; }
+  .dim { color:var(--dim); } .note { font-size:12px; color:var(--dim); line-height:1.8; margin-top:8px; }
+  .ok { color:#2e7d32; } .err { color:#c62828; }
+  .ed label { font-size:12px; color:var(--dim); display:block; margin:10px 0 3px; }
+  #emsg { font-size:13px; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span><h1>업무 안내서</h1><span class="who" id="whoami"></span><span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+<div class="wrap" id="body"><div class="dim">불러오는 중…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, { auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+const $ = id => document.getElementById(id);
+const CAN_SEE = [8, 19, 10, 11];
+const CATS = ['납부', '발달재활', '치료지원', '아동', '그 밖'];
+let IS_BOSS = false, G = [], CAT = 'all', Q = '', OPEN = new Set(), HIT = null;
+let EDIT = null;          // null = 칸 닫힘 · 'new' = 새 안내서 · 번호 = 고치는 안내서
+let EMSG = null;
+
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function dlab(ts){ if (!ts) return ''; const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' 고침'; }
+
+// 적고 저장 안 한 것
+function draft(){
+  if (!EDIT || !$('etitle')) return false;
+  const g = EDIT === 'new' ? { title: '', body: '', category: CAT === 'all' ? '그 밖' : CAT, sort_no: 0 } : G.find(x => x.id === EDIT);
+  if (!g) return false;
+  return $('etitle').value.trim() !== (g.title || '') || $('ebody').value !== (g.body || '')
+      || $('ecat').value !== g.category || String(Number($('esort').value) || 0) !== String(g.sort_no || 0);
+}
+function leaveOk(){ return !draft() || confirm('저장하지 않은 안내서가 있습니다.\n저장하지 않고 넘어갈까요?'); }
+window.addEventListener('beforeunload', e => { if (draft()) { e.preventDefault(); e.returnValue = ''; } });
+
+async function load(){
+  const { data, error } = await sb.from('nl_work_guides').select('*').order('category').order('sort_no').order('title').range(0, 999);
+  if (error) { $('body').innerHTML = '<div class="card err">불러오지 못했습니다.\n' + esc(error.message) + '</div>'; return; }
+  G = data || [];
+  if (EDIT && EDIT !== 'new' && !G.some(x => x.id === EDIT)) EDIT = null;
+  draw();
+}
+
+function edHtml(){
+  const g = EDIT === 'new' ? { title: '', body: '', category: CAT === 'all' ? '그 밖' : CAT, sort_no: 0 } : G.find(x => x.id === EDIT);
+  return '<div class="card ed" style="border-color:var(--camB)"><div style="font-weight:700;color:#7E5530">' + (EDIT === 'new' ? '새 안내서' : '안내서 고치기') + '</div>'
+    + '<div class="row"><div><label>갈래</label><select id="ecat">' + CATS.map(c => '<option' + (g.category === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></div>'
+    + '<div style="flex:1 1 280px"><label>제목 (80자까지)</label><input id="etitle" maxlength="80" style="width:100%" value="' + esc(g.title) + '" placeholder="예) 예외지급 신청 방법"></div>'
+    + '<div><label>차례 (작을수록 위)</label><input id="esort" type="number" style="width:90px" value="' + (g.sort_no || 0) + '"></div></div>'
+    + '<label>내용 — 한 줄에 한 단계씩 적으면 읽기 쉽습니다</label>'
+    + '<textarea id="ebody" maxlength="10000" placeholder="1. …&#10;2. …&#10;3. …">' + esc(g.body) + '</textarea>'
+    + '<div class="row" style="margin-top:10px"><button type="button" class="pri" id="esave">저장</button><button type="button" id="ecancel">그만</button><span id="emsg"></span></div>'
+    + '<div class="note">아동 이름 · 연락처 · 계좌번호는 적지 마세요. 서식 파일은 「서식」 화면에 올리고 여기에는 서식 이름만 적습니다.</div></div>';
+}
+
+function draw(){
+  const q = Q.trim();
+  const list = G.filter(g => (CAT === 'all' || g.category === CAT) && (!q || (g.title + '\n' + (g.body || '')).indexOf(q) >= 0));
+  let h = '';
+  if (IS_BOSS && EDIT === 'new') h += edHtml();
+  h += '<div class="card"><div class="tabs">' + ['all'].concat(CATS).map(c => {
+      const n = c === 'all' ? G.length : G.filter(g => g.category === c).length;
+      return '<button type="button" data-cat="' + c + '" class="' + (CAT === c ? 'on' : '') + '">' + (c === 'all' ? '전체' : c) + (n ? ' ' + n : '') + '</button>';
+    }).join('') + '</div>'
+    + '<div class="row" style="margin-bottom:8px"><input id="q" placeholder="찾기 (제목 · 내용)" value="' + esc(Q) + '" style="flex:1 1 220px">'
+    + (IS_BOSS && EDIT !== 'new' ? '<button type="button" class="pri" id="newg">＋ 새 안내서</button>' : '') + '</div>';
+  if (!list.length) h += '<div class="dim" style="padding:10px 4px">' + (G.length ? '맞는 안내서가 없습니다.' : '아직 안내서가 없습니다.' + (IS_BOSS ? ' 「＋ 새 안내서」로 적어 주세요.' : '')) + '</div>';
+  h += list.map(g => {
+    const on = OPEN.has(g.id) || (q && (g.body || '').indexOf(q) >= 0);
+    let r = '<div class="g' + (on ? ' on' : '') + (HIT === g.id ? ' hit' : '') + '" id="g' + g.id + '"><div class="h" data-tog="' + g.id + '">'
+      + '<span class="ar">' + (on ? '▾' : '▸') + '</span><span class="tt">' + esc(g.title) + '</span>'
+      + (CAT === 'all' ? '<span class="bdg">' + esc(g.category) + '</span>' : '') + '<span class="meta">' + dlab(g.updated_at) + '</span></div>';
+    if (on) r += '<div class="b">' + (g.body ? esc(g.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
+      + (IS_BOSS && EDIT !== g.id ? '<div class="row" style="padding:0 0 12px 26px"><button type="button" data-edit="' + g.id + '">고치기</button><button type="button" class="red" data-del="' + g.id + '">✕ 지우기</button></div>' : '');
+    if (IS_BOSS && EDIT === g.id) r += edHtml();
+    return r + '</div>';
+  }).join('');
+  h += '</div><div class="note">할 일 목록의 「늘 하는 일 설정」에서 안내서를 고르면, 그 할 일 칸에 「📖 안내」 단추가 생깁니다.' + (IS_BOSS ? '' : ' 안내서는 원장님이 적고 고칩니다.') + '</div>';
+  $('body').innerHTML = h;
+  bind();
+}
+
+function bind(){
+  document.querySelectorAll('button[data-cat]').forEach(b => b.onclick = () => { if (!leaveOk()) return; EDIT = null; CAT = b.dataset.cat; draw(); });
+  const qi = $('q');
+  qi.oninput = () => { Q = qi.value; const pos = qi.selectionStart; if (!leaveOk()) { return; } EDIT = null; draw(); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };
+  document.querySelectorAll('[data-tog]').forEach(el => el.onclick = () => {
+    const id = Number(el.dataset.tog); if (EDIT === id) return;
+    if (OPEN.has(id)) OPEN.delete(id); else OPEN.add(id); HIT = null; draw();
+  });
+  if ($('newg')) $('newg').onclick = () => { if (!leaveOk()) return; EDIT = 'new'; draw(); $('etitle').focus(); };
+  document.querySelectorAll('button[data-edit]').forEach(b => b.onclick = () => { if (!leaveOk()) return; EDIT = Number(b.dataset.edit); OPEN.add(EDIT); draw(); $('ebody').focus(); });
+  document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
+    const g = G.find(x => x.id === Number(b.dataset.del)); if (!g) return;
+    if (!confirm('「' + g.title + '」 안내서를 지울까요?\n\n이 안내서를 고른 늘 하는 일은 남고, 「📖 안내」 단추만 사라집니다.\n지운 뒤에는 되살릴 수 없습니다.')) return;
+    const { data, error } = await sb.from('nl_work_guides').delete().eq('id', g.id).select('id');
+    if (error || !data || !data.length) { alert('지우지 못했습니다.\n' + (error ? error.message : '지운 줄을 돌려받지 못했습니다')); return; }
+    OPEN.delete(g.id); load();
+  });
+  if (!$('esave')) return;
+  const emsg = (t, ok) => { const m = $('emsg'); if (m) { m.textContent = t; m.className = ok ? 'ok' : 'err'; } };
+  if (EMSG) { emsg(EMSG.t, EMSG.ok); EMSG = null; }
+  $('ecancel').onclick = () => { if (!leaveOk()) return; EDIT = null; draw(); };
+  $('esave').onclick = async () => {
+    const b = $('esave'); if (b.disabled) return;
+    const title = $('etitle').value.trim();
+    if (!title) { emsg('⚠ 제목을 적어 주세요', false); $('etitle').focus(); return; }
+    const row = { category: $('ecat').value, title: title, body: $('ebody').value.replace(/\s+$/, ''), sort_no: Number($('esort').value) || 0 };
+    b.disabled = true; b.textContent = '저장 중…';
+    const q = EDIT === 'new' ? sb.from('nl_work_guides').insert(row).select('id') : sb.from('nl_work_guides').update(row).eq('id', EDIT).select('id');
+    const { data, error } = await q;
+    if (error || !data || !data.length) {
+      b.disabled = false; b.textContent = '저장'; emsg('❌ 저장하지 못했습니다', false);
+      alert('안내서를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return;
+    }
+    const id = data[0].id; EDIT = null; OPEN.add(id); HIT = id; CAT = CAT === 'all' || CAT === row.category ? CAT : row.category;
+    await load();
+    const el = $('g' + id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+  };
+}
+
+$('home').onclick = () => { if (!leaveOk()) return; location.href = 'index.html'; };
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name').eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="card err">직원 표에 이 이메일이 없습니다.</div>'; return; }
+  nlKeep(me.id);
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="card err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+  IS_BOSS = Number(me.id) === 8;
+  $('whoami').textContent = me.name + ' 님으로 로그인됨';
+  const m = /^#g(\d+)$/.exec(location.hash || '');
+  if (m) { OPEN.add(Number(m[1])); HIT = Number(m[1]); }
+  await load();
+  if (HIT) { const el = $('g' + HIT); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' }); }
+})();
+</script>
+</body>
+</html>

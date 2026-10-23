@@ -18,6 +18,8 @@
        오늘 화면을 열면 오늘 몫 늘 하는 일이 저절로 들어옴 (nl_make_tasks · 한 번만)
        반복하는 일 칸 ✕ — 이 날 것만(nl_task_skips 에 적혀 다시 안 생김) / 반복 자체(오늘부터 앞날 「할 일」 칸 함께 지움 · 장치 trg_task_rule_del)
        늘 하는 일 설정 · 직원별 이 달 확인 · 이 달 업무일지 모아 보기 — 아래에 접어 둠
+       업무 안내서 (2026-10-23) — nl_work_guides · 늘 하는 일 guide_id 로 이음 · 할 일 칸 「📖 안내」를 누르면 그 자리에서 펼침
+         안내서 글은 work-guides.html 한 곳에서 쓰고 고침 (원장님만)
 -->
 <style>
   :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
@@ -112,6 +114,11 @@
   .mres textarea { flex:1 1 320px; min-height:46px; }
   .mres .mm { font-size:12.5px; font-weight:600; padding-top:7px; }
   .mres .rtxt { flex:1 1 320px; font-size:13px; color:#3B5E44; white-space:pre-wrap; line-height:1.6; padding-top:6px; }
+  /* 업무 안내 (2026-10-23) */
+  .tc .gd { margin:10px 0 0 36px; background:#FBF7F2; border:1px solid #F0E4D6; border-radius:10px; padding:10px 14px; font-size:13px; }
+  .tc .gd .gh { display:flex; align-items:center; gap:8px; font-weight:700; color:#7E5530; margin-bottom:6px; }
+  .tc .gd .gb { white-space:pre-wrap; line-height:1.75; }
+  .tc .sb button.gon { background:#F8F1E8; border-color:#E8C9A6; color:#7E5530; }
   .kf button.on.ns1 { background:#F1EFE8; border-color:#C4BDB5; } .kf button.on.ns2 { background:#FAEEDA; border-color:#E8C9A6; } .kf button.on.ns3 { background:#EAF3DE; border-color:#9FC48A; }
 </style>
 </head>
@@ -193,6 +200,8 @@ const NSCL = { '접수':'ns1', '처리 중':'ns2', '끝':'ns3' };
 let ME_ID = null, NOTES = [], NMSG = null, MKIND = 'all';
 let MTASKS = [], MNOTES = [], MOFF = {}, PREV = [];
 const MRES_EDIT = new Set();   // 처리 결과를 고치는 중인 민원 (저장된 글을 다시 칸으로 연 것)
+let GUIDES = []; const GOPEN = new Set();   // 업무 안내서 (2026-10-23)
+function guideOf(t){ const r = RULES.find(x => x.id === t.rule_id); return r && r.guide_id ? GUIDES.find(g => Number(g.id) === Number(r.guide_id)) : null; }
 let KIDS = [];   // 아동 이름으로 고르기 (2026-10-10 은정님 — 번호를 외울 수 없음)
 function kidOf(id){ return KIDS.find(k => Number(k.id) === Number(id)); }
 function kidLabel(id){ const k = kidOf(id); if (!k) return id == null ? '' : id + '번 아동'; const b = String(k.birth || '').replace(/-/g, ''); return k.name + (b.length >= 8 ? ' ' + b.slice(2, 8) : ''); }
@@ -262,19 +271,21 @@ async function readAll(mk){
 async function load(){
   const m = DAY.slice(0, 7), y = Number(m.slice(0, 4)), mo = Number(m.slice(5, 7));
   const from = m + '-01', to = m + '-' + String(new Date(y, mo, 0).getDate()).padStart(2, '0');
-  const [a, b, c, d, mt, mn, mo2] = await Promise.all([
+  const [a, b, c, d, mt, mn, mo2, gd] = await Promise.all([
     sb.from('nl_tasks').select('*').eq('task_date', DAY).order('staff_id').order('id'),
     sb.from('nl_tasks').select('*').lt('task_date', DAY).in('state', ['할 일', '하는 중']).order('task_date').limit(500),
     sb.from('nl_task_rules').select('*').order('active', { ascending: false }).order('staff_id').order('id'),
     sb.from('nl_work_notes').select('*').eq('note_date', DAY).order('note_time', { ascending: true, nullsFirst: true }).order('id').limit(1000),
     readAll(() => sb.from('nl_tasks').select('id, staff_id, state, reason, title, task_date').gte('task_date', from).lte('task_date', to).order('id')),
     readAll(() => sb.from('nl_work_notes').select('*').gte('note_date', from).lte('note_date', to).order('note_date').order('note_time', { ascending: true, nullsFirst: true }).order('id')),
-    sb.from('nl_offdays').select('off_date, kind, reason').gte('off_date', from).lte('off_date', to).in('kind', ['공휴일', '센터휴무'])
+    sb.from('nl_offdays').select('off_date, kind, reason').gte('off_date', from).lte('off_date', to).in('kind', ['공휴일', '센터휴무']),
+    sb.from('nl_work_guides').select('id, category, title, body, sort_no').order('category').order('sort_no').order('title')
   ]);
   const er = a.error || b.error || c.error || d.error || mt.error || mn.error || mo2.error;
   if (er) { $('body').innerHTML = '<div class="card err">불러오지 못했습니다.\n' + esc(er.message) + '</div>'; return; }
   TASKS = a.data || []; LATE = b.data || []; RULES = c.data || []; NOTES = d.data || [];
   MTASKS = mt.data || []; MNOTES = mn.data || [];
+  GUIDES = gd.error ? [] : (gd.data || []);   // 안내서를 못 읽어도 할 일은 그대로 보임
   MOFF = {}; (mo2.data || []).forEach(o => { MOFF[o.off_date] = o.reason || o.kind; });
   // 앞날 예정 — 늘 하는 일이 그날 새벽에 할 일로 생길 것 (서버 셈 · 못 부르면 비움)
   PREV = [];
@@ -356,12 +367,18 @@ function taskRow(t, kind){
   let h = '<div class="tc' + cls + '"><div class="top">'
     + '<button type="button" class="cb" data-chk="' + t.id + '" title="' + (done ? '체크 풀기 (할 일로)' : '체크하면 끝냄') + '"' + (moved ? ' disabled' : '') + '>' + (done ? '✓' : '') + '</button>'
     + '<div class="tt">' + esc(t.title) + '<div class="sub">' + sub.filter(Boolean).join(' · ') + '</div></div>';
+  const gdd = guideOf(t);
   if (!moved) h += '<div class="sb">'
+    + (gdd ? '<button type="button" data-gd="' + t.id + '"' + (GOPEN.has(t.id) ? ' class="gon"' : '') + ' title="이 일의 업무 안내 보기">📖 안내</button>' : '')
     + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '하는 중' ? '할 일' : '하는 중') + '" class="' + (st === '하는 중' ? 'on2' : '') + '" title="' + (st === '하는 중' ? '다시 누르면 할 일로' : '끝낼 때까지 날마다 따라옴') + '">진행 중</button>'
     + (done ? '' : '<button type="button" data-mv="' + t.id + '">📅 날짜 옮기기</button>')
     + '<button type="button" data-tk="' + t.id + '" data-s="' + (st === '못 함' ? '할 일' : '못 함') + '" class="' + (st === '못 함' ? 'on5' : '') + '">못 함</button>'
     + (IS_BOSS ? '<button type="button" data-del="' + t.id + '" title="지우기">✕</button>' : '') + '</div>';
   h += '</div>';
+  if (gdd) h += '<div class="gd" id="gd' + t.id + '" style="display:' + (GOPEN.has(t.id) ? 'block' : 'none') + '"><div class="gh">📖 ' + esc(gdd.title) + '<span style="flex:1"></span>'
+    + '<button type="button" class="lnk" data-gdclose="' + t.id + '">접기</button></div>'
+    + '<div class="gb">' + (gdd.body ? esc(gdd.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
+    + '<div style="text-align:right;margin-top:6px"><a href="work-guides.html#g' + gdd.id + '" target="_blank" style="color:var(--cam);font-size:12.5px">안내서 화면에서 보기 ↗</a></div></div>';
   if (MOVE === t.id) h += '<div class="mv">옮길 날 <input type="date" id="mvday" min="' + addDay(t.task_date, 1) + '" value="' + addDay(DAY > t.task_date ? DAY : t.task_date, 1) + '">'
     + '<button type="button" class="pri" id="mvgo">옮기기</button><button type="button" id="mvno">그만</button>'
     + '<span class="dim" style="font-size:12px">고른 날에 이 일이 들어가고, 이 날에는 「→ 옮김」이 남습니다.</span></div>';
@@ -514,7 +531,7 @@ function draw(){
   // ③ 접은 묶음 — 늘 하는 일 설정 · 직원별 · 이 달 일지
   if (IS_BOSS) h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 설정 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary><table>'
      + '<tr><th>직원</th><th>할 일</th><th>주기</th><th>쉬는 날</th><th>기간</th><th></th></tr>'
-     + RULES.map(r => '<tr data-rid="' + r.id + '" title="눌러서 고치기" class="rrow' + (r.active ? '' : ' dim') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + '</td>'
+     + RULES.map(r => '<tr data-rid="' + r.id + '" title="눌러서 고치기" class="rrow' + (r.active ? '' : ' dim') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + (r.guide_id ? ' <span class="dim" title="업무 안내서">📖 ' + esc((GUIDES.find(g => Number(g.id) === Number(r.guide_id)) || {}).title || '') + '</span>' : '') + '</td>'
          + '<td>' + esc(ruleText(r)) + '</td>'
          + '<td>' + (r.skip_off ? (r.cycle === '매일' ? '건너뜀' : '다음 출근 날') : '그대로') + '</td>'
          + '<td>' + esc(r.from_date) + ' ~ ' + esc(r.to_date || '') + '</td>'
@@ -532,6 +549,9 @@ function draw(){
      +   '<optgroup label="날짜">' + Array.from({ length: 31 }, (_, i) => '<option value="d' + (i + 1) + '">' + (i + 1) + '일</option>').join('') + '</optgroup></select>'
      + '<span id="rprev" style="font-size:13px;font-weight:600;color:var(--acc,#7E5530)"></span>'
      + '<label class="dim" style="font-size:12.5px"><input type="checkbox" id="rskip" checked> 쉬는 날 건너뜀</label>'
+     + '<span class="dim" style="font-size:12.5px">업무 안내서</span><select id="rguide" title="업무 안내서 (안 골라도 됨)"><option value="">없음</option>'
+     +   [...new Set(GUIDES.map(g => g.category))].map(c => '<optgroup label="' + esc(c) + '">' + GUIDES.filter(g => g.category === c).map(g => '<option value="' + g.id + '">' + esc(g.title) + '</option>').join('') + '</optgroup>').join('') + '</select>'
+     + '<a href="work-guides.html" target="_blank" style="color:var(--cam);font-size:12.5px">안내서 쓰기 ↗</a>'
      + '<button type="button" class="pri" id="radd">' + (EDIT_RID ? '저장' : '＋ 더하기') + '</button>'
      + (EDIT_RID ? '<button type="button" id="rcancel">취소</button>' : '')
      + '<span id="rmsg"></span></div>'
@@ -707,6 +727,16 @@ function bind(){
     if (error || !data || !data.length) { alert('바꾸지 못했습니다.\n' + (error ? error.message : '바뀐 줄을 돌려받지 못했습니다')); return; }
     FORM = null; load();
   });
+  // 업무 안내 펼치기 · 접기 (다시 그리지 않음 — 적던 칸이 지워지지 않게)
+  document.querySelectorAll('button[data-gd]').forEach(b => b.onclick = () => {
+    const box = $('gd' + b.dataset.gd); if (!box) return;
+    const open = box.style.display === 'none'; box.style.display = open ? 'block' : 'none'; b.classList.toggle('gon', open);
+    if (open) GOPEN.add(Number(b.dataset.gd)); else GOPEN.delete(Number(b.dataset.gd));
+  });
+  document.querySelectorAll('button[data-gdclose]').forEach(b => b.onclick = () => {
+    const box = $('gd' + b.dataset.gdclose); if (box) box.style.display = 'none'; GOPEN.delete(Number(b.dataset.gdclose));
+    const ob = document.querySelector('button[data-gd="' + b.dataset.gdclose + '"]'); if (ob) ob.classList.remove('gon');
+  });
   // 할 일 상태 · 지우기
   document.querySelectorAll('button[data-tk]').forEach(b => b.onclick = async () => {
     const t = TASKS.concat(LATE).find(x => x.id === Number(b.dataset.tk)); if (!t) return;
@@ -797,6 +827,7 @@ function bind(){
     const wk = r.week_no ? String(r.week_no) : (r.cycle === '매주') ? 'all' : '';
     const dy = (r.weekday != null && r.weekday >= 1) ? 'w' + r.weekday : r.month_day ? 'd' + r.month_day : (r.cycle === '매일' || (r.cycle === '조합' && !r.week_no)) ? 'all' : '';
     $('rmon').value = mo; $('rwk').value = wk; $('rday').value = dy; prev();
+    $('rguide').value = r.guide_id ? String(r.guide_id) : '';
   };
   if (EDIT_RID) { const r = RULES.find(x => String(x.id) === String(EDIT_RID)); if (r) fillRule(r); else EDIT_RID = null; }
   document.querySelectorAll('tr[data-rid]').forEach(tr => tr.onclick = e => {
@@ -809,7 +840,7 @@ function bind(){
     const title = $('rtitle').value.trim(), dr = dialRule();
     if (!title) { rmsg('⚠ 늘 하는 일을 적어 주세요', false); return; }
     if (dr.err) { rmsg('⚠ ' + dr.err, false); return; }
-    const row = Object.assign({ staff_id: Number($('rwho').value), title: title, skip_off: $('rskip').checked }, dr.row);
+    const row = Object.assign({ staff_id: Number($('rwho').value), title: title, skip_off: $('rskip').checked, guide_id: $('rguide').value ? Number($('rguide').value) : null }, dr.row);
     const b = $('radd'); if (b.disabled) return; b.disabled = true; b.textContent = '저장 중…';
     const q = EDIT_RID ? sb.from('nl_task_rules').update(row).eq('id', EDIT_RID).select('id') : sb.from('nl_task_rules').insert(row).select('id');
     const { data, error } = await q;
