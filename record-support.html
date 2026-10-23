@@ -648,20 +648,14 @@ function kbView(v) {
   if (v === 'sheet' && cur) $('kbBackTxt').textContent = month + '월 · ' + (cur.child.name || '') + ' · ' + (SUPNAME[cur.support_type_id] || '');
 }
 async function kbMonth(k) {
-  const [a, b] = await Promise.all([
-    sb.rpc('nl_log_check', { p_month: k }),
-    sb.from('nl_rc_results').select('child_id, item_no, item_key, checked_at, checked_detail').eq('month_key', k)
-  ]);
-  if (a.error) throw a.error;
-  const res = {};
-  (b.data || []).forEach(x => { res[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
+  // 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 기록지 점검 화면과 같은 상태
+  const { data, error } = await sb.rpc('nl_rc_open', { p_month: k });
+  if (error) throw error;
   const out = {};
-  (a.data || []).forEach(r => {
+  (data || []).forEach(r => {
     if (r.kind !== '치료지원') return;
-    if (Number(r.item_no) === 41 && /작성 중/.test(String(r.detail || ''))) return;   // 기한 전 미작성은 빨강 아님 (2026-10-23)
+    if (r.state === '참고' || r.state === '작성 중' || r.state === '끝') return;   // 기한 전 미작성 · 원장 확인 등
     if (Number(r.therapist_id) !== Number(ME.id)) return;
-    const x = res[r.child_id + '|' + r.item_no + '|' + (r.item_key || '')];
-    if (x && x.checked_at && String(x.checked_detail || '') === String(r.detail || '')) return;   // 원장 확인
     const key = r.child_id + '|' + (r.support_type_id || '');
     out[key] = (out[key] || 0) + 1;
   });

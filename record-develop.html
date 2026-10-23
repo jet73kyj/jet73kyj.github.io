@@ -793,47 +793,18 @@ function _kbMon(k, d) { const y = +k.slice(0, 4), m = +k.slice(5, 7) - 1 + d; re
 function _kbToday() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7); }
 const KB_LIST = n => (n >= 10 && n <= 14) || n === 18;      // 기록지를 고치면 사라짐
 async function kbMonth(k) {
-  const [a, b, c] = await Promise.all([
-    sb.rpc('nl_record_check', { p_month: k }),
-    sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, checked_at, checked_detail').eq('month_key', k),
-    sb.from('nl_rc_cases').select('id, grp, need_doc')
-  ]);
-  if (a.error) throw a.error;
-  const res = {}, cs = {};
-  (b.data || []).forEach(x => { res[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
-  (c.data || []).forEach(x => { cs[x.id] = x; });
-  let rows = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }))
-    .filter(r => r.item_no !== 9 && r.item_no !== 25);
+  // 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 기록지 점검 화면과 같은 상태
+  //   참고 · 작성 중 · 끝 → 뺌 / 제출 대기 → 옅은 주황 / 선생님이 고칠 줄 → 빨강 / 그 밖 → 주황(서류)
+  const { data, error } = await sb.rpc('nl_rc_open', { p_month: k });
+  if (error) throw error;
+  let rows = (data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }))
+    .filter(r => r.kind === '발달재활' && r.item_no < 31 && r.item_no !== 25
+              && r.state !== '참고' && r.state !== '작성 중' && r.state !== '끝');
   if (!_isAllView(ME.role)) rows = rows.filter(r => Number(r.therapist_id) === Number(ME.id));
-  rows = rows.filter(r => {
-    const x = res[r.child_id + '|' + r.item_no + '|' + (r.item_key || '')];
-    if (x && x.checked_at && String(x.checked_detail || '') === String(r.detail || '')) return false;   // 원장 확인
-    if (x && x.case_id && !KB_LIST(r.item_no)) {                                                       // 옛 처리
-      const cc = cs[x.case_id];
-      if (cc && (cc.grp === '특이사항 기재' || !cc.need_doc || x.doc_done)) return false;
-    }
-    return true;
-  });
-  // 선생님이 끝낸 서식 — 기록지 점검 devDone 과 같은 맞춤
-  const kids = [...new Set(rows.map(r => r.child_id))], docs = {};
-  for (let i = 0; i < kids.length; i += 200) {
-    const { data } = await sb.from('nl_dev_docs').select('child_id, doc_type, doc_key, data')
-      .in('child_id', kids.slice(i, i + 200)).in('doc_type', ['변경계약', '사실확인']).eq('done', true);
-    (data || []).forEach(x => { (docs[x.child_id] = docs[x.child_id] || []).push(x); });
-  }
-  const done = r => {
-    const ds = docs[r.child_id] || [], d = r.on_date ? String(r.on_date).slice(0, 10) : '';
-    if (r.item_no === 15) return ds.some(x => x.doc_type === '변경계약' && x.doc_key === '본인부담금:' + k + '-01');
-    if (r.item_no === 16) return ds.some(x => x.doc_type === '변경계약' && String(x.doc_key).indexOf('담당:' + k) === 0);
-    if ([1, 8, 18].includes(r.item_no) && d)
-      return ds.some(x => x.doc_type === '사실확인' && String(x.doc_key).indexOf(k + ':') === 0
-                          && x.data && (x.data.day === d || x.data.appr === d));
-    return false;
-  };
   const out = {};
   rows.forEach(r => {
     const o = out[r.child_id] || (out[r.child_id] = { fix: 0, doc: 0, wait: 0, th: {} });
-    if (done(r)) o.wait++;
+    if (r.state === '제출 대기') o.wait++;
     else if (KB_LIST(r.item_no)) o.fix++;
     else o.doc++;
     if (r.therapist_id) o.th[r.therapist_id] = 1;
