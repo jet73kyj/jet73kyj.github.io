@@ -367,6 +367,8 @@ let LOADED = false;
 //   PAY[i] = i+1회 결제 { paid_on, paid_time, appr_no, cls_start, cls_end, flag, total }
 //   MAN[i] = 선생님이 그 회 칸을 직접 고침 → 고친 내용이 먼저 · 검정
 let PAY = [], PAYTOTAL = 0, PAYERR = '', PAYEND = '', MAN = [], AUTOCHG = false;
+// EDITED[i] = 이번에 고치고 아직 저장 안 한 회 — 빨강은 서버 판정이라 저장한 뒤 다시 셈 (2026-10-23)
+let EDITED = [];
 // 시간표 · 결제 변경 관리 (2026-10-09)
 let THGENDER = {}, LICS = [], PCROWS = [], PCERR = '';
 
@@ -782,7 +784,7 @@ async function loadOne() {
       ITEMS = it.data || [];
     }
     // 카드 결제 — 못 받아도 기록지는 그대로 연다
-    PAY = []; PAYTOTAL = 0; PAYERR = ''; PAYEND = ''; MAN = []; AUTOCHG = false;
+    PAY = []; PAYTOTAL = 0; PAYERR = ''; PAYEND = ''; MAN = []; EDITED = []; AUTOCHG = false;
     // 이 달 전에 끝난 수업 — 결제 내역을 찾지 않고 「종결되었습니다」 (2026-10-09)
     //   누가기록지는 끝난 수업도 두 달까지 목록에 남긴다
     const tp0 = TPRAW.find(r => String(r.id) === String(cur.therapy_id));
@@ -819,7 +821,7 @@ async function loadOne() {
     else if (PAYERR) $('pInfo').textContent += ' · 카드 결제 내역을 읽지 못했습니다';
     else if (!PAY.length) $('pInfo').textContent += ' · 이 달 카드 결제 내역 없음';
     if (PAYTOTAL > SESSIONS) $('pInfo').textContent += ' · 결제 ' + PAYTOTAL + '건 — ' + SESSIONS + '건만 넣었습니다';
-    const redN = PAY.filter((p, i) => payRed(p, MAN[i])).length;
+    const redN = PAY.filter((p, i) => payRed(p, false)).length;
     if (redN) $('pInfo').textContent += ' · 빨강 ' + redN + '회 — 고쳐 주세요';
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
@@ -1144,32 +1146,39 @@ function payDateText(p) {
   return s.length >= 10 ? parseInt(s.slice(5, 7), 10) + '월 ' + parseInt(s.slice(8, 10), 10) + '일' : '';
 }
 function payClsText(p) { return (p.cls_start && p.cls_end) ? _hm5(p.cls_start) + '-' + _hm5(p.cls_end) : ''; }
-// 결제가 일러 수업 시간을 앞당긴 회 (서버 nl_support_pay_calc · 2026-10-13) — 빨강 아님
-function isShift(p) { return !!(p && /^수업 시간 앞당김/.test(String(p.flag || ''))); }
+// 선생님이 수업 시각을 고쳐 저장한 회 (서버 「수업 시간 변경」 · 2026-10-23) — 빨강 아님 · 결제 변경 관리 대장 줄
+//   서버 자동 앞당김은 없앰 (2026-10-23 은정님) · 옛 「수업 시간 앞당김」 글도 같이 알아봄
+function isShift(p) { return !!(p && /^수업 시간 (앞당김|변경)/.test(String(p.flag || ''))); }
+// 고정 수업 시각 — 시각 칸을 비우면 이것으로 되돌림
+function payFixText(p) {
+  const m = isShift(p) ? String(p.flag).match(/고정\s*([0-9:]+-[0-9:]+)/) : null;
+  return m ? m[1] : payClsText(p);
+}
 function payRed(p, man) { return !!(p && p.flag && !isShift(p) && !man); }
 function payLine(p, man) {
   if (!p) return '';
   let s = '결제 ' + esc(_hm5(p.paid_time));
   if (isShift(p) && !man) {
     const m = String(p.flag).match(/고정\s*([0-9:]+-[0-9:]+)/);
-    s += '<br><span class="q_shift">고정 ' + esc(m ? m[1] : '') + ' → 앞당김</span>';
+    s += '<br><span class="q_shift">고정 ' + esc(m ? m[1] : '') + ' → 시각 고침</span>';
   } else if (p.flag && !man) s += '<br>⚠ ' + esc(p.flag);
   return s;
 }
 function paintRow(tr) {
   const i = Number(tr.dataset.i), p = PAY[i] || null;
-  const red = payRed(p, MAN[i]);
+  const red = payRed(p, EDITED[i]);
   tr.querySelector('.q_date').classList.toggle('red', red);
   tr.querySelector('.q_time').classList.toggle('red', red);
   const pd = tr.querySelector('.q_pay');
   pd.classList.toggle('red', red);
-  pd.innerHTML = payLine(p, MAN[i]);
+  pd.innerHTML = payLine(p, EDITED[i]);
 }
 // 선생님이 일자·시간 칸을 고치면 그 회는 「직접 고침」 → 검정
 $('seqBody').addEventListener('input', e => {
   if (!e.target.matches('.q_date, .q_time')) return;
   const tr = e.target.closest('tr'); if (!tr) return;
   MAN[Number(tr.dataset.i)] = true;
+  EDITED[Number(tr.dataset.i)] = true;
   paintRow(tr);
   drawTT();
 });
@@ -1180,8 +1189,8 @@ $('seqBody').addEventListener('change', e => {
   const i = Number(tr.dataset.i), p = PAY[i] || null;
   const qd = tr.querySelector('.q_date'), qt = tr.querySelector('.q_time');
   if (qd.value.trim() || qt.value.trim()) return;
-  MAN[i] = false;
-  if (p) { qd.value = payDateText(p); qt.value = payClsText(p); }
+  MAN[i] = false; EDITED[i] = true;
+  if (p) { qd.value = payDateText(p); qt.value = payFixText(p); }
   paintRow(tr);
   drawTT();
 });
@@ -1208,7 +1217,7 @@ function buildSeq() {
       dVal = payDateText(p); tVal = payClsText(p);
       if (dVal !== savedD || tVal !== timeVal || String(it.voucher_no || '') !== String(p.appr_no || '')) AUTOCHG = true;
     }
-    const red = payRed(p, man);
+    const red = payRed(p, false);
     const tr = document.createElement('tr');
     tr.dataset.i = String(i);
     tr.innerHTML =
@@ -1216,7 +1225,7 @@ function buildSeq() {
       + '<div style="font-weight:bold;margin-bottom:4px;">' + (i+1) + '회</div>'
       + '<input type="text" class="q_date' + (red ? ' red' : '') + '" value="' + esc(dVal) + '" style="text-align:center;">'
       + '<input type="text" class="q_time' + (red ? ' red' : '') + '" value="' + esc(tVal) + '" style="text-align:center;margin-top:3px;">'
-      + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, man) + '</div>'
+      + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, false) + '</div>'
       + '</td>'
       + '<td><textarea class="q_content" style="min-height:64px;">' + esc(it.content || '') + '</textarea></td>'
       + '<td><textarea class="q_react" style="min-height:64px;">' + esc(it.reaction || '') + '</textarea></td>';
@@ -1308,6 +1317,14 @@ async function saveRecord() {
     $('pInfo').textContent = mk + ' · 저장됨';
     DIRTY = false;
     setSaveBtn('done');
+    // 저장한 시각으로 서버가 다시 판정 — 빨강 · 결제 변경 관리 대장 다시 (2026-10-23)
+    try {
+      const pr3 = await sb.rpc('nl_support_pay', { p_therapy: cur.therapy_id, p_month: mk });
+      if (!pr3.error) PAY = (pr3.data || []).slice().sort((a, b) => a.seq - b.seq).slice(0, SESSIONS);
+    } catch (e4) {}
+    EDITED = [];
+    document.querySelectorAll('#seqBody tr').forEach(tr => { if (tr.dataset.i != null) paintRow(tr); });
+    try { await loadPc(); } catch (e5) {}
     kbLoad();                        // 아동 단추 색 다시 (2026-10-22)
   } catch (e) {
     alert('❌ 저장하지 못했습니다.\n' + e.message);
