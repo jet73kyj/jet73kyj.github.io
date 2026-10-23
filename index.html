@@ -52,6 +52,13 @@
   .toprt { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .toprt button { padding:8px 13px; font-size:13px; }
   .loginlogo { display:block; height:56px; width:auto; margin:0 0 14px; }
+  /* 최근 아이디 (2026-10-23 은정님) — 센터 컴퓨터를 여러 선생님이 함께 씀 · 아이디만 기억 · 비밀번호는 안 남김 */
+  .rids { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+  .rids .rl { width:100%; font-size:12px; color:#A39C95; }
+  .rids .rid { display:inline-flex; align-items:center; border:1px solid #E6DED4; border-radius:16px; background:#fff; overflow:hidden; }
+  .rids .rid button { border:none; background:none; margin:0; width:auto; padding:5px 10px; font-size:13px; color:#2F2926; cursor:pointer; box-shadow:none; }
+  .rids .rid button:hover { background:#F8F1E8; }
+  .rids .rid button.x { padding:5px 8px 5px 2px; color:#A39C95; font-size:12px; }
   .who { font-size:12.5px; color:var(--ink3); margin-top:3px; }
 
   .grp { margin-top:30px; }
@@ -118,6 +125,7 @@
   <label for="em">아이디</label>
   <input id="em" type="text" autocomplete="username" autocapitalize="none" spellcheck="false"
          placeholder="메일 · namu018 · 01012345678 · p0001">
+  <div class="rids" id="rids"></div>
   <label for="pw">비밀번호</label>
   <input id="pw" type="password" autocomplete="current-password">
   <button id="btn">로그인</button>
@@ -516,6 +524,7 @@ $('albg').onclick = e => { if (e.target === $('albg')) { $('albg').style.display
 
 $('btn').onclick = async () => {
   let email = $('em').value.trim().toLowerCase();
+  const typed = email;   // 최근 아이디에는 친 그대로 남김 (namu018 · 메일)
   const pw    = $('pw').value;
   if (!email || !pw) { show($('msg'), '이메일(아이디)과 비밀번호를 모두 입력하세요.', false); return; }
   $('btn').disabled = true; $('btn').textContent = '로그인 중...';
@@ -537,6 +546,7 @@ $('btn').onclick = async () => {
     if (error) throw error;
     // 이메일만 기억해 둔다 (비밀번호는 저장하지 않는다)
     try { localStorage.setItem('nl_last_email', email); } catch (e) {}
+    ridAdd(typed);
     await afterLogin(data.user);
   } catch (e) {
     show($('msg'), '❌ 로그인 실패\n' + e.message, false);
@@ -584,11 +594,29 @@ function showStaffPw(user) {
   $('snp2').onkeydown = e => { if (e.key === 'Enter') $('snpBtn').click(); };
 }
 
+// 최근 아이디 — 이 컴퓨터에서 로그인에 성공한 직원 아이디 10개까지 (가장 최근이 앞)
+//   localStorage 'nl_recent_ids' · 학부모 아이디는 안 남김 · ✕ 로 하나씩 지움 · 누르면 아이디 칸에 넣고 비밀번호 칸으로
+function ridList(){ try { const a = JSON.parse(localStorage.getItem('nl_recent_ids') || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string' && x) : []; } catch (e) { return []; } }
+function ridSave(a){ try { localStorage.setItem('nl_recent_ids', JSON.stringify(a.slice(0, 10))); } catch (e) {} }
+function ridAdd(id){ if (!id || nlIsParentId(id)) return; ridSave([id].concat(ridList().filter(x => x !== id))); }
+function ridDraw(){
+  const box = $('rids'), a = ridList();
+  if (!a.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.style.display = '';
+  const esc2 = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  box.innerHTML = '<div class="rl">최근 아이디 — 눌러서 고르기</div>' + a.map(id => '<span class="rid"><button type="button" data-rid="' + esc2(id) + '">' + esc2(id)
+    + '</button><button type="button" class="x" data-rx="' + esc2(id) + '" title="이 아이디 지우기">✕</button></span>').join('');
+  box.querySelectorAll('[data-rid]').forEach(b => b.onclick = () => { $('em').value = b.dataset.rid; $('pw').value = ''; $('pw').focus(); });
+  box.querySelectorAll('[data-rx]').forEach(b => b.onclick = () => { ridSave(ridList().filter(x => x !== b.dataset.rx)); ridDraw(); });
+}
 // 화면을 열면 지난번 이메일을 채워둔다 (비밀번호는 매번 입력)
 try {
   const _last = localStorage.getItem('nl_last_email');
   if (_last) { $('em').value = _last; }
+  // 지난번 아이디도 최근 목록 맨 앞에 (이 기능 전에 쓰던 컴퓨터도 바로 보이게)
+  if (_last && !ridList().length) ridAdd(_last);
 } catch (e) {}
+ridDraw();
 // ── 직원 · 학부모 아이디 가르기 (2026-10-07 · parent.html 에도 같은 글) ──
 //   학부모 — 휴대폰 번호(01로 시작 10~11자리 · 띄어쓰기 · - 무시) 또는 p + 숫자 네 자리
 function nlParentId(v){ const r = String(v || '').trim().toLowerCase(); return /^p[0-9]{4}$/.test(r) ? r : r.replace(/[\s-]/g, ''); }
