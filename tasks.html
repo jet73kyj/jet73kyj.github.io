@@ -120,6 +120,45 @@
   .tc .gd .gb { white-space:pre-wrap; line-height:1.75; }
   .tc .sb button.gon { background:#F8F1E8; border-color:#E8C9A6; color:#7E5530; }
   .kf button.on.ns1 { background:#F1EFE8; border-color:#C4BDB5; } .kf button.on.ns2 { background:#FAEEDA; border-color:#E8C9A6; } .kf button.on.ns3 { background:#EAF3DE; border-color:#9FC48A; }
+  /* 정리한 차림 (2026-10-23 은정님 「화면이 조잡」) — 늘 하는 일 · 이 달 업무일지 */
+  .card { border-radius:14px; padding:18px 20px; }
+  .rgrp { font-size:12px; color:var(--dim); margin:14px 0 6px; } .rgrp:first-child { margin-top:2px; }
+  .rr { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--line); border-radius:10px; margin-bottom:6px; cursor:pointer; background:#fff; }
+  .rr:hover { background:#FBF7F2; } .rr.off { opacity:.5; } .rr.rnew { background:#EEF6EA; border-color:#BFD9B0; } .rr.redit { background:#F8F1E8; border-color:var(--camB); }
+  .rr .rt { flex:1 1 240px; font-weight:600; font-size:14px; }
+  .chip { font-size:12px; padding:3px 9px; border-radius:20px; background:#F3F1EE; color:#6b645d; white-space:nowrap; }
+  .chip.c { background:var(--camL); color:#7E5530; }
+  .rr .dots { border:none; background:none; color:var(--dim); font-size:18px; line-height:1; padding:2px 6px; }
+  .rr .dots:hover { background:#F3EEE8; }
+  .rr .rmenu { display:none; gap:4px; } .rr.menu .rmenu { display:inline-flex; } .rr.menu .dots { display:none; }
+  .rr .rmenu button { padding:3px 10px; font-size:12px; }
+  .rform { border:1px dashed #E2CBB2; background:#FFFCF8; border-radius:12px; padding:16px 18px; margin-top:12px; }
+  .rform .fh { font-weight:700; font-size:14px; margin-bottom:12px; }
+  .rform .g2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px 18px; }
+  .rform .f > label { display:block; font-size:12px; color:var(--dim); margin-bottom:4px; }
+  .rform .f input, .rform .f select { width:100%; box-sizing:border-box; padding:8px 10px; }
+  .rform .dial { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .rform .dial select { width:auto; } .rform .dial span { font-size:12.5px; color:var(--dim); }
+  .rform .fb { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; margin-top:12px; }
+  #rprev { font-size:13px; font-weight:600; color:#7E5530; margin-top:12px; }
+  details.hlp { margin-top:10px; font-size:12.5px; } details.hlp summary { color:var(--cam); cursor:pointer; list-style:none; }
+  details.hlp summary::-webkit-details-marker { display:none; }
+  details.hlp .note { margin-top:6px; }
+  .mn { border:1px solid var(--line); border-radius:12px; padding:13px 16px; margin-bottom:10px; font-size:13px; line-height:1.65; }
+  .mn.fin { opacity:.78; }
+  .mn .nh { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px; color:var(--dim); }
+  .mn .nh a { color:var(--cam); text-decoration:none; }
+  .mn .nh .sp { flex:1 1 auto; }
+  .mn .nb { margin:7px 0 2px; font-size:13.5px; color:var(--tx); white-space:pre-wrap; }
+  .mn .ni { font-size:12.5px; color:var(--dim); white-space:pre-wrap; }
+  .seg { display:inline-flex; border:1px solid #DDD6CE; border-radius:8px; overflow:hidden; }
+  .seg button { border:none; border-right:1px solid #DDD6CE; border-radius:0; padding:4px 11px; font-size:12px; background:#fff; color:#6b645d; }
+  .seg button:last-child { border-right:none; }
+  .seg button.on { background:var(--camL); color:#7E5530; font-weight:600; }
+  .seg button.on.ns3 { background:#EAF3DE; color:#27500A; }
+  .mn .addr { border:none; background:none; color:var(--cam); padding:4px 0 0; font-size:12.5px; }
+  .mn .addr:hover { background:none; text-decoration:underline; }
+  .mn .rdone { margin-top:6px; color:#2e7d32; font-size:13px; white-space:pre-wrap; }
 </style>
 </head>
 <body>
@@ -192,7 +231,7 @@ function dialRule() {
   return { row, text: ruleText(row) };
 }
 let STAFF = [], TASKS = [], LATE = [], RULES = [], DAY = null, WHO = 'all';
-let EDIT_RID = null, NEW_RID = null, RMSG = null;   // 고치는 줄 · 방금 저장한 줄 · 단추 옆 알림
+let EDIT_RID = null, NEW_RID = null, RMSG = null, RFORM = false;   // RFORM — 「＋ 늘 하는 일 더하기」 칸이 열림 (2026-10-23)   // 고치는 줄 · 방금 저장한 줄 · 단추 옆 알림
 // 업무일지 (2026-10-10 · 한 화면: 달력 → 날짜 → 그 날 할 일 → 그 일의 업무일지)
 const KINDS = ['업무', '학부모 민원', '치료사 민원', '기타'];
 const KCL = { '업무':'k1', '학부모 민원':'k2', '치료사 민원':'k3', '기타':'k4' };
@@ -459,25 +498,30 @@ function staffHtml(){
 
 // 이 달 업무일지 모아 보기 (갈래로 거르기)
 function monthNotesHtml(){
+  // 일지 한 건 = 카드 하나 (2026-10-23 정리) — 위 줄: 갈래 · 날짜 · 쓴 사람 · 아동 · 오른쪽 접수/처리 중/끝
+  //   처리 결과 칸은 「＋ 처리 결과 적기」를 눌러야 열림 · 끝난 민원은 살짝 흐림
   const ml = MNOTES.filter(n => (WHO === 'all' || Number(n.staff_id) === Number(WHO)) && (MKIND === 'all' || n.kind === MKIND));
   if (!ml.length) return '<span class="dim">없습니다.</span>';
   return ml.map(n => {
     const comp = isComplaint(n.kind);
-    return '<div class="wn"><span class="bdg ' + (KCL[n.kind] || 'k4') + '">' + esc(n.kind) + '</span>'
-      + '<a href="#" data-goday="' + n.note_date + '" style="color:var(--cam)">' + dlab(n.note_date) + '</a> ' + (n.note_time ? hm(n.note_time) : '')
+    const editing = MRES_EDIT.has(n.id);
+    return '<div class="mn' + (comp && n.state === '끝' ? ' fin' : '') + '"><div class="nh"><span class="bdg ' + (KCL[n.kind] || 'k4') + '" style="margin:0">' + esc(n.kind) + '</span>'
+      + '<a href="#" data-goday="' + n.note_date + '">' + dlab(n.note_date) + '</a>' + (n.note_time ? ' ' + hm(n.note_time) : '')
       + ' · ' + esc(stName(n.staff_id)) + (n.child_id != null ? ' · ' + esc(kidLabel(n.child_id)) : '')
-      + (comp ? ' <span class="kf" style="display:inline-flex;margin-left:6px">' + NSTATES.map(s => '<button type="button" data-ms="' + n.id + '" data-s="' + s + '" class="' + (n.state === s ? 'on ' + (NSCL[s] || '') : '') + '">' + s + '</button>').join('') + '</span>' : '')
-      + '<div class="ln">' + esc(n.content) + '</div>'
-      + (n.improve ? '<div class="ln dim">개선 방향 · ' + esc(n.improve) + '</div>' : '')
+      + '<span class="sp"></span>'
+      + (comp ? '<span class="seg">' + NSTATES.map(s => '<button type="button" data-ms="' + n.id + '" data-s="' + s + '" class="' + (n.state === s ? 'on ' + (NSCL[s] || '') : '') + '">' + s + '</button>').join('') + '</span>' : '')
+      + '</div>'
+      + '<div class="nb">' + esc(n.content) + '</div>'
+      + (n.improve ? '<div class="ni">개선 방향 · ' + esc(n.improve) + '</div>' : '')
       + (comp
-          ? (n.result && !MRES_EDIT.has(n.id)
-              ? '<div class="mres"><label>처리 결과</label><div class="rtxt">' + esc(n.result) + '</div>'
-                + '<button type="button" class="lnk" data-medit="' + n.id + '">고치기</button><span class="mm" id="mm' + n.id + '"></span></div>'
-              : '<div class="mres"><label>처리 결과</label><textarea data-mres="' + n.id + '" maxlength="2000" placeholder="해결 방법을 적어 주세요">' + esc(n.result || '') + '</textarea>'
-                + '<button type="button" class="pri" data-msave="' + n.id + '">저장</button>'
-                + (n.result ? '<button type="button" data-mcancel="' + n.id + '">그만</button>' : '')
-                + '<span class="mm" id="mm' + n.id + '"></span></div>')
-          : (n.result ? '<div class="ln" style="color:#3B5E44">결과 · ' + esc(n.result) + '</div>' : ''))
+          ? (editing
+              ? '<div class="mres"><label>처리 결과</label><textarea data-mres="' + n.id + '" maxlength="2000" placeholder="해결 방법을 적어 주세요">' + esc(n.result || '') + '</textarea>'
+                + '<button type="button" class="pri" data-msave="' + n.id + '">저장</button><button type="button" data-mcancel="' + n.id + '">그만</button>'
+                + '<span class="mm" id="mm' + n.id + '"></span></div>'
+              : n.result
+                ? '<div class="rdone">✓ 처리 결과 · ' + esc(n.result) + ' <button type="button" class="lnk" data-medit="' + n.id + '">고치기</button> <span class="mm" id="mm' + n.id + '"></span></div>'
+                : '<button type="button" class="addr" data-medit="' + n.id + '">＋ 처리 결과 적기</button> <span class="mm" id="mm' + n.id + '"></span>')
+          : (n.result ? '<div class="rdone">결과 · ' + esc(n.result) + '</div>' : ''))
       + '</div>';
   }).join('');
 }
@@ -531,37 +575,50 @@ function draw(){
   h += '<div id="tmsg" class="msg"></div></div>';
 
   // ③ 접은 묶음 — 늘 하는 일 설정 · 직원별 · 이 달 일지
-  if (IS_BOSS) h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 설정 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary><table>'
-     + '<tr><th>직원</th><th>할 일</th><th>주기</th><th>쉬는 날</th><th>기간</th><th></th></tr>'
-     + RULES.map(r => '<tr data-rid="' + r.id + '" title="눌러서 고치기" class="rrow' + (r.active ? '' : ' dim') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"><td>' + esc(stName(r.staff_id)) + '</td><td>' + esc(r.title) + (r.guide_id ? ' <span class="dim" title="업무 안내서">📖 ' + esc((GUIDES.find(g => Number(g.id) === Number(r.guide_id)) || {}).title || '') + '</span>' : '') + '</td>'
-         + '<td>' + esc(ruleText(r)) + '</td>'
-         + '<td>' + (r.skip_off ? (r.cycle === '매일' ? '건너뜀' : '다음 출근 날') : '그대로') + '</td>'
-         + '<td>' + esc(r.from_date) + ' ~ ' + esc(r.to_date || '') + '</td>'
-         + '<td style="white-space:nowrap"><button type="button" data-ra="' + r.id + '">' + (r.active ? '끄기' : '켜기') + '</button> <button type="button" class="rdel" data-rdel="' + r.id + '">✕ 지우기</button></td></tr>').join('')
-     + '</table>'
-     + '<div class="row" style="margin-top:12px;">'
-     + '<select id="rwho">' + STAFF.map(s => '<option value="' + s.id + '">' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>'
-     + '<input id="rtitle" placeholder="늘 하는 일" style="flex:1 1 220px">'
-     + '<span class="dim" style="font-size:12.5px">월</span><select id="rmon" title="월"><option value="">적용 없음</option><option value="all">매달</option>'
-     +   Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '월</option>').join('') + '</select>'
-     + '<span class="dim" style="font-size:12.5px">주</span><select id="rwk" title="주"><option value="">적용 없음</option><option value="all">매주</option>'
-     +   [1, 2, 3, 4, 5].map(i => '<option value="' + i + '">' + WK[i] + ' 주</option>').join('') + '</select>'
-     + '<span class="dim" style="font-size:12.5px">일</span><select id="rday" title="일"><option value="">적용 없음</option><option value="all">매일</option>'
-     +   '<optgroup label="요일">' + [1, 2, 3, 4, 5, 6].map(i => '<option value="w' + i + '">' + WD[i] + '요일</option>').join('') + '</optgroup>'
-     +   '<optgroup label="날짜">' + Array.from({ length: 31 }, (_, i) => '<option value="d' + (i + 1) + '">' + (i + 1) + '일</option>').join('') + '</optgroup></select>'
-     + '<span id="rprev" style="font-size:13px;font-weight:600;color:var(--acc,#7E5530)"></span>'
-     + '<label class="dim" style="font-size:12.5px"><input type="checkbox" id="rskip" checked> 쉬는 날 건너뜀</label>'
-     + '<span class="dim" style="font-size:12.5px">업무 안내서</span><select id="rguide" title="업무 안내서 (안 골라도 됨)"><option value="">없음</option>'
-     +   [...new Set(GUIDES.map(g => g.category))].map(c => '<optgroup label="' + esc(c) + '">' + GUIDES.filter(g => g.category === c).map(g => '<option value="' + g.id + '">' + esc(g.title) + '</option>').join('') + '</optgroup>').join('') + '</select>'
-     + '<a href="work-guides.html" target="_blank" style="color:var(--cam);font-size:12.5px">안내서 쓰기 ↗</a>'
-     + '<button type="button" class="pri" id="radd">' + (EDIT_RID ? '저장' : '＋ 더하기') + '</button>'
-     + (EDIT_RID ? '<button type="button" id="rcancel">취소</button>' : '')
-     + '<span id="rmsg"></span></div>'
-     + '<div class="note">주기는 월 · 주 · 일 다이얼을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다. 보기 — 매달 · 마지막 주 · 적용 없음 = 매달 마지막 주 첫날 한 번 / 매주 월요일 = 월 적용 없음 · 주 매주 · 일 월요일 / 매달 1일 = 월 매달 · 주 적용 없음 · 일 1일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일 · 마지막 주 화요일 = 그 달의 마지막 화요일<br>쉬는 날 — 일요일 · 공휴일 · 센터휴무. 매일은 그날을 건너뛰고, 그 밖의 주기는 다음 출근 날로 미뤄 만듭니다.<br>표의 줄을 누르면 아래 칸에 들어가 고칠 수 있습니다 (고친 것은 다음에 만드는 목록부터). 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「✕ 지우기」 — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다. 날짜 상자의 반복하는 일 칸 「✕」로도 「이 날 것만 / 반복 자체」를 골라 지울 수 있습니다.</div></details>';
+  //   늘 하는 일 (2026-10-23 정리) — 한 일에 한 줄 · 주기와 쉬는 날은 딱지 · 「⋯」 안에 고치기 · 끄기 · 지우기
+  //   입력 칸은 「＋ 늘 하는 일 더하기」나 줄을 눌러 고칠 때만 열림 · 긴 설명은 「? 주기 고르는 법」 안에
+  if (IS_BOSS) {
+    const td = today();
+    const gname = r => (GUIDES.find(g => Number(g.id) === Number(r.guide_id)) || {}).title || '';
+    const sids = [...new Set(RULES.map(r => String(r.staff_id)))];
+    const rrow = r => '<div class="rr' + (r.active ? '' : ' off') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '" data-rid="' + r.id + '" title="눌러서 고치기">'
+      + '<span class="rt">' + esc(r.title) + '</span>'
+      + '<span class="chip c">' + esc(ruleText(r)) + '</span>'
+      + '<span class="chip">' + (r.skip_off ? (r.cycle === '매일' ? '쉬는 날 건너뜀' : '쉬는 날이면 다음 출근 날') : '쉬는 날에도 그대로') + '</span>'
+      + (r.from_date && r.from_date > td ? '<span class="chip">' + esc(r.from_date) + '부터</span>' : '')
+      + (r.to_date ? '<span class="chip">~ ' + esc(r.to_date) + '</span>' : '')
+      + (r.guide_id ? '<span class="chip" title="업무 안내서">📖 ' + esc(gname(r)) + '</span>' : '')
+      + (r.active ? '' : '<span class="chip">꺼 둠</span>')
+      + '<button type="button" class="dots" data-rmenu="' + r.id + '" title="고치기 · 끄기 · 지우기">⋯</button>'
+      + '<span class="rmenu"><button type="button" data-redit="' + r.id + '">고치기</button><button type="button" data-ra="' + r.id + '">' + (r.active ? '끄기' : '켜기') + '</button>'
+      + '<button type="button" class="rdel" data-rdel="' + r.id + '">지우기</button></span></div>';
+    const formOpen = RFORM || EDIT_RID;
+    h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary>'
+      + '<div class="row" style="justify-content:flex-end;margin-bottom:6px">' + (formOpen ? '' : '<button type="button" class="pri" id="ropen">＋ 늘 하는 일 더하기</button>') + '</div>'
+      + (RULES.length ? sids.map(sid => '<div class="rgrp">' + esc(stName(sid)) + '</div>' + RULES.filter(r => String(r.staff_id) === sid).map(rrow).join('')).join('')
+                      : '<div class="dim">아직 늘 하는 일이 없습니다.</div>')
+      + (formOpen ? '<div class="rform"><div class="fh">' + (EDIT_RID ? '늘 하는 일 고치기' : '늘 하는 일 더하기') + '</div><div class="g2">'
+        + '<div class="f"><label>할 일</label><input id="rtitle" placeholder="예) 예외지급 청구 확인"></div>'
+        + '<div class="f"><label>누가</label><select id="rwho">' + STAFF.map(s => '<option value="' + s.id + '">' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select></div>'
+        + '<div class="f" style="grid-column:1/-1"><label>언제 — 월 · 주 · 일 가운데 필요한 것만 고르세요</label><div class="dial">'
+        +   '<span>월</span><select id="rmon"><option value="">적용 없음</option><option value="all">매달</option>' + Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '월</option>').join('') + '</select>'
+        +   '<span>주</span><select id="rwk"><option value="">적용 없음</option><option value="all">매주</option>' + [1, 2, 3, 4, 5].map(i => '<option value="' + i + '">' + WK[i] + ' 주</option>').join('') + '</select>'
+        +   '<span>일</span><select id="rday"><option value="">적용 없음</option><option value="all">매일</option>'
+        +     '<optgroup label="요일">' + [1, 2, 3, 4, 5, 6].map(i => '<option value="w' + i + '">' + WD[i] + '요일</option>').join('') + '</optgroup>'
+        +     '<optgroup label="날짜">' + Array.from({ length: 31 }, (_, i) => '<option value="d' + (i + 1) + '">' + (i + 1) + '일</option>').join('') + '</optgroup></select></div></div>'
+        + '<div class="f"><label>쉬는 날 (일요일 · 공휴일 · 센터휴무)</label><label style="font-size:13px;color:var(--tx);display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" id="rskip" checked style="width:auto"> 쉬는 날은 피하기 (매일은 건너뜀 · 그 밖은 다음 출근 날)</label></div>'
+        + '<div class="f"><label>업무 안내서 (안 골라도 됨) · <a href="work-guides.html" target="_blank" style="color:var(--cam)">안내서 쓰기 ↗</a></label><select id="rguide"><option value="">없음</option>'
+        +   [...new Set(GUIDES.map(g => g.category))].map(c => '<optgroup label="' + esc(c) + '">' + GUIDES.filter(g => g.category === c).map(g => '<option value="' + g.id + '">' + esc(g.title) + '</option>').join('') + '</optgroup>').join('') + '</select></div>'
+        + '</div><div id="rprev"></div>'
+        + '<div class="fb"><span id="rmsg"></span><button type="button" id="rcancel">그만</button><button type="button" class="pri" id="radd">' + (EDIT_RID ? '저장' : '더하기') + '</button></div></div>'
+        : '<div class="row"><span id="rmsg"></span></div>')
+      + '<details class="hlp"><summary>? 주기 고르는 법 (눌러서 펼치기)</summary><div class="note">주기는 월 · 주 · 일을 골라 정합니다. 일 「매일」은 고른 기간에 날마다, 일 「적용 없음」은 고른 기간에 한 번(그 기간 첫날) 만듭니다.<br>보기 — 매달 1일 = 월 매달 · 일 1일 / 매주 월요일 = 주 매주 · 일 월요일 / 매달 마지막 주 화요일 = 월 매달 · 주 마지막 주 · 일 화요일 / 매년 7월 첫째 주 = 월 7월 · 주 첫째 주<br>첫째 주 = 1~7일 · 마지막 주 = 그 달의 마지막 7일<br>고친 것은 다음에 만드는 목록부터 들어갑니다. 잠시 멈출 때는 「끄기」, 아예 없앨 때는 「지우기」 — 오늘부터 앞날의 「할 일」 칸도 함께 지워지고, 끝낸 칸 · 지난 기록은 남습니다.</div></details>'
+      + '</details>';
+  }
   if (IS_BOSS) h += '<details class="card fold" data-fold="staff"' + (FOLD.staff ? ' open' : '') + '><summary class="ct">직원별 이 달 확인 <span class="dim" style="font-weight:400">— ' + mo + '월</span></summary>' + staffHtml() + '</details>';
-  h += '<div class="card" id="mnCard"><div class="mhead"><span class="ct" style="margin:0">이 달 업무일지 모아 보기</span>'
-     + '<span class="kf">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</span>'
+  h += '<div class="card" id="mnCard"><div class="mhead"><span class="ct" style="margin:0">' + mo + '월 업무일지</span>'
      + '<span class="cnt" id="mcnt">' + monthHeadCnt() + '</span></div>'
+     + '<div class="tabs">' + ['all'].concat(KINDS).map(k => '<button type="button" data-mk="' + k + '" class="' + (MKIND === k ? 'on' : '') + '">' + (k === 'all' ? '전체' : k) + '</button>').join('') + '</div>'
      + '<div id="mlist">' + monthNotesHtml() + '</div></div>';
   $('body').innerHTML = h;
   bind();
@@ -590,6 +647,7 @@ function bindMonth(){
     if (error || !data || !data.length) { alert('상태를 바꾸지 못했습니다.\n' + (error ? error.message : '바뀐 줄을 돌려받지 못했습니다')); return; }
     setLocal(id, { state: data[0].state });
     b.parentNode.querySelectorAll('button[data-ms]').forEach(x => { x.className = x.dataset.s === data[0].state ? 'on ' + (NSCL[x.dataset.s] || '') : ''; });
+    { const card = b.closest('.mn'); if (card) card.classList.toggle('fin', data[0].state === '끝'); }
     if ($('mcnt')) $('mcnt').innerHTML = monthHeadCnt();
   });
   document.querySelectorAll('button[data-msave]').forEach(b => b.onclick = async () => {
@@ -818,48 +876,16 @@ function bind(){
     await load(); msg('✓ 반복하는 일 「' + r.title + '」 지웠습니다', true);
   };
   // 늘 하는 일 설정 (원장님만 — 선생님 화면에는 이 칸이 없음)
-  if (!$('radd')) return;
-  const prev = () => { const d = dialRule(); $('rprev').textContent = d.err ? '⚠ ' + d.err : '→ ' + d.text; $('rprev').style.color = d.err ? '#c62828' : ''; };
-  ['rmon', 'rwk', 'rday'].forEach(id => $(id).onchange = prev); prev();
-  const rmsg = (t, ok) => { RMSG = { t, ok }; const m = $('rmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
-  if (RMSG) { rmsg(RMSG.t, RMSG.ok); RMSG = null; }
-  // 고치는 줄이면 아래 칸을 그 줄 내용으로 채움
-  const fillRule = r => {
-    $('rwho').value = String(r.staff_id); $('rtitle').value = r.title || ''; $('rskip').checked = !!r.skip_off;
-    const mo = r.year_month ? String(r.year_month) : (r.cycle === '매달' || r.cycle === '매달요일' || (r.cycle === '조합' && (r.week_no || r.month_day))) ? 'all' : '';
-    const wk = r.week_no ? String(r.week_no) : (r.cycle === '매주') ? 'all' : '';
-    const dy = (r.weekday != null && r.weekday >= 1) ? 'w' + r.weekday : r.month_day ? 'd' + r.month_day : (r.cycle === '매일' || (r.cycle === '조합' && !r.week_no)) ? 'all' : '';
-    $('rmon').value = mo; $('rwk').value = wk; $('rday').value = dy; prev();
-    $('rguide').value = r.guide_id ? String(r.guide_id) : '';
-  };
-  if (EDIT_RID) { const r = RULES.find(x => String(x.id) === String(EDIT_RID)); if (r) fillRule(r); else EDIT_RID = null; }
-  document.querySelectorAll('tr[data-rid]').forEach(tr => tr.onclick = e => {
-    if (e.target.closest('button')) return;
-    EDIT_RID = Number(tr.dataset.rid); NEW_RID = null; RMSG = { t: '고치는 중 — 고친 뒤 「저장」', ok: true }; draw();
-    $('rtitle').focus();
+  if ($('ropen')) $('ropen').onclick = () => { RFORM = true; EDIT_RID = null; NEW_RID = null; RMSG = null; draw(); if ($('rtitle')) $('rtitle').focus(); };
+  document.querySelectorAll('button[data-rmenu]').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    document.querySelectorAll('.rr.menu').forEach(x => x.classList.remove('menu'));
+    b.closest('.rr').classList.add('menu');
   });
-  if ($('rcancel')) $('rcancel').onclick = () => { EDIT_RID = null; RMSG = null; draw(); };
-  $('radd').onclick = async () => {
-    const title = $('rtitle').value.trim(), dr = dialRule();
-    if (!title) { rmsg('⚠ 늘 하는 일을 적어 주세요', false); return; }
-    if (dr.err) { rmsg('⚠ ' + dr.err, false); return; }
-    const row = Object.assign({ staff_id: Number($('rwho').value), title: title, skip_off: $('rskip').checked, guide_id: $('rguide').value ? Number($('rguide').value) : null }, dr.row);
-    const b = $('radd'); if (b.disabled) return; b.disabled = true; b.textContent = '저장 중…';
-    const q = EDIT_RID ? sb.from('nl_task_rules').update(row).eq('id', EDIT_RID).select('id') : sb.from('nl_task_rules').insert(row).select('id');
-    const { data, error } = await q;
-    if (error || !data || !data.length) {
-      b.disabled = false; b.textContent = EDIT_RID ? '저장' : '＋ 더하기';
-      const why = error ? error.message : '저장된 줄을 돌려받지 못했습니다';
-      rmsg('❌ 저장하지 못했습니다', false); alert('늘 하는 일을 저장하지 못했습니다.\n' + why); return;
-    }
-    NEW_RID = data[0].id; const was = EDIT_RID; EDIT_RID = null;
-    // 오늘 몫을 바로 만듦 (새벽 5시를 기다리지 않게 · 2026-10-10)
-    const mk = await sb.rpc('nl_make_tasks', { p_date: today() });
-    const made = (!mk.error && mk.data) ? Number(mk.data) : 0;
-    RMSG = { t: '✓ 저장했습니다 — ' + dr.text + (made ? ' · 오늘 목록에 ' + made + '개 바로 넣었습니다' : '') + ' (앞날은 달력에 「예정」으로 보이고 그날 새벽 5시에 들어갑니다)', ok: true };
-    void was;
-    load();
-  };
+  const openEdit = id => { EDIT_RID = Number(id); RFORM = false; NEW_RID = null; RMSG = { t: '고치는 중 — 고친 뒤 「저장」', ok: true }; draw();
+    const f = document.querySelector('.rform'); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: 'smooth', block: 'center' }); if ($('rtitle')) $('rtitle').focus(); };
+  document.querySelectorAll('button[data-redit]').forEach(b => b.onclick = e => { e.stopPropagation(); openEdit(b.dataset.redit); });
+  document.querySelectorAll('.rr[data-rid]').forEach(el => el.onclick = e => { if (e.target.closest('button')) return; openEdit(el.dataset.rid); });
   document.querySelectorAll('button[data-rdel]').forEach(b => b.onclick = async () => {
     const r = RULES.find(x => x.id === Number(b.dataset.rdel)); if (!r) return;
     if (!confirm('「' + r.title + '」 · ' + ruleText(r) + '\n\n이 늘 하는 일을 지울까요?\n\n오늘부터 앞날의 「할 일」 칸도 함께 지워집니다.\n끝낸 칸 · 지난 기록은 그대로 남습니다.\n잠시 멈추기만 하려면 「끄기」를 누르세요.')) return;
@@ -874,6 +900,45 @@ function bind(){
     if (error || !data || !data.length) { msg('❌ 바꾸지 못했습니다. ' + (error ? error.message : ''), false); return; }
     load();
   });
+  if (!$('radd')) { if (RMSG && $('rmsg')) { $('rmsg').textContent = RMSG.t; $('rmsg').style.color = RMSG.ok ? '#2e7d32' : '#c62828'; RMSG = null; } return; }
+  const prev = () => { const d = dialRule(), none = !$('rmon').value && !$('rwk').value && !$('rday').value;
+    $('rprev').textContent = none ? '→ 월 · 주 · 일을 고르면 여기에 주기가 보입니다' : d.err ? '⚠ ' + d.err : '→ ' + d.text;
+    $('rprev').style.color = none ? 'var(--dim)' : d.err ? '#c62828' : ''; };
+  ['rmon', 'rwk', 'rday'].forEach(id => $(id).onchange = prev); prev();
+  const rmsg = (t, ok) => { RMSG = { t, ok }; const m = $('rmsg'); if (m) { m.textContent = t; m.style.color = ok ? '#2e7d32' : '#c62828'; } };
+  if (RMSG) { rmsg(RMSG.t, RMSG.ok); RMSG = null; }
+  // 고치는 줄이면 아래 칸을 그 줄 내용으로 채움
+  const fillRule = r => {
+    $('rwho').value = String(r.staff_id); $('rtitle').value = r.title || ''; $('rskip').checked = !!r.skip_off;
+    const mo = r.year_month ? String(r.year_month) : (r.cycle === '매달' || r.cycle === '매달요일' || (r.cycle === '조합' && (r.week_no || r.month_day))) ? 'all' : '';
+    const wk = r.week_no ? String(r.week_no) : (r.cycle === '매주') ? 'all' : '';
+    const dy = (r.weekday != null && r.weekday >= 1) ? 'w' + r.weekday : r.month_day ? 'd' + r.month_day : (r.cycle === '매일' || (r.cycle === '조합' && !r.week_no)) ? 'all' : '';
+    $('rmon').value = mo; $('rwk').value = wk; $('rday').value = dy; prev();
+    $('rguide').value = r.guide_id ? String(r.guide_id) : '';
+  };
+  if (EDIT_RID) { const r = RULES.find(x => String(x.id) === String(EDIT_RID)); if (r) fillRule(r); else EDIT_RID = null; }
+  if ($('rcancel')) $('rcancel').onclick = () => { EDIT_RID = null; RFORM = false; RMSG = null; draw(); };
+  $('radd').onclick = async () => {
+    const title = $('rtitle').value.trim(), dr = dialRule();
+    if (!title) { rmsg('⚠ 늘 하는 일을 적어 주세요', false); return; }
+    if (dr.err) { rmsg('⚠ ' + dr.err, false); return; }
+    const row = Object.assign({ staff_id: Number($('rwho').value), title: title, skip_off: $('rskip').checked, guide_id: $('rguide').value ? Number($('rguide').value) : null }, dr.row);
+    const b = $('radd'); if (b.disabled) return; b.disabled = true; b.textContent = '저장 중…';
+    const q = EDIT_RID ? sb.from('nl_task_rules').update(row).eq('id', EDIT_RID).select('id') : sb.from('nl_task_rules').insert(row).select('id');
+    const { data, error } = await q;
+    if (error || !data || !data.length) {
+      b.disabled = false; b.textContent = EDIT_RID ? '저장' : '더하기';
+      const why = error ? error.message : '저장된 줄을 돌려받지 못했습니다';
+      rmsg('❌ 저장하지 못했습니다', false); alert('늘 하는 일을 저장하지 못했습니다.\n' + why); return;
+    }
+    NEW_RID = data[0].id; const was = EDIT_RID; EDIT_RID = null; RFORM = false;
+    // 오늘 몫을 바로 만듦 (새벽 5시를 기다리지 않게 · 2026-10-10)
+    const mk = await sb.rpc('nl_make_tasks', { p_date: today() });
+    const made = (!mk.error && mk.data) ? Number(mk.data) : 0;
+    RMSG = { t: '✓ 저장했습니다 — ' + dr.text + (made ? ' · 오늘 목록에 ' + made + '개 바로 넣었습니다' : '') + ' (앞날은 달력에 「예정」으로 보이고 그날 새벽 5시에 들어갑니다)', ok: true };
+    void was;
+    load();
+  };
 }
 
 $('home').onclick = () => { location.href = 'index.html'; };
