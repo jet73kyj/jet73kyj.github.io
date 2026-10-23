@@ -498,6 +498,7 @@ function draw(){
   let h = '<div class="card"><div class="ct"><button type="button" id="mprev">‹</button><span>' + y + '년 ' + mo + '월</span><button type="button" id="mnext">›</button>'
     + (IS_BOSS ? '<select id="wsel"><option value="all">모든 직원</option>' + STAFF.map(s => '<option value="' + s.id + '"' + (String(WHO) === String(s.id) ? ' selected' : '') + '>' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select>' : '')
     + '<span style="flex:1"></span><a href="work-guides.html" target="_blank" title="업무 안내서 (새 탭)" style="display:inline-block;padding:6px 12px;border:1px solid var(--line,#ECE8E3);border-radius:8px;background:#fff;color:var(--cam,#B07A4A);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">📖 업무 안내서</a>'
+    + (IS_BOSS ? '<button type="button" id="gorules" title="아래 늘 하는 일 설정으로">⚙ 늘 하는 일</button>' : '')
     + '<button type="button" id="gotoday">오늘</button></div>'
     + calHtml()
     + '<div class="note">날짜를 누르면 아래에 그 날 할 일이 나옵니다. 칸 숫자 — 끝냄/할 일 (미룬 일은 뺌) · 일지 · 민원. 초록 = 다 끝냄 · 주황 = 남은 일 · 빨강 = 지난 날 남은 일이나 못 함</div></div>';
@@ -628,6 +629,13 @@ function bind(){
   $('mprev').onclick = () => goDay(mshift(-1));
   $('mnext').onclick = () => goDay(mshift(1));
   $('gotoday').onclick = () => goDay(today());
+  // 늘 하는 일 설정으로 바로 (2026-10-23) — 접힌 묶음을 펼치고 그 자리로 내려감
+  if ($('gorules')) $('gorules').onclick = () => {
+    const dt = document.querySelector('details.fold[data-fold="rules"]');
+    if (!dt) return;
+    dt.open = true; FOLD.rules = true; saveFold();
+    dt.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   document.querySelectorAll('[data-goday]').forEach(el => el.onclick = e => { e.preventDefault(); goDay(el.dataset.goday);
     setTimeout(() => { const c = $('dayCard'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); });
   if ($('wsel')) $('wsel').onchange = () => { if (!leaveOk()) { $('wsel').value = WHO; return; } FORM = null; WHO = $('wsel').value; draw(); };
