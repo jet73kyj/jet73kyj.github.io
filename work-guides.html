@@ -9,6 +9,8 @@
      보기 = 8 · 19 · 10 · 11번 / 쓰기 · 고치기 · 지우기 = 원장님(8번)만 (서버 잠금도 같음)
      주소 끝 #g번호 — 그 안내서를 펼친 채 엶
      사진 · 서식 파일은 「서식」 화면에 두고, 안내 글에는 서식 이름만 적음
+     그림 (2026-10-23) — 저장소 nl-guides · 글에는 「[그림:파일이름]」 · 쓰는 칸에서는 「[그림 1]」 (nl-guide-img.js)
+       캡처를 Ctrl+V · 끌어다 놓기 · 「📷 그림 넣기」 · 표시를 지우고 저장하면 그 그림 파일도 지움
 -->
 <style>
   :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
@@ -57,6 +59,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
+<script src="nl-guide-img.js"></script>
 <script>
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
@@ -67,16 +70,20 @@ const CATS = ['납부', '발달재활', '치료지원', '아동', '그 밖'];
 let IS_BOSS = false, G = [], CAT = 'all', Q = '', OPEN = new Set(), HIT = null;
 let EDIT = null;          // null = 칸 닫힘 · 'new' = 새 안내서 · 번호 = 고치는 안내서
 let EMSG = null;
+let EMAP = [], EUP = [], EDRAFT = null, EBUSY = 0;   // 그림 번호 → 파일 · 이번에 올린 파일 · 다시 그릴 때 적던 글 · 올리는 중
 
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function dlab(ts){ if (!ts) return ''; const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate() + ' 고침'; }
 
 // 적고 저장 안 한 것
+function startEdit(id){ EDIT = id; EMAP = []; EUP = []; EDRAFT = null; }
+function curBody(){ return NLGImg.toStore($('ebody').value, EMAP).replace(/\s+$/, ''); }
 function draft(){
   if (!EDIT || !$('etitle')) return false;
+  if (EUP.length) return true;
   const g = EDIT === 'new' ? { title: '', body: '', category: CAT === 'all' ? '그 밖' : CAT, sort_no: 0 } : G.find(x => x.id === EDIT);
   if (!g) return false;
-  return $('etitle').value.trim() !== (g.title || '') || $('ebody').value !== (g.body || '')
+  return $('etitle').value.trim() !== (g.title || '') || curBody() !== (g.body || '')
       || $('ecat').value !== g.category || String(Number($('esort').value) || 0) !== String(g.sort_no || 0);
 }
 function leaveOk(){ return !draft() || confirm('저장하지 않은 안내서가 있습니다.\n저장하지 않고 넘어갈까요?'); }
@@ -91,13 +98,16 @@ async function load(){
 }
 
 function edHtml(){
-  const g = EDIT === 'new' ? { title: '', body: '', category: CAT === 'all' ? '그 밖' : CAT, sort_no: 0 } : G.find(x => x.id === EDIT);
+  const g0 = EDIT === 'new' ? { title: '', body: '', category: CAT === 'all' ? '그 밖' : CAT, sort_no: 0 } : G.find(x => x.id === EDIT);
+  const g = EDRAFT ? Object.assign({}, g0, EDRAFT) : Object.assign({}, g0, { body: NLGImg.toEdit(g0.body, EMAP) });
   return '<div class="card ed" style="border-color:var(--camB)"><div style="font-weight:700;color:#7E5530">' + (EDIT === 'new' ? '새 안내서' : '안내서 고치기') + '</div>'
     + '<div class="row"><div><label>갈래</label><select id="ecat">' + CATS.map(c => '<option' + (g.category === c ? ' selected' : '') + '>' + c + '</option>').join('') + '</select></div>'
     + '<div style="flex:1 1 280px"><label>제목 (80자까지)</label><input id="etitle" maxlength="80" style="width:100%" value="' + esc(g.title) + '" placeholder="예) 예외지급 신청 방법"></div>'
     + '<div><label>차례 (작을수록 위)</label><input id="esort" type="number" style="width:90px" value="' + (g.sort_no || 0) + '"></div></div>'
-    + '<label>내용 — 한 줄에 한 단계씩 적으면 읽기 쉽습니다</label>'
-    + '<textarea id="ebody" maxlength="10000" placeholder="1. …&#10;2. …&#10;3. …">' + esc(g.body) + '</textarea>'
+    + '<div class="row" style="justify-content:space-between;margin-top:10px"><label style="margin:0">내용 — 한 줄에 한 단계씩 · 캡처한 화면은 이 칸에 <b>Ctrl+V</b></label>'
+    + '<span><button type="button" id="eimg">📷 그림 넣기</button><input type="file" id="efile" accept="image/*" multiple style="display:none"></span></div>'
+    + '<textarea id="ebody" data-eid="' + esc(String(EDIT)) + '" maxlength="10000" placeholder="1. …&#10;2. …&#10;3. …" style="margin-top:4px">' + esc(g.body) + '</textarea>'
+    + '<div id="estrip" class="row" style="margin-top:6px;gap:10px"></div>'
     + '<div class="row" style="margin-top:10px"><button type="button" class="pri" id="esave">저장</button><button type="button" id="ecancel">그만</button><span id="emsg"></span></div>'
     + '<div class="note">아동 이름 · 연락처 · 계좌번호는 적지 마세요. 서식 파일은 「서식」 화면에 올리고 여기에는 서식 이름만 적습니다.</div></div>';
 }
@@ -106,6 +116,7 @@ function draw(){
   const q = Q.trim();
   const list = G.filter(g => (CAT === 'all' || g.category === CAT) && (!q || (g.title + '\n' + (g.body || '')).indexOf(q) >= 0));
   let h = '';
+  if ($('etitle') && $('ebody').dataset.eid === String(EDIT)) EDRAFT = { category: $('ecat').value, title: $('etitle').value, body: $('ebody').value, sort_no: $('esort').value };
   if (IS_BOSS && EDIT === 'new') h += edHtml();
   h += '<div class="card"><div class="tabs">' + ['all'].concat(CATS).map(c => {
       const n = c === 'all' ? G.length : G.filter(g => g.category === c).length;
@@ -119,7 +130,7 @@ function draw(){
     let r = '<div class="g' + (on ? ' on' : '') + (HIT === g.id ? ' hit' : '') + '" id="g' + g.id + '"><div class="h" data-tog="' + g.id + '">'
       + '<span class="ar">' + (on ? '▾' : '▸') + '</span><span class="tt">' + esc(g.title) + '</span>'
       + (CAT === 'all' ? '<span class="bdg">' + esc(g.category) + '</span>' : '') + '<span class="meta">' + dlab(g.updated_at) + '</span></div>';
-    if (on) r += '<div class="b">' + (g.body ? esc(g.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
+    if (on) r += '<div class="b">' + (g.body ? NLGImg.html(g.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
       + (IS_BOSS && EDIT !== g.id ? '<div class="row" style="padding:0 0 12px 26px"><button type="button" data-edit="' + g.id + '">고치기</button><button type="button" class="red" data-del="' + g.id + '">✕ 지우기</button></div>' : '');
     if (IS_BOSS && EDIT === g.id) r += edHtml();
     return r + '</div>';
@@ -127,6 +138,7 @@ function draw(){
   h += '</div><div class="note">할 일 목록의 「늘 하는 일 설정」에서 안내서를 고르면, 그 할 일 칸에 「📖 안내」 단추가 생깁니다.' + (IS_BOSS ? '' : ' 안내서는 원장님이 적고 고칩니다.') + '</div>';
   $('body').innerHTML = h;
   bind();
+  NLGImg.fill(sb, $('body')).catch(() => {});
 }
 
 function bind(){
@@ -137,24 +149,75 @@ function bind(){
     const id = Number(el.dataset.tog); if (EDIT === id) return;
     if (OPEN.has(id)) OPEN.delete(id); else OPEN.add(id); HIT = null; draw();
   });
-  if ($('newg')) $('newg').onclick = () => { if (!leaveOk()) return; EDIT = 'new'; draw(); $('etitle').focus(); };
-  document.querySelectorAll('button[data-edit]').forEach(b => b.onclick = () => { if (!leaveOk()) return; EDIT = Number(b.dataset.edit); OPEN.add(EDIT); draw(); $('ebody').focus(); });
+  if ($('newg')) $('newg').onclick = () => { if (!leaveOk()) return; startEdit('new'); draw(); $('etitle').focus(); };
+  document.querySelectorAll('button[data-edit]').forEach(b => b.onclick = () => { if (!leaveOk()) return; startEdit(Number(b.dataset.edit)); OPEN.add(EDIT); draw(); $('ebody').focus(); });
   document.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
     const g = G.find(x => x.id === Number(b.dataset.del)); if (!g) return;
     if (!confirm('「' + g.title + '」 안내서를 지울까요?\n\n이 안내서를 고른 늘 하는 일은 남고, 「📖 안내」 단추만 사라집니다.\n지운 뒤에는 되살릴 수 없습니다.')) return;
     const { data, error } = await sb.from('nl_work_guides').delete().eq('id', g.id).select('id');
     if (error || !data || !data.length) { alert('지우지 못했습니다.\n' + (error ? error.message : '지운 줄을 돌려받지 못했습니다')); return; }
+    await NLGImg.remove(sb, NLGImg.paths(g.body));   // 그 안내서 그림 파일도 지움
     OPEN.delete(g.id); load();
   });
   if (!$('esave')) return;
   const emsg = (t, ok) => { const m = $('emsg'); if (m) { m.textContent = t; m.className = ok ? 'ok' : 'err'; } };
   if (EMSG) { emsg(EMSG.t, EMSG.ok); EMSG = null; }
-  $('ecancel').onclick = () => { if (!leaveOk()) return; EDIT = null; draw(); };
+  $('ecancel').onclick = async () => {
+    if (!leaveOk()) return;
+    const g = EDIT === 'new' ? null : G.find(x => x.id === EDIT);
+    const keep = NLGImg.paths(g ? g.body : '');
+    await NLGImg.remove(sb, EUP.filter(p => keep.indexOf(p) < 0));   // 이번에 올리고 저장 안 한 그림
+    EDIT = null; EUP = []; EDRAFT = null; draw();
+  };
+  // 그림 넣기 — 캡처 Ctrl+V · 끌어다 놓기 · 고르기 (커서 자리에 「[그림 N]」)
+  const ta = $('ebody');
+  const strip = () => {
+    const used = (ta.value.match(/\[그림 (\d+)\]/g) || []).map(x => Number(x.replace(/\D/g, '')));
+    $('estrip').innerHTML = used.filter((n, i) => used.indexOf(n) === i && EMAP[n - 1]).map(n =>
+      '<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid var(--line);border-radius:8px;padding:3px 6px">[그림 ' + n + ']'
+      + '<img class="gimg" data-gp="' + esc(EMAP[n - 1]) + '" style="height:40px;max-width:70px;border-radius:4px;cursor:zoom-in">'
+      + '<button type="button" class="red" data-imgx="' + n + '" style="padding:1px 6px" title="이 그림 빼기">✕</button></span>').join('');
+    $('estrip').querySelectorAll('button[data-imgx]').forEach(x => x.onclick = () => {
+      ta.value = ta.value.split('[그림 ' + x.dataset.imgx + ']').join('').replace(/\n{3,}/g, '\n\n'); strip();
+    });
+    NLGImg.fill(sb, $('estrip')).catch(() => {});
+  };
+  const addFiles = async files => {
+    files = Array.from(files || []).filter(f => /^image\//.test(f.type || ''));
+    if (!files.length) return;
+    EBUSY++; emsg('그림 올리는 중… (' + files.length + '개)', true); $('esave').disabled = true;
+    for (const f of files) {
+      try {
+        const name = await NLGImg.upload(sb, f);
+        EMAP.push(name); EUP.push(name);
+        const tag = '[그림 ' + EMAP.length + ']';
+        const a = ta.selectionStart, z = ta.selectionEnd, v = ta.value;
+        const pre = v.slice(0, a), post = v.slice(z);
+        const ins = (pre && !/\n$/.test(pre) ? '\n' : '') + tag + (post && !/^\n/.test(post) ? '\n' : '');
+        ta.value = pre + ins + post; ta.selectionStart = ta.selectionEnd = pre.length + ins.length;
+      } catch (e) { alert('그림을 올리지 못했습니다.\n' + (e && e.message ? e.message : e)); }
+    }
+    EBUSY--; if (!EBUSY) { $('esave').disabled = false; emsg('✓ 그림을 넣었습니다 — 「저장」을 눌러야 남습니다', true); }
+    strip(); ta.focus();
+  };
+  ta.addEventListener('paste', e => {
+    const fs = Array.from((e.clipboardData && e.clipboardData.items) || []).filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+    if (fs.length) { e.preventDefault(); addFiles(fs); }
+  });
+  ta.addEventListener('dragover', e => { e.preventDefault(); });
+  ta.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
+  ta.addEventListener('input', strip);
+  $('eimg').onclick = () => $('efile').click();
+  $('efile').onchange = () => { addFiles($('efile').files); $('efile').value = ''; };
+  strip();
   $('esave').onclick = async () => {
     const b = $('esave'); if (b.disabled) return;
     const title = $('etitle').value.trim();
     if (!title) { emsg('⚠ 제목을 적어 주세요', false); $('etitle').focus(); return; }
-    const row = { category: $('ecat').value, title: title, body: $('ebody').value.replace(/\s+$/, ''), sort_no: Number($('esort').value) || 0 };
+    if (EBUSY) { emsg('⚠ 그림을 올리는 중입니다. 잠시 뒤에 저장해 주세요', false); return; }
+    const row = { category: $('ecat').value, title: title, body: curBody(), sort_no: Number($('esort').value) || 0 };
+    if (/\[그림 \d+\]/.test(row.body)) { emsg('⚠ 번호가 맞지 않는 [그림 ○] 표시가 있습니다. 지우거나 그림을 다시 넣어 주세요', false); return; }
+    const oldG = EDIT === 'new' ? null : G.find(x => x.id === EDIT);
     b.disabled = true; b.textContent = '저장 중…';
     const q = EDIT === 'new' ? sb.from('nl_work_guides').insert(row).select('id') : sb.from('nl_work_guides').update(row).eq('id', EDIT).select('id');
     const { data, error } = await q;
@@ -162,6 +225,10 @@ function bind(){
       b.disabled = false; b.textContent = '저장'; emsg('❌ 저장하지 못했습니다', false);
       alert('안내서를 저장하지 못했습니다.\n' + (error ? error.message : '저장된 줄을 돌려받지 못했습니다')); return;
     }
+    // 글에서 빠진 그림 파일 지움 (옛 글에 있던 것 · 이번에 올리고 안 쓴 것)
+    const now = NLGImg.paths(row.body);
+    await NLGImg.remove(sb, NLGImg.paths(oldG ? oldG.body : '').concat(EUP).filter((p, i, a) => a.indexOf(p) === i && now.indexOf(p) < 0));
+    EUP = []; EDRAFT = null;
     const id = data[0].id; EDIT = null; OPEN.add(id); HIT = id; CAT = CAT === 'all' || CAT === row.category ? CAT : row.category;
     await load();
     const el = $('g' + id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });

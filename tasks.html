@@ -132,6 +132,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
+<script src="nl-guide-img.js"></script>
 <script>
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
@@ -377,7 +378,7 @@ function taskRow(t, kind){
   h += '</div>';
   if (gdd) h += '<div class="gd" id="gd' + t.id + '" style="display:' + (GOPEN.has(t.id) ? 'block' : 'none') + '"><div class="gh">📖 ' + esc(gdd.title) + '<span style="flex:1"></span>'
     + '<button type="button" class="lnk" data-gdclose="' + t.id + '">접기</button></div>'
-    + '<div class="gb">' + (gdd.body ? esc(gdd.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
+    + '<div class="gb">' + (gdd.body ? NLGImg.html(gdd.body) : '<span class="dim">아직 적힌 내용이 없습니다.</span>') + '</div>'
     + '<div style="text-align:right;margin-top:6px"><a href="work-guides.html#g' + gdd.id + '" target="_blank" style="color:var(--cam);font-size:12.5px">안내서 화면에서 보기 ↗</a></div></div>';
   if (MOVE === t.id) h += '<div class="mv">옮길 날 <input type="date" id="mvday" min="' + addDay(t.task_date, 1) + '" value="' + addDay(DAY > t.task_date ? DAY : t.task_date, 1) + '">'
     + '<button type="button" class="pri" id="mvgo">옮기기</button><button type="button" id="mvno">그만</button>'
@@ -563,6 +564,7 @@ function draw(){
      + '<div id="mlist">' + monthNotesHtml() + '</div></div>';
   $('body').innerHTML = h;
   bind();
+  if (window.NLGImg) NLGImg.fill(sb, $('body')).catch(() => {});
 }
 
 // 이 달 모아 보기 — 날짜로 가기 · 민원 상태 · 처리 결과 저장 (2026-10-20)
