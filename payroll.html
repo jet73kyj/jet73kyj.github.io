@@ -254,6 +254,13 @@
 .sumt input.dmi:focus{border-style:solid;border-color:#B07A4A;outline:none;}
 .sumt input.dmi.saved{border-style:solid;border-color:#ECE8E3;}
 .sumt .rtrow .rtlab{font-size:11px;color:#8a6a48;margin-bottom:3px;}
+/* 이체 줄 더하기 (nl_pay_xfer · 2026-10-23 은정님) — 그 달에만 · 합계에 더함 · 세무사 엑셀에는 안 들어감 */
+.sumt .xfrow td{background:#FFFBF5;}
+.sumt .xfrow input.xi{margin-bottom:4px !important;}
+.sumt .xfadd td{border-bottom:none;padding-top:6px;}
+.sumt .xfadd button{color:#B07A4A;font-weight:600;}
+.sumt .xfrow .xbt{display:flex;gap:4px;justify-content:flex-end;margin-top:4px;}
+.sumt .xfrow .xdel{color:#c62828;}
 </style>
 </head>
 <body>
@@ -1495,6 +1502,7 @@ async function dmSave(el){
 let PAYMEMO = { wage: '', fee: '', fuel: '' };
 // 퇴직금 줄 (nl_pay_retire · 2026-10-04) — 그 달 이전 가장 늦은 줄을 이어받음 · 저장하면 그 달부터
 let RET = { from: '', names: '', acc: '', w: 0, f: 0 };   // 이체 기록 메모 (nl_tax_month · 2026-10-04)
+let XF = [], XFK = 0;   // 이체 줄 (nl_pay_xfer · 2026-10-23) — { k, id, item, names, acc, w, f, u }
 async function buildSum(){
   const box = $('sumBox');
   // 지급 모음을 보는 동안 선생님 한 분 화면은 숨긴다 (2026-10-03)
@@ -1538,6 +1546,9 @@ async function buildSum(){
     if (rte) alert('퇴직금 줄을 읽지 못했습니다.\n' + rte.message);
     const x = (rt || [])[0];
     if (x) RET = { from: x.from_month, names: x.names || '', acc: x.account_memo || '', w: x.amt_wage || 0, f: x.amt_fee || 0 }; }
+  { const { data: xf, error: xfe } = await sb.from('nl_pay_xfer').select('id, item, names, account_memo, amt_wage, amt_fee, amt_fuel').eq('month_key', mon).order('id');
+    if (xfe) alert('이체 줄을 읽지 못했습니다.\n' + xfe.message);
+    XF = (xf || []).map(x => ({ k: ++XFK, id: x.id, item: x.item || '', names: x.names || '', acc: x.account_memo || '', w: x.amt_wage || 0, f: x.amt_fee || 0, u: x.amt_fuel || 0 })); }
   { const { data: em } = await sb.from('nl_tax_month').select('edu_amount, edu_memo, memo_wage, memo_fee, memo_fuel').eq('month_key', mon).maybeSingle();
     if (em) { EDU = { amount: em.edu_amount, memo: em.edu_memo || '' };
               PAYMEMO = { wage: em.memo_wage || '', fee: em.memo_fee || '', fuel: em.memo_fuel || '' }; } }
@@ -1577,8 +1588,10 @@ function drawSum(){
     +   '<td><input id="rtF" data-won class="n" type="text" inputmode="numeric" placeholder="금액" value="' + (RET.f ? won(RET.f) : '') + '">' + dmIn(0, 'retire') + '</td>'
     +   '<td class="n">–</td>'
     +   '<td class="n"><b id="rtT">' + won(RET.w + RET.f) + '</b><div><button type="button" class="ctsm" id="rtSave">✓ 저장됨</button></div></td></tr>'
-    + '</tbody><tfoot><tr><td>합계</td><td></td><td class="n" id="sumW">' + won(sum('wageNet') + RET.w) + '</td><td class="n" id="sumF">' + won(sum('netFee') + RET.f) + '</td>'
-    + '<td class="n">' + won(sum('fuel')) + '</td><td class="n" id="sumT">' + won(sum('wageNet') + sum('netFee') + sum('fuel') + RET.w + RET.f) + '</td></tr>'
+    + XF.map(xfRowHtml).join('')
+    + '<tr class="xfadd"><td colspan="6"><button type="button" class="ctsm" id="xfAdd">＋ 이체 줄 더하기</button> <span class="small">이 달에만 · 적은 금액은 아래 합계에 더해짐 · 세무사 엑셀에는 안 들어감</span></td></tr>'
+    + '</tbody><tfoot><tr><td>합계</td><td></td><td class="n" id="sumW"></td><td class="n" id="sumF"></td>'
+    + '<td class="n" id="sumU"></td><td class="n" id="sumT"></td></tr>'
     // 이체 기록 — 합계 아래 칸마다 메모 하나 (2026-10-04 은정님)
     + '<tr class="pmrow"><td class="small">이체 기록</td><td></td>'
     +   '<td><input id="pmWage" type="text" maxlength="500" placeholder="메모" value="' + esc(PAYMEMO.wage) + '"></td>'
@@ -1605,13 +1618,21 @@ function drawSum(){
   });
   // 퇴직금 줄 — 적으면 합계를 바로 다시 셈 (저장 전)
   const rtNum = id => Number(String($(id).value).replace(/[^0-9]/g, '')) || 0;
-  const rtRedraw = () => {
+  // 합계 — 퇴직금 줄 · 이체 줄의 지금 적힌 금액까지 (저장 전에도 바로 보임)
+  const liveTot = () => {
     const w = rtNum('rtW'), f = rtNum('rtF');
     $('rtT').textContent = won(w + f);
-    $('sumW').textContent = won(sum('wageNet') + w); $('sumF').textContent = won(sum('netFee') + f);
-    $('sumT').textContent = won(sum('wageNet') + sum('netFee') + sum('fuel') + w + f);
-    $('rtSave').textContent = '💾 저장 전';
+    let xw = 0, xf = 0, xu = 0;
+    box.querySelectorAll('tr.xfrow').forEach(tr => {
+      const g = c => Number(String(tr.querySelector('.' + c).value).replace(/[^0-9]/g, '')) || 0;
+      const a = g('xw'), b = g('xf'), c = g('xu'); xw += a; xf += b; xu += c;
+      tr.querySelector('.xt').textContent = won(a + b + c);
+    });
+    $('sumW').textContent = won(sum('wageNet') + w + xw); $('sumF').textContent = won(sum('netFee') + f + xf);
+    $('sumU').textContent = won(sum('fuel') + xu);
+    $('sumT').textContent = won(sum('wageNet') + sum('netFee') + sum('fuel') + w + f + xw + xf + xu);
   };
+  const rtRedraw = () => { liveTot(); $('rtSave').textContent = '💾 저장 전'; };
   ['rtNames', 'rtAcc', 'rtW', 'rtF'].forEach(id => { $(id).oninput = rtRedraw; });
   ['rtW', 'rtF'].forEach(id => { $(id).onblur = () => { const v = rtNum(id); $(id).value = v ? won(v) : ''; }; });
   $('rtSave').onclick = async () => {
@@ -1625,9 +1646,53 @@ function drawSum(){
     $('rtSave').textContent = '✓ 저장됨';
     const lab = document.querySelector('.rtrow .rtlab'); if (lab) lab.textContent = '퇴직금';
   };
+  // 이체 줄 — 「＋」로 한 줄 더함 (저장 전 줄) · 줄마다 저장 · 지우기
+  const xfBind = tr => {
+    const k = Number(tr.dataset.xk), x = XF.find(y => y.k === k); if (!x) return;
+    const bs = tr.querySelector('.xs');
+    tr.querySelectorAll('input').forEach(el => { el.oninput = () => { liveTot(); bs.textContent = '💾 저장'; tr.dataset.dirty = '1'; }; });
+    tr.querySelectorAll('input.xw, input.xf, input.xu').forEach(el => { el.onblur = () => { const v = Number(String(el.value).replace(/[^0-9]/g, '')) || 0; el.value = v ? won(v) : ''; }; });
+    bs.onclick = async () => {
+      const num = c => Number(String(tr.querySelector('.' + c).value).replace(/[^0-9]/g, '')) || null;
+      const txt = c => tr.querySelector('.' + c).value.trim() || null;
+      const row = { month_key: mon, item: txt('xi'), names: txt('xn'), account_memo: txt('xa'), amt_wage: num('xw'), amt_fee: num('xf'), amt_fuel: num('xu'), updated_at: new Date().toISOString() };
+      if (!row.item && !row.names && !row.amt_wage && !row.amt_fee && !row.amt_fuel) { alert('항목 · 이름 · 금액 가운데 하나는 적어 주세요.'); return; }
+      bs.disabled = true; bs.textContent = '저장 중…';
+      const q = x.id ? sb.from('nl_pay_xfer').update(row).eq('id', x.id).select('id') : sb.from('nl_pay_xfer').insert(row).select('id');
+      const { data, error } = await q;
+      bs.disabled = false;
+      if (error || !data || !data.length) { bs.textContent = '💾 저장'; alert('이체 줄을 저장하지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+      Object.assign(x, { id: data[0].id, item: row.item || '', names: row.names || '', acc: row.account_memo || '', w: row.amt_wage || 0, f: row.amt_fee || 0, u: row.amt_fuel || 0 });
+      bs.textContent = '✓ 저장됨'; delete tr.dataset.dirty;
+    };
+    tr.querySelector('.xdel').onclick = async () => {
+      if (x.id) {
+        if (!confirm('이 이체 줄을 지울까요?\n' + [x.item, x.names].filter(Boolean).join(' · '))) return;
+        const { data, error } = await sb.from('nl_pay_xfer').delete().eq('id', x.id).select('id');
+        if (error || !data || !data.length) { alert('지우지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+      }
+      XF = XF.filter(y => y.k !== k); tr.remove(); liveTot();
+    };
+  };
+  box.querySelectorAll('tr.xfrow').forEach(xfBind);
+  $('xfAdd').onclick = () => {
+    const x = { k: ++XFK, id: null, item: '', names: '', acc: '', w: 0, f: 0, u: 0 }; XF.push(x);
+    const tmp = document.createElement('tbody'); tmp.innerHTML = xfRowHtml(x);
+    const tr = tmp.firstElementChild; box.querySelector('tr.xfadd').before(tr); xfBind(tr);
+    tr.querySelector('.xi').focus();
+  };
+  liveTot();
   $('sumXls').onclick = downXls;
   $('eduSave').onclick = saveEdu;
   ['eduAmt', 'eduMemo'].forEach(id => { $(id).oninput = () => { $('eduMsg').textContent = '저장 전'; }; });
+}
+function xfRowHtml(x){
+  const inp = (c, v, ph, n) => '<input class="' + c + (n ? ' n' : '') + '" type="text"' + (n ? ' data-won inputmode="numeric"' : '') + ' maxlength="' + (n ? 15 : 200) + '" placeholder="' + ph + '" value="' + (n ? (v ? won(v) : '') : esc(v)) + '">';
+  return '<tr class="rtrow xfrow" data-xk="' + x.k + '"><td>' + inp('xi', x.item, '항목 (예: 상여금)') + inp('xn', x.names, '이름') + '</td>'
+    + '<td>' + inp('xa', x.acc, '은행 · 계좌') + '</td>'
+    + '<td>' + inp('xw', x.w, '금액', 1) + '</td><td>' + inp('xf', x.f, '금액', 1) + '</td><td>' + inp('xu', x.u, '금액', 1) + '</td>'
+    + '<td class="n"><b class="xt">' + won(x.w + x.f + x.u) + '</b><div class="xbt"><button type="button" class="ctsm xs">' + (x.id ? '✓ 저장됨' : '💾 저장') + '</button>'
+    + '<button type="button" class="ctsm xdel" title="이 줄 지우기">✕</button></div></td></tr>';
 }
 async function savePayMemo(){
   const v = id => $(id).value.trim() || null;
