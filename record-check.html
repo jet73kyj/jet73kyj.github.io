@@ -174,7 +174,6 @@ const ADMIN = [8, 19];
 let ME = null, ROWS = [], CASES = [], RES = {}, KIDNM = {}, THNM = {}, VIEW = 'left';
 // 갈래 · 보기 · 선생님 거르기 · 누적 통계 (2026-10-09)
 let KINDV = '전체', GROUPV = 'th', THF = 0, STATS = null, LOGERR = '';
-let DEVDOC = {};  // 아동 → 발달 기록지에서 끝낸 서식 [{type, key, data, done_on}] — 10호 서명 받음 · 27호 작성 끝 (2026-10-09)
 let NOTES = {};   // 아동|날짜 → 발달 기록지 특이사항 글들 · 아동|* → 그 달 전부 (2026-10-02)
 
 // 항목 이름 · 갈래 (g1 결제 · g2 기록지 · g3 서류 · g0 참고)
@@ -271,39 +270,11 @@ function fillMon(){
   $('mon').innerHTML = h;
 }
 
-// 처리 끝 = 사례를 골랐고, 서류가 필요한 사례면 「서류 받음」까지
-// 10호 변경 계약서 「서명 받음」 · 27호 사실 확인서 「작성 끝」이면 처리 끝 (2026-10-09 은정님)
-//   15 본인부담금 — 그 달 1일부터 바뀐 계약 / 16 담당 — 그 달 안 날짜부터 바뀐 계약
-//   1 결제 이름 · 8 금액 · 18 제공일자 ≠ 승인일자(결제가 다른 달) — 같은 날(수업일 또는 결제일) 사실 확인서
-//   18 같은 달은 특이사항 + [소급결제]를 누르면 서버 점검에서 사라짐 (2026-10-23)
-function devDone(r){
-  const ds = DEVDOC[r.child_id] || [];
-  const k = $('mon').value;
-  const d = r.on_date ? String(r.on_date).slice(0, 10) : '';
-  if (r.item_no === 15) return ds.find(x => x.type === '변경계약' && x.key === '본인부담금:' + k + '-01') || null;
-  if (r.item_no === 16) return ds.find(x => x.type === '변경계약' && x.key.indexOf('담당:' + k) === 0) || null;
-  if ([1, 8, 18].includes(r.item_no) && d)
-    return ds.find(x => x.type === '사실확인' && x.key.indexOf(k + ':') === 0
-                        && ((x.data && (x.data.day === d || x.data.appr === d)))) || null;
-  return null;
-}
-function isWriting(r){ return r.item_no === 41 && /작성 중/.test(String(r.detail || '')); }
-function isDone(r){
-  if (r.item_no === 9) return true;
-  if (isWriting(r)) return true;        // 기한 전 미작성 = 작성 중 · 오류로 안 봄 (2026-10-23 은정님)
-  if (r.item_no === 25) return false;   // 센터가 장을 정리하면 사라짐 (2026-10-22)
-  if (isChecked(r)) return true;        // 원장 [확인] — 확인한 내용과 같을 때만 (2026-10-22)
-  // 선생님 「작성 끝 · 서명 받음」은 제출 대기 — 원장 · 행정이 종이를 보고 [확인]해야 끝 (2026-10-22 은정님)
-  if (isList(r)) return false;
-  // 아래는 옛 처리(사례 고르기)로 끝낸 줄 — 다시 나타나지 않게 그대로 둠
-  const x = RES[rkey(r)];
-  if (!x || !x.case_id) return false;
-  const c = CASES.find(c => c.id === x.case_id);
-  if (!c) return false;
-  // 특이사항 기재 사례 — 기록지 그 회차 특이사항이 적혔으면 끝 (서류 없음)
-  if (c.grp === '특이사항 기재') return noteOf(r).length > 0;
-  return !c.need_doc || x.doc_done;
-}
+// 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 이 화면은 그리기만
+//   참고 · 작성 중 · 끝 → 남은 것에서 빠짐 / 남음 · 서류 필요 · 제출 대기 → 남은 것
+//   원장 [확인] · 기한 전 작성 중 · 선생님이 끝낸 서식(10호 · 27호) · 옛 사례 처리 모두 서버가 봄
+function isWriting(r){ return r.state === '작성 중'; }
+function isDone(r){ return r.state === '참고' || r.state === '작성 중' || r.state === '끝'; }
 function noteOf(r){
   return NOTES[r.child_id + '|' + (r.on_date ? String(r.on_date).slice(0,10) : '*')] || [];
 }
@@ -313,37 +284,23 @@ async function run(){
   const k = $('mon').value;
   $('body').innerHTML = '<div class="load">' + monNo(k) + '월 기록지를 점검하고 있습니다…</div>';
   const [a, b, c, lg, st] = await Promise.all([
-    sb.rpc('nl_record_check', { p_month: k }),
+    sb.rpc('nl_rc_open', { p_month: k }),   // 점검 줄 + 상태 (발달 · 치료지원 · 센터 · 미작성 모두 · 2026-10-23)
     sb.from('nl_rc_cases').select('id, grp, name, need_doc, sort_no').eq('active', true).order('sort_no'),
     sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo, checked_at, checked_by, checked_detail').eq('month_key', k),
-    // 치료지원 결제 빨강 · 미작성 (발달재활 · 치료지원 · 센터) — 2026-10-09
-    sb.rpc('nl_log_check', { p_month: k }),
+    Promise.resolve({ data: [] }),
     isAdmin() ? sb.rpc('nl_rc_stats', { p_year: Number(k.slice(0, 4)) }) : Promise.resolve({ data: null })
   ]);
   if (a.error) {
     $('body').innerHTML = '<div class="err">점검하지 못했습니다.\n' + esc(a.error.message) + '</div>';
     return;
   }
-  ROWS = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no), kind: '발달재활' }));
-  LOGERR = lg && lg.error ? lg.error.message : '';
-  ((lg && lg.data) || []).forEach(r => ROWS.push(Object.assign({}, r, { item_no: Number(r.item_no) })));
+  ROWS = (a.data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }));
+  LOGERR = '';
   STATS = (st && !st.error) ? (st.data || null) : null;
   if (!isAdmin()) ROWS = ROWS.filter(r => Number(r.therapist_id) === Number(ME.id));
   CASES = b.data || [];
   RES = {};
   (c.data || []).forEach(x => { RES[x.child_id + '|' + x.item_no + '|' + (x.item_key || '')] = x; });
-
-  // 발달 기록지에서 끝낸 서식 — 결과에 나온 아동만 (2026-10-09)
-  DEVDOC = {};
-  try {
-    const kids0 = [...new Set(ROWS.map(r => r.child_id).filter(Boolean))];
-    for (let i = 0; i < kids0.length; i += 200) {
-      const { data, error } = await sb.from('nl_dev_docs').select('child_id, doc_type, doc_key, data, done_on')
-        .in('child_id', kids0.slice(i, i + 200)).in('doc_type', ['변경계약', '사실확인']).eq('done', true);
-      if (error) throw error;
-      (data || []).forEach(x => { (DEVDOC[x.child_id] = DEVDOC[x.child_id] || []).push({ type: x.doc_type, key: x.doc_key, data: x.data || {}, done_on: x.done_on }); });
-    }
-  } catch (e) { DEVDOC = {}; }
 
   // 이름 — 결과에 나온 아동 · 선생님만
   KIDNM = {}; THNM = {};
@@ -429,10 +386,7 @@ function grpCell(gr){
 //   선생님이 기록지에서 사실 확인서 「작성 끝」 · 변경 계약서 「서명 받음」 → 주황 「제출 대기」
 function rcState(r){
   const x = RES[rkey(r)] || {};
-  const dd = devDone(r);
-  if (dd && !isChecked(r))
-    return '<div class="rcst wait">제출 대기 · ' + (dd.type === '변경계약' ? '변경 계약서 서명 받음' : '사실 확인서 작성 끝')
-         + (dd.done_on ? ' ' + esc(String(dd.done_on).slice(5, 10).replace('-', '/')) : '') + '</div>';
+  if (r.state === '제출 대기') return '<div class="rcst wait">' + esc(r.state_note || '제출 대기') + '</div>';
   if (r.item_no === 25) return '<div class="rcst dim">센터가 장을 정리하면 사라짐</div>';
   if (isList(r)) return '<div class="rcst dim">선생님이 고치면 사라짐</div>';
   if (x.case_id && !x.checked_at) {   // 옛 처리 기록
@@ -650,6 +604,17 @@ function okHtml(r, i){
   }
   return isAdmin() ? '<div class="okline"><button type="button" class="rcOk" data-i="' + i + '">확인</button></div>' : '';
 }
+// [확인] · [확인 취소] 뒤 — 상태만 서버에서 다시 받음 (판단은 서버 한 곳)
+async function refreshState(){
+  const { data, error } = await sb.rpc('nl_rc_open', { p_month: $('mon').value });
+  if (error || !data) return;
+  const m = {};
+  data.forEach(x => { m[x.child_id + '|' + x.item_no + '|' + (x.item_key || '') + '|' + (x.detail || '')] = x; });
+  ROWS.forEach(r => {
+    const x = m[rkey(r) + '|' + (r.detail || '')];
+    if (x) { r.state = x.state; r.state_note = x.state_note; }
+  });
+}
 async function setChecked(i, on, btn){
   const r = ROWS[Number(i)]; if (!r) return;
   if (btn) { btn.disabled = true; btn.textContent = on ? '확인 중…' : '취소 중…'; }
@@ -665,6 +630,7 @@ async function setChecked(i, on, btn){
     return;
   }
   RES[rkey(r)] = data[0];
+  await refreshState();
   const y = window.scrollY; draw(); window.scrollTo(0, y);
 }
 document.addEventListener('click', e => {
