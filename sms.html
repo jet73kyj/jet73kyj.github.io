@@ -204,6 +204,7 @@ function kindLabel(it) {
   if (it.kind === '공휴수업') return '공휴일 수업';
   if (it.kind === '발달안내') return '발달재활 첫 안내';
   if (isPiece(it)) return '보강 +' + it.mins;
+  if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
   if (it.kind === '보강' && it.plus) return '보강 +' + it.plus;
   return it.kind === '상담' ? '평가 상담' : it.kind;
 }
@@ -240,6 +241,17 @@ const DEV_INFO_BODY = '안녕하세요, 자라는나무입니다.\n'
   + '결석 및 보강 규정\n'
   + '결석 시 보강은 당월 내 진행이 원칙입니다. 바우처 포인트는 해당 월말에 소멸되어 다음 달로 이월되지 않으므로, 아이의 지속적인 성장을 위해 당월 내에 꼭 보강 일정을 잡아주시길 권장합니다.';
 const DEV_INFO_END = '\n\n아이의 건강한 성장을 위해 늘 정성을 다하는 자라는나무가 되겠습니다. 감사합니다.';
+// 보강 한 장에 시각이 여럿이면 한 줄씩 (2026-10-23 은정님)
+//   선생님이 모두 같으면 아래에 「담당 ○○ 선생님」 한 줄, 다르면 줄마다 「- 담당 ○○ 선생님」
+function whenLines(it) {
+  const all = [it].concat(it.subs || [])
+    .slice().sort((a, b) => String(a.show_time || a.on_time).localeCompare(String(b.show_time || b.on_time)));
+  const one = all.every(x => (x.ther || '') === (it.ther || ''));
+  return all.map(x => dayKo(it.on_date) + ' ' + timeKo(x.show_time || x.on_time) + (x.plus ? ' +' + x.plus + '분' : '')
+      + (one ? '' : ' - 담당 ' + (x.ther || '') + ' 선생님'))
+    .join('\n')
+    + (one ? '\n담당 ' + (it.ther || '') + ' 선생님' : '');
+}
 function smsText(it) {
   if (it.kind === '발달안내') return DEV_INFO_BODY + reelPart(it) + DEV_INFO_END;
   if (it.kind === '휴무') {
@@ -259,9 +271,8 @@ function smsText(it) {
     ? '아동 정규 수업에 이어 보강 ' + it.mins + '분이 진행됩니다'
     : (LINE1[it.kind] || '아동 일정 안내입니다');
   return HEAD + it.name + ' ' + l1 + '\n\n'
-       + dayKo(it.on_date) + ' ' + timeKo(it.show_time || it.on_time)
-       + (it.plus ? ' +' + it.plus + '분' : '') + '\n'
-       + '담당 ' + (it.ther || '') + ' 선생님'
+       + (it.kind === '보강' ? whenLines(it)
+          : dayKo(it.on_date) + ' ' + timeKo(it.on_time) + '\n' + '담당 ' + (it.ther || '') + ' 선생님')
        + (it.parking ? PARKING : '')
        + reelPart(it)
        + FOOT;
@@ -601,6 +612,19 @@ async function loadAll() {
       pc.merged = true;
     });
     for (let i = out.length - 1; i >= 0; i--) if (out[i].merged) out.splice(i, 1);
+    // 같은 아동 · 같은 날 보강이 여럿이면 한 장 — 시각마다 줄을 나눠 적는다 (선생님이 달라도)
+    //   보냄은 시각마다 적고, 한 시각이라도 안 보냈으면 다시 뜸
+    const firstOf = {};
+    out.forEach(x => {
+      if (x.kind !== '보강' || isPiece(x)) return;
+      const g = x.cid + '|' + x.on_date;
+      const h = firstOf[g];
+      if (!h) { firstOf[g] = x; return; }
+      if (h.on_time === x.on_time) { x.merged = true; return; }
+      (h.subs = h.subs || []).push({ on_time: x.on_time, show_time: x.show_time, plus: x.plus, ther: x.ther });
+      x.merged = true;
+    });
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].merged) out.splice(i, 1);
   }
 
   // 같은 것이 두 번 들어가지 않게
@@ -642,9 +666,10 @@ function sentKey(it) {
 // 휴무 안내는 날짜마다 보냄을 적는다 — 아직 안 보낸 날이 있으면 그 날만 다시 뜸
 function dayKey(cid, d) { return '휴무|' + cid + '|' + d + '|'; }
 function unsentDates(it) { return (it.dates || []).filter(d => !SENT[dayKey(it.cid, d)]); }
+function subKey(it, x) { return it.kind + '|' + it.cid + '|' + it.on_date + '|' + x.on_time; }
 function isSent(it) {
   if (it.kind === '휴무') return unsentDates(it).length === 0;
-  return !!SENT[sentKey(it)];
+  return !!SENT[sentKey(it)] && (it.subs || []).every(x => SENT[subKey(it, x)]);
 }
 function showLines(it) {
   const u = unsentDates(it);
@@ -752,6 +777,18 @@ async function markSent(it, on) {
     if (error && !String(error.message).includes('duplicate')) {
       show($('sum'), '❌ 표시하지 못했습니다.\n' + error.message, false); return;
     }
+    // 한 장에 묶인 다른 시각도 하나씩 적는다 (이미 적힌 시각은 건너뜀)
+    for (const x of (it.subs || [])) {
+      if (SENT[subKey(it, x)]) continue;
+      const r2 = await sb.from('nl_sms_sent').insert({
+        kind: it.kind, child_id: it.cid, on_date: it.on_date,
+        on_time: x.on_time ? x.on_time + ':00' : null, sent_by: ME ? ME.id : null, news_id: null
+      });
+      if (r2.error && !String(r2.error.message).includes('duplicate')) {
+        show($('sum'), '❌ 표시하지 못했습니다.\n' + r2.error.message, false); return;
+      }
+      SENT[subKey(it, x)] = true;
+    }
     // 이미 보냄으로 적혀 있던 줄(겹침)이면 서버에 적힌 릴스를 다시 읽는다
     if (error) { await reloadHist(); }
     else if (it.news) {
@@ -766,6 +803,12 @@ async function markSent(it, on) {
     q = it.on_time ? q.eq('on_time', it.on_time + ':00') : q.is('on_time', null);
     const { error } = await q;
     if (error) { show($('sum'), '❌ 지우지 못했습니다.\n' + error.message, false); return; }
+    for (const x of (it.subs || [])) {
+      const r2 = await sb.from('nl_sms_sent').delete()
+        .eq('kind', it.kind).eq('child_id', it.cid).eq('on_date', it.on_date).eq('on_time', x.on_time + ':00');
+      if (r2.error) { show($('sum'), '❌ 지우지 못했습니다.\n' + r2.error.message, false); return; }
+      delete SENT[subKey(it, x)];
+    }
     delete SENT[sentKey(it)];
     HIST = HIST.filter(h => h.key !== sentKey(it));
     delete SENTNEWS[sentKey(it)];
