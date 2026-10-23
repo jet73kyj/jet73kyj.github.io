@@ -59,6 +59,7 @@
   .k-주차 { background:#FFF4D6; color:#854F0B; }
   .k-릴스 { background:#FBEAF0; color:#993556; }
   .k-휴무 { background:#F1EFEA; color:#5F5E5A; }
+  .k-휴무전날 { background:#FBE4DE; color:#993C1D; }
   .k-발달안내 { background:#EAF3DE; color:#27500A; }
   .tpl-ed { background:#fff; border:1px solid #C9A27E; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
   .tpl-ed label { display:block; font-size:12.5px; color:var(--ink2); margin:8px 0 4px; }
@@ -203,6 +204,7 @@ function isPiece(it) { return it.kind === '보강' && it.mins > 0 && it.mins < 4
 function kindLabel(it) {
   if (it.kind === '공휴수업') return '공휴일 수업';
   if (it.kind === '발달안내') return '발달재활 첫 안내';
+  if (it.kind === '휴무전날') return '선생님 휴무 · 전날 안내';
   if (isPiece(it)) return '보강 +' + it.mins;
   if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
   if (it.kind === '보강' && it.plus) return '보강 +' + it.plus;
@@ -258,6 +260,12 @@ function smsText(it) {
     return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 수업이 없습니다.\n\n'
       + showLines(it).map(l => '· ' + l.text).join('\n')
       + reelPart(it) + THANKS;
+  }
+  // 선생님 휴무 전날 다시 알림 (2026-10-23 은정님) — 일주일 전 안내와 따로 보낸다 · 교육 자료 안 붙임
+  if (it.kind === '휴무전날') {
+    return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 내일 수업이 없어 다시 한번 안내드립니다.\n\n'
+      + it.lines.map(l => '· ' + l.text).join('\n')
+      + THANKS;
   }
   if (it.kind === '공휴수업') {
     return '안녕하세요\n자라는나무입니다. ^^\n\n'
@@ -506,6 +514,8 @@ async function loadAll() {
                          && Number(o.therapist_id) === Number(th));
     const offName = o => String(o.reason || '').trim() || (o.kind === '센터휴무' ? '센터 휴무' : '공휴일');
     const H = {};   // 아동 → [{date, text}]
+    const HV = {};  // 내일 선생님 휴무 → 아동 → [{date, text}] (전날 다시 알림)
+    const tmr = ymd(addDays(t0, 1));
     (s7R.data || []).sort((a, b) => String(a.plan_date).localeCompare(String(b.plan_date))
         || String(a.start_time).localeCompare(String(b.start_time))).forEach(x => {
       const k = KID[x.child_id]; if (!k) return;
@@ -517,6 +527,10 @@ async function loadAll() {
           : '— ' + area + ' 휴무');
         const L = H[x.child_id] = H[x.child_id] || [];
         if (!L.some(l => l.text === text)) L.push({ date: x.plan_date, text: text });
+        if (v && x.plan_date === tmr) {
+          const LV = HV[x.child_id] = HV[x.child_id] || [];
+          if (!LV.some(l => l.text === text)) LV.push({ date: x.plan_date, text: text });
+        }
         return;
       }
       if ((x.status === '예정' || x.status === '보강') && (!x.minutes || x.minutes >= 40)) {
@@ -530,6 +544,14 @@ async function loadAll() {
           });
         }
       }
+    });
+    Object.keys(HV).forEach(cid => {
+      const k = KID[cid];
+      out.push({
+        kind: '휴무전날', cid: Number(cid), name: k.name || ('아동 ' + cid),
+        on_date: tmr, on_time: '', lines: HV[cid],
+        ther: '', phone: k.phone || '', gds: GD[cid] || [], extra: '', mins: 0, meet: '', parking: false
+      });
     });
     Object.keys(H).forEach(cid => {
       const k = KID[cid]; const L = H[cid];
@@ -648,6 +670,7 @@ function assignReels() {
   HIST.forEach(h => add(h.cid, h.news));
   ITEMS.forEach(it => {
     it.cands = 0;
+    if (it.kind === '휴무전날') { it.news = null; return; }
     if (isSent(it)) {
       const ks = it.kind === '휴무' ? it.dates.map(d => dayKey(it.cid, d)) : [sentKey(it)];
       it.news = ks.map(k => SENTNEWS[k]).find(Boolean) || null; return;
@@ -678,7 +701,7 @@ function showLines(it) {
 
 // ── 그리기 ───────────────────────────────────────
 function reelLine(it, i, done) {
-  if (!REELS.length) return '';
+  if (!REELS.length || it.kind === '휴무전날') return '';
   const r = it.news ? REEL[it.news] : null;
   if (!r) return '<div class="reel">' + (done ? '교육 자료 없이 보냄' : '보낼 교육 자료 없음 (이 집은 릴스 · 블로그를 모두 받았습니다)') + '</div>';
   return '<div class="reel">' + reelName(r) + ': <b>「' + esc(r.title || '') + '」</b>'
