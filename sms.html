@@ -204,6 +204,7 @@ function kindLabel(it) {
   if (it.kind === '공휴수업') return '공휴일 수업';
   if (it.kind === '발달안내') return '발달재활 첫 안내';
   if (isPiece(it)) return '보강 +' + it.mins;
+  if (it.kind === '보강' && it.plus) return '보강 +' + it.plus;
   return it.kind === '상담' ? '평가 상담' : it.kind;
 }
 // 주차 안내 — 센터에 처음 오는 아동의 첫 방문 문자에만 붙인다 (2026-10-08 은정님)
@@ -258,7 +259,8 @@ function smsText(it) {
     ? '아동 정규 수업에 이어 보강 ' + it.mins + '분이 진행됩니다'
     : (LINE1[it.kind] || '아동 일정 안내입니다');
   return HEAD + it.name + ' ' + l1 + '\n\n'
-       + dayKo(it.on_date) + ' ' + timeKo(it.on_time) + '\n'
+       + dayKo(it.on_date) + ' ' + timeKo(it.show_time || it.on_time)
+       + (it.plus ? ' +' + it.plus + '분' : '') + '\n'
        + '담당 ' + (it.ther || '') + ' 선생님'
        + (it.parking ? PARKING : '')
        + reelPart(it)
@@ -581,6 +583,24 @@ async function loadAll() {
     [r1, r2, r3, r4].forEach(r => { if (r.error) throw r.error; });
     const came = [r1, r2, r3, r4].some(r => (r.data || []).length > 0);
     if (!came) first.parking = true;
+  }
+
+  // 같은 아동 · 같은 날 · 같은 선생님의 40분 보강에 바로 붙는 쪼개기 보강은 한 장으로 (2026-10-23 은정님)
+  //   「10월 26일 월요일 오전 9시 50분 +10분」 · 보냄 기록은 40분 보강 쪽 하나로 적는다
+  {
+    const hm2m = t => { const p = String(t || '').split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+    out.filter(isPiece).forEach(pc => {
+      const ps = hm2m(pc.on_time), pe = ps + pc.mins;
+      const host = out.find(x => x !== pc && !x.merged && x.kind === '보강' && !isPiece(x)
+        && x.cid === pc.cid && x.on_date === pc.on_date && x.ther === pc.ther
+        && (hm2m(x.show_time || x.on_time) + (x.mins || 40) + (x.plus || 0) === ps
+            || hm2m(x.show_time || x.on_time) === pe));
+      if (!host) return;
+      if (hm2m(host.show_time || host.on_time) === pe) host.show_time = pc.on_time;
+      host.plus = (host.plus || 0) + pc.mins;
+      pc.merged = true;
+    });
+    for (let i = out.length - 1; i >= 0; i--) if (out[i].merged) out.splice(i, 1);
   }
 
   // 같은 것이 두 번 들어가지 않게
