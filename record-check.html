@@ -257,13 +257,15 @@ async function copyText(t){
   } catch (e) { return false; }
 }
 
-// 달 고르기 — 지난 6달 ~ 이번 달 · 처음은 지난달 (기록지는 달이 끝난 뒤 씀)
+// 달 고르기 — 지난 6달 ~ 이번 달 · 처음은 지난달 (기록지는 달이 끝난 뒤 씀) · 2026-08 부터만
 function fillMon(){
   const now = new Date(), y = now.getFullYear(), m = now.getMonth();
   let h = '';
   for (let i = -6; i <= 0; i++) {
     const d = new Date(y, m + i, 1);
     const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    // 7월까지는 구글에서 옮겨 온 기록이라 점검하지 않는다 (2026-10-26)
+    if (k < '2026-08') continue;
     h += '<option value="' + k + '"' + (i === -1 ? ' selected' : '') + '>'
        + d.getFullYear() + '년 ' + (d.getMonth()+1) + '월</option>';
   }
