@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지난 기록지 옮기기 - 나무링크</title>
+<style>
+  :root{
+    --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+    --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E;
+    --sage:#5E9A6E; --sageL:#EEF6F0; --coral:#D8684A; --coralL:#FCEFEA; --coralT:#993C1D;
+    --amb:#B7791F; --ambL:#FDF6E3;
+  }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg);
+         margin:0; padding:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line);
+        display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .who { font-size:12px; color:var(--dim); }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 13px; font-size:13px;
+           background:var(--sf); color:var(--tx); border:1px solid var(--dim);
+           cursor:pointer; font-weight:500; }
+  button:hover { background:var(--camL); }
+  button.grey { border-color:var(--line); color:var(--cam); }
+  button.main { background:var(--cam); color:#fff; border-color:var(--cam); }
+  button.main:hover { background:#9a6a3f; }
+  button:disabled { opacity:.45; cursor:default; }
+  select { font:inherit; font-size:13px; padding:4px 7px; border-radius:7px;
+           border:1px solid var(--line); background:var(--sf); color:var(--tx); }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px;
+          padding:16px 18px; margin-bottom:14px; }
+  .note { font-size:12.5px; color:var(--dim); line-height:1.8; }
+  .drop { border:2px dashed var(--camB); border-radius:12px; padding:22px; text-align:center;
+          color:var(--cam); background:var(--camL); cursor:pointer; font-size:14px; }
+  .drop.on { background:#F1E3D2; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--camL); color:#4A1B0C; text-align:left; font-weight:500;
+       padding:6px 8px; border-bottom:1px solid var(--camB); white-space:nowrap; }
+  td { padding:6px 8px; border-bottom:1px solid #F0EEEA; vertical-align:top; }
+  tr.skip td { color:var(--dim); }
+  tr.done td { background:var(--sageL); }
+  tr.bad td { background:var(--coralL); }
+  .tag { display:inline-block; border-radius:10px; padding:1px 8px; font-size:12px; white-space:nowrap; }
+  .t-new  { background:var(--sageL); color:#2F6B40; }
+  .t-fill { background:var(--ambL); color:#7A4F0E; }
+  .t-skip { background:#F1EFEC; color:#857D75; }
+  .t-bad  { background:var(--coralL); color:var(--coralT); }
+  .t-ok   { background:#DDEFE2; color:#2F6B40; }
+  .sum { font-size:13px; margin:10px 0; }
+  .ex { font-size:12px; color:#6F6760; max-width:330px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar2 { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+  .err { background:var(--sf); border-left:3px solid var(--coral); padding:12px 14px;
+         color:var(--coralT); font-size:13.5px; white-space:pre-wrap; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span>
+  <h1>지난 기록지 옮기기</h1>
+  <span class="who" id="who"></span>
+  <span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+
+<div class="wrap" id="body">
+  <div class="card note">불러오는 중…</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="nl-login.js"></script>
+<script>
+// ── 구글 발달 기록지 엑셀 읽기 (화면 log-import.html 과 같은 글) ──
+function lgParseBook(X, wb) {
+  const out = [];
+  wb.SheetNames.forEach(function (sn) {
+    const ws = wb.Sheets[sn];
+    if (!ws || !ws['!ref']) return;
+    const rg = X.utils.decode_range(ws['!ref']);
+    const cell = function (r, c) { return ws[X.utils.encode_cell({ r: r, c: c })]; };
+    const txt  = function (r, c) { const x = cell(r, c); return x && x.v != null ? String(x.v) : ''; };
+    const blocks = {};
+    for (let r = rg.s.r; r <= rg.e.r; r++) for (let c = rg.s.c; c <= rg.e.c; c++) {
+      if (txt(r, c).replace(/\s/g, '') !== '서비스제공일자') continue;
+      const ent = {
+        row: r,
+        prov: lgDate(X, cell(r, c + 1)),
+        appr: txt(r + 1, c).replace(/\s/g, '') === '승인일자' ? lgDate(X, cell(r + 1, c + 1)) : null,
+        apprNo: txt(r + 2, c).replace(/\s/g, '') === '승인번호' ? txt(r + 2, c + 1).trim() : '',
+        state: lgState(cell(r, c + 2)),
+        result: txt(r, c + 4).replace(/\r/g, '').trim()
+      };
+      if (!ent.prov && !ent.appr && !ent.apprNo && !ent.result) continue;   // 빈 칸
+      (blocks[c] = blocks[c] || []).push(ent);
+    }
+    const cols = Object.keys(blocks).map(Number).sort(function (a, b) { return a - b; });
+    let prevMk = null;
+    cols.forEach(function (c) {
+      const ents = blocks[c].sort(function (a, b) { return a.row - b.row; });
+      const cnt = {};
+      ents.forEach(function (e) { const d = e.prov || e.appr; if (d) { const k = d.ymd.slice(0, 7); cnt[k] = (cnt[k] || 0) + 1; } });
+      let mk = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; })[0] || null;
+      let guess = false;
+      if (!mk && prevMk) { mk = lgNextMk(prevMk); guess = true; }
+      prevMk = mk || prevMk;
+      out.push({ sheet: sn, col: c, mk: mk, guess: guess, ents: ents });
+    });
+  });
+  return out;
+}
+function lgNextMk(mk) {
+  let y = Number(mk.slice(0, 4)), m = Number(mk.slice(5, 7)) + 1;
+  if (m > 12) { m = 1; y++; }
+  return y + '-' + String(m).padStart(2, '0');
+}
+function lgDate(X, x) {
+  if (!x || x.v == null || x.v === '') return null;
+  let p = null;
+  if (typeof x.v === 'number') {
+    const d = X.SSF.parse_date_code(x.v);
+    if (d) p = { y: d.y, m: d.m, d: d.d, H: d.H, M: d.M, S: Math.round(d.S) };
+  } else {
+    const m = String(x.v).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\D+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) p = { y: +m[1], m: +m[2], d: +m[3], H: +(m[4] || 0), M: +(m[5] || 0), S: +(m[6] || 0) };
+  }
+  if (!p || p.y < 2000) return null;
+  if (p.S >= 60) p.S = 59;
+  const z = function (n) { return String(n).padStart(2, '0'); };
+  const ymd = p.y + '-' + z(p.m) + '-' + z(p.d);
+  const hasT = p.H || p.M || p.S;
+  return { ymd: ymd, at: hasT ? (p.y + '.' + z(p.m) + '.' + z(p.d) + ' ' + z(p.H) + ':' + z(p.M) + ':' + z(p.S)) : null };
+}
+// 이용자 상태 — 빨간 글자를 골라진 것으로 본다
+const LG_FIELDS = [
+  { f: 'cloth',  lb: '옷',       vals: ['양호', '미흡'] },
+  { f: 'sock',   lb: '양말',     vals: ['여', '부'] },
+  { f: 'wear',   lb: '의목',     vals: ['여', '부'] },
+  { f: 'face',   lb: '표정',     vals: ['밝음', '보통', '우울', '화남', '짜증'] },
+  { f: 'health', lb: '건강',     vals: ['양호', '컨디션난조', '아픔'] }
+];
+function lgUnesc(s) {
+  return String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(+n); }).replace(/&amp;/g, '&');
+}
+function lgIsRed(rgb) {
+  const h = String(rgb || '').replace(/^#/, '').slice(-6);
+  if (!/^[0-9a-f]{6}$/i.test(h)) return false;
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return r >= 0xB0 && g < 0x90 && b < 0x90;
+}
+function lgState(x) {
+  const st = { cloth: '', sock: '', wear: '', face: '', health: '' };
+  if (!x || x.v == null) return { st: st, read: false, raw: '' };
+  const raw = String(x.v);
+  if (!x.r) return { st: st, read: false, raw: raw };
+  let full = '';
+  const reds = [];
+  const re = /<(?:\w+:)?r>([\s\S]*?)<\/(?:\w+:)?r>/g;
+  let m;
+  while ((m = re.exec(x.r))) {
+    const body = m[1];
+    const cm = body.match(/<(?:\w+:)?color[^>]*rgb="([0-9A-Fa-f]{6,8})"/);
+    let t = '';
+    body.replace(/<(?:\w+:)?t(?:\s[^>]*)?>([\s\S]*?)<\/(?:\w+:)?t>/g, function (_, s) { t += lgUnesc(s); return ''; });
+    if (cm && lgIsRed(cm[1]) && t.trim()) reds.push({ pos: full.length, t: t });
+    full += t;
+  }
+  if (!full) return { st: st, read: false, raw: raw };
+  const labPos = LG_FIELDS.map(function (F) { return { F: F, p: full.indexOf(F.lb) }; })
+    .filter(function (o) { return o.p >= 0; }).sort(function (a, b) { return a.p - b.p; });
+  reds.forEach(function (rd) {
+    let cur = null;
+    labPos.forEach(function (o) { if (o.p <= rd.pos) cur = o.F; });
+    if (!cur) return;
+    rd.t.split(/[\/,·\s()]+/).map(function (s) { return s.trim(); }).forEach(function (v) {
+      if (!v || cur.vals.indexOf(v) < 0) return;
+      const a = st[cur.f] ? st[cur.f].split(',') : [];
+      if (a.indexOf(v) < 0) a.push(v);
+      st[cur.f] = a.join(',');
+    });
+  });
+  return { st: st, read: true, raw: raw };
+}
+
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+const CAN_SEE = [8, 19];                 // 원장님 · 행정만 (2026-10-26)
+const NEW_FROM = '2026-08';              // 이 달부터는 시간표가 있어 보통 기록지로 넣는다
+let ME = null, KIDS = [], ROWS = [], RUNNING = false;
+
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function kstToday(){
+  const d = new Date(Date.now() + 9 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+function thisMk(){ return kstToday().slice(0, 7); }
+function mkLabel(mk){ return mk ? (mk.slice(0, 4) + '년 ' + Number(mk.slice(5, 7)) + '월') : '?'; }
+function mkList(){
+  const out = [], end = thisMk();
+  let mk = '2024-01';
+  while (mk < end) { out.push(mk); mk = lgNextMk(mk); }
+  return out;
+}
+function kidName(id){ const k = KIDS.find(x => Number(x.id) === Number(id)); return k ? k.name : ''; }
+
+// ── 아동 이름 · 번호로 탭을 잇는다 ──
+function matchKid(sheet){
+  const s = String(sheet || '').trim();
+  const m = s.match(/(\d+)\s*번/) || s.match(/^\s*(\d+)\s*$/);
+  if (m && KIDS.some(k => Number(k.id) === Number(m[1]))) return { id: Number(m[1]), how: '번호' };
+  const nm = s.replace(/\s/g, '');
+  const hit = KIDS.filter(k => String(k.name || '').replace(/\s/g, '') === nm);
+  if (hit.length === 1) return { id: Number(hit[0].id), how: '이름' };
+  if (hit.length > 1) return { id: null, how: '같은 이름 ' + hit.length + '명' };
+  return { id: null, how: '못 찾음' };
+}
+
+// ── 그 달 발달재활 담당 선생님 ──
+let THER = {};
+async function loadTher(ids){
+  THER = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await sb.from('nl_therapies')
+      .select('id, child_id, started_on, ended_on, nl_therapy_schedules(therapist_id, from_month, to_month, from_date, to_date)')
+      .eq('support_type_id', 2).in('child_id', ids.slice(i, i + 200));
+    if (error) throw error;
+    (data || []).forEach(t => { (THER[t.child_id] = THER[t.child_id] || []).push(t); });
+  }
+}
+function thFor(cid, mk){
+  const first = mk + '-01';
+  const last = mk + '-' + String(new Date(Number(mk.slice(0, 4)), Number(mk.slice(5, 7)), 0).getDate()).padStart(2, '0');
+  let best = null;
+  (THER[cid] || []).forEach(t => {
+    (t.nl_therapy_schedules || []).forEach(s => {
+      if (!s.therapist_id) return;
+      const ok = (s.from_month || '0000-00') <= mk && (s.to_month || '9999-12') >= mk
+        && (!s.from_date || String(s.from_date) <= last) && (!s.to_date || String(s.to_date) >= first);
+      const tok = (!t.started_on || String(t.started_on) <= last) && (!t.ended_on || String(t.ended_on) >= first);
+      const sc = (ok ? 2 : 0) + (tok ? 1 : 0);
+      const st = String(s.from_date || ((s.from_month || '0000-00') + '-01'));
+      if (!best || sc > best.sc || (sc === best.sc && st > best.st)) best = { sc: sc, st: st, th: s.therapist_id };
+    });
+  });
+  return best && best.sc > 0 ? best.th : null;
+}
+
+// ── 나무링크에 이미 있는 장 ──
+async function loadExist(){
+  const pairs = ROWS.filter(r => r.cid && r.mk);
+  const ids = [...new Set(pairs.map(r => r.cid))], mks = [...new Set(pairs.map(r => r.mk))];
+  const ex = {};
+  if (!ids.length) return ex;
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await sb.from('nl_session_logs')
+      .select('id, child_id, month_key, imported_from, therapy_id')
+      .eq('support_type_id', 2).in('child_id', ids.slice(i, i + 200)).in('month_key', mks);
+    if (error) throw error;
+    (data || []).forEach(l => { const k = l.child_id + '|' + l.month_key; (ex[k] = ex[k] || { logs: [], text: 0 }).logs.push(l); });
+  }
+  const logIds = [].concat(...Object.values(ex).map(e => e.logs.map(l => l.id)));
+  const byLog = {};
+  for (let i = 0; i < logIds.length; i += 200) {
+    const { data, error } = await sb.from('nl_session_items')
+      .select('log_id, reaction, content').in('log_id', logIds.slice(i, i + 200));
+    if (error) throw error;
+    (data || []).forEach(it => {
+      if (String(it.reaction || '').trim() || String(it.content || '').trim()) byLog[it.log_id] = (byLog[it.log_id] || 0) + 1;
+    });
+  }
+  Object.values(ex).forEach(e => { e.text = e.logs.reduce((a, l) => a + (byLog[l.id] || 0), 0); });
+  return ex;
+}
+
+// ── 줄마다 할 일 정하기 ──
+async function judge(){
+  let ex = {};
+  try { ex = await loadExist(); }
+  catch (e) { $('body').insertAdjacentHTML('afterbegin', '<div class="err">나무링크 기록지를 읽지 못했습니다.\n' + esc(e.message || e) + '</div>'); return; }
+  const seen = {};
+  ROWS.forEach(r => {
+    if (r.done) return;
+    r.why = ''; r.kind = '';
+    const nText = r.ents.filter(e => e.result).length;
+    if (!r.cid)                 { r.kind = 'bad'; r.why = '아동을 골라 주세요'; }
+    else if (!r.mk)             { r.kind = 'bad'; r.why = '달을 골라 주세요'; }
+    else if (r.mk >= thisMk())  { r.kind = 'bad'; r.why = '이번 달 · 앞날은 옮기지 않습니다'; }
+    else if (!nText)            { r.kind = 'bad'; r.why = '적힌 글이 없습니다'; }
+    else {
+      const k = r.cid + '|' + r.mk;
+      if (seen[k]) { r.kind = 'bad'; r.why = '같은 아동 · 같은 달이 엑셀에 두 번 있습니다 (' + seen[k] + ' 탭)'; }
+      else {
+        seen[k] = r.sheet.trim();
+        const e = ex[k];
+        if (!e)                 { r.kind = 'new';  r.why = '새 장을 만들어 넣음'; }
+        else if (e.logs.length > 1) { r.kind = 'bad'; r.why = '나무링크에 이 달 장이 ' + e.logs.length + '개 — Claude 에게 알려 주세요'; }
+        else if (e.text > 0)    { r.kind = 'skip'; r.why = '나무링크에 이미 ' + e.text + '회 적혀 있어 건너뜀'; }
+        else                    { r.kind = 'fill'; r.why = '나무링크 빈 장(미작성)에 채움'; r.logId = e.logs[0].id; }
+      }
+    }
+    if (r.kind !== 'new' && r.kind !== 'fill') r.on = false;
+    else if (r.on == null) r.on = true;
+  });
+  draw();
+}
+
+// ── 그리기 ──
+function draw(){
+  const mks = mkList();
+  const kidOpts = '<option value="">— 아동 고르기 —</option>' + KIDS.map(k =>
+    '<option value="' + k.id + '">' + k.id + '번 ' + esc(k.name) + (k.birth ? ' · ' + String(k.birth).slice(2, 10).replace(/-/g, '') : '') + '</option>').join('');
+  const tagOf = r => r.done ? '<span class="tag t-ok">✓ 넣음</span>'
+    : r.kind === 'new' ? '<span class="tag t-new">새 장</span>'
+    : r.kind === 'fill' ? '<span class="tag t-fill">빈 장 채움</span>'
+    : r.kind === 'skip' ? '<span class="tag t-skip">건너뜀</span>'
+    : '<span class="tag t-bad">확인 필요</span>';
+  const can = ROWS.filter(r => !r.done && r.on && (r.kind === 'new' || r.kind === 'fill'));
+  let h = '<div class="card"><div class="sum">탭 ' + new Set(ROWS.map(r => r.sheet)).size + '개 · 달 ' + ROWS.length + '장 · '
+    + '넣을 것 <b>' + can.length + '</b>장 · 건너뜀 ' + ROWS.filter(r => r.kind === 'skip').length
+    + ' · 확인 필요 ' + ROWS.filter(r => !r.done && r.kind === 'bad').length + ' · 넣음 ' + ROWS.filter(r => r.done).length + '</div>'
+    + '<div style="overflow-x:auto"><table><thead><tr><th></th><th>탭</th><th>아동</th><th>달</th><th>회차</th><th>넣는 모양</th><th>상태</th><th>첫 회차 글</th></tr></thead><tbody>';
+  ROWS.forEach((r, i) => {
+    const okKind = r.kind === 'new' || r.kind === 'fill';
+    const cls = r.done ? 'done' : (r.kind === 'bad' ? 'bad' : (r.kind === 'skip' ? 'skip' : ''));
+    const sel = (r.done || RUNNING) ? ' disabled' : '';
+    const first = (r.ents.find(e => e.result) || {}).result || '';
+    h += '<tr class="' + cls + '">'
+      + '<td><input type="checkbox" data-on="' + i + '"' + (r.on && okKind && !r.done ? ' checked' : '') + (okKind && !r.done && !RUNNING ? '' : ' disabled') + '></td>'
+      + '<td>' + esc(r.sheet.trim()) + '</td>'
+      + '<td><select data-kid="' + i + '"' + sel + '>' + kidOpts.replace('value="' + r.cid + '"', 'value="' + r.cid + '" selected') + '</select>'
+      + (r.kidHow && !r.cid ? '<div class="note">' + esc(r.kidHow) + '</div>' : '') + '</td>'
+      + '<td><select data-mk="' + i + '"' + sel + '><option value="">— 달 —</option>'
+      + mks.map(m => '<option value="' + m + '"' + (m === r.mk ? ' selected' : '') + '>' + mkLabel(m) + '</option>').join('') + '</select>'
+      + (r.guess ? '<div class="note" style="color:#B7791F">날짜가 없어 앞 달 다음으로 짐작</div>' : '') + '</td>'
+      + '<td>' + r.ents.length + '회</td>'
+      + '<td class="note">' + (r.mk && r.mk < NEW_FROM ? '옮겨 온 기록 (보기만)' : '보통 기록지') + '</td>'
+      + '<td>' + tagOf(r) + '<div class="note">' + esc(r.done ? r.doneMsg : r.why) + '</div></td>'
+      + '<td><div class="ex" title="' + esc(first) + '">' + esc(first.slice(0, 60)) + '</div></td></tr>';
+  });
+  h += '</tbody></table></div>'
+    + '<div class="bar2"><button class="main" id="go"' + (can.length && !RUNNING ? '' : ' disabled') + '>고른 ' + can.length + '장 나무링크에 넣기</button>'
+    + '<button id="again"' + (RUNNING ? ' disabled' : '') + '>다른 엑셀 고르기</button>'
+    + '<span class="note" id="prog"></span></div></div>';
+  $('rows').innerHTML = h;
+  document.querySelectorAll('[data-on]').forEach(el => el.onchange = () => { ROWS[+el.dataset.on].on = el.checked; draw(); });
+  document.querySelectorAll('[data-kid]').forEach(el => el.onchange = () => { const r = ROWS[+el.dataset.kid]; r.cid = el.value ? Number(el.value) : null; r.on = null; reTher().then(judge); });
+  document.querySelectorAll('[data-mk]').forEach(el => el.onchange = () => { const r = ROWS[+el.dataset.mk]; r.mk = el.value || null; r.guess = false; r.on = null; judge(); });
+  if ($('go')) $('go').onclick = runAll;
+  if ($('again')) $('again').onclick = () => { if (RUNNING) return; ROWS = []; $('rows').innerHTML = ''; $('file').value = ''; };
+}
+async function reTher(){
+  const ids = [...new Set(ROWS.filter(r => r.cid).map(r => r.cid))];
+  try { await loadTher(ids); } catch (e) {}
+}
+
+// ── 엑셀 읽기 ──
+async function readFile(f){
+  if (!f) return;
+  if (!/\.xlsx?$/i.test(f.name)) { alert('엑셀 파일(.xlsx)을 골라 주세요.\n구글 시트에서 파일 → 다운로드 → Microsoft Excel(.xlsx)'); return; }
+  $('rows').innerHTML = '<div class="card note">읽는 중…</div>';
+  try {
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellHTML: true });
+    const blocks = lgParseBook(XLSX, wb);
+    if (!blocks.length) { $('rows').innerHTML = '<div class="err">기록지 칸(「서비스 제공일자」)을 찾지 못했습니다.\n발달재활 기록지 엑셀인지 확인해 주세요.</div>'; return; }
+    ROWS = blocks.map(b => { const k = matchKid(b.sheet); return Object.assign(b, { cid: k.id, kidHow: k.how, on: null }); });
+    const unread = ROWS.reduce((a, r) => a + r.ents.filter(e => !e.state.read).length, 0);
+    await reTher();
+    await judge();
+    if (unread) $('rows').insertAdjacentHTML('afterbegin', '<div class="card note" style="border-left:3px solid #B7791F">이용자 상태 빨간 글자를 못 읽은 회차가 ' + unread + '개 있습니다. 그 회차는 이용자 상태가 빈 채로 들어갑니다.</div>');
+  } catch (e) {
+    $('rows').innerHTML = '<div class="err">엑셀을 읽지 못했습니다.\n' + esc(e.message || e) + '</div>';
+  }
+}
+
+// ── 넣기 ──
+async function putOne(r){
+  const old = r.mk < NEW_FROM;
+  const tag = '구글 ' + kstToday();
+  const th = thFor(r.cid, r.mk);
+  // 넣기 직전에 다시 본다 (그 사이 선생님이 적었을 수 있음)
+  const { data: lgs, error: e0 } = await sb.from('nl_session_logs').select('id, therapist_id')
+    .eq('child_id', r.cid).eq('support_type_id', 2).eq('month_key', r.mk);
+  if (e0) throw e0;
+  if ((lgs || []).length > 1) throw new Error('이 달 장이 ' + lgs.length + '개라 넣지 않았습니다');
+  let logId = lgs && lgs[0] ? lgs[0].id : null, made = false;
+  let oldItems = [];
+  if (logId) {
+    const it = await sb.from('nl_session_items').select('*').eq('log_id', logId).order('seq_no');
+    if (it.error) throw it.error;
+    oldItems = it.data || [];
+    if (oldItems.some(x => String(x.reaction || '').trim() || String(x.content || '').trim()))
+      return { skip: '그 사이 나무링크에 글이 적혀 건너뜀' };
+    const up = {};
+    if (old) up.imported_from = tag;
+    if (!lgs[0].therapist_id && th) up.therapist_id = th;
+    if (Object.keys(up).length) {
+      up.updated_at = new Date().toISOString();
+      const u = await sb.from('nl_session_logs').update(up).eq('id', logId).select('id');
+      if (u.error) throw u.error;
+      if (!(u.data || []).length) throw new Error('장을 고치지 못했습니다 (권한 확인)');
+    }
+  } else {
+    const row = { child_id: r.cid, support_type_id: 2, month_key: r.mk, therapist_id: th };
+    if (old) row.imported_from = tag;
+    const ins = await sb.from('nl_session_logs').insert(row).select('id').single();
+    if (ins.error) throw ins.error;
+    logId = ins.data.id; made = true;
+  }
+  const bySeq = {};
+  oldItems.forEach(x => { bySeq[x.seq_no] = x; });
+  const items = r.ents.map((e, i) => {
+    const b = bySeq[i + 1] || {};
+    const st = Object.assign({}, b.state_json || {});
+    Object.keys(e.state.st).forEach(f => { if (e.state.st[f]) st[f] = e.state.st[f]; });
+    if (e.appr && e.appr.at) { st.apprMan = true; st.apprAt = e.appr.at; }
+    st.imp = '구글';
+    return {
+      log_id: logId, seq_no: i + 1,
+      service_date: (e.prov && e.prov.ymd) || b.service_date || null,
+      start_time: b.start_time || null, end_time: b.end_time || null,
+      therapist_id: b.therapist_id || th || null,
+      reaction: e.result || null,
+      staff_memo: b.staff_memo || null,
+      voucher_date: (e.appr && e.appr.ymd) || b.voucher_date || null,
+      voucher_no: e.apprNo || b.voucher_no || null,
+      state_json: st,
+      status: '출석', absent_reason: null, makeup_date: null, makeup_time: null, makeup_memo: null
+    };
+  });
+  // 엑셀보다 나무링크 빈 장 회차가 더 많으면 그 회차는 그대로 둔다
+  oldItems.filter(x => x.seq_no > r.ents.length).forEach(x => { const c = Object.assign({}, x); delete c.id; delete c.created_at; items.push(c); });
+  if (oldItems.length) {
+    const del = await sb.from('nl_session_items').delete().eq('log_id', logId);
+    if (del.error) throw del.error;
+  }
+  const ins2 = await sb.from('nl_session_items').insert(items).select('id');
+  if (ins2.error || (ins2.data || []).length !== items.length) {
+    if (oldItems.length) {
+      const back = oldItems.map(x => { const c = Object.assign({}, x); delete c.id; return c; });
+      await sb.from('nl_session_items').insert(back);
+    }
+    if (made) await sb.from('nl_session_logs').delete().eq('id', logId);
+    throw new Error('회차를 넣지 못해 되돌렸습니다. ' + (ins2.error ? ins2.error.message : ''));
+  }
+  // 넣은 것을 다시 읽어 견준다
+  const chk = await sb.from('nl_session_items').select('seq_no, reaction').eq('log_id', logId);
+  if (chk.error) throw chk.error;
+  const nTxt = (chk.data || []).filter(x => String(x.reaction || '').trim()).length;
+  const want = r.ents.filter(e => e.result).length;
+  if (nTxt !== want) throw new Error('넣은 뒤 다시 읽으니 글이 ' + nTxt + '회 (엑셀 ' + want + '회) — Claude 에게 알려 주세요');
+  return { ok: (made ? '새 장' : '빈 장') + ' · ' + items.length + '회 · 장 번호 ' + logId + (th ? '' : ' · 담당 선생님 못 찾음') };
+}
+async function runAll(){
+  const list = ROWS.filter(r => !r.done && r.on && (r.kind === 'new' || r.kind === 'fill'));
+  if (!list.length) return;
+  if (!confirm(list.length + '장을 나무링크에 넣습니다.\n\n· 7월까지는 「옮겨 온 기록」(보기만)\n· 8월부터는 보통 기록지\n· 이미 글이 있는 달은 건너뜁니다\n\n넣을까요?')) return;
+  RUNNING = true; draw();
+  let ok = 0, ng = 0;
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
+    $('prog') && ($('prog').textContent = (i + 1) + ' / ' + list.length + ' 넣는 중…');
+    try {
+      const res = await putOne(r);
+      if (res.skip) { r.kind = 'skip'; r.why = res.skip; r.on = false; }
+      else { r.done = true; r.doneMsg = res.ok; ok++; }
+    } catch (e) {
+      r.kind = 'bad'; r.why = '넣지 못함 — ' + (e.message || e); r.on = false; ng++;
+    }
+    draw();
+  }
+  RUNNING = false; draw();
+  alert('끝났습니다 — 넣음 ' + ok + '장' + (ng ? ' · 못 넣음 ' + ng + '장 (빨간 줄을 보세요)' : ''));
+}
+
+window.addEventListener('beforeunload', e => { if (RUNNING) { e.preventDefault(); e.returnValue = ''; } });
+$('home').onclick = () => { if (RUNNING && !confirm('넣는 중입니다. 나갈까요?')) return; location.href = 'index.html'; };
+
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const user = data.session.user;
+  const { data: me, error } = await sb.from('nl_therapists')
+    .select('id, name, role').eq('login_email', user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="err">직원 표에 이 이메일이 없습니다.\n관리자에게 문의하세요.</div>'; return; }
+  nlKeep(me.id);
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="err">이 화면은 원장님 · 행정 선생님만 볼 수 있습니다.</div>'; return; }
+  ME = me;
+  $('who').textContent = me.name + ' 님으로 로그인됨';
+  KIDS = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: ks, error: ke } = await sb.from('nl_children').select('id, name, birth, status').order('id').range(from, from + 999);
+    if (ke) { $('body').innerHTML = '<div class="err">아동 목록을 읽지 못했습니다.\n' + esc(ke.message) + '</div>'; return; }
+    KIDS = KIDS.concat(ks || []);
+    if (!ks || ks.length < 1000) break;
+  }
+  $('body').innerHTML =
+    '<div class="card"><div class="note">구글 시트의 <b>발달재활 기록지</b>를 나무링크로 옮깁니다. '
+    + '구글 시트 → 파일 → 다운로드 → <b>Microsoft Excel(.xlsx)</b>로 받은 파일을 넣어 주세요. 탭이 여럿이면 탭마다 읽습니다.<br>'
+    + '· 탭 이름이 「80번」이면 번호로, 이름이면 아동 이름으로 찾습니다. 못 찾으면 줄에서 고르세요<br>'
+    + '· 제공일자 · 승인일자 · 승인번호 · 이용자 상태(빨간 글자) · 서비스 결과 글을 그대로 넣습니다<br>'
+    + '· 7월까지는 「옮겨 온 기록」으로 넣어 기록지 화면에서 보기만 됩니다 · 8월부터는 보통 기록지로 넣습니다<br>'
+    + '· 나무링크에 글이 이미 적힌 달은 건너뜁니다 (빈 장만 채움)<br>'
+    + '· 엑셀은 이 컴퓨터 브라우저 안에서만 읽습니다</div>'
+    + '<div class="drop" id="drop" style="margin-top:12px">엑셀 파일을 여기에 끌어다 놓거나 눌러서 고르세요</div>'
+    + '<input type="file" id="file" accept=".xlsx,.xls" style="display:none"></div>'
+    + '<div id="rows"></div>';
+  const dp = $('drop');
+  dp.onclick = () => { if (!RUNNING) $('file').click(); };
+  dp.ondragover = e => { e.preventDefault(); dp.classList.add('on'); };
+  dp.ondragleave = () => dp.classList.remove('on');
+  dp.ondrop = e => { e.preventDefault(); dp.classList.remove('on'); if (!RUNNING) readFile(e.dataTransfer.files[0]); };
+  $('file').onchange = () => readFile($('file').files[0]);
+})();
+</script>
+</body>
+</html>

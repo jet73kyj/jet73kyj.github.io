@@ -316,6 +316,7 @@
   <div id="plBox" class="no-print" style="display:none;"></div>
 
   <!-- ==================== 1. 서비스 일정표, 제공기록지 ==================== -->
+  <div class="sheet" id="impView" style="display:none"></div>
   <div class="sheet" id="sheet1">
     <!-- 저장 단추는 용지 맨 위 (9월) 줄 오른쪽 끝 (2026-10-22 은정님 — 위쪽 단추 줄에서 옮김) -->
     <div class="sheetsave-row" style="position:relative;">
@@ -564,6 +565,8 @@ let year = new Date().getFullYear();
 let month = new Date().getMonth() + 1;
 let childId = '';
 let LOADED = false;
+// 구글에서 옮겨 온 기록 (2026-10-26) — 시간표가 없던 달이라 보기만. 저장하면 제공일자 · 5회째가 지워지므로 막는다
+let IMPORTED = false;
 
 function show(el, text, ok) {
   el.textContent = text;
@@ -960,6 +963,9 @@ async function loadOne() {
         .gte('plan_date', _shiftIso(mk + '-01', -31)).lte('plan_date', _shiftIso(mk + '-01', 62))
     ]);
     if (t.error) throw t.error;
+    IMPORTED = !!(lg.data && lg.data.imported_from);
+    impShow(false);
+    if (IMPORTED) { LOADED = false; DIRTY = false; await impDraw(lg.data, cid, mk); return; }
 
     child   = CHILDREN.find(c => String(c.id) === String(cid));
     // 그 달에 살아 있던 발달재활 수업을 고른다 (치료가 둘인 아동 — 66번 등)
@@ -1070,6 +1076,44 @@ function schedThNames(nameOf) {
 }
 
 // 화면 전체 그리기
+// ── 옮겨 온 기록 보기 (2026-10-26) ──
+function impShow(on) {
+  ['sheet1', 'sheet2'].forEach(id => { const el = $(id); if (el) el.style.display = on ? 'none' : ''; });
+  const v = $('impView'); if (v) { v.style.display = on ? '' : 'none'; if (!on) v.innerHTML = ''; }
+  const b = $('btnSave'); if (b) b.style.display = on ? 'none' : '';
+}
+async function impDraw(log, cid, mk) {
+  const it = await sb.from('nl_session_items').select('*').eq('log_id', log.id).order('seq_no');
+  if (it.error) throw it.error;
+  const rows = it.data || [];
+  const e = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const dd = s => s ? String(s).slice(0, 10).replace(/-/g, '.') : '';
+  const c = CHILDREN.find(x => String(x.id) === String(cid)) || {};
+  const stTxt = j => {
+    j = j || {};
+    return [['옷', j.cloth], ['양말', j.sock], ['의복', j.wear], ['표정', j.face], ['건강', j.health]]
+      .filter(a => a[1]).map(a => a[0] + ' ' + a[1]).join('<br>');
+  };
+  let h = '<h2 class="title">서비스 제공기록 (' + Number(mk.slice(5, 7)) + '월) · ' + e(cid) + '번 ' + e(c.name || '') + '</h2>'
+    + '<div class="no-print" style="background:#FDF6E3;border-left:3px solid #B7791F;padding:8px 12px;margin:8px 0 12px;font-size:13px;line-height:1.7;">'
+    + '구글 기록지에서 옮겨 온 기록입니다 (' + e(log.imported_from) + '). 적힌 그대로 보기만 됩니다.</div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:12.5px;" border="1" cellpadding="6">'
+    + '<tr style="background:#f2f6f0"><th style="width:34px">회차</th><th style="width:120px">서비스 제공일자<br>승인일자 · 승인번호</th>'
+    + '<th style="width:90px">이용자 상태</th><th>서비스 결과</th></tr>';
+  rows.forEach(r => {
+    const j = r.state_json || {};
+    h += '<tr><td style="text-align:center">' + r.seq_no + '</td>'
+      + '<td>' + e(dd(r.service_date)) + '<br><span style="color:#777">' + e(j.apprAt || dd(r.voucher_date)) + '<br>' + e(r.voucher_no || '') + '</span></td>'
+      + '<td>' + stTxt(j) + '</td>'
+      + '<td style="white-space:pre-wrap;line-height:1.6">' + e(r.reaction || '') + '</td></tr>';
+  });
+  if (!rows.length) h += '<tr><td colspan="4" style="text-align:center;color:#999">회차가 없습니다</td></tr>';
+  h += '</table><div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
+  $('impView').innerHTML = h;
+  impShow(true);
+  $('pInfo').textContent = mk + ' · 옮겨 온 기록 · ' + rows.length + '회';
+}
+
 function drawAll(saved) {
   const mk = mkNow();
   SLOTS = computeSlots();
@@ -2918,6 +2962,7 @@ function _prefillStatusFromVoucher() {
 // 저장
 // ─────────────────────────────────────────────
 async function saveRecord() {
+  if (IMPORTED) { alert('구글에서 옮겨 온 기록이라 보기만 됩니다.'); return; }
   if (!LOADED || !childId) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
   const mk = mkNow();
   const wd = ($('s1_writeDate').value || '').replace(/\./g,'-').replace(/-(\d)(?!\d)/g,'-0$1');
