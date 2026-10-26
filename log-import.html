@@ -215,13 +215,30 @@ function kidName(id){ const k = KIDS.find(x => Number(x.id) === Number(id)); ret
 // ── 아동 이름 · 번호로 탭을 잇는다 ──
 function matchKid(sheet){
   const s = String(sheet || '').trim();
-  const m = s.match(/(\d+)\s*번/) || s.match(/^\s*(\d+)\s*$/);
+  // 1) 「80번」 · 「80」
+  const m = s.match(/(\d+)\s*번/) || s.match(/^\s*(\d{1,4})\s*$/);
   if (m && KIDS.some(k => Number(k.id) === Number(m[1]))) return { id: Number(m[1]), how: '번호' };
-  const nm = s.replace(/\s/g, '');
-  const hit = KIDS.filter(k => String(k.name || '').replace(/\s/g, '') === nm);
-  if (hit.length === 1) return { id: Number(hit[0].id), how: '이름' };
-  if (hit.length > 1) return { id: null, how: '같은 이름 ' + hit.length + '명' };
-  return { id: null, how: '못 찾음' };
+  const han = s.replace(/[^가-힣]/g, '');
+  const b6 = (s.match(/\d{6}/) || [])[0];                 // 생년월일 6자리가 붙은 탭
+  const byB = list => b6 ? list.filter(k => String(k.birth || '').replace(/-/g, '').slice(2, 8) === b6) : list;
+  const nm = k => String(k.name || '').replace(/[^가-힣]/g, '');
+  const pick = (list, how) => {
+    if (list.length > 1) { const b = byB(list); if (b.length === 1) return { id: Number(b[0].id), how: how + ' + 생년월일' }; }
+    if (list.length === 1) return { id: Number(list[0].id), how: how };
+    return null;
+  };
+  if (han) {
+    // 2) 이름이 똑같음  3) 탭 이름 안에 아동 이름이 들어 있음 (「홍길동 언어」)  4) 성을 뺀 이름만 (「길동」)
+    const r = pick(KIDS.filter(k => nm(k) === han), '이름')
+      || pick(KIDS.filter(k => nm(k).length >= 2 && han.includes(nm(k))), '이름 포함')
+      || pick(KIDS.filter(k => han.length >= 2 && nm(k).length > han.length && nm(k).endsWith(han)), '성 뺀 이름')
+      || pick(KIDS.filter(k => nm(k).length >= 3 && han.includes(nm(k).slice(1))), '성 뺀 이름 포함');
+    if (r) return r;
+    const many = KIDS.filter(k => nm(k) === han || (nm(k).length >= 2 && han.includes(nm(k))));
+    if (many.length > 1) return { id: null, how: '같은 이름 ' + many.length + '명 — 골라 주세요' };
+  }
+  if (b6) { const r = pick(byB(KIDS), '생년월일'); if (r) return r; }
+  return { id: null, how: '못 찾음 — 골라 주세요' };
 }
 
 // ── 그 달 발달재활 담당 선생님 ──
@@ -324,7 +341,12 @@ function draw(){
     : r.kind === 'skip' ? '<span class="tag t-skip">건너뜀</span>'
     : '<span class="tag t-bad">확인 필요</span>';
   const can = ROWS.filter(r => !r.done && r.on && (r.kind === 'new' || r.kind === 'fill'));
-  let h = '<div class="card"><div class="sum">탭 ' + new Set(ROWS.map(r => r.sheet)).size + '개 · 달 ' + ROWS.length + '장 · '
+  const yNow = $('yfix') ? $('yfix').value : '';
+  let h = '<div class="card"><div class="bar2" style="margin:0 0 8px">'
+    + '<span class="note">엑셀 날짜 연도가 틀렸을 때 (예: 25년 기록인데 26년으로 적힘)</span>'
+    + '<select id="yfix"' + (RUNNING ? ' disabled' : '') + '><option value="">날짜 연도 그대로</option>'
+    + ['2024', '2025', '2026'].map(y => '<option value="' + y + '"' + (y === yNow ? ' selected' : '') + '>모두 ' + y + '년으로</option>').join('')
+    + '</select></div><div class="sum">탭 ' + new Set(ROWS.map(r => r.sheet)).size + '개 · 달 ' + ROWS.length + '장 · '
     + '넣을 것 <b>' + can.length + '</b>장 · 건너뜀 ' + ROWS.filter(r => r.kind === 'skip').length
     + ' · 확인 필요 ' + ROWS.filter(r => !r.done && r.kind === 'bad').length + ' · 넣음 ' + ROWS.filter(r => r.done).length + '</div>'
     + '<div style="overflow-x:auto"><table><thead><tr><th></th><th>탭</th><th>아동</th><th>달</th><th>회차</th><th>넣는 모양</th><th>상태</th><th>첫 회차 글</th></tr></thead><tbody>';
@@ -343,7 +365,8 @@ function draw(){
       + (r.guess ? '<div class="note" style="color:#B7791F">날짜가 없어 앞 달 다음으로 짐작</div>' : '') + '</td>'
       + '<td>' + r.ents.length + '회</td>'
       + '<td class="note">' + (r.mk && r.mk < NEW_FROM ? '옮겨 온 기록 (보기만)' : '보통 기록지') + '</td>'
-      + '<td>' + tagOf(r) + '<div class="note">' + esc(r.done ? r.doneMsg : r.why) + '</div></td>'
+      + '<td>' + tagOf(r) + '<div class="note">' + esc(r.done ? r.doneMsg : r.why) + '</div>'
+      + (r.yfix ? '<div class="note" style="color:#B7791F">날짜 연도를 ' + r.yfix + '년으로 바꿔 넣음</div>' : '') + '</td>'
       + '<td><div class="ex" title="' + esc(first) + '">' + esc(first.slice(0, 60)) + '</div></td></tr>';
   });
   h += '</tbody></table></div>'
@@ -352,10 +375,27 @@ function draw(){
     + '<span class="note" id="prog"></span></div></div>';
   $('rows').innerHTML = h;
   document.querySelectorAll('[data-on]').forEach(el => el.onchange = () => { ROWS[+el.dataset.on].on = el.checked; draw(); });
-  document.querySelectorAll('[data-kid]').forEach(el => el.onchange = () => { const r = ROWS[+el.dataset.kid]; r.cid = el.value ? Number(el.value) : null; r.on = null; reTher().then(judge); });
-  document.querySelectorAll('[data-mk]').forEach(el => el.onchange = () => { const r = ROWS[+el.dataset.mk]; r.mk = el.value || null; r.guess = false; r.on = null; judge(); });
+  document.querySelectorAll('[data-kid]').forEach(el => el.onchange = () => {
+    // 한 줄에서 고르면 같은 탭의 아직 안 넣은 줄도 모두 그 아동으로 (2026-10-26)
+    const r0 = ROWS[+el.dataset.kid], v = el.value ? Number(el.value) : null;
+    ROWS.forEach(r => { if (r.done || r.sheet !== r0.sheet) return; r.cid = v; r.on = null; });
+    reTher().then(judge);
+  });
+  document.querySelectorAll('[data-mk]').forEach(el => el.onchange = () => { const r = ROWS[+el.dataset.mk]; r.mk = el.value || null; r.guess = false; r.on = null; setYfix(r); judge(); });
+  if ($('yfix')) $('yfix').onchange = () => { const y = $('yfix').value; ROWS.forEach(r => { if (r.done) return; if (y) { if (r.mk0) r.mk = y + r.mk0.slice(4); } else r.mk = r.mk0; r.on = null; setYfix(r); }); judge(); };
   if ($('go')) $('go').onclick = runAll;
   if ($('again')) $('again').onclick = () => { if (RUNNING) return; ROWS = []; $('rows').innerHTML = ''; $('file').value = ''; };
+}
+// 달 칸 연도가 엑셀 날짜 연도와 다르면 넣을 때 날짜 연도를 달 칸 연도로 바꾼다 (2026-10-26)
+function setYfix(r){
+  r.yfix = null;
+  if (!r.mk) return;
+  const ys = r.ents.map(e => (e.prov || e.appr || {}).ymd).filter(Boolean).map(d => d.slice(0, 4));
+  if (ys.length && ys.some(y => y !== r.mk.slice(0, 4))) r.yfix = r.mk.slice(0, 4);
+}
+function fixY(r, s){
+  if (!s || !r.yfix) return s;
+  return r.yfix + String(s).slice(4);
 }
 async function reTher(){
   const ids = [...new Set(ROWS.filter(r => r.cid).map(r => r.cid))];
@@ -372,7 +412,7 @@ async function readFile(f){
     const wb = XLSX.read(buf, { type: 'array', cellHTML: true });
     const blocks = lgParseBook(XLSX, wb);
     if (!blocks.length) { $('rows').innerHTML = '<div class="err">기록지 칸(「서비스 제공일자」)을 찾지 못했습니다.\n발달재활 기록지 엑셀인지 확인해 주세요.</div>'; return; }
-    ROWS = blocks.map(b => { const k = matchKid(b.sheet); return Object.assign(b, { cid: k.id, kidHow: k.how, on: null }); });
+    ROWS = blocks.map(b => { const k = matchKid(b.sheet); return Object.assign(b, { cid: k.id, kidHow: k.how, on: null, mk0: b.mk, yfix: null }); });
     const unread = ROWS.reduce((a, r) => a + r.ents.filter(e => !e.state.read).length, 0);
     await reTher();
     await judge();
@@ -422,16 +462,16 @@ async function putOne(r){
     const b = bySeq[i + 1] || {};
     const st = Object.assign({}, b.state_json || {});
     Object.keys(e.state.st).forEach(f => { if (e.state.st[f]) st[f] = e.state.st[f]; });
-    if (e.appr && e.appr.at) { st.apprMan = true; st.apprAt = e.appr.at; }
+    if (e.appr && e.appr.at) { st.apprMan = true; st.apprAt = fixY(r, e.appr.at); }
     st.imp = '구글';
     return {
       log_id: logId, seq_no: i + 1,
-      service_date: (e.prov && e.prov.ymd) || b.service_date || null,
+      service_date: fixY(r, e.prov && e.prov.ymd) || b.service_date || null,
       start_time: b.start_time || null, end_time: b.end_time || null,
       therapist_id: b.therapist_id || th || null,
       reaction: e.result || null,
       staff_memo: b.staff_memo || null,
-      voucher_date: (e.appr && e.appr.ymd) || b.voucher_date || null,
+      voucher_date: fixY(r, e.appr && e.appr.ymd) || b.voucher_date || null,
       voucher_no: e.apprNo || b.voucher_no || null,
       state_json: st,
       status: '출석', absent_reason: null, makeup_date: null, makeup_time: null, makeup_memo: null
