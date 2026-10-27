@@ -1503,7 +1503,17 @@ function drawTimeline() {
   parts.sort((a, b) => String(a.d).localeCompare(String(b.d)));
   $('tl').innerHTML = parts.map(x => x.html).join('');
 
-  $('tl').querySelectorAll('.tlKmEdit').forEach(b => b.onclick = () => tlTab('km'));
+  $('tl').querySelectorAll('.tlKmEdit').forEach(b => b.onclick = () => {
+    $('tl').querySelectorAll('.tlKmEdit').forEach(x => { x.classList.remove('on'); x.textContent = '수정'; });
+    b.classList.add('on'); b.textContent = '수정 중 ↓';
+    tlTab('km', true);
+    const m = $('d_kmemo');
+    setTimeout(() => {
+      memoFit(m);
+      $('kmForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try { m.focus({ preventScroll: true }); m.setSelectionRange(m.value.length, m.value.length); } catch (e) {}
+    }, 30);
+  });
   $('tl').querySelectorAll('.tlEvEdit').forEach(b => b.onclick = () => tlTab('ev'));
   $('tl').querySelectorAll('.tlTrEdit').forEach(b => b.onclick = () => tlTab('tr'));
   $('tl').querySelectorAll('.tlLogEdit').forEach(b => b.onclick = () => logEdit(Number(b.dataset.id)));
@@ -1562,6 +1572,7 @@ function tlTab(which, noScroll) {
   $('tabKm').className  = 'tab' + (which === 'km'  ? ' on' : '');
   $('tabEv').className  = 'tab' + (which === 'ev'  ? ' on' : '');
   if (!noScroll) $('addBar').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (which !== 'km') document.querySelectorAll('#tl .tlKmEdit').forEach(x => { x.classList.remove('on'); x.textContent = '수정'; });
 }
 $('tabLog').onclick = () => tlTab('log');
 $('tabKm').onclick  = () => tlTab('km');
