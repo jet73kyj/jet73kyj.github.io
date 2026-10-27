@@ -1617,6 +1617,7 @@ function dkmShow(text, at) {
   $('dkmDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
   $('d_kmemo').value = t;
   $('d_kmemo').dataset.orig = t;
+  memoFit($('d_kmemo'));
   $('dkmMsg').textContent = '';
 }
 
@@ -3633,7 +3634,7 @@ function resetAddBox() {
   ['a_channel','a_area','a_day','a_time','a_action','a_memo',
    'k_name','k_birth','k_guardian','k_phone']
     .forEach(k => $(k).value = '');
-  $('k_memo').value = MEMO_TMPL;
+  $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
   $('k_evalsum').value = '';
   $('k_age').textContent = '';
   $('k_gender').value = '';
@@ -3946,7 +3947,7 @@ $('saveNew').onclick = async () => {
     ['a_channel','a_area','a_day','a_time','a_action','a_memo',
      'k_name','k_birth','k_guardian','k_phone']
       .forEach(k => $(k).value = '');
-    $('k_memo').value = MEMO_TMPL;
+    $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
     $('k_evalsum').value = '';
     $('k_gender').value = '';
     $('k_status').value = '대기중';
@@ -4522,6 +4523,32 @@ $('ikPreBtn').onclick = async () => {
     PRE_SAVING = false; $('ikPreBtn').disabled = false;
   }
 };
+
+// ── 상담 내용 · 아동 메모 칸 — 글 길이에 맞춰 높이가 늘어남 (2026-10-27) ──
+// 처음 8줄 높이 · 최대 화면 높이의 70% (넘으면 칸 안 스크롤)
+function memoFit(el) {
+  if (!el || el.offsetParent === null) return;
+  const minH = 210;
+  const maxH = Math.max(minH, Math.round(window.innerHeight * 0.7));
+  el.style.height = 'auto';
+  const want = el.scrollHeight + 2;
+  el.style.height = Math.min(maxH, Math.max(minH, want)) + 'px';
+  el.style.overflowY = want > maxH ? 'auto' : 'hidden';
+}
+(function () {
+  const ids = ['k_memo', 'd_kmemo'];
+  const els = ids.map(id => document.getElementById(id)).filter(Boolean);
+  els.forEach(el => {
+    el.style.boxSizing = 'border-box';
+    el.addEventListener('input', () => memoFit(el));
+    el.addEventListener('focus', () => memoFit(el));
+  });
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) memoFit(e.target); }));
+    els.forEach(el => io.observe(el));
+  }
+  window.addEventListener('resize', () => els.forEach(memoFit));
+})();
 </script>
 </body>
 </html>
