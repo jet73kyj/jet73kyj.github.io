@@ -261,6 +261,13 @@
 .sumt .xfadd button{color:#B07A4A;font-weight:600;}
 .sumt .xfrow .xbt{display:flex;gap:4px;justify-content:flex-end;margin-top:4px;}
 .sumt .xfrow .xdel{color:#c62828;}
+/* 퇴직금 · 이체 줄 글 칸 — 길면 줄을 바꿔 다 보이게 (2026-10-27 · 전에는 한 줄 칸이라 뒤가 잘려 보였음) */
+.sumt textarea.wrapt{display:block;width:100%;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.45;
+  padding:4px 6px !important;margin:0 !important;min-height:28px;height:28px;resize:none;overflow:hidden;
+  white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;border:1px solid #D3D1C7;border-radius:4px;background:#fff;color:inherit;}
+.sumt textarea.wrapt:focus{border-color:#B07A4A;outline:none;}
+.sumt .xfrow textarea.xi{margin-bottom:4px !important;}
+@media print{ .sumt textarea.wrapt{border:none;padding:0 !important;} }
 </style>
 </head>
 <body>
@@ -1585,8 +1592,8 @@ function drawSum(){
         + '<td class="n"><b>' + won((r.wageNet || 0) + (r.netFee || 0) + (r.fuel || 0)) + '</b></td></tr>').join('')
     // 퇴직금 줄 (2026-10-04 은정님) — 이름 · 계좌 · 금액을 직접 적음 · 합계에 들어감
     + '<tr class="rtrow"><td><div class="rtlab">퇴직금' + (RET.from && RET.from !== mon ? ' <span class="small">(' + esc(RET.from) + '부터)</span>' : '') + '</div>'
-    +   '<input id="rtNames" type="text" maxlength="300" placeholder="직원 이름" value="' + esc(RET.names) + '"></td>'
-    +   '<td><input id="rtAcc" type="text" maxlength="300" placeholder="입금 계좌 메모" value="' + esc(RET.acc) + '"></td>'
+    +   '<textarea id="rtNames" class="wrapt" rows="1" maxlength="300" placeholder="직원 이름">' + esc(RET.names) + '</textarea></td>'
+    +   '<td><textarea id="rtAcc" class="wrapt" rows="1" maxlength="300" placeholder="입금 계좌 메모">' + esc(RET.acc) + '</textarea></td>'
     +   '<td><input id="rtW" data-won class="n" type="text" inputmode="numeric" placeholder="금액" value="' + (RET.w ? won(RET.w) : '') + '"></td>'
     +   '<td><input id="rtF" data-won class="n" type="text" inputmode="numeric" placeholder="금액" value="' + (RET.f ? won(RET.f) : '') + '">' + dmIn(0, 'retire') + '</td>'
     +   '<td class="n">–</td>'
@@ -1636,7 +1643,8 @@ function drawSum(){
     $('sumT').textContent = won(sum('wageNet') + sum('netFee') + sum('fuel') + w + f + xw + xf + xu);
   };
   const rtRedraw = () => { liveTot(); $('rtSave').textContent = '💾 저장 전'; };
-  ['rtNames', 'rtAcc', 'rtW', 'rtF'].forEach(id => { $(id).oninput = rtRedraw; });
+  ['rtNames', 'rtAcc', 'rtW', 'rtF'].forEach(id => { $(id).oninput = () => { rtRedraw(); if ($(id).tagName === 'TEXTAREA') wrapGrow($(id)); }; });
+  box.querySelectorAll('textarea.wrapt').forEach(wrapGrow);
   ['rtW', 'rtF'].forEach(id => { $(id).onblur = () => { const v = rtNum(id); $(id).value = v ? won(v) : ''; }; });
   $('rtSave').onclick = async () => {
     const row = { from_month: mon, names: $('rtNames').value.trim() || null, account_memo: $('rtAcc').value.trim() || null,
@@ -1653,7 +1661,7 @@ function drawSum(){
   const xfBind = tr => {
     const k = Number(tr.dataset.xk), x = XF.find(y => y.k === k); if (!x) return;
     const bs = tr.querySelector('.xs');
-    tr.querySelectorAll('input').forEach(el => { el.oninput = () => { liveTot(); bs.textContent = '💾 저장'; tr.dataset.dirty = '1'; }; });
+    tr.querySelectorAll('input, textarea').forEach(el => { el.oninput = () => { liveTot(); bs.textContent = '💾 저장'; tr.dataset.dirty = '1'; if (el.tagName === 'TEXTAREA') wrapGrow(el); }; });
     tr.querySelectorAll('input.xw, input.xf, input.xu').forEach(el => { el.onblur = () => { const v = Number(String(el.value).replace(/[^0-9]/g, '')) || 0; el.value = v ? won(v) : ''; }; });
     bs.onclick = async () => {
       const num = c => Number(String(tr.querySelector('.' + c).value).replace(/[^0-9]/g, '')) || null;
@@ -1682,6 +1690,7 @@ function drawSum(){
     const x = { k: ++XFK, id: null, item: '', names: '', acc: '', w: 0, f: 0, u: 0 }; XF.push(x);
     const tmp = document.createElement('tbody'); tmp.innerHTML = xfRowHtml(x);
     const tr = tmp.firstElementChild; box.querySelector('tr.xfadd').before(tr); xfBind(tr);
+    tr.querySelectorAll('textarea.wrapt').forEach(wrapGrow);
     tr.querySelector('.xi').focus();
   };
   liveTot();
@@ -1689,8 +1698,12 @@ function drawSum(){
   $('eduSave').onclick = saveEdu;
   ['eduAmt', 'eduMemo'].forEach(id => { $(id).oninput = () => { $('eduMsg').textContent = '저장 전'; }; });
 }
+// 글 칸 높이를 글 길이에 맞춤
+function wrapGrow(el){ if (!el) return; el.style.height = 'auto'; el.style.height = Math.max(28, el.scrollHeight + 2) + 'px'; }
 function xfRowHtml(x){
-  const inp = (c, v, ph, n) => '<input class="' + c + (n ? ' n' : '') + '" type="text"' + (n ? ' data-won inputmode="numeric"' : '') + ' maxlength="' + (n ? 15 : 200) + '" placeholder="' + ph + '" value="' + (n ? (v ? won(v) : '') : esc(v)) + '">';
+  const inp = (c, v, ph, n) => !n
+    ? '<textarea class="' + c + ' wrapt" rows="1" maxlength="200" placeholder="' + ph + '">' + esc(v) + '</textarea>'
+    : '<input class="' + c + (n ? ' n' : '') + '" type="text"' + (n ? ' data-won inputmode="numeric"' : '') + ' maxlength="' + (n ? 15 : 200) + '" placeholder="' + ph + '" value="' + (n ? (v ? won(v) : '') : esc(v)) + '">';
   return '<tr class="rtrow xfrow" data-xk="' + x.k + '"><td>' + inp('xi', x.item, '항목 (예: 상여금)') + inp('xn', x.names, '이름') + '</td>'
     + '<td>' + inp('xa', x.acc, '은행 · 계좌') + '</td>'
     + '<td>' + inp('xw', x.w, '금액', 1) + '</td><td>' + inp('xf', x.f, '금액', 1) + '</td><td>' + inp('xu', x.u, '금액', 1) + '</td>'
