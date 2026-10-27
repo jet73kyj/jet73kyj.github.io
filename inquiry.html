@@ -708,7 +708,7 @@
         <button type="button" id="tabEv"  class="tab">＋ 평가 줄</button>
         <button type="button" id="tabTr"  class="tab"
                 style="background:#eef6fb;border:1px solid #9cc8e6;color:#0c447c;">＋ 체험 수업</button>
-        <button type="button" id="tabKm"  class="tab">✏️ 아동 메모</button>
+        <button type="button" id="tabKm"  class="tab" style="display:none;">✏️ 아동 메모</button>
         <button type="button" id="dvOther" class="tab"
                 style="background:#e3f0fb;border:1px solid #85b7eb;color:#0c447c;
                        font-weight:600;">📎 평가보고서 <span id="dvOtherN"></span></button>
@@ -739,15 +739,16 @@
         <div id="msgL" class="out"></div>
       </div>
 
+      <div id="kmHome"></div>
       <div id="kmForm" style="display:none;">
         <div style="font-size:12.5px; color:#666; margin-bottom:4px;">아동 메모
           <span id="dkmDate" style="color:#999;"></span></div>
         <textarea id="d_kmemo" rows="7" style="font:inherit; font-size:14px; padding:9px 11px;
           width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
         <div class="btns">
+          <button type="button" id="dkmCancel" class="tab">나가기</button>
           <button type="button" id="dkmSave" class="tab"
             style="background:#2e7d32;color:#fff;font-weight:bold;">저장</button>
-          <button type="button" id="dkmCancel" class="tab">취소</button>
         </div>
         <div id="dkmMsg" style="font-size:12.5px;"></div>
       </div>
@@ -1420,6 +1421,7 @@ function tlRow(date, tag, body, btn) {
 }
 
 function drawTimeline() {
+  kmGoHome();
   const r = ALL.find(x => x.id === openId);
   if (!r) { $('tl').innerHTML = ''; return; }
   const kk = KIDS.find(k => k.id === r.child_id);
@@ -1491,29 +1493,31 @@ function drawTimeline() {
     parts.push({
       d: kk.memo_at ? String(kk.memo_at) : String(r.inquiry_date || ''),
       html: tlRow(kk.memo_at ? String(kk.memo_at) : '날짜 없음',
-        tlTag('아동 메모', '#fff8e1', '#8a6116'), esc(kk.memo),
-        '<button type="button" class="tab tlKmEdit" style="padding:3px 9px; font-size:12px;">수정</button>')
+        tlTag('아동 메모', '#fff8e1', '#8a6116'), KMEDIT ? '<div id="kmSlot" style="white-space:normal;"></div>' : esc(kk.memo),
+        '<button type="button" class="tab tlKmEdit' + (KMEDIT ? ' on' : '') + '" style="padding:3px 9px; font-size:12px;">'
+        + (KMEDIT ? '수정 중' : '수정') + '</button>')
     });
   }
+  // 아동 메모가 없는 아동 — 맨 위에 적기 줄
+  let kmTop = '';
+  if (kk && !kk.memo) {
+    kmTop = tlRow('', tlTag('아동 메모', '#fff8e1', '#8a6116'),
+      KMEDIT ? '<div id="kmSlot" style="white-space:normal;"></div>' : '<span style="color:#999;">아직 적힌 아동 메모가 없습니다.</span>',
+      '<button type="button" class="tab tlKmEdit' + (KMEDIT ? ' on' : '') + '" style="padding:3px 9px; font-size:12px;">'
+      + (KMEDIT ? '적는 중' : '＋ 아동 메모 적기') + '</button>');
+  }
 
-  if (!parts.length) {
+  if (!parts.length && !kmTop) {
     $('tl').innerHTML = '<div class="lognone">아직 기록이 없습니다. 아래에서 적어 주세요.</div>';
     return;
   }
   parts.sort((a, b) => String(a.d).localeCompare(String(b.d)));
-  $('tl').innerHTML = parts.map(x => x.html).join('');
+  $('tl').innerHTML = kmTop + (parts.length ? parts.map(x => x.html).join('')
+    : '<div class="lognone">아직 기록이 없습니다. 아래에서 적어 주세요.</div>');
+  const slot = $('kmSlot');
+  if (KMEDIT && slot) { slot.appendChild($('kmForm')); $('kmForm').style.display = 'block'; }
 
-  $('tl').querySelectorAll('.tlKmEdit').forEach(b => b.onclick = () => {
-    $('tl').querySelectorAll('.tlKmEdit').forEach(x => { x.classList.remove('on'); x.textContent = '수정'; });
-    b.classList.add('on'); b.textContent = '수정 중 ↓';
-    tlTab('km', true);
-    const m = $('d_kmemo');
-    setTimeout(() => {
-      memoFit(m);
-      $('kmForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      try { m.focus({ preventScroll: true }); m.setSelectionRange(m.value.length, m.value.length); } catch (e) {}
-    }, 30);
-  });
+  $('tl').querySelectorAll('.tlKmEdit').forEach(b => b.onclick = () => kmEditStart());
   $('tl').querySelectorAll('.tlEvEdit').forEach(b => b.onclick = () => tlTab('ev'));
   $('tl').querySelectorAll('.tlTrEdit').forEach(b => b.onclick = () => tlTab('tr'));
   $('tl').querySelectorAll('.tlLogEdit').forEach(b => b.onclick = () => logEdit(Number(b.dataset.id)));
@@ -1564,7 +1568,6 @@ async function logInlineSave(li) {
 // ── 아래 고정 칸 — 갈래 바꾸기 ──
 function tlTab(which, noScroll) {
   $('logForm').style.display = (which === 'log') ? 'block' : 'none';
-  $('kmForm').style.display  = (which === 'km')  ? 'block' : 'none';
   $('evForm').style.display  = (which === 'ev')  ? 'block' : 'none';
   $('trForm').style.display  = (which === 'tr')  ? 'block' : 'none';
   $('tabTr').className  = 'tab' + (which === 'tr'  ? ' on' : '');
@@ -1572,10 +1575,9 @@ function tlTab(which, noScroll) {
   $('tabKm').className  = 'tab' + (which === 'km'  ? ' on' : '');
   $('tabEv').className  = 'tab' + (which === 'ev'  ? ' on' : '');
   if (!noScroll) $('addBar').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  if (which !== 'km') document.querySelectorAll('#tl .tlKmEdit').forEach(x => { x.classList.remove('on'); x.textContent = '수정'; });
 }
 $('tabLog').onclick = () => tlTab('log');
-$('tabKm').onclick  = () => tlTab('km');
+$('tabKm').onclick  = () => kmEditStart();
 $('tabEv').onclick  = () => tlTab('ev');
 $('tabTr').onclick  = () => tlTab('tr');
 
@@ -1587,6 +1589,11 @@ function logEdit(lid) {
   if (logInlineDirty() && !confirm('고치던 상담 기록이 저장되지 않았습니다. 버리고 이 줄을 고칠까요?')) return;
   LOGORIG  = { log_date: String(l.log_date || today()), way: l.way || '전화', content: l.content || '' };
   LOGDRAFT = Object.assign({}, LOGORIG);
+  if (KMEDIT) {
+    const m = $('d_kmemo');
+    if (m.value.trim() !== (m.dataset.orig || '') && !confirm('고치던 아동 메모가 저장되지 않았습니다. 버리고 이 줄을 고칠까요?')) return;
+    m.value = m.dataset.orig || ''; KMEDIT = false;
+  }
   LOGEDIT  = lid;
   drawTimeline();
   const ta = $('tl').querySelector('.logInline .li_text');
@@ -1628,16 +1635,43 @@ function dkmShow(text, at) {
   $('dkmDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
   $('d_kmemo').value = t;
   $('d_kmemo').dataset.orig = t;
+  KMEDIT = false; kmGoHome();
   memoFit($('d_kmemo'));
   $('dkmMsg').textContent = '';
 }
 
 $('dkmCancel').onclick = () => {
+  const m = $('d_kmemo');
+  if (m.value.trim() !== (m.dataset.orig || '') && !confirm('고친 아동 메모를 버리고 나갈까요?')) return;
   const r = ALL.find(x => x.id === openId);
   const kk = r ? KIDS.find(k => k.id === r.child_id) : null;
-  dkmShow($('d_kmemo').dataset.orig || '', kk ? kk.memo_at : null);
-  tlTab('log');
+  dkmShow(m.dataset.orig || '', kk ? kk.memo_at : null);
+  drawTimeline();
 };
+
+// ── 아동 메모 — 기록 줄 그 자리에서 고친다 (2026-10-27 은정님) ──
+//   KMEDIT 이면 kmForm 을 그 줄 아래(kmSlot)로 옮겨 보여 준다. 다시 그리기 전에는 늘 제자리(kmHome)로
+var KMEDIT = false;
+function kmGoHome() {
+  const f = $('kmForm'), h = $('kmHome');
+  if (!f || !h) return;
+  if (f.previousElementSibling !== h) h.after(f);
+  if (!KMEDIT) f.style.display = 'none';
+}
+function kmEditStart() {
+  if (KMEDIT) { const m0 = $('d_kmemo'); m0.focus(); return; }
+  if (logInlineDirty() && !confirm('고치던 상담 기록이 저장되지 않았습니다. 버리고 아동 메모를 고칠까요?')) return;
+  LOGEDIT = LOGDRAFT = LOGORIG = null;
+  KMEDIT = true;
+  $('dkmMsg').textContent = '';
+  drawTimeline();
+  const m = $('d_kmemo');
+  setTimeout(() => {
+    memoFit(m);
+    $('kmForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try { m.focus({ preventScroll: true }); m.setSelectionRange(m.value.length, m.value.length); } catch (e) {}
+  }, 30);
+}
 
 $('dkmSave').onclick = async () => {
   const r = ALL.find(x => x.id === openId);
@@ -1646,10 +1680,11 @@ $('dkmSave').onclick = async () => {
   $('dkmSave').disabled = true;
   $('dkmSave').textContent = '저장 중...';
   try {
-    const { error } = await sb.from('nl_children')
+    const { data: kd, error } = await sb.from('nl_children')
       .update({ memo: v || null, memo_at: today(), updated_at: new Date().toISOString() })
-      .eq('id', r.child_id);
+      .eq('id', r.child_id).select('id');
     if (error) throw error;
+    if (!kd || !kd.length) throw new Error('저장된 줄이 없습니다. 권한을 확인해 주세요.');
     const kk = KIDS.find(k => k.id === r.child_id);
     if (kk) { kk.memo = v || null; kk.memo_at = today(); }
     dkmShow(v, today());
