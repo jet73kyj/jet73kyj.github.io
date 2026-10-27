@@ -1622,10 +1622,7 @@ function drawSum(){
   ['pmWage', 'pmFee', 'pmFuel'].forEach(id => { $(id).oninput = () => { $('pmSave').textContent = '💾 저장 전'; }; });
   $('pmSave').onclick = savePayMemo;
   // 입금일 메모 — 칸 밖을 누르면 바로 저장 (Enter 도)
-  box.querySelectorAll('input.dmi').forEach(el => {
-    el.onchange = () => dmSave(el);
-    el.onkeydown = e => { if (e.key === 'Enter') el.blur(); };
-  });
+  box.querySelectorAll('input.dmi').forEach(dmBind);
   // 퇴직금 줄 — 적으면 합계를 바로 다시 셈 (저장 전)
   const rtNum = id => Number(String($(id).value).replace(/[^0-9]/g, '')) || 0;
   // 합계 — 퇴직금 줄 · 이체 줄의 지금 적힌 금액까지 (저장 전에도 바로 보임)
@@ -1675,12 +1672,16 @@ function drawSum(){
       if (error || !data || !data.length) { bs.textContent = '💾 저장'; alert('이체 줄을 저장하지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
       Object.assign(x, { id: data[0].id, item: row.item || '', names: row.names || '', acc: row.account_memo || '', w: row.amt_wage || 0, f: row.amt_fee || 0, u: row.amt_fuel || 0 });
       bs.textContent = '✓ 저장됨'; delete tr.dataset.dirty;
+      xfrow_addDm(tr, x);
     };
     tr.querySelector('.xdel').onclick = async () => {
       if (x.id) {
         if (!confirm('이 이체 줄을 지울까요?\n' + [x.item, x.names].filter(Boolean).join(' · '))) return;
         const { data, error } = await sb.from('nl_pay_xfer').delete().eq('id', x.id).select('id');
         if (error || !data || !data.length) { alert('지우지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
+        // 이 줄 입금일 메모도 함께 지움
+        try { await sb.from('nl_pay_daymemo').delete().eq('month_key', mon).eq('who', -x.id); } catch (e) {}
+        ['wage', 'fee', 'fuel'].forEach(c => { delete DM[(-x.id) + '|' + c]; });
       }
       XF = XF.filter(y => y.k !== k); tr.remove(); liveTot();
     };
@@ -1700,13 +1701,31 @@ function drawSum(){
 }
 // 글 칸 높이를 글 길이에 맞춤
 function wrapGrow(el){ if (!el) return; el.style.height = 'auto'; el.style.height = Math.max(28, el.scrollHeight + 2) + 'px'; }
+// 이체 줄 입금일 — 입금일 표(nl_pay_daymemo)에 who = −(이체 줄 번호)로 담는다 (2026-10-27)
+//   저장 전 줄은 번호가 없어 칸 대신 안내 글 · 저장하면 칸이 생김
+function xfDm(x, col){
+  return x.id ? dmIn(-x.id, col) : '<div class="small xdmh" style="margin-top:3px;text-align:right;">저장하면 입금일 칸</div>';
+}
+function dmBind(el){
+  el.onchange = () => dmSave(el);
+  el.onkeydown = e => { if (e.key === 'Enter') el.blur(); };
+}
+function xfrow_addDm(tr, x){
+  [['xw', 'wage'], ['xf', 'fee'], ['xu', 'fuel']].forEach(a => {
+    const td = tr.querySelector('.' + a[0]).closest('td');
+    const h = td.querySelector('.xdmh'); if (h) h.remove();
+    if (td.querySelector('input.dmi')) return;
+    td.insertAdjacentHTML('beforeend', dmIn(-x.id, a[1]));
+    dmBind(td.querySelector('input.dmi'));
+  });
+}
 function xfRowHtml(x){
   const inp = (c, v, ph, n) => !n
     ? '<textarea class="' + c + ' wrapt" rows="1" maxlength="200" placeholder="' + ph + '">' + esc(v) + '</textarea>'
     : '<input class="' + c + (n ? ' n' : '') + '" type="text"' + (n ? ' data-won inputmode="numeric"' : '') + ' maxlength="' + (n ? 15 : 200) + '" placeholder="' + ph + '" value="' + (n ? (v ? won(v) : '') : esc(v)) + '">';
   return '<tr class="rtrow xfrow" data-xk="' + x.k + '"><td>' + inp('xi', x.item, '항목 (예: 상여금)') + inp('xn', x.names, '이름') + '</td>'
     + '<td>' + inp('xa', x.acc, '은행 · 계좌') + '</td>'
-    + '<td>' + inp('xw', x.w, '금액', 1) + '</td><td>' + inp('xf', x.f, '금액', 1) + '</td><td>' + inp('xu', x.u, '금액', 1) + '</td>'
+    + '<td>' + inp('xw', x.w, '금액', 1) + xfDm(x, 'wage') + '</td><td>' + inp('xf', x.f, '금액', 1) + xfDm(x, 'fee') + '</td><td>' + inp('xu', x.u, '금액', 1) + xfDm(x, 'fuel') + '</td>'
     + '<td class="n"><b class="xt">' + won(x.w + x.f + x.u) + '</b><div class="xbt"><button type="button" class="ctsm xs">' + (x.id ? '✓ 저장됨' : '💾 저장') + '</button>'
     + '<button type="button" class="ctsm xdel" title="이 줄 지우기">✕</button></div></td></tr>';
 }
