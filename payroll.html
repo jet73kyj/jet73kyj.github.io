@@ -1458,10 +1458,13 @@ async function afterLogin(user){
   if (location.hash === '#sum') buildSum();
 }
 
+// 지급 모음을 보다가 달을 바꾸면 그 달 지급 모음을 다시 연다 (2026-10-27 · 전에는 위탁수수료 화면으로 넘어갔음)
 $('mon').onchange = async () => { mon = $('mon').value;
-  document.body.classList.remove('summode'); $('sumBox').style.display = 'none';
+  const wasSum = document.body.classList.contains('summode');
+  if (!wasSum) { document.body.classList.remove('summode'); $('sumBox').style.display = 'none'; }
   try { localStorage.setItem('nl_payroll_mon', mon); } catch(e) {}
-  await loadMonth(); await loadUnconf(); await loadPub(); calc(); };
+  await loadMonth(); await loadUnconf(); await loadPub(); calc();
+  if (wasSum) buildSum(); };
 $('th').onchange  = () => { document.body.classList.remove('summode'); $('sumBox').style.display = 'none';
   thId = Number($('th').value); calc(); drawWorkDays(); loadCard(); };
 
