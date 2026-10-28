@@ -3844,12 +3844,16 @@ function buildNeedMk(){
 
 // 그 아동의 칸 아래에 붙일 빨간 알림 줄
 function needMkNote(cid){
+  // 시간표 칸의 「보강 잡아주세요」 알림은 쓰지 않는다 (2026-10-28 은정님 — 같은 칸 다른 수업 이야기로 오해)
+  //   보강이 필요한 줄은 위쪽 상자 셋 · 찾기 창에서 본다
+  return '';
   const list = NEEDMK[Number(cid)];
   if (!list || !list.length) return '';
   const txt = list.map(function(s){
     const mk2 = Number(String(s.month_key || mon).slice(5,7));
     const d = new Date(String(s.plan_date) + 'T00:00:00');
-    return mk2 + '-' + (s.run_no || 0) + ' · '
+    // 사업 줄임말을 앞에 (2026-10-28 — 같은 칸의 다른 수업 이야기로 오해하지 않게)
+    return (FABBR[s.support_type_id] ? FABBR[s.support_type_id] + ' ' : '') + mk2 + '-' + (s.run_no || 0) + ' · '
       + (d.getMonth()+1) + '월 ' + d.getDate() + '일 '
       + h12(s.start_time);
   }).join(' / ');
