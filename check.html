@@ -177,6 +177,12 @@ async function loadNames(ids){
 //   서버 글 「2026-08 · 센터 · ○○○ 선생님 · 4회 중 1회 미작성」을 나눠
 //   제목 「3번 ○○○ 선생님」 아래 「28번 ○○○ · 센터 · 4회 중 1회 미작성」
 let THNO = {};
+let THNAME = {};   // 선생님 번호 → 이름 (2026-10-28 은정님 — 점검 글에 번호 대신 이름)
+function thFix(t) {
+  return String(t == null ? '' : t).replace(/담당 (\d+)번/g, function(m, n){
+    return THNAME[n] ? '담당 ' + THNAME[n] + ' 선생님' : m;
+  });
+}
 function logByTh(list){
   const g = {}, ord = [];
   // 기한 — 서버 글 뒤 「기한 지남」 또는 「작성 중 · 기한 ○월 15일」 (2026-09-22 · 15일로 2026-10-10)
@@ -206,7 +212,7 @@ function logByTh(list){
   }
   ord.forEach(function(nm){
     const n = noOf(nm);
-    const head = /^\d+번$/.test(nm) ? nm : ((n < 999 ? n + '번 ' : '') + nm);
+    const head = nm;   // 번호 없이 이름만 (2026-10-28)
     h += '<div style="margin:0 0 14px;">'
        + '<div style="font-weight:bold;padding:6px 0;border-bottom:1px solid var(--line,#ECE8E3);">'
        + esc(head) + ' 선생님 <span style="font-weight:normal;color:var(--dim);font-size:12px;">'
@@ -256,10 +262,10 @@ async function run(){
   }
 
   // 22번을 선생님별로 묶을 때 쓸 선생님 번호 (2026-09-21)
-  THNO = {};
+  THNO = {}; THNAME = {};
   try {
     const { data: th } = await sb.from('nl_therapists').select('id, name');
-    (th || []).forEach(function(t){ if (t.name) THNO[t.name] = t.id; });
+    (th || []).forEach(function(t){ if (t.name) { THNO[t.name] = t.id; THNAME[String(t.id)] = t.name; } });
   } catch (e) {}
 
   await loadProg(k);
@@ -294,7 +300,7 @@ async function run(){
     list.forEach(function(r){
       h += '<tr><td class="cid">' + esc(kidTxt(r['아동'])) + '</td>'
          + '<td' + (no === '33' ? ' style="white-space:pre-line"' : '') + '>'   // 33번은 줄을 나눠 보임 (2026-10-22)
-         + (no === '11' ? row11(r['내용']) : esc(r['내용'])) + '</td></tr>';
+         + (no === '11' ? row11(r['내용']) : esc(thFix(r['내용']))) + '</td></tr>';
     });
     h += '</table></div>';
   });
@@ -368,7 +374,7 @@ function logBoxOld(k, list){
     const pr = PROG.filter(function(r){ return Number(r.need_cnt) > 0; });
     if (!pr.length) R += '<div class="grp-why">이 달에 끝난 수업이 아직 없습니다.</div>';
     pr.forEach(function(r){
-      R += '<div class="lgrow"><span>' + esc(r.therapist_id + '번 ' + (r.th_name || '') + ' 선생님')
+      R += '<div class="lgrow"><span>' + esc((r.th_name || (r.therapist_id + '번')) + ' 선생님')
          + ' <span style="color:var(--dim);font-size:12px;">' + r.kids + '명</span></span>'
          + '<span>적힌 <b>' + r.put_cnt + '</b> / ' + r.need_cnt + '회</span></div>';
     });
