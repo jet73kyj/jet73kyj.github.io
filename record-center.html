@@ -358,6 +358,11 @@ async function afterLogin(user) {
   if (window.NLDocs) NLDocs.init(sb, me.id);   // 상담·보고서 보기 창 (보기 전용)
   ME = me;
   if (_isBlocked(me.role)) { _blockScreen(me.role); return; }
+  // 표에 새로 더한 치료 종류(예: 미술치료)도 영역 이름이 나오게 (2026-10-28)
+  try {
+    const { data: tts } = await sb.from('nl_therapy_types').select('id, name');
+    (tts || []).forEach(x => { if (!TTYPE[x.id]) TTYPE[x.id] = x.name; });
+  } catch (e) {}
 
   const [th, tp, ot] = await Promise.all([
     sb.from('nl_therapists').select('id, name'),

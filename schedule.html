@@ -10753,7 +10753,12 @@ async function afterLogin(user){
   // 치료 종류 정식 이름 — 표에서 가져온다. 못 읽으면 짧은 이름을 쓴다
   const { data: tts } = await sb.from('nl_therapy_types').select('id, name').order('id');
   TTNAME = {};
-  (tts || []).forEach(x => { TTNAME[x.id] = x.name; });
+  (tts || []).forEach(x => {
+    TTNAME[x.id] = x.name;
+    // 표에 새로 더한 종류(예: 미술치료)는 짧은 이름이 없으면 표 이름을 그대로 쓴다 (2026-10-28)
+    //   → 앞으로 새 치료 종류는 nl_therapy_types 표에 한 줄만 더하면 목록 · 시간표에 나온다
+    if (!TTYPE[x.id]) TTYPE[x.id] = x.name;
+  });
   const ttOpts = Object.keys(TTYPE)
     .map(k => '<option value="' + k + '">' + k + ' '
               + (TTNAME[k] || TTYPE[k]) + '</option>').join('');
