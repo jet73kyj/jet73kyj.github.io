@@ -8797,12 +8797,18 @@ function splitHosts(s){
   const from = (_td < _m1) ? _td : _m1, lim = mkLimit(s);
   // 2026-09-17 원칙 2 바뀜 — 40분 보강 수업 앞·뒤에도 조각을 붙일 수 있다
   //   정규 줄은 예정·완료 / 보강 줄은 보강·완료 (서버 nl_split_host_trg 와 같은 규칙)
+  // 그 수업 요일 · 시각 자리에 놓인 발추에도 얹는다 (2026-10-28 은정님 · 서버 nl_split_host_trg 와 같은 규칙)
+  //   보기: 방과후 금 2:20 자리를 발추가 쓴 날(발추대체 달 · 손으로 넣은 날)
+  const _rs = (ROWS_ALL || []).find(r => Number(r.id) === Number(s.schedule_id));
+  const onSlotX8 = x => !!_rs && Number(x.support_type_id) === 8 && !isMk(x)
+      && wdOf(x.plan_date) === _rs.weekday
+      && String(x.start_time || '').slice(0, 5) === String(_rs.start_time || '').slice(0, 5);
   return allSessU().filter(x => x.id !== s.id
       && Number(x.makeup_for || 0) !== Number(s.id)
       && Number(x.child_id) === Number(s.child_id)
       && Number(x.therapist_id) === Number(s.therapist_id)
       // 발달재활 조각은 같은 선생님의 발추 수업에도 붙는다 (2026-09-17)
-      && (Number(x.support_type_id) === hostSp || (sp === 2 && Number(x.support_type_id) === 8))
+      && (Number(x.support_type_id) === hostSp || (sp === 2 && Number(x.support_type_id) === 8) || onSlotX8(x))
       && (isMk(x) ? (x.status === '보강' || x.status === '완료')
                   : (x.status === '예정' || x.status === '완료'))
       && Number(x.minutes || 40) === 40 && x.start_time
