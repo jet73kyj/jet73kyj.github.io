@@ -1062,6 +1062,13 @@
   #mainBox .blkslot b { color:#A39C95; }
   #mainBox .blkslot.on { background:#B07A4A; border-color:#B07A4A; color:#fff; }
   #mainBox .blkslot.on b { color:#F4E9DC; }
+  /* 이미 막힌 칸 · 풀 칸 (2026-10-28 하루씩 막고 풀기) */
+  #mainBox .blkslot.had { background:#5a5f5c; border-color:#5a5f5c; color:#fff; }
+  #mainBox .blkslot.had b { color:#e6e9e5; }
+  #mainBox .blkslot.had::after { content:'막힘'; display:block; font-size:10.5px; color:#e6e9e5; }
+  #mainBox .blkslot.had.rel { background:#f2f1ef; border:1px dashed #a8aeaa; color:#A39C95; text-decoration:line-through; }
+  #mainBox .blkslot.had.rel b { color:#A39C95; }
+  #mainBox .blkslot.had.rel::after { content:'풀 칸'; color:#C2553A; text-decoration:none; }
   #mainBox .meetb { border-color:#E4E0DA; color:#4A433F; }
   #mainBox .meetb.on { background:#B07A4A; border-color:#B07A4A; color:#fff; }
   #mainBox .offlist-t { color:#4A433F; }
@@ -1341,10 +1348,10 @@
           <select id="bk_th"></select>
         </div>
       </div>
-      <div class="blkhint">막을 교시를 눌러 고르세요. 여러 개 고를 수 있습니다.</div>
+      <div class="blkhint">하루씩 막고 풉니다. 흰 교시를 누르면 「막을 칸」, ■막힘 교시를 누르면 「풀 칸」이 됩니다. 다시 누르면 원래대로입니다.</div>
       <div id="bk_slots" class="blkslots"></div>
       <!-- 한꺼번에 풀기 (2026-10-06 은정님 — 선생님들이 막아 둔 자리를 아동이 생기면 풀어 달라심) -->
-      <div id="bkRelBox" style="margin:12px 0 4px;padding:10px 12px;border:1px solid #ECE8E3;border-left:3px solid #C9A27E;border-radius:6px;background:#FBF5EE;">
+      <div id="bkRelBox" style="display:none;margin:12px 0 4px;padding:10px 12px;border:1px solid #ECE8E3;border-left:3px solid #C9A27E;border-radius:6px;background:#FBF5EE;">
         <div style="font-weight:700;color:#6b5a48;margin-bottom:6px;">한꺼번에 풀기 <span style="font-weight:400;color:#A39C95;font-size:12px;">— 위 치료사가 막아 둔 요일 · 시각을 이날부터 모두</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
           <div><label for="bkRelWd" style="display:block;font-size:12px;">요일</label><select id="bkRelWd" style="width:auto !important;margin:0 !important;min-width:70px;"></select></div>
@@ -1356,7 +1363,7 @@
         <div id="bkRelMsg" style="margin-top:6px;font-size:12.5px;color:#6b5a48;"></div>
       </div>
       <div class="pbtns">
-        <button id="blkSave" class="pbtn ok-btn">시간 막기</button>
+        <button id="blkSave" class="pbtn ok-btn">저장</button>
         <button id="blkClose" class="pbtn grey">닫기</button>
       </div>
     </div>
@@ -8234,38 +8241,52 @@ $('offClose').onclick = () => { $('offBox').style.display='none'; };
 
 // ===== 시간 막기 저장 — 고른 교시를 한꺼번에 넣는다 =====
 $('blkSave').onclick = async () => {
+  // 하루씩 막고 풀기 (2026-10-28 은정님) — 막을 칸은 넣고, 풀 칸은 지운다
   const d = $('bk_date').value;
   if (!d) { offmsg('날짜를 고르세요.', false); return; }
   const th = Number($('bk_th').value);
   if (!th) { offmsg('치료사를 고르세요.', false); return; }
-  const picked = Array.from($('bk_slots').querySelectorAll('.blkslot.on'))
-                      .map(el => el.dataset.hm);
-  if (!picked.length) { offmsg('막을 교시를 하나 이상 고르세요.', false); return; }
-
-  $('blkSave').disabled = true; $('blkSave').textContent = '넣는 중...';
+  const add = Array.from($('bk_slots').querySelectorAll('.blkslot.on:not(.had)')).map(el => el.dataset.hm);
+  const rel = Array.from($('bk_slots').querySelectorAll('.blkslot.had.rel')).map(el => el.dataset.hm);
+  if (!add.length && !rel.length) { offmsg('막을 칸이나 풀 칸을 하나 이상 고르세요.', false); return; }
+  const md = Number(d.slice(5, 7)) + '월 ' + Number(d.slice(8, 10)) + '일(' + wdOf(d) + ')';
+  const q = thName(th) + ' 선생님 · ' + md
+    + (add.length ? '\n막음 ' + add.length + '칸 — ' + add.map(h12).join(', ') : '')
+    + (rel.length ? '\n풂 ' + rel.length + '칸 — ' + rel.map(h12).join(', ') : '')
+    + '\n\n저장할까요?';
+  if (!confirm(q)) return;
+  $('blkSave').disabled = true; $('blkSave').textContent = '저장 중...';
   try {
-    // 이미 막아 둔 시각은 빼고 넣는다 (같은 날에 여러 번 넣을 수 있다)
-    const { data: had } = await sb.from('nl_offdays')
-      .select('start_time')
-      .eq('off_date', d).eq('kind', '시간막음').eq('therapist_id', th);
-    const hadSet = new Set((had || []).map(x => String(x.start_time || '').slice(0,5)));
-    const rows = picked.filter(hm => !hadSet.has(hm))
-      .map(hm => ({ off_date: d, kind: '시간막음',
-                    therapist_id: th, start_time: hm + ':00' }));
-    if (!rows.length) {
-      offmsg('고르신 교시는 이미 막혀 있습니다.', false);
-      $('blkSave').disabled = false; $('blkSave').textContent = '시간 막기';
-      return;
+    let nAdd = 0, nRel = 0;
+    if (add.length) {
+      // 그 사이 막힌 시각은 빼고 넣는다
+      const { data: had } = await sb.from('nl_offdays').select('start_time')
+        .eq('off_date', d).eq('kind', '시간막음').eq('therapist_id', th);
+      const hadSet = new Set((had || []).map(x => String(x.start_time || '').slice(0, 5)));
+      const rows = add.filter(hm => !hadSet.has(hm))
+        .map(hm => ({ off_date: d, kind: '시간막음', therapist_id: th, start_time: hm + ':00' }));
+      if (rows.length) {
+        const { data, error } = await sb.from('nl_offdays').insert(rows).select('id');
+        if (error) throw error;
+        nAdd = (data || []).length;
+      }
     }
-    const { error } = await sb.from('nl_offdays').insert(rows);
-    if (error) throw error;
-    offmsg('✅ ' + dayNo(d) + '일 ' + rows.length + '개 자리를 막았습니다.', true);
-    $('bk_slots').querySelectorAll('.blkslot.on').forEach(el => el.classList.remove('on'));
+    if (rel.length) {
+      const ids = rel.map(hm => BKHAD[hm]).filter(Boolean);
+      const { data, error } = await sb.from('nl_offdays').delete()
+        .in('id', ids).eq('kind', '시간막음').eq('therapist_id', th).eq('off_date', d).select('id');
+      if (error) throw error;
+      nRel = (data || []).length;
+    }
+    const ok = nAdd === add.length && nRel === rel.length;
+    offmsg((ok ? '✅ ' : '⚠️ ') + md + ' · 막음 ' + nAdd + '칸 · 풂 ' + nRel + '칸'
+      + (ok ? '' : ' — 고른 것과 다릅니다. 다시 확인해 주세요.'), ok);
     await loadMonth(); drawOffList(); draw();
+    drawBlkSlots();
   } catch (e) {
-    offmsg('❌ 막지 못했습니다.\n' + (e.message || e), false);
+    offmsg('❌ 저장하지 못했습니다.\n' + (e.message || e), false);
   } finally {
-    $('blkSave').disabled = false; $('blkSave').textContent = '시간 막기';
+    $('blkSave').disabled = false; $('blkSave').textContent = '저장';
   }
 };
 $('of_kind').onchange = () => {
@@ -8385,9 +8406,30 @@ function drawBlkSlots(){
       ? '<div style="grid-column:1/-1;font-size:11.5px;color:#7a827d;">'
         + '토요일 교시입니다 (점심 없음 · 11교시까지)</div>' : '');
   $('bk_slots').querySelectorAll('.blkslot').forEach(el => {
-    el.onclick = () => el.classList.toggle('on');
+    el.onclick = () => { if (el.classList.contains('had')) el.classList.toggle('rel'); else el.classList.toggle('on'); };
+  });
+  markBlkHad();
+}
+// 그 날 · 그 선생님이 이미 막아 둔 교시에 「막힘」 (2026-10-28 하루씩 막고 풀기)
+let BKHAD = {};   // 시각 → 시간 막음 줄 번호
+async function markBlkHad(){
+  BKHAD = {};
+  const d = $('bk_date') ? $('bk_date').value : '';
+  const th = Number(($('bk_th') || {}).value || 0);
+  if (!d || !th) return;
+  const { data, error } = await sb.from('nl_offdays').select('id, start_time')
+    .eq('off_date', d).eq('kind', '시간막음').eq('therapist_id', th);
+  if (error) { offmsg('막아 둔 칸을 읽지 못했습니다 — ' + error.message, false); return; }
+  if ($('bk_date').value !== d || Number($('bk_th').value) !== th) return;   // 그 사이 바꿨으면 그리지 않음
+  (data || []).forEach(o => { if (o.start_time) BKHAD[String(o.start_time).slice(0, 5)] = o.id; });
+  $('bk_slots').querySelectorAll('.blkslot').forEach(el => {
+    const had = el.dataset.hm in BKHAD;
+    el.classList.toggle('had', had);
+    el.classList.remove('rel');
+    if (had) el.classList.remove('on');
   });
 }
+if ($('bk_th')) $('bk_th').addEventListener('change', () => { if (OFFTAB === 'blk') drawBlkSlots(); });
 
 // ===== 나오는 날 (추가근무) =====
 // 원래 안 나오는 날에 특별히 나오실 때. 그 사이 교시가 빈 자리로 열린다
