@@ -1210,7 +1210,9 @@ $('rtSave').onclick = async () => {
   const from = $('rt_from').value;
   const fee  = numOf($('rt_fee').value);
   if (!from) { rtMsg('적용 시작 달을 고르세요.', false); return; }
-  if (!fee)  { rtMsg('회기 단가를 넣으세요.', false); return; }
+  // 영역이 모두 5:5 이면 회기 단가는 0 으로 둔다 (2026-10-28 — 22번 미술재활)
+  const allShare = areaVals().length && areaVals().every(a => a.share_pct);
+  if (!fee && !allShare)  { rtMsg('회기 단가를 넣으세요.', false); return; }
 
   const ins = ($('rt_ins').value === 'yes');
   const dec = numOf($('rt_dec').value);
