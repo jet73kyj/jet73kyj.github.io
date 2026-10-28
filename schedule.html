@@ -3534,6 +3534,23 @@ function drawFind(){
     //   발4+발추1   — 매달 1회
     //   발4+5주발추 — 그 요일이 5번 있는 달만 1회 (공휴일 빼고 셈)
     let ghost = '';
+    // 발추를 다른 수업 첫째 주 자리에서 할 때 (발추대체 · 2026-10-28 은정님)
+    //   발달 줄 끝에 「이 방11-1 대체」만 · 날짜 단추는 그 수업 줄에 「이 11-5 6일」로 그려진다
+    if (Number(r.support_type_id) === 2) {
+      const _myIds = idsOf(r);
+      SESS.filter(function(x){
+        return x.child_id === r._cid && !x.makeup_for
+            && Number(x.support_type_id) === 8
+            && x.schedule_id && _myIds.indexOf(x.schedule_id) < 0
+            && (!x.month_key || String(x.month_key) === String(mon))
+            && x.status !== '취소';
+      }).forEach(function(x){
+        const _h = hit.find(function(h){ return h.id === x.schedule_id; });
+        if (!_h || Number(_h.support_type_id) === 2) return;
+        ghost += '<span class="fb s8" title="' + esc(String(x.plan_date)) + ' 발추를 이 수업 자리에서 함">이 '
+          + (FABBR[_h.support_type_id] || '') + monNo(mon) + '-1 대체</span>';
+      });
+    }
     if (Number(r.support_type_id) === 2) {
       const isX8N = function(x){
         return Number(x.support_type_id) === 8
