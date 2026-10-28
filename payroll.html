@@ -569,6 +569,43 @@ function areaFeeOf(r, tt){
   const a = AREA_RATES.find(x => x.pay_rate_id === r.id && Number(x.therapy_type_id) === Number(tt));
   return a ? Number(a.fee) || 0 : 0;
 }
+// 5:5 — 결제 금액의 몇 % 를 지급 (2026-10-28 은정님 · 미술재활) · 없으면 0
+function areaShareOf(r, tt){
+  if (!r || !tt) return 0;
+  const a = AREA_RATES.find(x => x.pay_rate_id === r.id && Number(x.therapy_type_id) === Number(tt));
+  return a ? Number(a.share_pct) || 0 : 0;
+}
+let PAYM = [], TFEES = [];   // 그 달 · 지난달 납부 줄 · 학부모 수업료 (5:5 셈에만)
+let SHAREMISS = false;
+// 그 회기의 학부모 1회 결제 단가 — 납부 메모 [요일줄단가요일줄:금액] → 없으면 담당 선생님 학부모 수업료
+function payUnitOf(s, sc, dur){
+  const mk = String(s.month_key || mon);
+  const sid = Number(s.schedule_id || 0);
+  for (const p of PAYM) {
+    if (Number(p.child_id) !== Number(s.child_id) || String(p.month_key) !== mk) continue;
+    const m = String(p.memo || '').match(/\[요일줄단가([0-9:,]+)\]/);
+    if (!m) continue;
+    for (const kv of m[1].split(',')) {
+      const [a, b] = kv.split(':').map(Number);
+      if (a === sid && b > 0) return b;
+    }
+  }
+  const th = Number((sc && sc.therapist_id) || s.therapist_id);
+  const f = TFEES.filter(x => Number(x.therapist_id) === th && String(x.from_month || '') <= mk)
+    .sort((a, b) => String(b.from_month).localeCompare(String(a.from_month)))[0];
+  if (!f) return 0;
+  return Number(dur >= 60 ? f.fee_60 : dur >= 50 ? f.fee_50 : f.fee_40) || 0;
+}
+// 그 아동 그 달 리뷰 건수 — 납부 메모 [리뷰N] (줄마다 같게 적힘 · 가장 큰 값)
+function reviewNOf(cid, mk){
+  let n = 0;
+  PAYM.forEach(p => {
+    if (Number(p.child_id) !== Number(cid) || String(p.month_key) !== String(mk)) return;
+    const m = String(p.memo || '').match(/\[리뷰([0-9]+)\]/);
+    if (m) n = Math.max(n, Number(m[1]));
+  });
+  return n;
+}
 function areaGrpOf(r, tt){
   if (!r || !tt) return 0;
   const a = AREA_RATES.find(x => x.pay_rate_id === r.id && Number(x.therapy_type_id) === Number(tt));
@@ -578,13 +615,13 @@ function ttName(id){ const t = (typeof TTYPES !== 'undefined' ? TTYPES : []).fin
 function areaTxt(r){
   if (!r) return '';
   const rows = AREA_RATES.filter(x => x.pay_rate_id === r.id).sort((a, b) => a.therapy_type_id - b.therapy_type_id);
-  if (rows.length) return rows.map(x => ' · ' + ttName(x.therapy_type_id) + ' ' + (x.fee ? won(x.fee) : '기본')
+  if (rows.length) return rows.map(x => ' · ' + ttName(x.therapy_type_id) + ' ' + (x.share_pct ? '5:5' : x.fee ? won(x.fee) : '기본')
     + (x.group_fee ? ' / 그룹 ' + won(x.group_fee) : '')).join('');
   return r.special_fee ? ' · 심리(메모) ' + won(r.special_fee) : '';
 }
 async function loadAreaRates(){
   const [a, b] = await Promise.all([
-    sb.from('nl_pay_area_rates').select('pay_rate_id, therapy_type_id, fee, group_fee'),
+    sb.from('nl_pay_area_rates').select('pay_rate_id, therapy_type_id, fee, group_fee, share_pct'),
     sb.from('nl_th_areas').select('therapist_id, therapy_type_id')
   ]);
   if (a.error) alert('영역별 단가를 읽지 못했습니다. 새로고침 해 주세요.\n' + a.error.message);
@@ -733,6 +770,7 @@ function calc(){
   // 아동별로 모으기
   const byKid = {};
   GRPMISS = false;
+  SHAREMISS = false;
   AREAMISS = [];
   done.forEach(s => {
     const sc = ROWS.find(x => x.id === s.schedule_id);
@@ -757,6 +795,7 @@ function calc(){
     //   옛 방식(메모에 「심리」 + 특별 단가)은 영역별 단가가 없을 때만 (지난 자료 보호)
     const tt2 = tt || (s.therapy_id ? TPTT[s.therapy_id] : null) || null;
     const aFee = isGrp ? 0 : areaFeeOf(r, tt2);
+    const shp  = isGrp ? 0 : areaShareOf(r, tt2);   // 5:5 (2026-10-28)
     const myA = TH_AREAS[thId] || [];
     if (tt2 && myA.length && myA.indexOf(Number(tt2)) < 0 && AREAMISS.indexOf(Number(tt2)) < 0) AREAMISS.push(Number(tt2));
     const isSp = !aFee && r.special_fee && String(s.memo||'').includes('심리');
@@ -765,7 +804,16 @@ function calc(){
     const part = s._unpaid ? 0 : (rest ? rest / 40 : Number(s.minutes || 40) / 40);
     let fee, unit = 0, ulab = '';
     const gFee = isGrp ? (areaGrpOf(r, tt2) || Number(r.group_fee) || 0) : 0;
-    if (isGrp)         { k.m40 += part; fee = gFee * part; if (!gFee) GRPMISS = true; unit = gFee; ulab = areaGrpOf(r, tt2) ? '그룹 ' + ttName(tt2) : '그룹'; }
+    if (shp && !isGrp) {
+      // 5:5 — 그 회 학부모 결제 단가의 몇 % · 리뷰 할인은 아래에서 아동 · 달마다 한 번 뺀다
+      const pu = payUnitOf(s, sc, dur);
+      if (!pu) SHAREMISS = true;
+      if (dur >= 60) k.m60 += part; else k.m40 += part;
+      unit = pu * shp / 100; fee = unit * part; ulab = '5:5 · ' + ttName(tt2);
+      k.cid = s.child_id;
+      (k.shareMk = k.shareMk || {})[String(s.month_key || mon)] = shp;
+    }
+    else if (isGrp)    { k.m40 += part; fee = gFee * part; if (!gFee) GRPMISS = true; unit = gFee; ulab = areaGrpOf(r, tt2) ? '그룹 ' + ttName(tt2) : '그룹'; }
     else if (aFee)     { if (dur >= 60) { k.m60 += part; fee = aFee * 1.5 * part; unit = aFee * 1.5; } else { k.m40 += part; fee = aFee * part; unit = aFee; } ulab = ttName(tt2); }
     else if (isSp)     { k.m40 += part; fee = r.special_fee * part; unit = r.special_fee; ulab = '심리'; }   // 특수(심리)도 40분 칸에 · 단가는 특수 (2026-10-03)
     else if (dur >= 60){ k.m60 += part; fee = r.session_fee * 1.5 * part; unit = r.session_fee * 1.5; }
@@ -789,6 +837,23 @@ function calc(){
           : ''));
   });
 
+  // 5:5 — 리뷰 할인(5,000원 × 건수)은 결제 금액에서 빠지므로 그 몫만큼 뺀다 (아동 · 몫인 달마다 한 번 · 2026-10-28)
+  Object.values(byKid).forEach(k => {
+    if (!k.shareMk) return;
+    Object.keys(k.shareMk).forEach(mk => {
+      const n = reviewNOf(k.cid, mk);
+      if (!n) return;
+      const cut = Math.min(k.fee, Math.round(n * 5000 * k.shareMk[mk] / 100));
+      if (!cut) return;
+      k.fee -= cut;
+      k.days.push('리뷰 ' + n + '건 −' + won(cut));
+    });
+  });
+  if (SHAREMISS) {
+    $('warnBox').style.display = 'block';
+    $('warnBox').innerHTML = (($('warnBox').innerHTML && $('warnBox').style.display === 'block') ? $('warnBox').innerHTML + '<br>' : '')
+      + '<b>5:5 수업 가운데 결제 단가를 찾지 못한 회가 있습니다.</b> 납부 계산에서 그 아동 그 달을 저장했는지, 선생님 학부모 수업료가 있는지 봐 주세요.';
+  }
   // 아동 번호 차례로 (숫자로 견줌)
   // 금액 번외 (미지급분 등) — 회기 수 없이 수수료에만 · 총 수수료에 들어가 원천징수까지 (2026-10-03)
   EXTRA.filter(x => x.therapist_id === thId && x.fee_amt).forEach(x => {
@@ -1060,7 +1125,7 @@ function drawAreaInputs(){
   const chk = box ? Array.from(box.querySelectorAll('input[type=checkbox]')) : [];
   const keep = {};
   const key = thId + '|' + (r ? r.id : '');
-  if ($('rt_areas').dataset.key === key) Array.from($('rt_areas').querySelectorAll('input')).forEach(i => { keep[i.dataset.tt + '|' + i.dataset.k] = i.value; });
+  if ($('rt_areas').dataset.key === key) Array.from($('rt_areas').querySelectorAll('input')).forEach(i => { keep[i.dataset.tt + '|' + i.dataset.k] = (i.type === 'checkbox') ? (i.checked ? '1' : '0') : i.value; });
   $('rt_areas').dataset.key = key;
   const editing = chk.length && $('ctEdit').style.display !== 'none';
   let ids = editing ? chk.filter(c => c.checked).map(c => Number(c.value)) : (TH_AREAS[thId] || []).slice();
@@ -1074,13 +1139,21 @@ function drawAreaInputs(){
   $('rt_areas').innerHTML = ids.length ? ids.map(id => {
     const v1 = (id + '|fee' in keep) ? keep[id + '|fee'] : (areaFeeOf(r, id) || (r && had(id) && r.session_fee) || '');
     const v2 = (id + '|grp' in keep) ? keep[id + '|grp'] : (areaGrpOf(r, id) || (r && had(id) && r.group_fee) || '');
-    return '<tr><td>' + esc(ttName(id)) + ' <button type="button" class="rtx" data-x="' + id + '" title="이 영역 빼기" style="width:auto !important;margin:0 0 0 4px !important;padding:0 6px !important;font-size:12px;border:1px solid #ECE8E3;border-radius:6px;background:#fff;color:#C2553A;cursor:pointer;">✕</button></td>' + cell(id, 'fee', v1, ph1) + cell(id, 'grp', v2, ph2) + '</tr>';
+    // 5:5 — 결제 금액의 50% (2026-10-28) · 켜면 1:1 칸은 비우고 잠금
+    const sh = (id + '|share' in keep) ? keep[id + '|share'] === '1' : !!areaShareOf(r, id);
+    const feeTd = '<td><input data-won data-tt="' + id + '" data-k="fee" type="text" inputmode="numeric" placeholder="' + (sh ? '결제 금액의 50%' : ph1) + '" value="' + (sh ? '' : esc(String(v1))) + '"' + (sh ? ' disabled' : '') + '>'
+      + ' <label class="small" style="white-space:nowrap;cursor:pointer;" title="학부모 결제 금액(리뷰 할인 뺀 것)의 절반을 지급"><input type="checkbox" data-tt="' + id + '" data-k="share"' + (sh ? ' checked' : '') + ' style="width:auto !important;margin:0 2px 0 4px !important;vertical-align:middle;">5:5</label></td>';
+    return '<tr><td>' + esc(ttName(id)) + ' <button type="button" class="rtx" data-x="' + id + '" title="이 영역 빼기" style="width:auto !important;margin:0 0 0 4px !important;padding:0 6px !important;font-size:12px;border:1px solid #ECE8E3;border-radius:6px;background:#fff;color:#C2553A;cursor:pointer;">✕</button></td>' + feeTd + cell(id, 'grp', v2, ph2) + '</tr>';
   }).join('') : '<tr><td colspan="3" class="small" style="color:#888;">영역이 없습니다 — 「영역」 옆에서 골라 넣어 주세요</td></tr>';
   // ＋ 영역 — 아직 줄이 없는 치료 종류
   const left = (typeof TTYPES !== 'undefined' ? TTYPES : []).filter(x => ids.indexOf(Number(x.id)) < 0);
   $('rt_addArea').innerHTML = '<option value="">＋ 영역</option>' + left.map(x => '<option value="' + x.id + '">' + esc(x.name) + '</option>').join('');
   $('rt_addArea').style.display = left.length ? '' : 'none';
 }
+$('rt_areas').addEventListener('change', e => {
+  const c = e.target.closest('input[type=checkbox][data-k="share"]'); if (!c) return;
+  drawAreaInputs();
+});
 $('rt_areas').addEventListener('click', e => {
   const b = e.target.closest('button[data-x]'); if (!b) return;
   const id = Number(b.dataset.x);
@@ -1093,9 +1166,11 @@ $('rt_areas').addEventListener('click', e => {
 function rtSyncBase(){
   const rows = Array.from($('rt_areas').querySelectorAll('tr')).filter(tr => tr.querySelector('input[data-k="fee"]'));
   if (!rows.length) return '영역을 하나 이상 넣어 주세요 (「영역」 옆에서 고르기).';
-  const miss = rows.filter(tr => !numOf(tr.querySelector('input[data-k="fee"]').value));
+  const isSh = tr => { const c = tr.querySelector('input[data-k="share"]'); return !!(c && c.checked); };
+  const miss = rows.filter(tr => !isSh(tr) && !numOf(tr.querySelector('input[data-k="fee"]').value));
   if (miss.length) return miss.map(tr => String(tr.firstChild.firstChild.nodeValue || '').trim()).join(', ') + ' — 1:1 단가를 적어 주세요.';
-  $('rt_fee').value = String(numOf(rows[0].querySelector('input[data-k="fee"]').value));
+  const fr = rows.find(tr => !isSh(tr));
+  $('rt_fee').value = String(fr ? numOf(fr.querySelector('input[data-k="fee"]').value) : 0);
   $('rt_grp').value = '';
   return '';
 }
@@ -1109,10 +1184,12 @@ $('rt_addArea').onchange = () => {
 function areaVals(){
   const m = {};
   Array.from($('rt_areas').querySelectorAll('input')).forEach(i => {
-    const tt = Number(i.dataset.tt), o = m[tt] = m[tt] || { therapy_type_id: tt, fee: null, group_fee: null };
-    if (i.dataset.k === 'grp') o.group_fee = numOf(i.value); else o.fee = numOf(i.value);
+    const tt = Number(i.dataset.tt), o = m[tt] = m[tt] || { therapy_type_id: tt, fee: null, group_fee: null, share_pct: null };
+    if (i.dataset.k === 'share') o.share_pct = i.checked ? 50 : null;
+    else if (i.dataset.k === 'grp') o.group_fee = numOf(i.value); else o.fee = numOf(i.value);
   });
-  return Object.values(m).filter(x => x.fee || x.group_fee);
+  Object.values(m).forEach(x => { if (x.share_pct) x.fee = null; });
+  return Object.values(m).filter(x => x.fee || x.group_fee || x.share_pct);
 }
 
 function rtMsg(t, ok){
@@ -1164,11 +1241,11 @@ $('rtSave').onclick = async () => {
     if (!res.data || !res.data.length) throw new Error('단가 줄이 저장되지 않았습니다 (권한).');
     const rid = res.data[0].id;
     // 영역별 단가 — 그 단가 줄 것을 지우고 넣기 (실패하면 옛 줄을 되살림 · 2026-10-04)
-    const oldAr = AREA_RATES.filter(x => x.pay_rate_id === rid).map(x => ({ pay_rate_id: rid, therapy_type_id: x.therapy_type_id, fee: x.fee, group_fee: x.group_fee }));
+    const oldAr = AREA_RATES.filter(x => x.pay_rate_id === rid).map(x => ({ pay_rate_id: rid, therapy_type_id: x.therapy_type_id, fee: x.fee, group_fee: x.group_fee, share_pct: x.share_pct || null }));
     const dAr = await sb.from('nl_pay_area_rates').delete().eq('pay_rate_id', rid);
     if (dAr.error) throw dAr.error;
     if (areas.length) {
-      const ins = areas.map(a => ({ pay_rate_id: rid, therapy_type_id: a.therapy_type_id, fee: a.fee, group_fee: a.group_fee }));
+      const ins = areas.map(a => ({ pay_rate_id: rid, therapy_type_id: a.therapy_type_id, fee: a.fee, group_fee: a.group_fee, share_pct: a.share_pct || null }));
       const iAr = await sb.from('nl_pay_area_rates').insert(ins).select('id');
       if (iAr.error || !iAr.data || iAr.data.length !== ins.length) {
         if (oldAr.length) await sb.from('nl_pay_area_rates').insert(oldAr);
@@ -1204,6 +1281,24 @@ async function loadEvals(){
       .order('lesson_date');
     TRIALS = (tl || []).filter(t => t.status === '완료');
   } catch (e) { TRIALS = []; }
+
+  // 5:5 정산용 — 그 달 · 지난달 납부 줄 · 학부모 수업료 (2026-10-28)
+  PAYM = []; TFEES = [];
+  try {
+    const [py, pm] = mon.split('-').map(Number);
+    const pd = new Date(py, pm - 2, 1);
+    const prev = pd.getFullYear() + '-' + String(pd.getMonth() + 1).padStart(2, '0');
+    for (let f = 0; ; f += 1000) {
+      const r1 = await sb.from('nl_payments').select('child_id, month_key, support_type_id, amount, memo')
+        .in('month_key', [mon, prev]).order('id').range(f, f + 999);
+      if (r1.error) throw r1.error;
+      PAYM = PAYM.concat(r1.data || []);
+      if ((r1.data || []).length < 1000) break;
+    }
+    const r2 = await sb.from('nl_therapist_fees').select('therapist_id, from_month, fee_40, fee_50, fee_60');
+    if (r2.error) throw r2.error;
+    TFEES = r2.data || [];
+  } catch (e) { console.error('5:5 셈 자료 읽기 실패', e); }
 }
 
 async function loadMonth(){
@@ -1799,7 +1894,7 @@ function initCard(){
   $('ctSave').onclick = saveCard;
 }
 function rtSnap(){ return ['rt_fee','rt_grp','rt_fuel','rt_fname','rt_ins','rt_dec','rt_ev1','rt_ev2','rt_ev3'].map(i => $(i).value).join('|')
-  + '|' + areaVals().map(a => a.therapy_type_id + ':' + a.fee + '/' + a.group_fee).join(','); }
+  + '|' + areaVals().map(a => a.therapy_type_id + ':' + a.fee + '/' + a.group_fee + '/' + a.share_pct).join(','); }
 // 퇴사 뒤 상태 글 — 다음 날부터 14일은 기록지만, 그 뒤는 막힘 (서버 nl_me 와 같은 셈)
 function leftNote(d){
   const t0 = new Date(); const today = t0.getFullYear() + '-' + String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0');
