@@ -3244,6 +3244,9 @@ function fBtn(x, mkOf, PARTS, HOSTADD){
 // 「발추 1회를 나눠서 진행」 자리표 — 「이 +10×4 예정」 (2026-09-11)
 //   정규 수업 네 번에 10분씩 얹는 발추. 자리표 줄은 그 달 마지막 수업 날에 붙어 있어
 //   그 날 단추와 겹치므로, 날짜 칸에 넣지 않고 줄 끝에 따로 그린다
+// 발추 쪼개기 자리표 (nl_x8_split_anchor 가 만든 결석 줄 · 메모 [발추쪼개기])
+//   실제 수업이 아니므로 시간표 칸에는 안 그리고, 찾기 창은 그 날 발달 단추에 조각만 붙인다 (2026-10-28 은정님)
+function isAnchor(x){ return !!x && Number(x.support_type_id) === 8 && String(x.memo || '').indexOf('[발추쪼개기]') >= 0; }
 function isBunsan(x){ return Number(x.support_type_id) === 8 && String(x.memo || '').indexOf('분산') >= 0; }
 function fBunsan(x){
   const m = String(x.memo || '').match(/(\d+)\s*분씩/);
@@ -3495,11 +3498,20 @@ function drawFind(){
     // 한 날에 원래 줄이 둘 이상이면 오류 (두 벌) — 줄 끝에 빨간 글
     let dup = 0, nOn = 0;
     const main = days.map(d => {
-      const xs = slot[d] || [];
-      if (!xs.length) return '<span class="fb fbl"></span>';
+      const all = slot[d] || [];
+      // 발추 쪼개기 자리표는 단추로 그리지 않고 그 날 발달 단추 뒤에 조각만 「이 +10 +10 +10 +10」
+      const anc = all.filter(isAnchor), xs = all.filter(x => !isAnchor(x));
+      const ancTxt = anc.map(a => {
+        const ps = (PARTS[a.id] || []).filter(pCount);
+        const sum = ps.reduce((t, v) => t + Number(v.minutes || 0), 0);
+        return '<small class="fx8sp" style="color:#8a6a9a;margin-left:2px;" title="발추를 10분씩 나눠 진행 (자리표는 시간표에 안 보임)">이 '
+          + (ps.length ? ps.map(v => '+' + Number(v.minutes || 0)).join(' ') : '쪼개기')
+          + (sum < 40 ? ' (' + (40 - sum) + '분 남음)' : '') + '</small>';
+      }).join('');
+      if (!xs.length) return anc.length ? '<span class="fb fbl"></span>' + ancTxt : '<span class="fb fbl"></span>';
       nOn++;
       dup += xs.length - 1;
-      return xs.map(x => fBtn(x, mkOf, PARTS, HOSTADD)).join('');
+      return xs.map(x => fBtn(x, mkOf, PARTS, HOSTADD)).join('') + ancTxt;
     }).join('');
     // 전월 보강 (지난달 몫 보강·조각을 이 달에 한 것) · 요일줄 밖 보강 — 점선 초록으로 앞에 덧붙임
     const pvx = (PREV || []).filter(s => isMk(s) && s.child_id === r._cid
@@ -3920,6 +3932,7 @@ function drawWeek(){
     //   다만 휴무(공휴일·치료사 휴가)는 그대로 그린다.
     //   선생님이 안 나오시는 날이라 빈 자리가 아니기 때문 (2026-09-10)
     if (s.no_makeup && s.status !== '휴무') return;
+    if (isAnchor(s)) return;   // 발추 쪼개기 자리표는 칸에 안 그린다 (2026-10-28)
     if (!s.plan_date || !dset.has(s.plan_date)) return;
     if (!thIds.has(Number(s.therapist_id))) return;
     const k = slotNoOf(s) + '_' + wdOf(s.plan_date)
@@ -4504,6 +4517,7 @@ function drawOne(){
     //   다만 휴무(공휴일·치료사 휴가)는 그대로 그린다.
     //   선생님이 안 나오시는 날이라 빈 자리가 아니기 때문 (2026-09-10)
     if (s.no_makeup && s.status !== '휴무') return;
+    if (isAnchor(s)) return;   // 발추 쪼개기 자리표는 칸에 안 그린다 (2026-10-28)
     if (s.plan_date !== oneDate) return;
     if (!thIds.has(Number(s.therapist_id))) return;
     const k = slotNoOf(s) + '_' + s.therapist_id;
@@ -5057,6 +5071,7 @@ function drawDay(){
     //   다만 휴무(공휴일·치료사 휴가)는 그대로 그린다.
     //   선생님이 안 나오시는 날이라 빈 자리가 아니기 때문 (2026-09-10)
     if (s.no_makeup && s.status !== '휴무') return;
+    if (isAnchor(s)) return;   // 발추 쪼개기 자리표는 칸에 안 그린다 (2026-10-28)
     if (isMk(s)) return;
     if (!s.schedule_id || !s.plan_date) return;
     if (wdOf(s.plan_date) !== wd) return;
@@ -5150,6 +5165,7 @@ function drawDay(){
   const absCell = {};
   SESS.forEach(x => {
     if (x.no_makeup) return;          // 「보강 없음」으로 뺀 날은 ＋ 단추도 안 낸다 (2026-09-09)
+    if (isAnchor(x)) return;          // 발추 쪼개기 자리표 (2026-10-28)
     if (x.status !== '결석' && x.status !== '휴무' && x.status !== '쉼') return;
     if (!x.plan_date) return;
     if (String(x.plan_date).slice(0,7) !== mon) return;
