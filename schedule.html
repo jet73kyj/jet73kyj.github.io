@@ -8790,7 +8790,11 @@ function partsSum(id){
 function splitHosts(s){
   const sp = Number(s.support_type_id) || 0;
   const hostSp = (sp === 8) ? 2 : sp;
-  const from = String(s.month_key || mon) + '-01', lim = mkLimit(s);
+  // 쪼개기를 얹을 수 있는 날 (2026-10-28 은정님)
+  //   몫인 달 1일부터 — 다만 몫인 달이 아직 안 왔으면 오늘부터 (지난달 남은 수업에 미리 얹는 선보강)
+  //   보기: 오늘 10/28 · 11/6 결석 → 10/30 금요일 수업에 +10
+  const _m1 = String(s.month_key || mon) + '-01', _td = todayKr();
+  const from = (_td < _m1) ? _td : _m1, lim = mkLimit(s);
   // 2026-09-17 원칙 2 바뀜 — 40분 보강 수업 앞·뒤에도 조각을 붙일 수 있다
   //   정규 줄은 예정·완료 / 보강 줄은 보강·완료 (서버 nl_split_host_trg 와 같은 규칙)
   return allSessU().filter(x => x.id !== s.id
