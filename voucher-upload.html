@@ -313,9 +313,11 @@
       </div>
       <div id="auditSum"></div>
       <div id="auditBody"></div>
+      <div id="vCopyBox" class="noprint" style="display:none;margin-top:10px;"></div>
       <div class="foot noprint">
         <button id="pdfBtn" class="ghost">치료사 공유용 PDF</button>
         <button id="pdfAllBtn" class="ghost" style="display:none;">전체 보관용 PDF</button>
+        <button id="vCopy" class="ghost" style="display:none;">미결제 복사</button>
         <span class="grow" style="font-size:12px;color:#777;">
           인쇄 창에서 「대상」을 <b>PDF로 저장</b> 으로 고르세요
         </span>
@@ -714,6 +716,24 @@ function tab(head, rows, memo) {
     + '</table>';
 }
 
+// ── 미결제 복사 (2026-10-29 은정님) — 아동명 / 완료 회수 / 미결제 회수 / 담당 치료사 ──
+//   점검 결과를 그대로 글로 옮길 뿐, 따로 셈하지 않는다
+function upCopyText(box, txt) {
+  box.style.display = 'block';
+  box.innerHTML = '<textarea readonly style="width:100%;min-height:160px;font-size:13px;line-height:1.6;'
+    + 'padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box;"></textarea>'
+    + '<div class="copymsg" style="font-size:12.5px;margin-top:4px;"></div>';
+  const ta = box.querySelector('textarea'), m = box.querySelector('.copymsg');
+  ta.value = txt;
+  const ok = () => { m.textContent = '✓ 복사했습니다 — 카톡 · 문자에 붙여넣으세요'; m.style.color = '#2e7d32'; };
+  const no = () => { ta.focus(); ta.select(); m.textContent = '자동 복사가 막혔습니다 — 위 글을 Ctrl+C 로 복사해 주세요'; m.style.color = '#c62828'; };
+  try {
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(ok, no);
+    else { ta.focus(); ta.select(); document.execCommand('copy') ? ok() : no(); }
+  } catch (e) { no(); }
+}
+let V_COPY = '';   // 지금 점검 결과의 미결제 복사 글
+
 async function drawAudit() {
   if (!ROWS.length) return;
   const MK = ROWS[0].month_key || '';
@@ -828,6 +848,16 @@ async function drawAudit() {
         (MONTH_NEED - g.ds.length) + '회 부족' ] });
   });
   e4.sort((a,b) => Number(b.v[3].replace(/\D/g,'')) - Number(a.v[3].replace(/\D/g,'')));
+  // 미결제 복사 — 4번 「월 회수 미달」 그대로 · 이름 앞 [번호] 뺌
+  { const cm = e4.map(x => ({ nm: String(x.v[0]).replace(/^\[\d+\]\s*/, ''), thr: x.thr,
+        done: parseInt(x.v[1], 10) || 0, un: parseInt(x.v[3], 10) || 0 }))
+      .sort((a, b) => a.thr.localeCompare(b.thr, 'ko') || a.nm.localeCompare(b.nm, 'ko'));
+    V_COPY = cm.length ? '[' + Number(MK.slice(5,7)) + '월 발달재활 미결제 ' + cm.length + '명]\n'
+      + '아동명 / 완료 회수 / 미결제 회수 / 담당 치료사\n'
+      + cm.map(r => r.nm + ' / ' + r.done + '회 / ' + r.un + '회 / '
+          + (r.thr === '담당 치료사 없음' ? r.thr : r.thr + ' 선생님')).join('\n') : '';
+    $('vCopy').style.display = V_COPY ? 'inline-block' : 'none';
+    $('vCopyBox').style.display = 'none'; }
 
   // --- 5·7·8. 전월 대비 ---
   const e5 = [], e7 = [], e8 = [];
@@ -973,6 +1003,8 @@ async function drawAudit() {
   bindMemo();
 }
 
+
+$('vCopy').onclick = () => { if (V_COPY) upCopyText($('vCopyBox'), V_COPY); };
 
 // ── 서버와 견줌 — 새 엑셀인지 알려 주기 (2026-10-11 은정님) ──
 //   새 결제 · 이미 저장된 결제 · 서버에만 있는 결제(엑셀 날짜 범위 안) · 엑셀 안에서 겹친 줄 · 마지막으로 올린 때
