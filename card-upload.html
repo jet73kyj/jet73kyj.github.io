@@ -787,6 +787,8 @@ $('save').onclick = async () => {
       + '같은 파일을 다시 올려도 중복으로 쌓이지 않습니다.', true);
     cuOk = true;
     drawCmp(ROWS);
+    // 대조 결과가 떠 있으면 새 결제로 다시 대조
+    if ($('ckPdf').style.display !== 'none') $('ckGo').click();
   } catch (e) {
     show($('msg3'), '❌ 저장하지 못했습니다.\n' + (e.message || e), false);
   } finally {
@@ -829,6 +831,8 @@ $('ckGo').onclick = async () => {
   const mk = $('ckMk').value;
   const st = Number($('ckKind').value);
   const kind = (st === 3) ? '치료지원' : '방과후';
+  // 마지막으로 대조한 달 · 갈래를 이 컴퓨터에 남김 — 새로고침해도 다시 대조 (2026-10-29)
+  try { localStorage.setItem('nl_ck_last', JSON.stringify({ mk: mk, st: st })); } catch (e) {}
   $('ckBody').innerHTML = '<div class="empty">보는 중...</div>';
   CK_COPY = ''; $('ckCopy').style.display = 'none'; $('ckCopyBox').style.display = 'none';
 
@@ -976,6 +980,15 @@ async function afterLogin(user) {
   // 주소 ?st=5 = 방과후로 열기 (결제내역 올리기 갈래 줄)
   const st0 = Number(new URLSearchParams(location.search).get('st')) === 5 ? 5 : 3;
   setKind(st0);
+  // 지난번 대조 결과를 다시 그림 — 셈은 서버 저장 자료라 새 엑셀을 저장하기 전까지 같은 결과
+  try {
+    const last = JSON.parse(localStorage.getItem('nl_ck_last') || 'null');
+    if (last && [3, 5].includes(Number(last.st))
+        && Array.from($('ckMk').options).some(o => o.value === last.mk)) {
+      $('ckMk').value = last.mk; $('ckKind').value = String(last.st);
+      $('ckGo').click();
+    }
+  } catch (e) {}
 }
 
 $('btn').onclick = async () => {
