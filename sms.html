@@ -207,6 +207,7 @@ function kindLabel(it) {
   if (it.kind === '공휴수업') return '공휴일 수업';
   if (it.kind === '발달안내') return '발달재활 첫 안내';
   if (it.kind === '클린센터') return '클린센터 안내 (1월)';
+  if (it.kind === '5주쉼') return '5주차 쉼 안내';
   if (it.kind === '휴무전날') return '선생님 휴무 · 전날 안내';
   if (isPiece(it)) return '보강 +' + it.mins;
   if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
@@ -267,6 +268,15 @@ function smsText(it) {
     const g = devGuideTpl();
     if (g) return String(g.body || '').replace(/\s+$/, '') + reelPart(it);
     return DEV_INFO_BODY + reelPart(it) + DEV_INFO_END;
+  }
+  // 5주차 쉼 안내 (2026-10-29 은정님) — 월 4회 아동이 5주차에 잘못 오시는 일 막기
+  if (it.kind === '5주쉼') {
+    return '안녕하세요\n자라는나무입니다. ^^\n\n'
+      + it.name + ' 아동 ' + dayKo(it.on_date) + '은 그 달 5주차라\n'
+      + it.lines.map(l => '· ' + l).join('\n') + '\n'
+      + '수업이 없어 한 주 쉬어갑니다.\n\n'
+      + '착오 없으시길 바라며, 다음 수업 시간에 뵙겠습니다.'
+      + reelPart(it) + THANKS;
   }
   if (it.kind === '휴무') {
     return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 수업이 없습니다.\n\n'
@@ -582,6 +592,63 @@ async function loadAll() {
         ther: '', phone: k.phone || '', gds: GD[cid] || [], extra: '', mins: 0, meet: '', parking: false
       });
     });
+  }
+
+  // ⑭ 5주차 쉼 안내 — 일주일 안 (2026-10-29 은정님)
+  //   그 달 같은 요일의 다섯째 날(29 · 30 · 31일)에 살아 있는 요일줄이 있는데
+  //   그 날 그 요일줄 수업 줄이 하나도 없으면(월 4회 · 주차선택 등) 「수업이 없다」고 알린다
+  //   그 아동이 그 날 시간표에 일정이 하나라도 있으면 뺀다 (2026-10-29 은정님)
+  //     1~4회 결석분 보강이 5주차에 잡힌 경우 · 다른 수업 · 발추 · 체험 · 추가 · 평가 — 실제로 오시는 날
+  //   아동마다 날짜마다 한 장
+  {
+    const days = [];
+    for (let d = new Date(t0); ymd(d) <= to7; d = addDays(d, 1)) if (d.getDate() >= 29) days.push(ymd(d));
+    if (days.length) {
+      const [scR, tpR, svR, ttR5, trR5, evR5] = await Promise.all([
+        sb.from('nl_therapy_schedules').select('id, therapy_id, weekday, start_time, from_date, to_date, from_month, to_month'),
+        sb.from('nl_therapies').select('id, child_id, therapy_type_id, started_on, ended_on'),
+        sb.from('nl_sessions').select('child_id, plan_date, status')
+          .gte('plan_date', days[0]).lte('plan_date', days[days.length - 1]).neq('status', '취소'),
+        sb.from('nl_therapy_types').select('id, name'),
+        sb.from('nl_trial_lessons').select('child_id, lesson_date, status')
+          .gte('lesson_date', days[0]).lte('lesson_date', days[days.length - 1]).neq('status', '취소'),
+        sb.from('nl_evaluations').select('child_id, eval_date, status')
+          .gte('eval_date', days[0]).lte('eval_date', days[days.length - 1]).neq('status', '취소')
+      ]);
+      [scR, tpR, svR, ttR5, trR5, evR5].forEach(q => { if (q.error) throw q.error; });
+      const BUSY5 = new Set();   // 아동|날짜 — 그 날 일정이 하나라도 있음
+      (svR.data || []).forEach(v => BUSY5.add(v.child_id + '|' + v.plan_date));
+      (trR5.data || []).forEach(v => BUSY5.add(v.child_id + '|' + v.lesson_date));
+      (evR5.data || []).forEach(v => BUSY5.add(v.child_id + '|' + v.eval_date));
+      const TP = {}; (tpR.data || []).forEach(t => TP[t.id] = t);
+      const TN = {}; (ttR5.data || []).forEach(t => TN[t.id] = String(t.name || '').replace(/재활$|치료$/, ''));
+      const W5 = {};   // 아동|날짜 → [글]
+      days.forEach(d => {
+        const wd = WD[new Date(d + 'T00:00:00').getDay()];
+        const mk = d.slice(0, 7);
+        (scR.data || []).forEach(sc => {
+          if (sc.weekday !== wd) return;
+          const tp = TP[sc.therapy_id]; if (!tp || !KID[tp.child_id]) return;
+          if ((sc.from_date && sc.from_date > d) || (sc.to_date && sc.to_date < d)) return;
+          if ((sc.from_month && sc.from_month > mk) || (sc.to_month && sc.to_month < mk)) return;
+          if ((tp.started_on && tp.started_on > d) || (tp.ended_on && tp.ended_on < d)) return;
+          const hm = String(sc.start_time || '').slice(0, 5);
+          if (BUSY5.has(tp.child_id + '|' + d)) return;
+          const k = tp.child_id + '|' + d;
+          const L = W5[k] = W5[k] || [];
+          const t = timeKo(hm) + ' ' + (TN[tp.therapy_type_id] ? TN[tp.therapy_type_id] + ' ' : '') + '수업';
+          if (L.indexOf(t) < 0) L.push(t);
+        });
+      });
+      Object.keys(W5).forEach(key => {
+        const [cid, d] = key.split('|'); const k = KID[cid];
+        out.push({
+          kind: '5주쉼', cid: Number(cid), name: k.name || ('아동 ' + cid),
+          on_date: d, on_time: '', lines: W5[key].sort(),
+          ther: '', phone: k.phone || '', gds: GD[cid] || [], extra: '', mins: 0, meet: '', parking: false
+        });
+      });
+    }
   }
 
   // ⑫ 발달재활 첫 안내 — 발달재활 수업을 처음 받는 아동의 첫 수업이 사흘 안 (2026-10-08 은정님)
