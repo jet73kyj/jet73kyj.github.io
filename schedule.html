@@ -7902,6 +7902,7 @@ async function pickMnKid(kid){
 }
 
 // 그 달에서 담당 치료사가 비는 자리 찾기 (보강 잡기와 같은 방식)
+let MN_FREE_TXT = '';
 $('mnFind').onclick = () => {
   if (!mnKey) return;
   const th = mnKey.th;
@@ -7943,9 +7944,25 @@ $('mnFind').onclick = () => {
     $('mnFree').innerHTML = '<div class="freenone">이 달에 빈 자리가 없습니다.</div>';
     return;
   }
-  $('mnFree').innerHTML = top.map(c =>
+  // 학부모 안내 문구 (2026-10-29) — 화면에 보인 자리 그대로 · 날짜마다 한 줄
+  { const byD = {}, ord = [];
+    top.slice().sort((a, b) => (a.date + slotHm(a.slot, th, a.dw)).localeCompare(b.date + slotHm(b.slot, th, b.dw)))
+      .forEach(c => { if (!byD[c.date]) { byD[c.date] = []; ord.push(c.date); } byD[c.date].push(apm12(slotHm(c.slot, th, c.dw))); });
+    const isX8 = String($('mn_sp').value) === '8';
+    const mm = monNo(PLAN_MK || mon);
+    MN_FREE_TXT = '안녕하세요^^\n자라는 나무 입니다\n\n'
+      + (mnKid ? mnKid.name + ' 아동 ' : '') + mm + '월 ' + (isX8 ? '발달추가 ' : '') + '수업\n가능한 일정입니다.\n\n'
+      + ord.map(d => '· ' + mdLbl(d) + ' ' + byD[d].join(', ')).join('\n')
+      + '\n\n담당 ' + thName(th) + ' 선생님\n'
+      + '원하시는 시간을 알려 주시면 일정을 잡아 드릴게요.\n042-488-6011'; }
+  $('mnFree').innerHTML = '<div style="flex-basis:100%;display:flex;gap:8px;align-items:center;margin-bottom:2px;">'
+    + '<button type="button" id="mnFreeCopy" class="pbtn" style="width:auto;margin:0;padding:6px 12px;'
+    + 'background:#fff;color:#2c5980;border:1px solid #c3d9ea;">학부모 안내 문구 복사</button>'
+    + '<span id="mnFreeMsg" style="font-size:12.5px;"></span></div>'
+    + top.map(c =>
     '<span class="freeone" data-d="'+c.date+'" data-s="'+c.slot.no+'">'
     + dayNo(c.date) + '일(' + c.dw + ') ' + slotHm12(c.slot, th, c.dw) + '</span>').join('');
+  $('mnFreeCopy').onclick = () => copyTxt(MN_FREE_TXT, $('mnFreeMsg'));
   $('mnFree').querySelectorAll('.freeone').forEach(el => {
     el.onclick = () => {
       $('mn_date').value = el.dataset.d;
