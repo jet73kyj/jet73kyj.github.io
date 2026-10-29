@@ -2619,7 +2619,8 @@ function extraInfoHtml(rows, fixed) {
       + '<span>' + (Number(v.fee) || 0).toLocaleString() + '원</span>'
       + '<span class="evst ' + (done ? 'ok' : '') + '">' + esc(v.status || '예정') + '</span>'
       + (v.memo ? '<span>' + esc(v.memo) + '</span>' : '')
-      + (!done && !fixed ? '<button type="button" class="xldel" data-xldel="' + v.id + '" title="이 추가 수업 지우기">✕</button>' : '')
+      // 확정한 달에도 ✕ — 누르면 예정으로 돌린 뒤 지운다 (2026-10-29) · 완료한 수업은 못 지움
+      + (!done ? '<button type="button" class="xldel" data-xldel="' + v.id + '" title="이 추가 수업 지우기">✕</button>' : '')
       + '</div>';
   }).join('');
 }
@@ -3964,6 +3965,17 @@ async function delExtra(id, btn) {
   if (ch && (ch.card || ch.bank)) {
     alert('이 아동에 저장하지 않은 칸이 있습니다.\n먼저 저장한 뒤 지워 주세요.');
     return;
+  }
+  if (isFixed(childId)) {
+    if (!confirm(Number(String(LOADED_MK).slice(5, 7)) + '월 교육비가 「확정」되어 있습니다.\n\n'
+        + '추가 수업을 지우면 금액이 바뀌므로 「예정」으로 돌린 뒤 지웁니다.\n'
+        + '지우고 나서 「예정」 딱지를 눌러 다시 확정해 주세요. (학부모께 확정 알림이 다시 갑니다)\n\n'
+        + '예정으로 돌릴까요?')) return;
+    const fb = document.querySelector('.kid[data-child="' + childId + '"] .kfix');
+    if (!fb) { alert('예정 · 확정 딱지를 찾지 못했습니다. 새로고침(F5) 뒤 다시 눌러 주세요.'); return; }
+    await toggleFix(childId, fb);
+    if (isFixed(childId)) return;
+    btn = null;   // 상자를 다시 그려 옛 단추는 없어짐
   }
   if (!confirm(v.lesson_date + ' 추가 수업을 지울까요?\n시간표에서도 빠지고 담당 선생님께 알림이 갑니다.')) return;
   if (btn) btn.disabled = true;
