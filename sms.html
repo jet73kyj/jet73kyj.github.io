@@ -226,6 +226,10 @@ function reelPart(it) {
   if (!r || !r.url) return '';
   return (r.kind === '블로그' ? BLOG_TXT : REEL_TXT) + r.url;
 }
+function devGuideTpl() {
+  return (TPL || []).find(t => { const n = String(t.title || '').replace(/\s/g, '');
+    return n.indexOf('발달재활') >= 0 && n.indexOf('규칙') >= 0; }) || null;
+}
 function reelName(r) { return r && r.kind === '블로그' ? '블로그' : '릴스'; }
 // 받침이 있으면 「은」, 없으면 「는」 (한글날은 · 추석 연휴는)
 function eunNeun(w) {
@@ -256,7 +260,12 @@ function whenLines(it) {
     + (one ? '\n담당 ' + (it.ther || '') + ' 선생님' : '');
 }
 function smsText(it) {
-  if (it.kind === '발달안내') return DEV_INFO_BODY + reelPart(it) + DEV_INFO_END;
+  if (it.kind === '발달안내') {
+    // 보관 문자 「발달재활서비스 이용 규칙」이 있으면 그 글을 쓴다 — 보관 문자만 고치면 따라감 (2026-10-29 은정님)
+    const g = devGuideTpl();
+    if (g) return String(g.body || '').replace(/\s+$/, '') + reelPart(it);
+    return DEV_INFO_BODY + reelPart(it) + DEV_INFO_END;
+  }
   if (it.kind === '휴무') {
     return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 수업이 없습니다.\n\n'
       + showLines(it).map(l => '· ' + l.text).join('\n')
