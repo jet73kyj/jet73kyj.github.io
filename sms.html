@@ -161,6 +161,7 @@ let ME = null, ITEMS = [], SENT = {}, fFilter = '안보냄';
 //   HIST   보낸 기록 { key, cid, news } — 그 집에 보낸 릴스를 다시 안 보내려고
 //   FAM    아동 → 집 (학부모 계정이 같거나 대표 번호가 같으면 한 집)
 let REELS = [], REEL = {}, HIST = [], FAM = {}, SENTNEWS = {};
+let CLEAN_NOTICE = null;   // 공지 「전자바우처 클린센터」 글 (2026-10-29)
 const CENTER_TEL = '042-488-6011';
 const WD = ['일','월','화','수','목','금','토'];
 
@@ -205,6 +206,7 @@ function isPiece(it) { return it.kind === '보강' && it.mins > 0 && it.mins < 4
 function kindLabel(it) {
   if (it.kind === '공휴수업') return '공휴일 수업';
   if (it.kind === '발달안내') return '발달재활 첫 안내';
+  if (it.kind === '클린센터') return '클린센터 안내 (1월)';
   if (it.kind === '휴무전날') return '선생님 휴무 · 전날 안내';
   if (isPiece(it)) return '보강 +' + it.mins;
   if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
@@ -270,6 +272,14 @@ function smsText(it) {
     return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 아동 수업이 없습니다.\n\n'
       + showLines(it).map(l => '· ' + l.text).join('\n')
       + reelPart(it) + THANKS;
+  }
+  // 1월 전자바우처 클린센터 안내 (2026-10-29 은정님) — 보관 문자 「클린센터」 → 없으면 학부모 공지 「클린센터」 글
+  if (it.kind === '클린센터') {
+    const t = (TPL || []).find(x => String(x.title || '').replace(/\s/g, '').indexOf('클린센터') >= 0);
+    const body = t ? t.body : (CLEAN_NOTICE ? CLEAN_NOTICE.title + '\n\n' + CLEAN_NOTICE.body : '');
+    if (!body) return '(보관 문자에 제목에 「클린센터」가 든 문자를 먼저 적어 주세요)';
+    return '안녕하세요\n자라는나무입니다. ^^\n\n' + it.name + ' 보호자님께 안내드립니다.\n\n'
+      + String(body).replace(/\s+$/, '') + THANKS;
   }
   // 선생님 휴무 전날 다시 알림 (2026-10-23 은정님) — 일주일 전 안내와 따로 보낸다 · 교육 자료 안 붙임
   if (it.kind === '휴무전날') {
@@ -599,6 +609,41 @@ async function loadAll() {
     }
   }
 
+  // ⑬ 1월 클린센터 안내 — 해마다 1월 2일 ~ 8일에 목록에 뜸 (2026-10-29 은정님)
+  //   1월 몫 발달재활 원래 수업이 있는 아동 · 형제는 한 장 (집 묶기 FAM) · 보낸 날은 1월 2일로 적음
+  if (t0.getMonth() === 0 && t0.getDate() >= 2 && t0.getDate() <= 8) {
+    const jan = t0.getFullYear() + '-01', d2 = jan + '-02';
+    const kids = new Set();
+    for (let f = 0; ; f += 1000) {
+      const { data: dv, error: dvE } = await sb.from('nl_sessions').select('child_id')
+        .eq('month_key', jan).eq('support_type_id', 2).is('makeup_for', null)
+        .neq('status', '취소').order('id').range(f, f + 999);
+      if (dvE) throw dvE;
+      (dv || []).forEach(x => kids.add(Number(x.child_id)));
+      if (!dv || dv.length < 1000) break;
+    }
+    const cs = await sb.from('nl_sms_sent').select('child_id').eq('kind', '클린센터').eq('on_date', d2);
+    if (cs.error) throw cs.error;
+    (cs.data || []).forEach(x => { SENT['클린센터|' + x.child_id + '|' + d2 + '|'] = true; });
+    const nt = await sb.from('nl_notices').select('title, body').ilike('title', '%클린센터%')
+      .order('id', { ascending: false }).limit(1);
+    CLEAN_NOTICE = (!nt.error && nt.data && nt.data[0]) ? nt.data[0] : null;
+    const fam = {};
+    Array.from(kids).sort((a, b) => a - b).forEach(cid => {
+      if (!KID[cid]) return;
+      const fk = FAM[cid] || ('c' + cid);
+      (fam[fk] = fam[fk] || []).push(cid);
+    });
+    Object.keys(fam).forEach(fk => {
+      const cids = fam[fk], k = KID[cids[0]];
+      out.push({
+        kind: '클린센터', cid: cids[0], name: cids.map(c => KID[c].name || ('아동 ' + c)).join(' · '),
+        on_date: d2, on_time: '', ther: '', phone: k.phone || '', gds: GD[cids[0]] || [],
+        extra: '', mins: 0, meet: '', parking: false
+      });
+    });
+  }
+
   // ⑨ 주차 안내 — 센터에 처음 오는 아동 (2026-10-08 은정님)
   //   첫수업 · 체험 · 평가 · 평가상담(대면) 가운데
   //   그 날 앞에 완료된 수업 · 평가 · 체험 · 대면 상담이 하나도 없는 아동의
@@ -680,7 +725,7 @@ function assignReels() {
   HIST.forEach(h => add(h.cid, h.news));
   ITEMS.forEach(it => {
     it.cands = 0;
-    if (it.kind === '휴무전날') { it.news = null; return; }
+    if (it.kind === '휴무전날' || it.kind === '클린센터') { it.news = null; return; }
     if (isSent(it)) {
       const ks = it.kind === '휴무' ? it.dates.map(d => dayKey(it.cid, d)) : [sentKey(it)];
       it.news = ks.map(k => SENTNEWS[k]).find(Boolean) || null; return;
@@ -711,7 +756,7 @@ function showLines(it) {
 
 // ── 그리기 ───────────────────────────────────────
 function reelLine(it, i, done) {
-  if (!REELS.length || it.kind === '휴무전날') return '';
+  if (!REELS.length || it.kind === '휴무전날' || it.kind === '클린센터') return '';
   const r = it.news ? REEL[it.news] : null;
   if (!r) return '<div class="reel">' + (done ? '교육 자료 없이 보냄' : '보낼 교육 자료 없음 (이 집은 릴스 · 블로그를 모두 받았습니다)') + '</div>';
   return '<div class="reel">' + reelName(r) + ': <b>「' + esc(r.title || '') + '」</b>'
