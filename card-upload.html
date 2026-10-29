@@ -918,11 +918,11 @@ $('ckGo').onclick = async () => {
     // 미결제 복사 — 아동과 이어진 누락 줄만 · 4만원 = 1회
     const cm = miss.filter(x => x.id).map(x => ({ nm: x.name || (x.id + '번'), thr: x.thr || '담당 없음',
       done: Math.floor(x.got / 40000), un: Math.ceil(-x.diff / 40000) }))
-      .sort((a, b) => a.thr.localeCompare(b.thr, 'ko') || a.nm.localeCompare(b.nm, 'ko'));
+      .sort((a, b) => a.nm.localeCompare(b.nm, 'ko'));
     if (cm.length) {
       CK_COPY = '[' + Number(mk.slice(5,7)) + '월 ' + kind + ' 미결제 ' + cm.length + '명]\n'
-        + '아동명 / 완료 회수 / 미결제 회수 / 담당 치료사\n'
-        + cm.map(r => r.nm + ' / ' + r.done + '회 / ' + r.un + '회 / ' + (r.thr === '담당 없음' ? r.thr : r.thr + ' 선생님')).join('\n');
+        + '아동명 / 완료 회수 / 미결제 회수\n'
+        + cm.map(r => r.nm + ' / ' + r.done + '회 / ' + r.un + '회').join('\n');
       $('ckCopy').style.display = 'inline-block';
     }
   } catch (e) {
