@@ -70,6 +70,7 @@
   .tpl-t { font-weight:600; font-size:14.5px; }
   .tpl-p { white-space:pre-wrap; color:var(--ink2); font-size:13px; line-height:1.6; margin-top:6px;
     max-height:4.8em; overflow:hidden; }
+  .tpl-p.open { max-height:none; }   /* 「전체 보기」 (2026-10-29) */
   .tpl-on { font-size:11.5px; padding:1px 8px; border-radius:9px; background:#FBEAF0; color:#993556; margin-left:6px; }
   .done-btn { background:#EAF3DE !important; border-color:#97C459 !important; color:#27500A !important; }
   .k-공휴수업 { background:#FBE4DE; color:#993C1D; }
@@ -951,6 +952,7 @@ async function loadTpl() {
   TPL_ERR = error ? error.message : '';
   TPL = data || [];
 }
+const TPL_OPEN = new Set();   // 펼쳐 둔 보관 문자 (2026-10-29)
 function tplSnap() {
   if (!TPL_ED || !$('tplT')) return '';
   return [$('tplT').value, $('tplB').value, $('tplR').checked].join('\u0001');
@@ -995,8 +997,10 @@ function drawTpl() {
     if (TPL_ED && TPL_ED.id === t.id) return;
     html += '<div class="card">'
       + '<div><span class="tpl-t">' + esc(t.title) + '</span>' + (t.add_reel ? '<span class="tpl-on">+ 릴스</span>' : '') + '</div>'
-      + '<div class="tpl-p">' + esc(t.body) + '</div>'
+      + '<div class="tpl-p' + (TPL_OPEN.has(t.id) ? ' open' : '') + '">' + esc(t.body) + '</div>'
       + '<div class="rb">'
+      +   (String(t.body || '').split('\n').length > 3 || String(t.body || '').length > 120
+            ? '<button type="button" data-topen="' + t.id + '">' + (TPL_OPEN.has(t.id) ? '접기' : '전체 보기') + '</button>' : '')
       +   '<button type="button" class="cp" data-tcp="' + t.id + '">복사</button>'
       +   '<button type="button" data-ted="' + t.id + '">고치기</button>'
       +   '<button type="button" data-tdel="' + t.id + '" style="color:#c62828;">지우기</button>'
@@ -1029,6 +1033,13 @@ function drawTpl() {
     if (!tplLeaveOk()) return;
     const t = TPL.find(x => x.id === Number(b.dataset.ted)); if (!t) return;
     TPL_ED = Object.assign({}, t, { _orig: [t.title, t.body, !!t.add_reel].join('\u0001') }); drawTpl();
+  });
+  $('list').querySelectorAll('[data-topen]').forEach(b => b.onclick = () => {
+    const id = Number(b.dataset.topen);
+    const p = b.closest('.card') ? b.closest('.card').querySelector('.tpl-p') : null;
+    if (TPL_OPEN.has(id)) TPL_OPEN.delete(id); else TPL_OPEN.add(id);
+    if (p) p.classList.toggle('open', TPL_OPEN.has(id));
+    b.textContent = TPL_OPEN.has(id) ? '접기' : '전체 보기';
   });
   $('list').querySelectorAll('[data-tdel]').forEach(b => b.onclick = () => tplDel(Number(b.dataset.tdel)));
   $('list').querySelectorAll('[data-tup]').forEach(b => b.onclick = () => tplMove(Number(b.dataset.tup), -1));
