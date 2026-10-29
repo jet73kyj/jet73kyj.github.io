@@ -7916,51 +7916,52 @@ async function pickMnKid(kid){
 
 // 그 달에서 담당 치료사가 비는 자리 찾기 (보강 잡기와 같은 방식)
 let MN_FREE_TXT = '';
-$('mnFind').onclick = () => {
+$('mnFind').onclick = async () => {
   if (!mnKey) return;
   const th = mnKey.th;
+  // 빈 자리 셈은 서버 한 곳(nl_th_slots → nl_slots_core) — 보강 잡기 창 · 연결시간 찾기와 같은 규칙 (2026-10-29)
+  //   출근 요일 · 시각 · 휴무 · 시간 막음 · 평가 상담 · 평가 · 체험 · 다른 수업을 서버가 거른다
+  //   기한 — 날짜 칸의 범위(발추 몫이면 몫인 달 1일 ~ 다음 달 말일) · 없으면 보는 달 · 오늘부터
   const base = $('mn_date').value || (mon + '-01');
-  const pmn = String(mon).split('-');
-  const y = Number(pmn[0]), m = Number(pmn[1]);
-
-  const cand = [];
-  const d = new Date(y, m - 1, 1);
-  while (d.getMonth() === m - 1) {
-    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')
-              + '-' + String(d.getDate()).padStart(2,'0');
-    const dw = WDS[d.getDay()];
-    if (dw !== '일' && !OFF.has(key) && !OFF.has(key + '#' + th)) {
-      SLOTS.forEach(sl => {
-        const isSat = (dw === '토');
-        if (!isSat && sl.no === LUNCH_NO) return;
-        const busy = ROWS.some(r => r.therapist_id === th && r.weekday === dw
-                       && nearest(toMin(r.start_time)).no === sl.no)
-                  || SESS.some(v => v.plan_date === key
-                       && v.therapist_id === th
-                       && v.status !== '결석' && v.status !== '휴무' && v.status !== '쉼'
-                       && nearest(toMin(v.start_time)).no === sl.no)
-                  // 그 아동이 이미 다른 수업을 받는 시각도 뺀다 (2026-09-09)
-                  || (mnKid && SESS.some(v => v.plan_date === key
-                       && Number(v.child_id) === Number(mnKid.id)
-                       && v.status !== '결석' && v.status !== '휴무' && v.status !== '쉼'
-                       && nearest(toMin(v.start_time)).no === sl.no));
-        if (!busy) cand.push({ date:key, dw:dw, slot:sl,
-                     gap: Math.abs(new Date(key) - new Date(base)) });
-      });
-    }
-    d.setDate(d.getDate() + 1);
+  const t0 = todayKr();
+  let from = $('mn_date').min || (mon + '-01');
+  const last = $('mn_date').max || monEnd(mon);
+  if (from < t0) from = t0;
+  if (from > last) { $('mnFree').innerHTML = '<div class="freenone">찾을 수 있는 날이 지났습니다.</div>'; return; }
+  $('mnFree').innerHTML = '<div class="freenone" style="color:#666;">찾는 중…</div>';
+  const [rs, rk] = await Promise.all([
+    sb.rpc('nl_th_slots', { p_th: Number(th), p_from: from, p_last: last }),
+    // 그 아동이 이미 다른 수업을 받는 시각도 뺀다 (2026-09-09)
+    mnKid ? sb.from('nl_sessions').select('plan_date, start_time, minutes, status')
+      .eq('child_id', mnKid.id).gte('plan_date', from).lte('plan_date', last)
+      .in('status', ['예정', '완료', '보강']) : Promise.resolve({ data: [] })
+  ]);
+  if (rs.error || rk.error) {
+    $('mnFree').innerHTML = '<div class="freenone">빈 자리를 받지 못했습니다 · ' + esc((rs.error || rk.error).message) + '</div>';
+    return;
   }
-  cand.sort((a,b) => a.gap - b.gap);
+  const mine = rk.data || [];
+  const cand = [];
+  (rs.data || []).forEach(x => {
+    const dd = String(x.slot_date).slice(0, 10), hm = String(x.slot_time).slice(0, 5), st = toMin(hm);
+    if (mine.some(v => v.plan_date === dd && v.start_time
+        && toMin(String(v.start_time).slice(0, 5)) < st + 40
+        && st < toMin(String(v.start_time).slice(0, 5)) + (Number(v.minutes) || 40))) return;
+    cand.push({ date: dd, dw: wdOf(dd), hm: hm, slot: nearest(st),
+                gap: Math.abs(new Date(dd) - new Date(base)) });
+  });
+  cand.sort((a, b) => a.gap - b.gap || a.hm.localeCompare(b.hm));
   const top = cand.slice(0, 12);
 
   if (!top.length) {
-    $('mnFree').innerHTML = '<div class="freenone">이 달에 빈 자리가 없습니다.</div>';
+    $('mnFree').innerHTML = '<div class="freenone">' + dLbl(last) + '까지 빈 자리가 없습니다. '
+      + '🏖 휴무 관리 → 「나오는 날」로 자리를 열 수 있습니다.</div>';
     return;
   }
   // 학부모 안내 문구 (2026-10-29) — 화면에 보인 자리 그대로 · 날짜마다 한 줄
   { const byD = {}, ord = [];
-    top.slice().sort((a, b) => (a.date + slotHm(a.slot, th, a.dw)).localeCompare(b.date + slotHm(b.slot, th, b.dw)))
-      .forEach(c => { if (!byD[c.date]) { byD[c.date] = []; ord.push(c.date); } byD[c.date].push(apm12(slotHm(c.slot, th, c.dw))); });
+    top.slice().sort((a, b) => (a.date + a.hm).localeCompare(b.date + b.hm))
+      .forEach(c => { if (!byD[c.date]) { byD[c.date] = []; ord.push(c.date); } byD[c.date].push(apm12(c.hm)); });
     const isX8 = String($('mn_sp').value) === '8';
     const mm = monNo(PLAN_MK || mon);
     MN_FREE_TXT = '안녕하세요^^\n자라는 나무 입니다\n\n'
@@ -7974,7 +7975,7 @@ $('mnFind').onclick = () => {
     + '<span id="mnFreeMsg" style="font-size:12.5px;"></span></div>'
     + top.map(c =>
     '<span class="freeone" data-d="'+c.date+'" data-s="'+c.slot.no+'">'
-    + dayNo(c.date) + '일(' + c.dw + ') ' + slotHm12(c.slot, th, c.dw) + '</span>').join('');
+    + dLbl(c.date) + ' ' + h12(c.hm) + '</span>').join('');
   $('mnFreeCopy').onclick = () => copyTxt(MN_FREE_TXT, $('mnFreeMsg'));
   $('mnFree').querySelectorAll('.freeone').forEach(el => {
     el.onclick = () => {
