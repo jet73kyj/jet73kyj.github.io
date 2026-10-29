@@ -2276,7 +2276,8 @@ function drawKid(c) {
       + (xlStale ? staleHtml('추가 수업', Number(xv.amount)) : '');
     if (xlStale) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
   }
-  if (!fixed) b += '<button type="button" class="xladd" data-xladd="' + c.id + '">＋ 1회 수업 추가</button>';
+  // 확정한 아동에게도 단추를 둔다 — 누르면 예정으로 돌린 뒤 넣는다 (2026-10-29 은정님 · 62번)
+  b += '<button type="button" class="xladd" data-xladd="' + c.id + '">＋ 1회 수업 추가</button>';
 
   // 리뷰 차감 — 수업 없이 평가만 받는 아동에게도 보인다 (2026-09-16)
   {
@@ -3632,7 +3633,7 @@ function openGrade(cid) {
 $('kids').addEventListener('click', e => {
   // 추가 수업 (2026-09-30)
   const xa = e.target.closest ? e.target.closest('[data-xladd]') : null;
-  if (xa) { openExtra(Number(xa.dataset.xladd)); return; }
+  if (xa) { addExtraTap(Number(xa.dataset.xladd)); return; }
   const xd = e.target.closest ? e.target.closest('[data-xldel]') : null;
   if (xd) { delExtra(Number(xd.dataset.xldel), xd); return; }
   // 날짜 단추 (2026-09-11)
@@ -3866,6 +3867,20 @@ function xlFee(tid, dur) {
   const f = FEES[tid];
   if (!f) return 0;
   return Number(dur === 60 ? f.fee_60 : dur === 50 ? f.fee_50 : f.fee_40) || 0;
+}
+// 확정한 달이면 — 묻고 예정으로 돌린 뒤 창을 연다 (확정 = 금액 확정이므로)
+async function addExtraTap(childId) {
+  if (isFixed(childId)) {
+    if (!confirm(Number(String(LOADED_MK).slice(5, 7)) + '월 교육비가 「확정」되어 있습니다.\n\n'
+        + '추가 수업을 넣으면 금액이 바뀌므로 「예정」으로 돌린 뒤 넣습니다.\n'
+        + '넣고 나서 「예정」 딱지를 눌러 다시 확정해 주세요. (학부모께 확정 알림이 다시 갑니다)\n\n'
+        + '예정으로 돌릴까요?')) return;
+    const fb = document.querySelector('.kid[data-child="' + childId + '"] .kfix');
+    if (!fb) { alert('예정 · 확정 딱지를 찾지 못했습니다. 새로고침(F5) 뒤 다시 눌러 주세요.'); return; }
+    await toggleFix(childId, fb);
+    if (isFixed(childId)) return;   // 돌리지 못함 — toggleFix 가 알렸음
+  }
+  openExtra(childId);
 }
 function openExtra(childId) {
   const ch = CHANGED[childId];
