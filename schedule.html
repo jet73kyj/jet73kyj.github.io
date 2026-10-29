@@ -7529,9 +7529,22 @@ function dayAdd(s, n){
 const ED_DURS = [40, 50, 60];
 function edHm(n){ return String(Math.floor(n / 60)).padStart(2,'0') + ':' + String(n % 60).padStart(2,'0'); }
 // 두 창(수정 · 수업 넣기)이 함께 쓴다
+// 고르는 시각의 끝 — 7:40 과 선생님 「마지막 수업」 중 늦은 쪽 (2026-10-29 · 22번 8:10)
+//   마지막 수업은 수수료 정산 → 「출근 요일과 수업 시각」에서 적는다 (nl_therapist_days)
+function lastStartMin(){
+  let m = 19 * 60 + 40;
+  Object.keys(THDAYS || {}).forEach(function(th){
+    Object.keys(THDAYS[th] || {}).forEach(function(wd){
+      const r = THDAYS[th][wd];
+      const x = (r && r.works && r.l) ? toMin(String(r.l).slice(0, 5)) : null;
+      if (x != null && x > m) m = x;
+    });
+  });
+  return Math.min(m, 21 * 60 + 50);
+}
 function tmFillStart(id, cur){
   const opts = [];
-  for (let n = 9 * 60; n <= 19 * 60 + 40; n += 10) opts.push(edHm(n));
+  for (let n = 9 * 60; n <= lastStartMin(); n += 10) opts.push(edHm(n));
   if (cur && opts.indexOf(cur) < 0) { opts.push(cur); opts.sort(); }
   $(id).innerHTML = opts.map(function(v){
     return '<option value="' + v + '">' + h12(v) + '</option>'; }).join('');
@@ -7549,7 +7562,7 @@ function tmFillEnd(idS, idE, dur){
 $('ad_t1').addEventListener('change', function(){ tmFillEnd('ad_t1', 'ad_t2', Number($('ad_t2').value) || 40); });
 function edFillStart(cur){
   const opts = [];
-  for (let n = 9 * 60; n <= 19 * 60 + 40; n += 10) opts.push(edHm(n));
+  for (let n = 9 * 60; n <= lastStartMin(); n += 10) opts.push(edHm(n));
   if (cur && opts.indexOf(cur) < 0) { opts.push(cur); opts.sort(); }   // 10분 단위가 아닌 옛 시각도 그대로 보이게
   $('ed_t1').innerHTML = opts.map(function(v){
     return '<option value="' + v + '">' + h12(v) + '</option>'; }).join('');
