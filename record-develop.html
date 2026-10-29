@@ -1192,7 +1192,7 @@ function _pairVouchers() {
     rows.push({ i, tr });
   });
   const req = ++PAIR_REQ;
-  sb.rpc('nl_dev_pair_core', { p_month: mk, p_rows: inp }).then(({ data, error }) => {
+  return sb.rpc('nl_dev_pair_core', { p_month: mk, p_rows: inp }).then(({ data, error }) => {
     if (req !== PAIR_REQ) return;
     if (Number($('pChild').value) !== cid || mkNow() !== mk) return;   // 그 사이 다른 아동 · 달
     if (error) { console.warn('결제 짝 받기 실패', error); return; }
@@ -2966,6 +2966,11 @@ async function saveRecord() {
   if (!LOADED || !childId) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
   const mk = mkNow();
   const wd = ($('s1_writeDate').value || '').replace(/\./g,'-').replace(/-(\d)(?!\d)/g,'-0$1');
+
+  // 저장 직전에 결제 짝을 지금 적힌 제공일자로 다시 맞춘다 (2026-10-29 · 85번 10월)
+  //   전에는 기록지를 열 때만 짝을 맞춰, 그 뒤 제공일자를 고치고 저장하면
+  //   승인일자 · 승인번호가 옛 날짜 자리에 남아 22일 · 24일 짝이 서로 바뀐 채 저장됐다
+  try { await _pairVouchers(); } catch (e) {}
 
   SAVING = true;
   setSaveBtn('saving');
