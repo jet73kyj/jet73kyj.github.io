@@ -9465,6 +9465,46 @@ function fillMkSlots(){
 }
 if ($('mk_date')) $('mk_date').addEventListener('change', fillMkSlots);
 
+// 빈자리 찾기 → 학부모 안내 문구 (2026-10-29 은정님)
+//   결석한 날 + 그 결석의 보강 가능한 날짜 · 시각 (서버 nl_mk_slots 결과 그대로 · 날짜마다 한 줄)
+let MK_FREE_TXT = '';
+function apm12(v) {
+  const p = String(v || '').slice(0, 5).split(':');
+  const h = Number(p[0]);
+  return (h < 12 ? '오전 ' : '오후 ') + h12(v);
+}
+function mdLbl(d) {
+  const x = new Date(String(d).slice(0, 10) + 'T00:00:00');
+  return (x.getMonth() + 1) + '월 ' + x.getDate() + '일(' + WDS[x.getDay()] + ')';
+}
+function mkFreeText(s, list, thId) {
+  const row = (ROWS_ALL || []).find(x => x.id === s.schedule_id);
+  const tt = row ? (TTNAME[row._tt] || TTYPE[row._tt] || '') : '';
+  const why = s.status === '결석' ? '결석' : '휴무';
+  const byD = {}, ord = [];
+  list.forEach(c => {
+    const d = String(c.slot_date).slice(0, 10);
+    if (!byD[d]) { byD[d] = []; ord.push(d); }
+    byD[d].push(apm12(c.slot_time));
+  });
+  return '안녕하세요^^\n자라는 나무 입니다\n\n'
+    + (s._name || '') + ' 아동 ' + mdLbl(s.plan_date) + ' ' + apm12(s.start_time)
+    + (tt ? ' ' + tt : '') + ' 수업 ' + why + '에 대한\n보강 가능한 일정입니다.\n\n'
+    + ord.map(d => '· ' + mdLbl(d) + ' ' + byD[d].join(', ')).join('\n')
+    + '\n\n담당 ' + thName(thId) + ' 선생님\n'
+    + '원하시는 시간을 알려 주시면 보강 일정을 잡아 드릴게요.\n042-488-6011';
+}
+function mkFreeCopy() { copyTxt(MK_FREE_TXT, $('mkFreeMsg')); }
+function copyTxt(txt, m) {
+  if (!txt || !m) return;
+  const ok = () => { m.textContent = '✓ 복사했습니다'; m.style.color = '#2e7d32'; };
+  const no = () => { window.prompt('자동 복사가 막혔습니다. Ctrl+C 로 복사해 주세요.', txt); };
+  try {
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(ok, no);
+    else no();
+  } catch (e) { no(); }
+}
+
 // 빈자리 찾기 — 서버 한 곳(nl_mk_slots)에서 받는다 (원칙 6)
 //   원래 선생님(원칙 5) · 그 아동 · 기한(원칙 3)은 서버가 그 줄에서 정한다
 $('mkFind').onclick = async () => {
@@ -9485,9 +9525,15 @@ $('mkFind').onclick = async () => {
       + '🏖 휴무 관리 → 「나오는 날」로 자리를 열 수 있습니다.</div>';
     return;
   }
-  $('mkFree').innerHTML = list.slice(0, 60).map(c =>
+  MK_FREE_TXT = mkFreeText(s, list.slice(0, 60), thPick);
+  $('mkFree').innerHTML = '<div style="flex-basis:100%;display:flex;gap:8px;align-items:center;margin-bottom:2px;">'
+    + '<button type="button" id="mkFreeCopy" class="pbtn" style="width:auto;margin:0;padding:6px 12px;'
+    + 'background:#fff;color:#2c5980;border:1px solid #c3d9ea;">학부모 안내 문구 복사</button>'
+    + '<span id="mkFreeMsg" style="font-size:12.5px;"></span></div>'
+    + list.slice(0, 60).map(c =>
     '<span class="freeone" data-d="' + c.slot_date + '" data-t="' + String(c.slot_time).slice(0, 5) + '">'
     + dLbl(c.slot_date) + ' ' + h12(c.slot_time) + '</span>').join('');
+  $('mkFreeCopy').onclick = () => mkFreeCopy();
   $('mkFree').querySelectorAll('.freeone').forEach(el => {
     el.onclick = () => {
       const d = el.dataset.d, t = el.dataset.t;
@@ -11078,6 +11124,7 @@ $('albg').onclick = ev => { if (ev.target === $('albg')) $('albg').style.display
 //   (결석 · 쉼 · 휴무 · 취소 줄은 안 막음 · 공휴일 · 휴가 · 출근 밖 · 시간 막음 · 상담 · 평가 · 체험은 막음)
 //   지난 날은 안 봄 (오늘은 지금 시각 뒤만) · 자라는나무 링크 th_slots 와 같은 짜임
 let PAIR_BUSY = false;
+let PAIR_TXT = '';
 async function pairFind(){
   if (PAIR_BUSY) return;
   const picked = (THPICK && THPICK.size)
@@ -11124,8 +11171,10 @@ async function pairFind(){
     const isFree = (dd, thId, s, w) => FREE[Number(thId)].has(dd + '#' + slotHm(s, thId, w));
 
     let html = '', found = 0;
+    const txtDays = [];   // 학부모 안내 문구 (2026-10-29)
     dates.forEach(dd => {
       const w = wdOf(dd);
+      const txtRows = [];
       // 그 요일에 실제로 있는 교시만 (평일은 점심 5교시 뺌)
       const slots = SLOTS.filter(s => slotOnWd(s, w) && !(w !== '토' && s.no === LUNCH_NO));
       let rows = '';
@@ -11148,18 +11197,30 @@ async function pairFind(){
               + '<b>' + h12(slotHm(s2, b.id, w)) + '</b>' + k2
               + ' ' + b.id + '번 ' + esc(b.name || '')
               + '</div>';
+            txtRows.push('· ' + apm12(slotHm(s1, a.id, w)) + (kind[a.id] ? ' ' + kind[a.id] : '')
+              + ' ' + (a.name || '') + ' 선생님 → ' + apm12(slotHm(s2, b.id, w))
+              + (kind[b.id] ? ' ' + kind[b.id] : '') + ' ' + (b.name || '') + ' 선생님');
             found++;
           });
         });
       }
+      if (txtRows.length) txtDays.push(mdLbl(dd) + '\n' + txtRows.join('\n'));
       if (rows)
         html += '<div style="margin:10px 0 4px;font-weight:700;color:#2c5c37">'
           + Number(String(dd).slice(5,7)) + '월 ' + dayNo(dd) + '일 (' + w + ')</div>' + rows;
     });
 
-    body.innerHTML = '<div style="color:#666;margin-bottom:6px">'
+    PAIR_TXT = '안녕하세요^^\n자라는 나무 입니다\n\n연달아 수업 가능한 일정입니다.\n\n'
+      + txtDays.join('\n\n')
+      + '\n\n원하시는 시간을 알려 주시면 일정을 잡아 드릴게요.\n042-488-6011';
+    body.innerHTML = (found ? '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">'
+        + '<button type="button" id="pairCopy" style="border:1px solid #c3d9ea;background:#fff;color:#2c5980;'
+        + 'border-radius:8px;padding:6px 12px;cursor:pointer;width:auto;margin:0;">학부모 안내 문구 복사</button>'
+        + '<span id="pairCopyMsg" style="font-size:12.5px;"></span></div>' : '')
+      + '<div style="color:#666;margin-bottom:6px">'
       + range + (all[0] < t0 ? ' (오늘부터)' : '') + ' · 고른 치료사 ' + picked.length + '명 · 찾은 자리 ' + found + '개</div>'
       + (found ? html : '<div style="color:#a33;padding:8px 0">잇달아 비는 자리가 없습니다.</div>');
+    if (found) $('pairCopy').onclick = () => copyTxt(PAIR_TXT, $('pairCopyMsg'));
   } catch (e) {
     body.innerHTML = '<div style="color:#a33;padding:8px 0">서버에 닿지 못했습니다. 다시 눌러 주세요</div>';
   } finally { PAIR_BUSY = false; }
