@@ -241,6 +241,8 @@ const $  = id => document.getElementById(id);
 
 const SESSIONS = 4;          // 센터비용 = 월 4회
 const SUPPORT  = 1;          // 센터비용
+const SUPS     = [1, 5];     // 센터비용 + 방과후활동(5) — 방과후도 센터 서식으로 쓴다 (2026-10-30 은정님)
+function supNow() { return (cur && cur.support) || SUPPORT; }
 const TTYPE = { 1:'언어치료', 2:'작업치료', 3:'전산화인지치료',
                 4:'감각통합치료', 5:'음악치료', 6:'일상자립' };
 
@@ -327,6 +329,7 @@ function drawKidList() {
         const tn = p.ths.map(v => THERAPISTS[v] || '').filter(v => v).join('·');
         return '<option value="' + i + '" data-cid="' + p.child.id + '"'
              + ' data-th="' + p.therapy_id + '">' + esc(p.child.name)
+             + (p.support === 5 ? ' · [방과후]' : '')
              + (tt ? ' · ' + esc(tt) : '')
              + (wd ? ' · ' + esc(wd) : '')
              + ((_isAllView(ME.role) && tn) ? ' · ' + esc(tn) : '')
@@ -367,8 +370,8 @@ async function afterLogin(user) {
   const [th, tp, ot] = await Promise.all([
     sb.from('nl_therapists').select('id, name'),
     sb.from('nl_therapies')
-      .select('id, child_id, therapy_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status), nl_therapy_schedules(weekday, start_time, therapist_id, duration, to_month)')
-      .eq('support_type_id', SUPPORT),
+      .select('id, child_id, support_type_id, therapy_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status), nl_therapy_schedules(weekday, start_time, therapist_id, duration, to_month)')
+      .in('support_type_id', SUPS),
     // 발달재활·치료지원·방과후 치료지원 수업 — 누가 맡았는지까지 본다
     sb.from('nl_therapies').select('child_id, ended_on, nl_therapy_schedules(therapist_id, to_month)')
       .in('support_type_id', [2,3,4,6,7])
@@ -423,12 +426,12 @@ async function buildPairs() {
       }
     });
     (data || []).forEach(r => {
-      if (Number(r.support_type_id) !== SUPPORT) return;
+      if (SUPS.indexOf(Number(r.support_type_id)) < 0) return;
       const c = KIDS[r.child_id];
       if (!c) return;
       const g = byKid[r.therapy_id] = byKid[r.therapy_id] || {
         child: c, therapy_id: r.therapy_id, therapy_type_id: r.therapy_type_id,
-        tts: [], sched: [], ths: [] };
+        support: Number(r.support_type_id), tts: [], sched: [], ths: [] };
       if (g.tts.indexOf(r.therapy_type_id) < 0) g.tts.push(r.therapy_type_id);
       g.sched.push({ weekday: r.weekday, start_time: r.start_time,
                      therapist_id: r.therapist_id, duration: r.duration });
@@ -463,7 +466,7 @@ async function buildPairs() {
       if (mineOnly && !sc.some(x => String(x.therapist_id) === String(ME.id))) return;
       const g = byKid[r.id] = byKid[r.id] || {
         child: c, therapy_id: r.id, therapy_type_id: r.therapy_type_id,
-        tts: [], sched: [], ths: [] };
+        support: Number(r.support_type_id), tts: [], sched: [], ths: [] };
       if (g.tts.indexOf(r.therapy_type_id) < 0) g.tts.push(r.therapy_type_id);
       sc.forEach(s => {
         g.sched.push(s);
@@ -538,10 +541,10 @@ async function loadOne() {
     if (!scq.error) SCHED = schedInMonth(scq.data || []);
     const [lg, pr] = await Promise.all([
       sb.from('nl_session_logs').select('*')
-        .eq('child_id', cur.child.id).eq('support_type_id', SUPPORT)
+        .eq('child_id', cur.child.id).eq('support_type_id', supNow())
         .eq('therapy_id', cur.therapy_id).eq('month_key', mk).maybeSingle(),
       sb.from('nl_session_logs').select('*')
-        .eq('child_id', cur.child.id).eq('support_type_id', SUPPORT)
+        .eq('child_id', cur.child.id).eq('support_type_id', supNow())
         .eq('therapy_id', cur.therapy_id).lt('month_key', mk)
         .order('month_key', { ascending: false }).limit(1)
     ]);
@@ -665,7 +668,7 @@ async function saveRecord() {
   setSaveBtn('saving');
   try {
     const logRow = {
-      child_id: cur.child.id, support_type_id: SUPPORT,
+      child_id: cur.child.id, support_type_id: supNow(),
       therapy_id: cur.therapy_id, month_key: mk,
       therapist_id: SCHED.length ? SCHED[SCHED.length - 1].therapist_id : null,
       goal_short:     $('f_goal').value  || null,
