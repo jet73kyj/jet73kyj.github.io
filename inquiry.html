@@ -2237,7 +2237,8 @@ function dvAddRow(e) {
     +   '<input class="dv_card" type="text" style="width:140px;" value="'
     +   esc(e && e.card_no || '') + '"></div>'
     + stSeg('dv', e && e.status)
-    + '<button type="button" class="tab dv_rep" style="padding:6px 12px;background:#e3f0fb;'
+    // 평가보고서는 아래 회색 상자 「📎 평가보고서」 하나로 (2026-10-30) — 줄 단추는 숨김
+    + '<button type="button" class="tab dv_rep" style="display:none;padding:6px 12px;background:#e3f0fb;'
     +   'border:1px solid #85b7eb;color:#0c447c;">📎 평가보고서 <span class="dv_repn"></span></button>'
     + '</div></div>';
   $('dvRows').insertAdjacentHTML('beforeend', html);
@@ -2280,7 +2281,7 @@ async function refreshDocs(cid) {
     return;
   }
   const c = await NLDocs.count(cid);
-  $('dvOtherN').textContent = c.other ? c.other : '';
+  $('dvOtherN').textContent = c.total ? c.total : '';
   document.querySelectorAll('#dvRows .dvrow').forEach(b => {
     const n = b.dataset.id ? (c.byEval[Number(b.dataset.id)] || 0) : 0;
     const sp = b.querySelector('.dv_repn');
@@ -2293,8 +2294,9 @@ $('dvOther').onclick = () => {
   const r   = ALL.find(x => x.id === openId);
   const cid = r ? r.child_id : null;
   if (!cid) return;
+  // 센터 · 타기관 한 창 (2026-10-30) — 평가 받은 날이 센터 평가일과 같으면 그 평가에 저절로 이음
   NLDocs.open({
-    cid: cid, kid: cid + '번 ' + kidName(cid), source: '타기관',
+    cid: cid, kid: cid + '번 ' + kidName(cid),
     onChange: () => refreshDocs(cid)
   });
 };

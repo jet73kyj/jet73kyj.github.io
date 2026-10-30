@@ -104,12 +104,13 @@
   // ---------- 개수 세기 (단추에 붙일 숫자) ----------
   // 돌려주는 것: { byEval: {평가번호: 파일수}, other: 타기관 파일수 }
   async function count(cid) {
-    const out = { byEval: {}, other: 0 };
+    const out = { byEval: {}, other: 0, total: 0 };
     if (!SB || !cid) return out;
     const { data, error } = await SB.from('nl_eval_docs')
       .select('eval_id, source').eq('child_id', Number(cid));
     if (error || !data) return out;
     data.forEach(r => {
+      out.total++;
       if (r.source === '타기관') out.other++;
       else if (r.eval_id) out.byEval[r.eval_id] = (out.byEval[r.eval_id] || 0) + 1;
     });
@@ -123,23 +124,27 @@
     close();
     // o.view 가 참이면 누구든 보기만 (기록지 화면에서 부를 때)
     const ED = canUse() && !o.view;
+    // 2026-10-30 — 센터 · 타기관 단추를 하나로 (o.source 가 없으면 「전체」)
+    //   이름은 직접 적고, 「평가 받은 날」이 이 아동의 센터 평가일과 같으면 그 평가에 저절로 잇는다
+    const isAll    = !o.source || o.source === '전체';
     const isCenter = o.source === '센터';
     const wrap = document.createElement('div');
     wrap.id = 'nlDocWrap';
     wrap.innerHTML =
       '<div class="dk">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
-      +   '<div><h3>' + (isCenter ? '평가보고서 (우리 센터)' : '타기관 평가보고서') + '</h3>'
+      +   '<div><h3>' + (isAll ? '평가보고서' : isCenter ? '평가보고서 (우리 센터)' : '타기관 평가보고서') + '</h3>'
       +   '<div class="sub">' + esc(o.kid || (o.cid + '번 아동'))
       +     (isCenter && o.title ? ' · ' + esc(o.title) : '') + '</div></div>'
       +   '<button type="button" data-a="close">닫기</button>'
       + '</div>'
       + (ED
         ? '<div class="up">'
-          + '<div><label>' + (isCenter ? '문서 이름' : '기관·문서 이름') + '</label>'
+          + '<div><label>' + (isAll ? '평가 · 문서 이름' : isCenter ? '문서 이름' : '기관·문서 이름') + '</label>'
           +   '<input type="text" class="t" style="width:230px;" placeholder="'
-          +   (isCenter ? '언어평가 결과보고서' : '○○대학병원 발달평가') + '" value="' + esc(o.title || '') + '"></div>'
+          +   (isAll ? '언어평가 결과보고서' : isCenter ? '언어평가 결과보고서' : '○○대학병원 발달평가') + '" value="' + esc(o.title || '') + '"></div>'
           + '<div><label>평가 받은 날</label><input type="date" class="d" value="' + esc(o.date || '') + '"></div>'
+          + (isAll ? '<div style="flex-basis:100%;font-size:12px;color:#5a6156;">「평가 받은 날」이 우리 센터 평가일과 같으면 그 평가 보고서로 저절로 이어집니다. 다른 기관 보고서는 그 기관에서 평가 받은 날을 적어 주세요.</div>' : '')
           + '<div class="dz">⬆ 여기에 사진·PDF·한글 파일을 끌어다 놓으세요'
           +   '<small>이름과 평가 받은 날이 적혀 있으면 바로 올라갑니다 · 비어 있으면 적을 때까지 기다립니다</small>'
           +   '<small>여러 개를 한꺼번에 놓아도 됩니다 · 눌러서 고를 수도 있습니다</small>'
@@ -165,7 +170,7 @@
     let ROWS = [];
     async function load() {
       let q = SB.from('nl_eval_docs').select('*').eq('child_id', Number(o.cid));
-      q = isCenter ? q.eq('eval_id', Number(o.evalId)) : q.eq('source', '타기관');
+      if (!isAll) q = isCenter ? q.eq('eval_id', Number(o.evalId)) : q.eq('source', '타기관');
       const { data, error } = await q;
       if (error) { say('❌ 목록을 불러오지 못했습니다.\n' + error.message, false); ROWS = []; }
       else ROWS = data || [];
@@ -194,7 +199,9 @@
         const kind = [nImg ? '사진 ' + nImg + '장' : '', nPdf ? 'PDF ' + nPdf + '개' : '',
                       nDoc ? '파일 ' + nDoc + '개' : ''].filter(Boolean).join(' · ');
         return '<div class="grp" data-g="' + gi + '">'
-          + '<div class="gh"><b>' + esc(L[0].title || '(이름 없음)') + ' · ' + md(L[0].doc_date) + ' · ' + kind + '</b>'
+          + '<div class="gh"><b>' + esc(L[0].title || '(이름 없음)') + ' · ' + md(L[0].doc_date) + ' · ' + kind
+          +   (isAll ? ' <span style="font-weight:normal;font-size:12px;color:' + (L[0].eval_id ? '#2e7d32' : '#777') + ';">· '
+          +     (L[0].eval_id ? '센터 평가' : '타기관') + '</span>' : '') + '</b>'
           +   '<button type="button" data-a="all" data-g="' + gi + '">한꺼번에 보기</button>'
           +   (ED ? '<button type="button" class="del" data-a="gdel" data-g="' + gi + '">묶음 지우기</button>' : '')
           + '</div>'
@@ -297,7 +304,7 @@
     const tIn   = wrap.querySelector('.t');
     const dIn   = wrap.querySelector('.d');
     let PENDING = [], BUSY = false;
-    const nameLbl = isCenter ? '문서 이름' : '기관·문서 이름';
+    const nameLbl = isAll ? '평가 · 문서 이름' : isCenter ? '문서 이름' : '기관·문서 이름';
 
     function take(list) {
       if (BUSY) return;
@@ -366,6 +373,25 @@
       let pno = already.reduce((m, r) => Math.max(m, r.page_no || 0), 0);
 
       upBtn.style.display = 'none';
+      // 어느 평가에 이을지 (전체 창) — 같은 이름·날짜 묶음이 있으면 그것을 따르고,
+      //   없으면 이 아동의 같은 날 센터 평가(취소 뺌)를 찾는다. 여럿이면 이름에 평가 종류가 든 것
+      let linkId = isCenter ? Number(o.evalId) : null, linkNm = '';
+      if (isAll) {
+        const same = already.find(r => r.eval_id);
+        if (same) linkId = same.eval_id;
+        else if (already.length) linkId = null;
+        else if (dd) {
+          const [ev, ty] = await Promise.all([
+            SB.from('nl_evaluations').select('id, eval_type_id, status')
+              .eq('child_id', Number(o.cid)).eq('eval_date', dd),
+            SB.from('nl_eval_types').select('id, name')
+          ]);
+          const tn = {}; ((ty && ty.data) || []).forEach(t => { tn[t.id] = t.name; });
+          const L = ((ev && ev.data) || []).filter(e => e.status !== '취소');
+          const hit = L.find(e => tn[e.eval_type_id] && title.indexOf(String(tn[e.eval_type_id]).replace(/평가$/, '')) >= 0) || L[0];
+          if (hit) { linkId = hit.id; linkNm = tn[hit.eval_type_id] || '평가'; }
+        }
+      }
       let okN = 0, fail = [];
       const stamp = Date.now();
       for (let i = 0; i < files.length; i++) {
@@ -379,8 +405,8 @@
         pno++;
         const ins = await SB.from('nl_eval_docs').insert({
           child_id: Number(o.cid),
-          eval_id: isCenter ? Number(o.evalId) : null,
-          source: isCenter ? '센터' : '타기관',
+          eval_id: linkId,
+          source: linkId ? '센터' : '타기관',
           title: title, doc_date: dd,
           file_path: path, file_name: f.name,
           file_size: s.blob.size, page_no: pno,
@@ -396,7 +422,9 @@
       }
       BUSY = false;
       if (dz) dz.classList.remove('busy');
-      say((okN ? '✅ ' + okN + '개를 올렸습니다.' : '')
+      say((okN ? '✅ ' + okN + '개를 올렸습니다.'
+            + (isAll ? (linkId ? (linkNm ? ' (' + md(dd) + ' ' + linkNm + '에 이었습니다)' : ' (센터 평가 보고서)')
+                              : ' (같은 날 센터 평가가 없어 타기관 보고서로 올렸습니다)') : '') : '')
         + (fail.length ? '\n❌ 못 올린 것 ' + fail.length + '개\n' + fail.join('\n') : ''), !fail.length);
       await load();
       if (o.onChange) o.onChange();

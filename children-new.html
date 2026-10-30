@@ -1930,16 +1930,18 @@ async function drawDocs(cid) {
        +   'border-bottom:1px solid #e3ecf5;' + (e.status === '취소' ? 'color:#9a9a9a;' : '') + '">'
        + '<span style="flex:1;">' + esc(e.eval_date || '날짜 없음') + ' · ' + esc(nm)
        +   ' · ' + esc(e.status || '예정') + '</span>'
-       + '<button type="button" data-ev="' + e.id + '" data-t="' + esc(nm + ' 결과보고서') + '"'
-       +   ' data-d="' + esc(e.eval_date || '') + '" style="' + DOCBTN + '">평가보고서 '
-       +   (n || '') + '</button></div>';
+       + (e.status === '취소' ? '' : n
+           ? '<span style="color:#2e7d32;font-weight:600;">보고서 ✓ ' + n + '개</span>'
+           : '<span style="color:#999;">보고서 없음</span>') + '</div>';
   });
   if (!evs.length) h += '<div style="color:#888;padding:4px 0;">우리 센터 평가 기록이 없습니다.</div>';
   box.innerHTML = h;
   // 「타기관 평가보고서」는 「평가보고서」 제목 옆에 둔다 (2026-09-17)
   const oth = $('e_docOther');
+  // 센터 · 타기관 단추를 하나로 (2026-10-30) — 이름은 직접 적고, 평가 받은 날이 센터 평가일과 같으면 그 평가에 이음
   if (oth) oth.innerHTML = '<button type="button" data-other="1" style="' + DOCBTN + '">'
-     + '타기관 평가보고서 ' + (cnt.other || '') + '</button>';
+     + '📎 평가보고서 올리기 · 보기 ' + (cnt.total || '') + '</button>'
+     + (cnt.other ? '<span style="font-size:12px;color:#777;margin-left:6px;">타기관 ' + cnt.other + '개</span>' : '');
 
   box.querySelectorAll('[data-ev]').forEach(b => {
     b.onclick = () => NLDocs.open({
@@ -1949,7 +1951,7 @@ async function drawDocs(cid) {
   });
   const othBtn = oth ? oth.querySelector('[data-other]') : null;
   if (othBtn) othBtn.onclick = () => NLDocs.open({
-    cid: cid, kid: kid, source: '타기관', onChange: () => drawDocs(cid)
+    cid: cid, kid: kid, onChange: () => drawDocs(cid)
   });
 }
 
