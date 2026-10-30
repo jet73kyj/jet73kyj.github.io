@@ -478,8 +478,7 @@
       <div style="display:flex; align-items:flex-start; gap:10px;">
         <div style="flex:1; min-width:0;">
           <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">
-            💬 상담 메모</div>
-          <div style="font-size:12px; color:#8a8f86; margin-bottom:3px;">(초기 상담) <span id="emDate" style="color:#999;"></span></div>
+            💬 상담 메모 <span id="emDate" style="font-weight:normal;color:#aaa;font-size:11.5px;"></span></div>
           <div id="emView" style="font-size:14px; line-height:1.7; white-space:pre-line;"></div>
           <textarea id="e_memo" rows="7" style="display:none; font:inherit; font-size:14px;
             padding:9px 11px; width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
@@ -499,11 +498,10 @@
         <!-- 간단히 (2026-10-30) — 내용 한 줄 + 상담진행목록 체크 · 날짜는 오늘 · 담당은 적은 사람 -->
         <div style="display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
           <input id="cn_text" type="text" maxlength="1000" style="flex:1; min-width:220px; margin:0;"
-            placeholder="예: 방과후 승인여부 확인">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;margin:0;cursor:pointer;white-space:nowrap;">
-            <input id="cn_follow" type="checkbox" style="width:auto;margin:0;"> 상담진행목록에 올리기</label>
+            placeholder="메모 (예: 방과후 승인여부 확인)">
+          <input id="cn_follow" type="checkbox" checked style="display:none;">
           <button type="button" id="cnAdd" class="tab"
-            style="background:#8bc34a;color:#fff;font-weight:bold;padding:7px 14px;">메모 추가</button>
+            style="background:#8bc34a;color:#fff;font-weight:bold;padding:4px 16px;font-size:20px;line-height:1.3;" title="추가 — 상담진행목록에 올라갑니다">＋</button>
         </div>
         <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
       </div>
@@ -1747,9 +1745,9 @@ function md2(d) { if (!d) return ''; const p = String(d).split('-'); return Numb
 $('cn_text').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) $('cnAdd').click(); });
 function cnReset() {
   $('cn_text').value = '';
-  $('cn_follow').checked = false;
+  $('cn_follow').checked = true;   // 메모는 모두 상담진행목록에 올라간다 (2026-10-30)
   delete $('cnAdd').dataset.editId;
-  $('cnAdd').textContent = '메모 추가';
+  $('cnAdd').textContent = '＋';
 }
 
 async function loadNotes(cid) {
@@ -1778,11 +1776,8 @@ function drawNotes() {
     + '<span style="flex:1; min-width:0; color:#1c1f1a; line-height:1.6; white-space:pre-line;">' + esc(n.content) + '</span>'
     + (n.closed_at
         ? '<span style="font-size:12px;color:#5a7a5e;white-space:nowrap;">✓ 종료 ' + md2(String(n.closed_at).slice(0, 10)) + '</span>'
-        : '<label style="display:flex;align-items:center;gap:4px;font-size:12.5px;margin:0;cursor:pointer;white-space:nowrap;color:' + (open ? '#B07A4A' : '#777') + ';">'
-          + '<input type="checkbox" class="cnFol" data-id="' + n.id + '"' + (open ? ' checked' : '') + ' style="width:auto;margin:0;">'
-          + ' 상담진행목록' + (open && n.owner ? ' · ' + esc(n.owner) : '') + '</label>')
-    + '<button type="button" class="tab cnEd" data-id="' + n.id + '" style="padding:2px 8px; font-size:12px;">수정</button>'
-    + '<button type="button" class="tab cnDel" data-id="' + n.id + '" style="padding:2px 8px; font-size:12px; color:#c62828;">지우기</button>'
+        : open ? '<span style="font-size:12px;color:#B07A4A;white-space:nowrap;">진행 중</span>' : '')
+    + '<button type="button" class="cnDel" data-id="' + n.id + '" title="지우기" style="width:auto;margin:0;padding:0 4px;border:none;background:none;color:#bbb;font-size:15px;cursor:pointer;">✕</button>'
     + '</div>';
   }).join('');
 
@@ -1858,14 +1853,13 @@ $('cnAdd').onclick = async () => {
     await loadNotes(edId);
     loadProgress();
     $('cnMsg').style.color = '#2e7d32';
-    $('cnMsg').textContent = (wasEdit ? '✅ 고쳤습니다.' : '✅ 메모를 넣었습니다.')
-      + (follow ? ' 상담진행목록에 올렸습니다.' : '');
+    $('cnMsg').textContent = wasEdit ? '✅ 고쳤습니다.' : '✅ 상담진행목록에 올렸습니다.';
   } catch (e) {
     $('cnMsg').style.color = '#c62828';
     $('cnMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
   } finally {
     $('cnAdd').disabled = false;
-    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = wasEdit ? '고쳐 저장' : '메모 추가';
+    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = wasEdit ? '고쳐 저장' : '＋';
   }
 };
 
