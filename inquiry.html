@@ -672,6 +672,11 @@
         <label for="d_birth">생년월일 <span id="d_age" style="color:#2e7d32;font-weight:700;"></span></label>
         <input id="d_birth" type="date">
       </div>
+      <!-- 연락처 (2026-10-30) — 보기만 · 아동 표 대표 번호 + 보호자 표 번호 · 고치기는 아동 목록에서 -->
+      <div style="grid-column:span 2;">
+        <label>연락처</label>
+        <div id="d_tel" style="padding:8px 2px;font-size:14px;line-height:1.6;"></div>
+      </div>
       <input id="d_area" type="hidden">
       <input id="d_day" type="hidden">
       <input id="d_time" type="hidden">
@@ -1240,6 +1245,7 @@ async function openDetail(id) {
   dkmShow(kk && kk.memo ? kk.memo : '', kk ? kk.memo_at : null);
   const _bd = kk && kk.birth ? String(kk.birth).slice(0, 10) : '';
   $('d_birth').value = _bd; $('d_birth').dataset.orig = _bd; drawDAge();
+  drawDTel(r.child_id, kk);
   dsumShow(kk && kk.eval_summary ? kk.eval_summary : '');
   showBox('msgD', '', true); $('msgD').className = 'out';
 
@@ -3786,6 +3792,32 @@ function drawAge() {
   $('k_age').textContent = t ? '만 ' + t : '';
 }
 // 열기 창 생년월일 나이 (2026-10-14)
+// 열기 창 연락처 (2026-10-30) — 아동 표 대표 번호 + 보호자 표 번호 · 같은 번호는 한 번만
+async function drawDTel(cid, kk) {
+  const box = $('d_tel');
+  if (!box) return;
+  const L = [];
+  const add = (rel, name, ph) => {
+    const d = String(ph || '').replace(/\D/g, '');
+    if (!d || L.some(x => x.d === d)) return;
+    L.push({ d: d, t: [rel, name].filter(Boolean).join(' '), ph: ph });
+  };
+  if (kk && kk.phone) add('', kk.guardian || '', kk.phone);
+  box.innerHTML = '불러오는 중…';
+  try {
+    const { data } = await sb.from('nl_guardians').select('relation, name, phone, is_primary')
+      .eq('child_id', cid).order('is_primary', { ascending: false });
+    (data || []).forEach(g => add(g.relation && g.relation !== '미상' ? g.relation : '', g.name || '', g.phone));
+  } catch (e) {}
+  if (!$('d_tel') || openIdChild() !== cid) return;
+  box.innerHTML = L.length
+    ? L.map(x => '<a href="tel:' + x.d + '" style="color:#1c1f1a;text-decoration:none;margin-right:14px;white-space:nowrap;">'
+        + (x.t ? '<span style="color:#888;font-size:12.5px;">' + esc(x.t) + '</span> ' : '')
+        + '<b>' + esc(x.ph) + '</b></a>').join('')
+    : '<span style="color:#999;">연락처가 없습니다 (아동 목록에서 넣어 주세요)</span>';
+}
+function openIdChild() { const r = ALL.find(x => x.id === openId); return r ? r.child_id : null; }
+
 function drawDAge() {
   const t = ageText($('d_birth').value);
   $('d_age').textContent = t ? '만 ' + t : '';
