@@ -1057,6 +1057,8 @@ async function kidToActive(cid) {
 
 // ===== 오늘 확인할 건 =====
 function drawAlert() {
+  // 「오늘까지 확인할 문의」 상자는 쓰지 않음 (2026-10-30 은정님) — 아래 목록이 최근 고친 차례로 올라온다
+  $('alertBox').style.display = 'none'; return;
   if (MODE !== 'new') { $('alertBox').style.display = 'none'; return; }
   const td = today();
   // 평가중·일정조율중·자리대기 는 날짜와 상관없이 늘 띄운다
@@ -1147,10 +1149,14 @@ function draw() {
     if (r.next_check_date && r.next_check_date <= tdNow) return 1;  // 날짜 지남
     return 2;
   }
+  // 문의 중은 최근에 고친 것(할 일 · 상태를 바꿔 저장한 것)이 위로 (2026-10-30) · 치료 시작 등은 맨 아래
   list.sort(function(a, b) {
-    const d = orderOf(a) - orderOf(b);
-    if (d) return d;
-    return String(b.inquiry_date || '').localeCompare(String(a.inquiry_date || ''));
+    const ga = orderOf(a) === 3 ? 1 : 0, gb = orderOf(b) === 3 ? 1 : 0;
+    if (ga !== gb) return ga - gb;
+    const ua = String(a.updated_at || a.created_at || a.inquiry_date || '');
+    const ub = String(b.updated_at || b.created_at || b.inquiry_date || '');
+    if (ua !== ub) return ub.localeCompare(ua);
+    return b.id - a.id;
   });
 
   const goneN = ALL.filter(r => DONE.indexOf(r.status) >= 0).length;
