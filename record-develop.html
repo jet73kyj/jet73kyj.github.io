@@ -578,6 +578,29 @@ function esc(s) {
 }
 function mkNow() { return year + '-' + String(month).padStart(2,'0'); }
 function thrName(id) { return THERAPISTS[id] || ''; }
+// 일정표 담당재활사 칸 — 직접 고친 이름 (시간표 담당과 다를 때만) · 그 이름의 선생님 번호
+function thNameMan(i) {
+  const el = document.getElementById('s1_therapistName_' + (i + 1));
+  if (!el) return null;
+  const v = String(el.value || '').trim();
+  return v && v !== String(el.dataset.auto || '').trim() ? v : null;
+}
+function thNameId(i) {
+  const v = thNameMan(i);
+  if (!v) return null;
+  const k = Object.keys(THERAPISTS).find(x => THERAPISTS[x] === v);
+  return k ? Number(k) : null;
+}
+// 담당 고를 이름 목록 (칸에 쳐도 되고 골라도 됨)
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('thNameList')) return;
+  const dl = document.createElement('datalist'); dl.id = 'thNameList'; document.body.appendChild(dl);
+});
+function fillThNameList() {
+  let dl = document.getElementById('thNameList');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'thNameList'; document.body.appendChild(dl); }
+  dl.innerHTML = Object.keys(THERAPISTS).map(k => '<option value="' + String(THERAPISTS[k]).replace(/"/g, '&quot;') + '">').join('');
+}
 
 function fmtBirth(b){
   if (!b) return '';
@@ -660,6 +683,7 @@ async function afterLogin(user) {
       .eq('support_type_id', 2)
   ]);
   (th.data || []).forEach(t => THERAPISTS[t.id] = t.name);
+  try { fillThNameList(); } catch (e) {}
 
   CH_RAW = ch.data || [];
   KIDS = {};
@@ -1137,7 +1161,17 @@ function drawAll(saved) {
   for (let i = 1; i <= SESSIONS; i++) {
     // 회차마다 그 회기를 맡은 선생님 (시간표 회기 · 2026-10-02)
     const _sl = SLOTS[i - 1];
-    const el = $('s1_therapistName_' + i); if (el) el.value = (_sl && _sl.th) ? thrName(_sl.th) : (_sl ? tname : '');
+    const el = $('s1_therapistName_' + i);
+    // 저장 때 손으로 고친 담당 이름이 있으면 그것 (state_json.thName · 2026-10-30)
+    const _it = (ITEMS || []).find(x => Number(x.seq_no) === i);
+    const _man = _it && _it.state_json && _it.state_json.thName;
+    if (el) {
+      el.value = _man ? _man : ((_sl && _sl.th) ? thrName(_sl.th) : (_sl ? tname : ''));
+      el.dataset.auto = (_sl && _sl.th) ? thrName(_sl.th) : (_sl ? tname : '');
+      el.setAttribute('list', 'thNameList');
+      el.style.background = _man ? '#fff8d6' : '';
+      el.title = '담당재활사 — 바뀌었으면 직접 고쳐 적으세요 (비우면 시간표 담당)';
+    }
     const tt = $('s1_totalTime_' + i);     if (tt) tt.value = VOUCH_MIN + '분';
     const tc = $('s1_totalCost_' + i);     if (tc) tc.value = UNIT.toLocaleString() + '원';
   }
@@ -3023,7 +3057,7 @@ async function saveRecord() {
         // 화면은 12시간(4:00) — 저장은 1~8시를 오후로 (2026-10-02 · 9월 82회차가 04:00 으로 들어갔던 일)
         start_time: $('s1_startTime_' + (i+1)).value ? _to24($('s1_startTime_' + (i+1)).value) : null,
         end_time:   $('s1_endTime_'   + (i+1)).value ? _to24($('s1_endTime_'   + (i+1)).value) : null,
-        therapist_id: (SLOTS[i] && SLOTS[i].th) || (day ? thOnIso(_ymd(day)) : thOnIso(null)),
+        therapist_id: thNameId(i) || (SLOTS[i] && SLOTS[i].th) || (day ? thOnIso(_ymd(day)) : thOnIso(null)),
         reaction:   tr ? tr.querySelector('.st_result').value : null,
         staff_memo: tr ? tr.querySelector('.st_note').value : null,
         voucher_date: tr ? d2iso(tr.querySelector('.st_apprDate').value) : null,
@@ -3032,7 +3066,8 @@ async function saveRecord() {
                            face:sel(tr,'face'), health:sel(tr,'health'),
                            apprMan: _apprIsMan(i, tr),                   // 승인 칸 직접 고침 (2026-10-06)
                            apprAt: _apprIsMan(i, tr) ? (String(tr.querySelector('.st_apprDate').value || '').trim() || null) : null,
-                           sog: _sogOk(tr) ? tr.dataset.sog : null } : null,   // [소급결제] (2026-10-23)
+                           sog: _sogOk(tr) ? tr.dataset.sog : null,   // [소급결제] (2026-10-23)
+                           thName: thNameMan(i) } : null,              // 담당재활사 직접 고침 (2026-10-30)
         // 결석 · 보강은 시간표에서 관리 — 기록지 회차는 수업한 회만 (2026-10-02)
         status: '출석',
         absent_reason: null,
@@ -3093,7 +3128,8 @@ function setSaveBtn(st) {
                's1_childBirth','s1_mgmtNo','s1_childName2',
                's1_provider','s1_svcProviderName','s1_svcTel','s1_svcCharge',
                's1_costType','s1_costUnit','s1_costCount','s1_costTotal','s1_costSelf','s1_svcDays'];
-  for (let i = 1; i <= 4; i++) ids.push('s1_therapistName_' + i, 's1_totalTime_' + i, 's1_totalCost_' + i);
+  // 담당재활사는 회차마다 직접 고칠 수 있다 (2026-10-30 은정님 — 143번 수업 중 선생님 바뀜)
+  for (let i = 1; i <= 4; i++) ids.push('s1_totalTime_' + i, 's1_totalCost_' + i);
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
