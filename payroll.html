@@ -2056,6 +2056,18 @@ function wdState(k){
   else if (k === 'done') { b.classList.add('done'); b.textContent = '✓ 저장됨'; }
   else b.textContent = '저장 전';
 }
+// 수업 시각 직접 적기 (2026-10-30) — 「1830」 「18:30」 「6:30」 모두 받음 · 1~8시는 오후로 봄
+function wdHm(v) {
+  v = String(v || '').trim().replace(/[.\s]/g, ':');
+  if (!v) return '';
+  let h, m;
+  if (/^\d{1,2}$/.test(v)) { h = Number(v); m = 0; }
+  else if (/^\d{3,4}$/.test(v)) { h = Number(v.slice(0, v.length - 2)); m = Number(v.slice(-2)); }
+  else { const x = v.match(/^(\d{1,2}):(\d{1,2})$/); if (!x) return null; h = Number(x[1]); m = Number(x[2]); }
+  if (h >= 1 && h <= 8) h += 12;
+  if (h > 23 || m > 59) return null;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
 async function drawWorkDays(){
   if (!thId) return;
   wdMsg('');
@@ -2072,8 +2084,8 @@ async function drawWorkDays(){
       + '<td>' + w + '</td>'
       + '<td><label style="font-weight:normal;margin:0;"><input type="checkbox" class="wdOn"'
       + (r.works ? ' checked' : '') + '> 출근</label></td>'
-      + '<td><input type="time" class="wdF" value="' + hm(r.first_hm) + '"' + (r.works ? '' : ' disabled') + '></td>'
-      + '<td><input type="time" class="wdL" value="' + hm(r.last_hm) + '"' + (r.works ? '' : ' disabled') + '></td>'
+      + '<td><input type="text" inputmode="numeric" maxlength="5" placeholder="9:50" class="wdF wdT" value="' + hm(r.first_hm) + '"' + (r.works ? '' : ' disabled') + ' style="width:80px;"></td>'
+      + '<td><input type="text" inputmode="numeric" maxlength="5" placeholder="18:30" class="wdL wdT" value="' + hm(r.last_hm) + '"' + (r.works ? '' : ' disabled') + ' style="width:80px;"></td>'
       + '</tr>';
   }).join('');
   $('wdRows').querySelectorAll('tr').forEach(tr => {
@@ -2084,7 +2096,10 @@ async function drawWorkDays(){
       tr.querySelector('.wdL').disabled = !on.checked;
       wdState('');
     };
-    tr.querySelectorAll('input[type=time]').forEach(x => x.oninput = () => wdState(''));
+    tr.querySelectorAll('.wdT').forEach(x => {
+      x.oninput = () => wdState('');
+      x.onblur  = () => { const v = wdHm(x.value); if (v) x.value = v; x.style.borderColor = (x.value && !v) ? '#c62828' : ''; };
+    });
   });
   wdState('done');
 }
@@ -2094,8 +2109,9 @@ $('wdSave').onclick = async () => {
   let bad = '';
   $('wdRows').querySelectorAll('tr').forEach(tr => {
     const on = tr.querySelector('.wdOn').checked;
-    const f = tr.querySelector('.wdF').value || null;
-    const l = tr.querySelector('.wdL').value || null;
+    const f0 = tr.querySelector('.wdF').value, l0 = tr.querySelector('.wdL').value;
+    const f = wdHm(f0) || null, l = wdHm(l0) || null;
+    if (on && ((f0.trim() && !f) || (l0.trim() && !l))) bad = bad || tr.dataset.wd + '요일 시각을 「18:30」처럼 적어 주세요.';
     if (on && f && l && f > l) bad = tr.dataset.wd + '요일 첫 수업이 마지막 수업보다 늦습니다.';
     rows.push({ therapist_id: thId, weekday: tr.dataset.wd, works: on,
                 first_hm: on ? f : null, last_hm: on ? l : null,
