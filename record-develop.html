@@ -3899,6 +3899,10 @@ function openCalEdit(k, isoPre) {
     _calFire(dt, d.replace(/-/g, '.'));
     _calFire(st, a ? _hm12(a) : '');
     if (en) _calFire(en, b ? _hm12(b) : '');
+    // 날짜를 넣었으면 「포기」 표시는 푼다 — 포기 회차는 달력에 안 그려 시간이 안 보였음 (2026-10-30)
+    const _tr = document.querySelectorAll('#statusTbl tbody tr')[k];
+    const _an = _tr && _tr.querySelector('.st_apprNo');
+    if (_an && String(_an.value || '').trim() === '포기') { _an.value = ''; _an.dispatchEvent(new Event('input', { bubbles: true })); }
     // 이 회차 서비스 종류 · 담당재활사 (2026-10-30)
     const sv = String($('_cpS').value || '').trim();
     if (sv && sv !== _getServiceType()) SVCK[k] = sv; else delete SVCK[k];
