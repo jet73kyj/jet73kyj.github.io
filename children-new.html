@@ -482,21 +482,15 @@
       </div>
     </div>
 
-    <!-- ② 초기 상담 -->
+    <!-- ② 초기 상담 · 상담 메모 (2026-10-30 은정님) -->
+    <!--   초기 상담 = 신규 상담에서 적은 글(아동 표 memo) · 수정만 -->
+    <!--   상담 메모 = 치료 중 상담 · 안내(nl_child_notes) · 줄마다 상담목록이동 · 수정 · ✕ -->
     <div style="background:#fff; border:1px solid #d5dad2; border-radius:10px;
          padding:12px 14px; margin-bottom:12px;">
       <div style="display:flex; align-items:flex-start; gap:10px;">
         <div style="flex:1; min-width:0;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-            <span style="font-size:12.5px; font-weight:700; color:#2c5c37;">💬 상담 메모
-              <span id="emDate" style="font-weight:normal;color:#aaa;font-size:11.5px;"></span></span>
-            <span style="margin-left:auto; display:flex; gap:6px;">
-              <button type="button" id="cnMove" class="tab" style="display:none;padding:4px 11px;font-size:12.5px;"
-                title="위 메모를 아동 목록 맨 위 상담진행목록으로 올립니다">상담목록이동</button>
-              <button type="button" id="cnPlus" class="tab" style="padding:2px 12px;font-size:17px;line-height:1.3;"
-                title="메모 한 줄 더하기">＋</button>
-            </span>
-          </div>
+          <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">📝 초기 상담
+            <span id="emDate" style="font-weight:normal;color:#aaa;font-size:11.5px;"></span></div>
           <div id="emView" style="font-size:14px; line-height:1.7; white-space:pre-line;"></div>
           <textarea id="e_memo" rows="7" style="display:none; font:inherit; font-size:14px;
             padding:9px 11px; width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
@@ -510,21 +504,21 @@
                 style="padding:5px 12px; white-space:nowrap;">✏️ 수정</button>
       </div>
       <div id="emMsg" style="font-size:12.5px; margin-top:6px;"></div>
-      <!-- 날짜별 상담 · 안내 메모 (2026-10-30 · 아래 칸에서 옮김) -->
-      <div>
-        <!-- 메모 줄 목록은 숨김 (2026-10-30 · 맨 위 상담진행목록에서 봄 · 서버 기록은 남음) -->
-        <div id="cnRows" style="display:none; font-size:13px; color:#5a6156;">불러오는 중...</div>
-        <!-- 간단히 (2026-10-30) — 내용 한 줄 + 상담진행목록 체크 · 날짜는 오늘 · 담당은 적은 사람 -->
-        <div id="cnInRow" style="display:none; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;">
+
+      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <span style="font-size:12.5px; font-weight:700; color:#2c5c37;">💬 상담 메모</span>
+          <button type="button" id="cnPlus" class="tab" style="margin-left:auto;padding:2px 12px;font-size:17px;line-height:1.3;"
+            title="상담 메모 한 줄 더하기">＋</button>
+        </div>
+        <div id="cnRows" style="font-size:13.5px; color:#1c1f1a;">불러오는 중...</div>
+        <div id="cnInRow" style="display:none; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
           <input id="cn_text" type="text" maxlength="1000" style="flex:1; min-width:220px; margin:0;"
-            placeholder="메모 (예: 방과후 승인여부 확인)">
-          <input id="cn_follow" type="checkbox" checked style="display:none;">
+            placeholder="상담 메모 (예: 방과후 승인여부 확인)">
           <span class="emAct">
             <button type="button" id="cnPut">넣기</button>
             <button type="button" id="cnPutMv" class="emMv">상담목록이동</button>
           </span>
-          <button type="button" id="cnAdd" class="tab"
-            style="display:none;background:#8bc34a;color:#fff;font-weight:bold;padding:4px 16px;font-size:20px;line-height:1.3;" title="추가 — 상담진행목록에 올라갑니다">＋</button>
         </div>
         <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
       </div>
@@ -1713,8 +1707,8 @@ function tdy() {
 
 function emShow(text, at) {
   const t = (text || '').trim();
-  $('emView').innerHTML = t ? emLinesHtml(t)
-    : '<span style="color:#999;">아직 적은 메모가 없습니다. 「＋」나 「✏️ 수정」을 눌러 적으세요.</span>';
+  $('emView').innerHTML = t ? esc(t)
+    : '<span style="color:#999;">아직 적은 초기 상담이 없습니다. 「✏️ 수정」을 눌러 적으세요.</span>';
   $('emDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
   $('emView').style.display = 'block';
   $('e_memo').style.display = 'none';
@@ -1775,61 +1769,6 @@ async function emSaveText(v) {
   emShow(v, tdy());
   draw();
 }
-$('emView').addEventListener('click', async ev => {
-  const mv = ev.target.closest('.emMv'), ed = ev.target.closest('.emEd');
-  const sv = ev.target.closest('.emLs'), cx = ev.target.closest('.emLx');
-  const lines = emLines($('e_memo').dataset.orig || '');
-  const say = (t, ok) => { $('emMsg').style.color = ok ? '#2e7d32' : '#c62828'; $('emMsg').textContent = t; };
-  if (mv) {
-    const txt = (lines[Number(mv.dataset.i)] || '').trim();
-    if (!txt || mv.disabled) return;
-    mv.disabled = true; mv.textContent = '…';
-    const res = await sb.from('nl_child_notes')
-      .insert({ child_id: edId, staff_id: MEID, note_date: tdy(), content: txt, follow: true, owner: cnOwner() })
-      .select('id');
-    if (res.error || !res.data || !res.data.length) {
-      mv.disabled = false; mv.textContent = '상담목록이동';
-      say('❌ 옮기지 못했습니다: ' + (res.error ? res.error.message : '권한 확인'), false); return;
-    }
-    await loadNotes(edId); loadProgress();
-    say('✅ 상담진행목록에 올렸습니다.', true);
-    return;
-  }
-  if (ed) {
-    const i = Number(ed.dataset.i);
-    const row = ed.closest('.emLine');
-    row.innerHTML = '<input type="text" class="emLi" value="' + esc(lines[i] || '') + '" style="flex:1;min-width:0;margin:0;">'
-      + '<span class="emAct"><button type="button" class="emLs" data-i="' + i + '">저장</button>'
-      + '<button type="button" class="emLx">취소</button></span>';
-    const inp = row.querySelector('.emLi');
-    inp.focus();
-    inp.addEventListener('keydown', e2 => {
-      if (e2.key === 'Enter' && !e2.isComposing) row.querySelector('.emLs').click();
-      if (e2.key === 'Escape') row.querySelector('.emLx').click();
-    });
-    return;
-  }
-  if (cx) { emRedraw(); return; }
-  if (sv) {
-    const i = Number(sv.dataset.i);
-    const row = sv.closest('.emLine');
-    const nv = row.querySelector('.emLi').value.trim();
-    const old = (lines[i] || '').trim();
-    if (nv === old) { emRedraw(); return; }
-    if (nv) lines[i] = nv; else lines.splice(i, 1);
-    sv.disabled = true;
-    try {
-      await emSaveText(lines.join('\n').trim());
-      // 옮겨 둔 진행 중 줄이면 그 글도 함께 고친다
-      const n = NOTES.find(x => x.follow && !x.closed_at && x.content === old);
-      if (n && nv) {
-        await sb.from('nl_child_notes').update({ content: nv, updated_at: new Date().toISOString() }).eq('id', n.id);
-        await loadNotes(edId); loadProgress();
-      }
-      say('✅ 저장했습니다.', true);
-    } catch (e) { sv.disabled = false; say('❌ 저장하지 못했습니다: ' + e.message, false); }
-  }
-});
 
 $('emSave').onclick = async () => {
   if (!edId) return;
@@ -1863,174 +1802,129 @@ let NOTES = [];
 const CN_COLS = 'id, child_id, note_date, content, staff_id, kind, follow, owner, due_on, result, closed_at';
 function cnOwner() { return MEID === 8 ? '원장' : '행정'; }   // 담당 = 적은 사람
 function md2(d) { if (!d) return ''; const p = String(d).split('-'); return Number(p[1]) + '/' + Number(p[2]); }
-$('cn_text').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) cnAppend(); });
-$('cnPut').onclick   = () => cnAppend(false);
-$('cnPutMv').onclick = () => cnAppend(true);
-// 머리 줄 ＋ — 입력 줄을 열고, 적은 것이 있으면 넣는다 · 상담목록이동 — 위 메모를 진행목록으로 (2026-10-30)
+function cnSay(t, ok) { $('cnMsg').style.color = ok ? '#2e7d32' : '#c62828'; $('cnMsg').textContent = t; }
+
+// ＋ — 입력 칸을 연다 · [넣기] 메모만 / [상담목록이동] 메모 + 상담진행목록
 $('cnPlus').onclick = () => {
   const row = $('cnInRow');
-  if (row.style.display === 'none') { row.style.display = 'flex'; $('cn_text').focus(); return; }
-  if ($('cn_text').value.trim()) cnAppend(); else $('cn_text').focus();
+  row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+  if (row.style.display === 'flex') $('cn_text').focus();
 };
-// ＋ 로 적은 줄은 위 상담 메모 글 끝에 한 줄로 붙는다 (2026-10-30) — 옮기기는 그 줄의 [상담목록이동]
 async function cnAppend(alsoMove) {
   const txt = $('cn_text').value.trim();
   if (!edId || cnAppend.busy) return;
-  if (!txt) { $('emMsg').style.color = '#c62828'; $('emMsg').textContent = '내용을 적어 주세요.'; $('cn_text').focus(); return; }
+  if (!txt) { cnSay('내용을 적어 주세요.', false); $('cn_text').focus(); return; }
   cnAppend.busy = true;
   try {
-    const cur = ($('e_memo').dataset.orig || '').trim();
-    await emSaveText(cur ? cur + '\n' + txt : txt);
+    const res = await sb.from('nl_child_notes')
+      .insert({ child_id: edId, staff_id: MEID, note_date: tdy(), content: txt,
+                follow: !!alsoMove, owner: alsoMove ? cnOwner() : null })
+      .select('id');
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) throw new Error('저장된 줄이 없습니다 (권한 확인)');
     $('cn_text').value = '';
     $('cnInRow').style.display = 'none';
-    if (alsoMove === true) {
-      const res = await sb.from('nl_child_notes')
-        .insert({ child_id: edId, staff_id: MEID, note_date: tdy(), content: txt, follow: true, owner: cnOwner() })
-        .select('id');
-      if (res.error || !res.data || !res.data.length)
-        throw new Error('메모에는 넣었으나 상담목록으로 못 옮겼습니다 — 그 줄의 [상담목록이동]을 눌러 주세요');
-      await loadNotes(edId); loadProgress();
-      $('emMsg').style.color = '#2e7d32'; $('emMsg').textContent = '✅ 메모에 넣고 상담진행목록에 올렸습니다.';
-    } else {
-      $('emMsg').style.color = '#2e7d32'; $('emMsg').textContent = '✅ 한 줄 더했습니다.';
-    }
-  } catch (e) {
-    $('emMsg').style.color = '#c62828'; $('emMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
-  } finally { cnAppend.busy = false; }
+    await loadNotes(edId);
+    if (alsoMove) loadProgress();
+    cnSay(alsoMove ? '✅ 상담 메모에 넣고 상담진행목록에 올렸습니다.' : '✅ 상담 메모에 넣었습니다.', true);
+  } catch (e) { cnSay('❌ 저장하지 못했습니다: ' + e.message, false); }
+  finally { cnAppend.busy = false; }
 }
-$('cnMove').onclick = async () => {
-  if (!edId) return;
-  const lines = String($('e_memo').dataset.orig || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-  if (!lines.length) { alert('위 상담 메모가 비어 있습니다. 「✏️ 수정」으로 먼저 적어 주세요.'); return; }
-  const txt = lines[lines.length - 1];
-  if (NOTES.some(n => n.content === txt && n.follow && !n.closed_at)) { alert('이미 상담진행목록에 있습니다.'); return; }
-  if (!confirm('이 줄을 상담진행목록으로 옮길까요?\n\n' + txt)) return;
-  $('cn_text').value = txt;
-  $('cn_follow').checked = true;
-  delete $('cnAdd').dataset.editId;
-  $('cnAdd').click();
-};
-function cnReset() {
-  $('cn_text').value = '';
-  $('cn_follow').checked = true;   // 메모는 모두 상담진행목록에 올라간다 (2026-10-30)
-  delete $('cnAdd').dataset.editId;
-  $('cnAdd').textContent = '＋';
-}
+$('cn_text').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) cnAppend(false); });
+$('cnPut').onclick   = () => cnAppend(false);
+$('cnPutMv').onclick = () => cnAppend(true);
 
 async function loadNotes(cid) {
   if (NOTES.length && NOTES[0].child_id !== cid) NOTES = [];
   $('cnRows').innerHTML = '불러오는 중...';
-  cnReset();
   $('cnMsg').textContent = '';
+  $('cn_text').value = '';
+  $('cnInRow').style.display = 'none';
   const { data, error } = await sb.from('nl_child_notes')
     .select(CN_COLS)
     .eq('child_id', cid)
-    .order('note_date', { ascending: false })
-    .order('id', { ascending: false });
+    .order('note_date', { ascending: true })
+    .order('id', { ascending: true });
   if (error) { $('cnRows').innerHTML = '메모를 불러오지 못했습니다. ' + esc(error.message); return; }
   NOTES = data || [];
   drawNotes();
 }
 
 function drawNotes() {
-  emRedraw();
   if (!NOTES.length) {
-    $('cnRows').innerHTML = '<span style="color:#999;">아직 상담 메모가 없습니다.</span>';
+    $('cnRows').innerHTML = '<span style="color:#999;font-size:13px;">아직 상담 메모가 없습니다. 「＋」를 눌러 적으세요.</span>';
     return;
   }
   $('cnRows').innerHTML = NOTES.map(n => {
-    const open = n.follow && !n.closed_at;
-    return '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #e3ebe1;">'
-    + '<span style="color:#888; min-width:46px; white-space:nowrap; font-size:12.5px;">' + md2(n.note_date) + '</span>'
-    + '<span style="flex:1; min-width:0; color:#1c1f1a; line-height:1.6; white-space:pre-line;">' + esc(n.content) + '</span>'
-    + (n.closed_at
-        ? '<span style="font-size:12px;color:#5a7a5e;white-space:nowrap;">✓ 종료 ' + md2(String(n.closed_at).slice(0, 10)) + '</span>'
-        : open ? '<span style="font-size:12px;color:#B07A4A;white-space:nowrap;">진행 중</span>' : '')
-    + '<button type="button" class="cnDel" data-id="' + n.id + '" title="지우기" style="width:auto;margin:0;padding:0 4px;border:none;background:none;color:#bbb;font-size:15px;cursor:pointer;">✕</button>'
-    + '</div>';
+    const st = n.closed_at ? '<span class="emSt done">✓ 종료</span>'
+             : n.follow ? '<span class="emSt">진행 중</span>'
+             : '<button type="button" class="emMv" data-id="' + n.id + '">상담목록이동</button>';
+    return '<div class="emLine" data-id="' + n.id + '">'
+      + '<span style="color:#999;font-size:12px;min-width:38px;">' + md2(n.note_date) + '</span>'
+      + '<span class="emTx">' + esc(n.content) + '</span>'
+      + '<span class="emAct">' + st
+      + '<button type="button" class="emEd" data-id="' + n.id + '">수정</button>'
+      + '<button type="button" class="cnDel" data-id="' + n.id + '" title="지우기">✕</button></span></div>';
   }).join('');
-
-  $('cnRows').querySelectorAll('.cnFol').forEach(c => c.onchange = async () => {
-    const id = Number(c.dataset.id);
-    const on = c.checked;
-    c.disabled = true;
-    const up = await sb.from('nl_child_notes')
-      .update({ follow: on, owner: on ? cnOwner() : null, updated_at: new Date().toISOString() })
-      .eq('id', id).select('id');
-    if (up.error || !up.data || !up.data.length) {
-      c.checked = !on; c.disabled = false;
-      $('cnMsg').style.color = '#c62828';
-      $('cnMsg').textContent = '❌ 바꾸지 못했습니다: ' + (up.error ? up.error.message : '권한 확인');
-      return;
-    }
-    await loadNotes(edId);
-    loadProgress();
-    $('cnMsg').style.color = '#2e7d32';
-    $('cnMsg').textContent = on ? '✅ 상담진행목록에 올렸습니다.' : '✅ 상담진행목록에서 뺐습니다.';
-  });
-
-  $('cnRows').querySelectorAll('.cnEd').forEach(b => b.onclick = () => {
-    const n = NOTES.find(x => x.id === Number(b.dataset.id));
-    if (!n) return;
-    $('cn_text').value = n.content;
-    $('cn_follow').checked = !!(n.follow && !n.closed_at);
-    $('cnAdd').dataset.editId = String(n.id);
-    $('cnAdd').textContent = '고쳐 저장';
-    $('cn_text').focus();
-  });
-
-  $('cnRows').querySelectorAll('.cnDel').forEach(b => b.onclick = async () => {
-    if (!confirm('이 상담 메모를 지울까요?')) return;
-    const { error } = await sb.from('nl_child_notes').delete().eq('id', Number(b.dataset.id));
-    if (error) { $('cnMsg').style.color = '#c62828';
-                 $('cnMsg').textContent = '❌ 지우지 못했습니다: ' + error.message; return; }
-    await loadNotes(edId);
-    loadProgress();
-    $('cnMsg').style.color = '#2e7d32';
-    $('cnMsg').textContent = '✅ 지웠습니다.';
-  });
 }
 
-$('cnAdd').onclick = async () => {
-  if (!edId || $('cnAdd').disabled) return;
-  const txt = $('cn_text').value.trim();
-  if (!txt) { $('cnMsg').style.color = '#c62828';
-              $('cnMsg').textContent = '내용을 적으세요.'; $('cn_text').focus(); return; }
-  const follow = $('cn_follow').checked;
-  const eid = $('cnAdd').dataset.editId ? Number($('cnAdd').dataset.editId) : null;
-  const row = { content: txt };
-  if (!eid || follow) { row.follow = follow; row.owner = follow ? cnOwner() : null; }
-  if (eid) {
-    const n = NOTES.find(x => x.id === eid);
-    if (n && n.closed_at) { delete row.follow; delete row.owner; }      // 종료한 줄은 체크를 건드리지 않음
-    else if (!follow) { row.follow = false; row.owner = null; }
-  }
-  $('cnAdd').disabled = true;
-  const wasEdit = !!eid;
-  $('cnAdd').textContent = '저장 중...';
-  try {
-    let res;
-    if (eid) {
-      row.updated_at = new Date().toISOString();
-      res = await sb.from('nl_child_notes').update(row).eq('id', eid).select('id');
-    } else {
-      row.child_id = edId; row.staff_id = MEID; row.note_date = tdy();
-      res = await sb.from('nl_child_notes').insert(row).select('id');
+$('cnRows').addEventListener('click', async ev => {
+  const b = ev.target.closest('button[data-id], .emLs, .emLx');
+  if (!b) return;
+  const id = Number(b.dataset.id || (b.closest('.emLine') && b.closest('.emLine').dataset.id));
+  const n = NOTES.find(x => x.id === id);
+  if (!n) return;
+  if (b.classList.contains('emMv')) {
+    if (b.disabled) return;
+    b.disabled = true; b.textContent = '…';
+    const up = await sb.from('nl_child_notes')
+      .update({ follow: true, owner: cnOwner(), updated_at: new Date().toISOString() })
+      .eq('id', id).select('id');
+    if (up.error || !up.data || !up.data.length) {
+      b.disabled = false; b.textContent = '상담목록이동';
+      cnSay('❌ 옮기지 못했습니다: ' + (up.error ? up.error.message : '권한 확인'), false); return;
     }
-    if (res.error) throw res.error;
-    if (!res.data || !res.data.length) throw new Error('저장된 줄이 없습니다 (권한 확인)');
-    await loadNotes(edId);
-    loadProgress();
-    $('cnMsg').style.color = '#2e7d32';
-    $('cnMsg').textContent = wasEdit ? '✅ 고쳤습니다.' : '✅ 상담진행목록에 올렸습니다.';
-  } catch (e) {
-    $('cnMsg').style.color = '#c62828';
-    $('cnMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
-  } finally {
-    $('cnAdd').disabled = false;
-    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = wasEdit ? '고쳐 저장' : '＋';
+    await loadNotes(edId); loadProgress();
+    cnSay('✅ 상담진행목록에 올렸습니다.', true);
+    return;
   }
-};
+  if (b.classList.contains('emEd')) {
+    const row = b.closest('.emLine');
+    row.innerHTML = '<input type="text" class="emLi" maxlength="1000" style="flex:1;min-width:0;margin:0;" value="' + esc(n.content) + '">'
+      + '<span class="emAct"><button type="button" class="emLs">저장</button>'
+      + '<button type="button" class="emLx">취소</button></span>';
+    const inp = row.querySelector('.emLi');
+    inp.focus();
+    inp.addEventListener('keydown', e2 => {
+      if (e2.key === 'Enter' && !e2.isComposing) row.querySelector('.emLs').click();
+      if (e2.key === 'Escape') row.querySelector('.emLx').click();
+    });
+    return;
+  }
+  if (b.classList.contains('emLx')) { drawNotes(); return; }
+  if (b.classList.contains('emLs')) {
+    const nv = b.closest('.emLine').querySelector('.emLi').value.trim();
+    if (!nv) { cnSay('내용을 적어 주세요. 지우려면 ✕를 누르세요.', false); return; }
+    if (nv === n.content) { drawNotes(); return; }
+    b.disabled = true;
+    const up = await sb.from('nl_child_notes')
+      .update({ content: nv, updated_at: new Date().toISOString() }).eq('id', id).select('id');
+    if (up.error || !up.data || !up.data.length) {
+      b.disabled = false; cnSay('❌ 저장하지 못했습니다: ' + (up.error ? up.error.message : '권한 확인'), false); return;
+    }
+    await loadNotes(edId);
+    if (n.follow && !n.closed_at) loadProgress();
+    cnSay('✅ 고쳤습니다.', true);
+    return;
+  }
+  if (b.classList.contains('cnDel')) {
+    if (!confirm('이 상담 메모를 지울까요?')) return;
+    const { error } = await sb.from('nl_child_notes').delete().eq('id', id);
+    if (error) { cnSay('❌ 지우지 못했습니다: ' + error.message, false); return; }
+    await loadNotes(edId); loadProgress();
+    cnSay('✅ 지웠습니다.', true);
+  }
+});
 
 // ── 상담진행목록 (2026-10-30) — 아동 목록 맨 위 · 원장 · 행정 화면만 ──
 //   체크한 상담 메모가 담당(적은 사람)별로 모이고, [종료]를 누르면 사라진다
