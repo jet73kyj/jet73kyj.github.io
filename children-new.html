@@ -189,6 +189,30 @@
   /* 지원 카드번호 상자 — 주황 면 대신 옅은 회백 (2026-09-17) */
   #e_cardView, #e_cards { background:#FAF9F7 !important; border-color:#ECE8E3 !important; }
   /* ===== 꾸밈 B 끝 ===== */
+/* 상담 메모 · 상담진행목록 (2026-10-30) */
+.cnSeg{display:inline-flex;border:1px solid #d5dad2;border-radius:7px;overflow:hidden;}
+.cnSeg button{width:auto!important;margin:0!important;padding:6px 12px!important;border:none!important;border-radius:0!important;background:#fff!important;color:#555!important;font-size:13px!important;font-weight:normal!important;}
+.cnSeg button.on{background:#2c5c37!important;color:#fff!important;font-weight:bold!important;}
+.cnTag{flex:none;font-size:11.5px;padding:1px 7px;border-radius:9px;background:#eef3ec;color:#2c5c37;white-space:nowrap;}
+.cnTag.g{background:#fff4e0;color:#b45309;}
+#cpBox .cpTitle{font-size:15px;font-weight:700;color:#2F2926;margin-bottom:8px;}
+#cpBox .cpGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media (max-width:760px){#cpBox .cpGrid{grid-template-columns:1fr;}}
+#cpBox .cpCol{background:#fff;border:1px solid #ECE8E3;border-left:3px solid #C9A27E;border-radius:10px;padding:10px 12px;}
+#cpBox .cpHead{font-size:13px;font-weight:700;color:#6b5b2e;margin-bottom:6px;}
+#cpBox .cpHead b{color:#B07A4A;margin-left:4px;}
+#cpBox .cpRow{border-top:1px solid #f0ece6;padding:8px 0;}
+#cpBox .cpRow.late .cpDue{color:#c62828;font-weight:bold;}
+#cpBox .cpTop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+#cpBox .cpDue{font-size:12.5px;color:#777;min-width:46px;}
+#cpBox .cpKid{font-weight:600;color:#2F2926;text-decoration:none;}
+#cpBox .cpKid:hover{text-decoration:underline;}
+#cpBox .cpTxt{font-size:13.5px;line-height:1.6;white-space:pre-line;margin:4px 0 6px;}
+#cpBox .cpEnd{display:flex;gap:6px;}
+#cpBox .cpEnd input{flex:1;min-width:0;margin:0!important;padding:6px 9px!important;font-size:13px!important;}
+#cpBox .cpEnd button{width:auto!important;margin:0!important;padding:6px 14px!important;background:#fff!important;color:#B07A4A!important;border:1px solid #C9A27E!important;border-radius:7px!important;font-size:13px!important;font-weight:bold!important;}
+#cpBox .cpNone{color:#aaa;font-size:13px;padding:6px 0;}
+#cpBox .cpErr{color:#c62828;font-size:13px;}
 </style>
 </head>
 <body>
@@ -235,6 +259,9 @@
     <button id="addBtn" class="tab" style="background:#8bc34a;color:#fff;font-weight:bold;">＋ 신규 등록</button>
     <span class="count" id="count"></span>
   </div>
+
+  <!-- 상담진행목록 (2026-10-30) — 원장 · 행정 화면만 -->
+  <div id="cpBox" style="display:none; margin:0 0 14px;"></div>
 
   <!-- 신규 등록 창 -->
   <div id="addBox" class="addbox" style="display:none;">
@@ -451,7 +478,8 @@
       <div style="display:flex; align-items:flex-start; gap:10px;">
         <div style="flex:1; min-width:0;">
           <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">
-            📝 초기 상담 <span id="emDate" style="font-weight:normal;color:#999;"></span></div>
+            💬 상담 메모</div>
+          <div style="font-size:12px; color:#8a8f86; margin-bottom:3px;">(초기 상담) <span id="emDate" style="color:#999;"></span></div>
           <div id="emView" style="font-size:14px; line-height:1.7; white-space:pre-line;"></div>
           <textarea id="e_memo" rows="7" style="display:none; font:inherit; font-size:14px;
             padding:9px 11px; width:100%; box-sizing:border-box; resize:vertical; line-height:1.7;"></textarea>
@@ -465,6 +493,42 @@
                 style="padding:5px 12px; white-space:nowrap;">✏️ 수정</button>
       </div>
       <div id="emMsg" style="font-size:12.5px; margin-top:6px;"></div>
+      <!-- 날짜별 상담 · 안내 메모 (2026-10-30 · 아래 칸에서 옮김) -->
+      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
+        <div id="cnRows" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
+        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:10px; flex-wrap:wrap;">
+          <div style="width:150px;">
+            <label for="cn_date" style="font-size:12px;">날짜</label>
+            <input id="cn_date" type="date">
+          </div>
+          <div>
+            <label style="font-size:12px;">종류</label>
+            <div class="cnSeg" id="cn_kind" data-v="상담">
+              <button type="button" data-v="상담" class="on">상담</button><button type="button" data-v="안내">안내</button>
+            </div>
+          </div>
+          <div style="flex:1; min-width:240px;">
+            <label for="cn_text" style="font-size:12px;">내용</label>
+            <textarea id="cn_text" rows="2" style="font:inherit;font-size:14px;padding:8px 10px;width:100%;box-sizing:border-box;resize:vertical;"
+              placeholder="예: 방과후 활동지원비 신청 방법 안내 / 어머님 — 주 2회로 늘리고 싶어 하심"></textarea>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:0;cursor:pointer;">
+            <input id="cn_follow" type="checkbox" style="width:auto;margin:0;"> 상담진행목록에 올리기</label>
+          <span id="cn_fwrap" style="display:none; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:12px;color:#666;">담당</span>
+            <span class="cnSeg" id="cn_owner" data-v="원장">
+              <button type="button" data-v="원장" class="on">원장</button><button type="button" data-v="행정">행정</button>
+            </span>
+            <span style="font-size:12px;color:#666;">확인할 날</span>
+            <input id="cn_due" type="date" style="width:150px;">
+          </span>
+          <button type="button" id="cnAdd" class="tab"
+            style="margin-left:auto;background:#8bc34a;color:#fff;font-weight:bold;padding:7px 14px;">메모 추가</button>
+        </div>
+        <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
+      </div>
     </div>
 
     <!-- ③ 평가 · 상담 메모 -->
@@ -496,24 +560,6 @@
         <div id="esMsg" style="font-size:12.5px; margin-top:6px;"></div>
       </div>
 
-      <div style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;">
-        <div style="font-size:12.5px; font-weight:700; color:#2c5c37; margin-bottom:6px;">
-          💬 상담 메모 <span style="font-weight:normal;color:#888;">— 치료 중 어머님 말씀·바라시는 것</span></div>
-        <div id="cnRows" style="font-size:13px; color:#5a6156;">불러오는 중...</div>
-        <div style="display:flex; gap:8px; align-items:flex-end; margin-top:10px; flex-wrap:wrap;">
-          <div style="width:170px;">
-            <label for="cn_date" style="font-size:12px;">날짜</label>
-            <input id="cn_date" type="date">
-          </div>
-          <div style="flex:1; min-width:240px;">
-            <label for="cn_text" style="font-size:12px;">내용</label>
-            <input id="cn_text" type="text" placeholder="예: 어머님 — 주 2회로 늘리고 싶어 하심">
-          </div>
-          <button type="button" id="cnAdd" class="tab"
-            style="background:#8bc34a;color:#fff;font-weight:bold;padding:7px 14px;">메모 추가</button>
-        </div>
-        <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
-      </div>
     </div>
 
     <!-- ④ 수업 진행 상황 (히스토리 포함) -->
@@ -899,6 +945,7 @@ async function afterLogin(user) {
   $('loginBox').style.display = 'none';
   $('listBox').style.display  = 'block';
   draw();
+  loadProgress();   // 상담진행목록 (2026-10-30)
 }
 
 $('btn').onclick = async () => {
@@ -1712,24 +1759,61 @@ $('emSave').onclick = async () => {
   }
 };
 
-// ── 상담 메모 (2026-09-15) — 날짜별로 쌓인다 ──
+// ── 상담 메모 (2026-09-15 · 2026-10-30 고침) — 날짜별로 쌓인다 ──
+//   종류 상담 · 안내 / 「상담진행목록에 올리기」 → 담당(원장 · 행정) · 확인할 날
+//   종료하면 결과가 남고 목록 맨 위 상담진행목록에서 사라진다
 let NOTES = [];
+const CN_COLS = 'id, child_id, note_date, content, staff_id, kind, follow, owner, due_on, result, closed_at';
+
+function segVal(id) { return $(id).dataset.v; }
+function segSet(id, v) {
+  $(id).dataset.v = v;
+  $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
+}
+['cn_kind', 'cn_owner'].forEach(id => {
+  $(id).addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-v]');
+    if (b) segSet(id, b.dataset.v);
+  });
+});
+$('cn_follow').onchange = () => {
+  $('cn_fwrap').style.display = $('cn_follow').checked ? 'inline-flex' : 'none';
+};
+function cnReset() {
+  $('cn_date').value = tdy();
+  $('cn_text').value = '';
+  segSet('cn_kind', '상담');
+  $('cn_follow').checked = false;
+  segSet('cn_owner', '원장');
+  $('cn_due').value = '';
+  $('cn_fwrap').style.display = 'none';
+  delete $('cnAdd').dataset.editId;
+  $('cnAdd').textContent = '메모 추가';
+}
 
 async function loadNotes(cid) {
   $('cnRows').innerHTML = '불러오는 중...';
-  $('cn_date').value = tdy();
-  $('cn_text').value = '';
-  delete $('cnAdd').dataset.editId;
-  $('cnAdd').textContent = '메모 추가';
+  cnReset();
   $('cnMsg').textContent = '';
   const { data, error } = await sb.from('nl_child_notes')
-    .select('id, note_date, content, staff_id')
+    .select(CN_COLS)
     .eq('child_id', cid)
     .order('note_date', { ascending: false })
     .order('id', { ascending: false });
   if (error) { $('cnRows').innerHTML = '메모를 불러오지 못했습니다. ' + esc(error.message); return; }
   NOTES = data || [];
   drawNotes();
+}
+
+function md2(d) { if (!d) return ''; const p = String(d).split('-'); return Number(p[1]) + '/' + Number(p[2]); }
+function cnState(n) {
+  if (!n.follow) return '';
+  if (n.closed_at)
+    return '<div style="font-size:12px;color:#5a7a5e;margin-top:2px;">✓ 종료 · ' + md2(String(n.closed_at).slice(0, 10))
+         + (n.result ? ' · ' + esc(n.result) : '') + '</div>';
+  const late = n.due_on && n.due_on < tdy();
+  return '<div style="font-size:12px;margin-top:2px;color:' + (late ? '#c62828' : '#b45309') + ';">'
+       + (late ? '🔴 ' : '') + '진행 중 · ' + esc(n.owner || '') + (n.due_on ? ' · ' + md2(n.due_on) + '까지' : '') + '</div>';
 }
 
 function drawNotes() {
@@ -1741,8 +1825,9 @@ function drawNotes() {
     '<div style="display:flex; align-items:flex-start; gap:8px; padding:7px 0;'
     + ' border-bottom:1px solid #e3ebe1;">'
     + '<span style="color:#666; min-width:82px; white-space:nowrap;">' + esc(n.note_date) + '</span>'
-    + '<span style="flex:1; min-width:0; color:#1c1f1a; line-height:1.6;'
-    + ' white-space:pre-line;">' + esc(n.content) + '</span>'
+    + '<span class="cnTag' + (n.kind === '안내' ? ' g' : '') + '">' + esc(n.kind || '상담') + '</span>'
+    + '<span style="flex:1; min-width:0; color:#1c1f1a; line-height:1.6;">'
+    +   '<span style="white-space:pre-line;">' + esc(n.content) + '</span>' + cnState(n) + '</span>'
     + (n.staff_id ? '<span style="color:#aaa; white-space:nowrap;">' + n.staff_id + '번</span>' : '')
     + '<button type="button" class="tab cnEd" data-id="' + n.id
     + '" style="padding:2px 8px; font-size:12px;">수정</button>'
@@ -1755,6 +1840,11 @@ function drawNotes() {
     if (!n) return;
     $('cn_date').value = n.note_date;
     $('cn_text').value = n.content;
+    segSet('cn_kind', n.kind || '상담');
+    $('cn_follow').checked = !!n.follow;
+    segSet('cn_owner', n.owner || '원장');
+    $('cn_due').value = n.due_on || '';
+    $('cn_fwrap').style.display = n.follow ? 'inline-flex' : 'none';
     $('cnAdd').dataset.editId = String(n.id);
     $('cnAdd').textContent = '고쳐 저장';
     $('cn_text').focus();
@@ -1766,6 +1856,7 @@ function drawNotes() {
     if (error) { $('cnMsg').style.color = '#c62828';
                  $('cnMsg').textContent = '❌ 지우지 못했습니다: ' + error.message; return; }
     await loadNotes(edId);
+    loadProgress();
     $('cnMsg').style.color = '#2e7d32';
     $('cnMsg').textContent = '✅ 지웠습니다.';
   });
@@ -1776,33 +1867,109 @@ $('cnAdd').onclick = async () => {
   const txt = $('cn_text').value.trim();
   if (!txt) { $('cnMsg').style.color = '#c62828';
               $('cnMsg').textContent = '내용을 적으세요.'; return; }
+  const follow = $('cn_follow').checked;
+  if (follow && !$('cn_due').value) {
+    $('cnMsg').style.color = '#c62828';
+    $('cnMsg').textContent = '상담진행목록에 올리려면 「확인할 날」을 적어 주세요.'; $('cn_due').focus(); return;
+  }
   const eid = $('cnAdd').dataset.editId ? Number($('cnAdd').dataset.editId) : null;
+  const row = {
+    note_date: $('cn_date').value || tdy(), content: txt,
+    kind: segVal('cn_kind'), follow: follow,
+    owner: follow ? segVal('cn_owner') : null,
+    due_on: follow ? $('cn_due').value : null
+  };
   $('cnAdd').disabled = true;
   const wasEdit = !!eid;
   $('cnAdd').textContent = '저장 중...';
   try {
-    let error;
+    let res;
     if (eid) {
-      ({ error } = await sb.from('nl_child_notes')
-        .update({ note_date: $('cn_date').value || tdy(), content: txt,
-                  updated_at: new Date().toISOString() }).eq('id', eid));
+      row.updated_at = new Date().toISOString();
+      res = await sb.from('nl_child_notes').update(row).eq('id', eid).select('id');
     } else {
-      ({ error } = await sb.from('nl_child_notes')
-        .insert({ child_id: edId, note_date: $('cn_date').value || tdy(),
-                  content: txt, staff_id: MEID }));
+      row.child_id = edId; row.staff_id = MEID;
+      res = await sb.from('nl_child_notes').insert(row).select('id');
     }
-    if (error) throw error;
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) throw new Error('저장된 줄이 없습니다 (권한 확인)');
     await loadNotes(edId);
+    loadProgress();
     $('cnMsg').style.color = '#2e7d32';
-    $('cnMsg').textContent = wasEdit ? '✅ 고쳤습니다.' : '✅ 메모를 넣었습니다.';
+    $('cnMsg').textContent = (wasEdit ? '✅ 고쳤습니다.' : '✅ 메모를 넣었습니다.')
+      + (follow ? ' 상담진행목록에 올렸습니다.' : '');
   } catch (e) {
     $('cnMsg').style.color = '#c62828';
     $('cnMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
   } finally {
     $('cnAdd').disabled = false;
-    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = '메모 추가';
+    if ($('cnAdd').textContent === '저장 중...') $('cnAdd').textContent = wasEdit ? '고쳐 저장' : '메모 추가';
   }
 };
+
+// ── 상담진행목록 (2026-10-30) — 아동 목록 맨 위 · 원장 · 행정 화면만 ──
+let CPROWS = [];
+const CP_DRAFT = {};   // 줄 번호 -> 적던 결과 (다시 그려도 남게)
+async function loadProgress() {
+  const box = $('cpBox');
+  if (!box) return;
+  if (!CAN_EDIT) { box.style.display = 'none'; return; }
+  const { data, error } = await sb.from('nl_child_notes').select(CN_COLS)
+    .eq('follow', true).is('closed_at', null)
+    .order('due_on', { ascending: true }).order('id', { ascending: true });
+  box.style.display = 'block';
+  if (error) { box.innerHTML = '<div class="cpErr">상담진행목록을 불러오지 못했습니다. ' + esc(error.message) + '</div>'; return; }
+  CPROWS = data || [];
+  drawProgress();
+}
+function drawProgress() {
+  const box = $('cpBox');
+  const today = tdy();
+  const nameOf = id => { const c = ALL.find(x => x.id === id); return c ? c.name : ''; };
+  const col = who => {
+    const L = CPROWS.filter(r => (r.owner || '원장') === who)
+      .sort((a, b) => (a.due_on || '9999').localeCompare(b.due_on || '9999') || a.id - b.id);
+    const body = L.length ? L.map(r => {
+      const late = r.due_on && r.due_on < today;
+      return '<div class="cpRow' + (late ? ' late' : '') + '">'
+        + '<div class="cpTop"><span class="cpDue">' + (late ? '🔴 ' : '') + md2(r.due_on) + '</span>'
+        +   '<a href="#" class="cpKid" data-cid="' + r.child_id + '">' + r.child_id + '번 ' + esc(nameOf(r.child_id)) + '</a>'
+        +   '<span class="cnTag' + (r.kind === '안내' ? ' g' : '') + '">' + esc(r.kind || '상담') + '</span></div>'
+        + '<div class="cpTxt">' + esc(r.content) + '</div>'
+        + '<div class="cpEnd"><input type="text" class="cpRes" data-id="' + r.id + '" maxlength="500"'
+        +   ' placeholder="결과 (예: 11/4 신청 완료 확인)" value="' + esc(CP_DRAFT[r.id] || '') + '">'
+        +   '<button type="button" class="cpDone" data-id="' + r.id + '">종료</button></div>'
+        + '</div>';
+    }).join('') : '<div class="cpNone">남은 것이 없습니다.</div>';
+    return '<div class="cpCol"><div class="cpHead">' + who + (who === '원장' ? '님' : '샘') + ' 할 일 <b>' + L.length + '</b></div>' + body + '</div>';
+  };
+  box.innerHTML = '<div class="cpTitle">상담진행목록</div><div class="cpGrid">' + col('원장') + col('행정') + '</div>';
+  box.querySelectorAll('.cpKid').forEach(a => a.onclick = ev => { ev.preventDefault(); openEdit(Number(a.dataset.cid)); });
+  box.querySelectorAll('.cpRes').forEach(i => i.oninput = () => { CP_DRAFT[i.dataset.id] = i.value; });
+  box.querySelectorAll('.cpDone').forEach(b => b.onclick = async () => {
+    const id = Number(b.dataset.id);
+    const r = CPROWS.find(x => x.id === id);
+    if (!r) return;
+    const res = (CP_DRAFT[id] || '').trim();
+    if (!confirm(r.child_id + '번 — 이 일을 종료할까요?' + (res ? '\n결과: ' + res : '\n(결과는 비어 있습니다)'))) return;
+    b.disabled = true; b.textContent = '저장 중…';
+    const up = await sb.from('nl_child_notes')
+      .update({ result: res || null, closed_at: new Date().toISOString(), closed_by: MEID,
+                updated_at: new Date().toISOString() })
+      .eq('id', id).select('id');
+    if (up.error || !up.data || !up.data.length) {
+      b.disabled = false; b.textContent = '종료';
+      alert('❌ 종료하지 못했습니다.\n' + (up.error ? up.error.message : '권한 확인'));
+      return;
+    }
+    delete CP_DRAFT[id];
+    await loadProgress();
+    if (edId === r.child_id) loadNotes(edId);
+  });
+}
+window.addEventListener('beforeunload', ev => {
+  if (Object.values(CP_DRAFT).some(v => String(v || '').trim())) { ev.preventDefault(); ev.returnValue = ''; }
+});
 
 // ── 치료사 계정 — 초기 상담·평가보고서 보기 전용 창 (2026-09-15) ──
 // 선생님 목록의 맨 오른쪽 칸에 단추. 초기 상담이나 보고서가 있는 아동에만 붙는다
