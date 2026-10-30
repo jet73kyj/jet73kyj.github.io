@@ -519,6 +519,10 @@
           <input id="cn_text" type="text" maxlength="1000" style="flex:1; min-width:220px; margin:0;"
             placeholder="메모 (예: 방과후 승인여부 확인)">
           <input id="cn_follow" type="checkbox" checked style="display:none;">
+          <span class="emAct">
+            <button type="button" id="cnPut">넣기</button>
+            <button type="button" id="cnPutMv" class="emMv">상담목록이동</button>
+          </span>
           <button type="button" id="cnAdd" class="tab"
             style="display:none;background:#8bc34a;color:#fff;font-weight:bold;padding:4px 16px;font-size:20px;line-height:1.3;" title="추가 — 상담진행목록에 올라갑니다">＋</button>
         </div>
@@ -1860,6 +1864,8 @@ const CN_COLS = 'id, child_id, note_date, content, staff_id, kind, follow, owner
 function cnOwner() { return MEID === 8 ? '원장' : '행정'; }   // 담당 = 적은 사람
 function md2(d) { if (!d) return ''; const p = String(d).split('-'); return Number(p[1]) + '/' + Number(p[2]); }
 $('cn_text').addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) cnAppend(); });
+$('cnPut').onclick   = () => cnAppend(false);
+$('cnPutMv').onclick = () => cnAppend(true);
 // 머리 줄 ＋ — 입력 줄을 열고, 적은 것이 있으면 넣는다 · 상담목록이동 — 위 메모를 진행목록으로 (2026-10-30)
 $('cnPlus').onclick = () => {
   const row = $('cnInRow');
@@ -1867,16 +1873,27 @@ $('cnPlus').onclick = () => {
   if ($('cn_text').value.trim()) cnAppend(); else $('cn_text').focus();
 };
 // ＋ 로 적은 줄은 위 상담 메모 글 끝에 한 줄로 붙는다 (2026-10-30) — 옮기기는 그 줄의 [상담목록이동]
-async function cnAppend() {
+async function cnAppend(alsoMove) {
   const txt = $('cn_text').value.trim();
-  if (!edId || !txt || cnAppend.busy) return;
+  if (!edId || cnAppend.busy) return;
+  if (!txt) { $('emMsg').style.color = '#c62828'; $('emMsg').textContent = '내용을 적어 주세요.'; $('cn_text').focus(); return; }
   cnAppend.busy = true;
   try {
     const cur = ($('e_memo').dataset.orig || '').trim();
     await emSaveText(cur ? cur + '\n' + txt : txt);
     $('cn_text').value = '';
     $('cnInRow').style.display = 'none';
-    $('emMsg').style.color = '#2e7d32'; $('emMsg').textContent = '✅ 한 줄 더했습니다.';
+    if (alsoMove === true) {
+      const res = await sb.from('nl_child_notes')
+        .insert({ child_id: edId, staff_id: MEID, note_date: tdy(), content: txt, follow: true, owner: cnOwner() })
+        .select('id');
+      if (res.error || !res.data || !res.data.length)
+        throw new Error('메모에는 넣었으나 상담목록으로 못 옮겼습니다 — 그 줄의 [상담목록이동]을 눌러 주세요');
+      await loadNotes(edId); loadProgress();
+      $('emMsg').style.color = '#2e7d32'; $('emMsg').textContent = '✅ 메모에 넣고 상담진행목록에 올렸습니다.';
+    } else {
+      $('emMsg').style.color = '#2e7d32'; $('emMsg').textContent = '✅ 한 줄 더했습니다.';
+    }
   } catch (e) {
     $('emMsg').style.color = '#c62828'; $('emMsg').textContent = '❌ 저장하지 못했습니다: ' + e.message;
   } finally { cnAppend.busy = false; }
