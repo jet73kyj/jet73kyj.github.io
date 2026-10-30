@@ -931,6 +931,11 @@ async function afterLogin(user) {
   $('listBox').style.display  = 'block';
   draw();
   loadProgress();   // 상담진행목록 (2026-10-30)
+  // 새로고침 전에 열려 있던 아동 창을 다시 연다 (이 탭만)
+  try {
+    const k = Number(sessionStorage.getItem('nl_cl_open'));
+    if (k && CAN_EDIT && ALL.some(x => x.id === k)) openEdit(k);
+  } catch (e) {}
 }
 
 $('btn').onclick = async () => {
@@ -1305,6 +1310,7 @@ function openEdit(id) {
   if (!c) return;
   if (!cardLeaveOk()) return;
   edId = id;
+  try { sessionStorage.setItem('nl_cl_open', String(id)); } catch (e) {}   // 새로고침해도 이 아동 창 (2026-10-30)
   $('addBox').style.display = 'none';
   $('edTitle').textContent = '아동 ' + c.id + '번 고치기';
   $('e_no').value         = c.manager_no || '';
@@ -2602,10 +2608,11 @@ async function saveGuards(id){
   return rows;
 }
 
-$('cancelEdit').onclick = () => { if (!cardLeaveOk()) return; $('edBox').style.display = 'none'; edId = null; };
+function clOpenOff() { try { sessionStorage.removeItem('nl_cl_open'); } catch (e) {} }
+$('cancelEdit').onclick = () => { if (!cardLeaveOk()) return; $('edBox').style.display = 'none'; edId = null; clOpenOff(); };
 $('e_backList').onclick = () => {
   if (!cardLeaveOk()) return;
-  $('edBox').style.display = 'none'; edId = null;
+  $('edBox').style.display = 'none'; edId = null; clOpenOff();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -2694,6 +2701,7 @@ $('q').addEventListener('input', () => {
   if ($('edBox') && $('edBox').style.display !== 'none') {
     $('edBox').style.display = 'none';
     edId = null;
+    clOpenOff();
   }
   draw();
 });
