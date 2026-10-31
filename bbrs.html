@@ -58,7 +58,11 @@
   .info { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px 16px; margin-bottom:12px; }
   .info label { font-size:13px; color:#6E6660; display:block; margin-bottom:3px; }
   .info input, .info select { width:100%; }
-  .rule { background:#FBF8F4; border:1px solid #EFE6DA; border-radius:8px; padding:8px 12px; font-size:14px; margin-bottom:10px; }
+  /* 작성 기준 — 문항을 내려도 위에 붙어 따라옴 (2026-10-31) */
+  .rule { position:sticky; top:0; z-index:5; background:#FBF8F4; border:1px solid #EFE6DA; border-radius:8px; padding:8px 12px;
+          font-size:14px; line-height:1.55; margin-bottom:10px; box-shadow:0 3px 8px rgba(0,0,0,.06); }
+  .rule .rt { font-weight:700; color:#7E5530; margin-bottom:2px; }
+  .rule b { display:inline-block; width:18px; color:#B07A4A; }
   .q { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed #EFE6DA; }
   .q .no { width:34px; text-align:right; color:#7E5530; font-weight:600; flex:none; }
   .q .tx { flex:1; min-width:0; }
@@ -154,7 +158,12 @@
         <div><label>평가자</label><input type="text" id="t_rater" maxlength="30"></div>
         <div><label>아동과의 관계</label><select id="t_rel"><option>모</option><option>부</option><option>조모</option><option>조부</option><option>교사</option><option>치료사</option><option>기타</option></select></div>
       </div>
-      <div class="rule">평가 기준 — <b>1</b> 해당 행동이 전혀 없음 · <b>2</b> 약간 나타남 · <b>3</b> 대체로 확실히 나타남 · <b>4</b> 심한 정도로 아주 흔히 나타남 · <b>5</b> 심한 정도로 매우 꾸준히 나타남</div>
+      <div class="rule"><div class="rt">작성 기준</div>
+        <div><b>1</b> 해당 행동이 전혀 없음</div>
+        <div><b>2</b> 해당 행동이 약간 나타남</div>
+        <div><b>3</b> 해당 행동이 대체로 확실히 나타남</div>
+        <div><b>4</b> 해당 행동이 심한 정도로 아주 흔히 나타남</div>
+        <div><b>5</b> 해당 행동이 심한 정도로 매우 꾸준히 나타남</div></div>
       <div id="qs"></div>
       <div class="cnt"><span id="ansCnt" style="font-size:14px;"></span><span style="flex:1"></span>
         <button type="button" id="jumpMiss">안 한 문항으로</button>
