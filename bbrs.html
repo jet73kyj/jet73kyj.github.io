@@ -91,6 +91,9 @@
   .sumbox .sl { display:flex; gap:10px; font-weight:400; color:var(--tx); }
   .sumbox .sl span { flex:none; width:96px; font-weight:700; }
   .sumbox .sl.lv1 span { color:#3B6D11; } .sumbox .sl.lv2 span { color:#B45309; } .sumbox .sl.lv3 span { color:#C0392B; }
+  .ttabs { display:flex; gap:0; border-bottom:1px solid var(--line); margin:0 0 12px; }
+  .ttabs button { border:none; border-bottom:2px solid transparent; border-radius:0; background:none; padding:9px 16px; font-size:15px; color:#8a7a6a; }
+  .ttabs button.on { border-bottom-color:var(--cam); color:var(--cam); font-weight:700; }
   .ans { display:grid; grid-template-columns:repeat(15, 1fr); gap:2px; font-size:11.5px; margin-top:8px; }
   .ans div { border:1px solid #e7e0d6; text-align:center; padding:2px 0; }
   .ans b { display:block; color:#8a7a6a; font-weight:400; font-size:10.5px; }
@@ -119,7 +122,9 @@
 
 <div class="container">
   <div id="listBox">
-    <div class="sub">아동을 고르고 「검사 시작」을 누르면 105문항 검사지가 열립니다. 문항마다 1~5를 누르고 「저장」하면 18개 영역 결과지가 나오고 인쇄할 수 있습니다.</div>
+    <!-- 검사 갈래 (2026-10-31 · 유아 105문항 · 초․중등 109문항) -->
+    <div class="ttabs" id="ttabs"><button type="button" data-t="bbrs">유아 (105문항)</button><button type="button" data-t="bbrs2">초․중등 (109문항)</button></div>
+    <div class="sub" id="subTx"></div>
     <div class="grp"><div class="grp-h">검사 시작</div>
       <div class="grp-b">
         <div class="srch" style="position:relative;">
@@ -142,8 +147,8 @@
   <div id="itemsBox" style="display:none;">
     <div class="tool"><button type="button" id="itemsBack">← 목록으로</button></div>
     <div class="sheet">
-      <h2 style="font-size:18px;">문항 넣기</h2>
-      <div class="sub" style="margin-top:8px;">센터가 가지고 있는 검사지의 문항을 <b>한 줄에 한 문항씩, 1번부터 105번까지</b> 붙여넣으세요. 앞의 번호(「1.」)는 있어도 없어도 됩니다. 넣은 문항은 이 센터 안에서만 보입니다.</div>
+      <h2 style="font-size:18px;" id="itemsTitle">문항 넣기</h2>
+      <div class="sub" style="margin-top:8px;" id="itemsSub"></div>
       <textarea id="itemsTx" rows="18" style="width:100%;font-size:14px;line-height:1.6;"></textarea>
       <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
         <span id="itemsCnt" style="font-size:13px;color:#6E6660;"></span><span style="flex:1"></span>
@@ -156,7 +161,7 @@
   <div id="takeBox" style="display:none;">
     <div class="tool"><button type="button" id="takeBack">← 목록으로</button></div>
     <div class="sheet">
-      <h2>벅스 유아 행동 종합 평가지</h2><div class="org">자라는나무 아동발달센터</div>
+      <h2 id="takeTitle">벅스 유아 행동 종합 평가지</h2><div class="org">자라는나무 아동발달센터</div>
       <div class="info">
         <div><label>이름</label><input type="text" id="t_kid" readonly></div>
         <div><label>평가일</label><input type="date" id="t_date"></div>
@@ -215,8 +220,7 @@ function ageText(birth, on) {
 
 // ===== 영역 셈 — 센터 엑셀 「프로파일」 장과 같음 (문항 번호 · 기준 점수) =====
 //   cut1 = 「심각하다」가 시작하는 점수 · cut2 = 「매우 심각하다」가 시작하는 점수
-const N_ITEMS = 105;
-const SCALES = [
+const SCALES_KID = [
   { nm: '심한 자책',        it: [3, 8, 12, 15, 19],                 cut1: 11, cut2: 18 },
   { nm: '심한 불안',        it: [4, 10, 13, 17, 21],                cut1: 11, cut2: 18 },
   { nm: '심한 위축',        it: [2, 5, 7, 11, 14, 18],              cut1: 13, cut2: 22 },
@@ -236,8 +240,39 @@ const SCALES = [
   { nm: '심한 저항감',      it: [80, 87, 90, 96, 102],              cut1: 11, cut2: 18 },
   { nm: '사회 적응력 부족', it: [77, 83, 89, 92, 94, 97, 100, 105], cut1: 17, cut2: 29 }
 ];
-function calcScores(ans) {
-  return SCALES.map(s => {
+// 초․중등 (2026-10-31) — 문항 1~110 (63번은 원본에도 없음 · 109문항)
+//   영역 이름 · 기준 점수는 센터 엑셀 「프로파일」 장 · 문항 짝은 종이 검사지(한글 파일)의 칸 위치
+//   ※ 센터 엑셀의 문항 짝은 80번대 이후가 한 칸씩 밀려 있었음 (같은 문항을 두 번 더하는 줄도 있음) — 종이 검사지를 따름
+const SCALES_SCH = [
+  { nm: '심한 자책',        it: [2, 5, 10, 14, 17, 21],                cut1: 11, cut2: 18 },
+  { nm: '심한 불안',        it: [23, 33, 37, 42, 49],                  cut1: 11, cut2: 18 },
+  { nm: '심한 위축',        it: [80, 86, 90, 94, 98, 107],             cut1: 13, cut2: 22 },
+  { nm: '심한 의존',        it: [87, 93, 102, 105, 109],               cut1: 13, cut2: 22 },
+  { nm: '자아 강도 부족',   it: [81, 83, 88, 91, 97, 101, 104, 110],   cut1: 15, cut2: 25 },
+  { nm: '체력 부족',        it: [54, 59, 64, 71, 75],                  cut1: 11, cut2: 18 },
+  { nm: '협응력 부족',      it: [58, 62, 65, 69, 72],                  cut1: 11, cut2: 18 },
+  { nm: '지적 능력 부족',   it: [4, 6, 9, 12, 16, 18, 22],             cut1: 15, cut2: 25 },
+  { nm: '학업 성취 저조',   it: [25, 29, 39, 44, 51],                  cut1: 11, cut2: 18 },
+  { nm: '주의력 부족',      it: [1, 7, 11, 15, 20],                    cut1: 11, cut2: 18 },
+  { nm: '자제력 부족',      it: [26, 31, 35, 46, 52],                  cut1: 11, cut2: 18 },
+  { nm: '현실감 부족',      it: [24, 27, 32, 36, 40, 43, 47, 50],      cut1: 17, cut2: 29 },
+  { nm: '정체감 부족',      it: [56, 68, 74, 78],                      cut1: 11, cut2: 18 },
+  { nm: '심한 자학',        it: [79, 85, 89, 95, 99, 103, 108],        cut1: 15, cut2: 25 },
+  { nm: '울화 억제력 부족', it: [55, 61, 67, 73, 77],                  cut1: 11, cut2: 18 },
+  { nm: '심한 피해 의식',   it: [3, 8, 13, 19],                        cut1: 11, cut2: 18 },
+  { nm: '심한 공격성',      it: [82, 84, 92, 96, 100, 106],            cut1: 13, cut2: 22 },
+  { nm: '심한 저항감',      it: [57, 60, 66, 70, 76],                  cut1: 11, cut2: 18 },
+  { nm: '사회 적응력 부족', it: [28, 30, 34, 38, 41, 45, 48, 53],      cut1: 17, cut2: 29 }
+];
+const range = (a, b, skip) => { const o = []; for (let i = a; i <= b; i++) if (!(skip || []).includes(i)) o.push(i); return o; };
+const TESTS = {
+  bbrs:  { nm: '유아',    title: '벅스 유아 행동 종합 평가지',     ptitle: '벅스 유아 행동평가척도 프로파일',     nos: range(1, 105),       len: 105, scales: SCALES_KID },
+  bbrs2: { nm: '초․중등', title: '벅스 초․중등 행동 종합 평가지', ptitle: '벅스 초․중등 행동평가척도 프로파일', nos: range(1, 110, [63]), len: 110, scales: SCALES_SCH }
+};
+let TCODE = 'bbrs';
+function T() { return TESTS[TCODE]; }
+function calcScores(ans, scales) {
+  return (scales || T().scales).map(s => {
     const sc = s.it.reduce((t, n) => t + (Number(ans[n - 1]) || 0), 0);
     const lv = sc >= s.cut2 ? 3 : sc >= s.cut1 ? 2 : 1;
     return { nm: s.nm, score: sc, level: lv };
@@ -245,6 +280,7 @@ function calcScores(ans) {
 }
 const LVNM = { 1: '심각하지 않다', 2: '심각하다', 3: '매우 심각하다' };
 
+let ITEMSALL = {};
 let ME = null, KIDS = [], RESULTS = [], ITEMS = {}, PICK = null, ANS = [], DIRTY = false, CURVIEW = null;
 function CAN_EDIT() { return ME && [8, 19, 11].includes(Number(ME.id)); }
 async function readAll(mk) {
@@ -259,16 +295,31 @@ async function readAll(mk) {
 async function loadAll() {
   const [c, r, it] = await Promise.all([
     readAll(() => sb.from('nl_children').select('id, name, birth, status').order('id')),
-    readAll(() => sb.from('nl_bbrs_results').select('id, child_id, test_date, rater, relation, answers, scores, created_at').order('id', { ascending: false })),
-    sb.from('nl_test_items').select('item_no, body').eq('test_code', 'bbrs').order('item_no')
+    readAll(() => sb.from('nl_bbrs_results').select('id, test_code, child_id, test_date, rater, relation, answers, scores, created_at').order('id', { ascending: false })),
+    sb.from('nl_test_items').select('test_code, item_no, body').in('test_code', Object.keys(TESTS)).order('item_no')
   ]);
   const bad = [c, r, it].find(x => x.error);
   if (bad) { show('자료를 읽지 못했습니다 — ' + bad.error.message, false); return false; }
   KIDS = c.data || []; RESULTS = r.data || [];
-  ITEMS = {}; (it.data || []).forEach(x => { ITEMS[x.item_no] = x.body; });
+  ITEMSALL = {}; Object.keys(TESTS).forEach(c => { ITEMSALL[c] = {}; });
+  (it.data || []).forEach(x => { if (ITEMSALL[x.test_code]) ITEMSALL[x.test_code][x.item_no] = x.body; });
+  ITEMS = ITEMSALL[TCODE];
   return true;
 }
-function itemsReady() { for (let i = 1; i <= N_ITEMS; i++) if (!ITEMS[i]) return false; return true; }
+function itemsReady() { return T().nos.every(i => !!ITEMS[i]); }
+function itemsHave() { return T().nos.filter(i => !!ITEMS[i]).length; }
+function setTest(c) {
+  if (!TESTS[c]) c = 'bbrs';
+  TCODE = c; ITEMS = ITEMSALL[c] || {};
+  document.querySelectorAll('#ttabs button').forEach(b => b.classList.toggle('on', b.dataset.t === c));
+  $('subTx').textContent = '아동을 고르고 「검사 시작」을 누르면 ' + T().nos.length + '문항 검사지가 열립니다. 문항마다 1~5를 누르고 「저장」하면 '
+    + T().scales.length + '개 영역 결과지가 나오고 인쇄할 수 있습니다.';
+  $('takeTitle').textContent = T().title;
+}
+document.getElementById('ttabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]'); if (!b) return;
+  setTest(b.dataset.t); drawList(); keepState();
+});
 function kidOf(cid) { return KIDS.find(k => Number(k.id) === Number(cid)); }
 function kidLine(k) { return k.id + '번 ' + esc(k.name || '') + ' <span class="bd">' + b6(k.birth) + '</span>'; }
 function matchKid(k, q) { return /^\d+$/.test(q) ? String(k.id) === q : String(k.name || '').includes(q); }
@@ -283,7 +334,7 @@ let SCR = 'listBox';
 const KEEP = 'nl_bbrs_state';
 function keepState() {
   try {
-    const st = { scr: SCR };
+    const st = { scr: SCR, t: TCODE };
     if (SCR === 'takeBox' && PICK) Object.assign(st, { cid: PICK.id, ans: ANS, date: $('t_date').value, rater: $('t_rater').value, rel: $('t_rel').value });
     if (SCR === 'viewBox' && CURVIEW) st.vid = CURVIEW.id;
     sessionStorage.setItem(KEEP, JSON.stringify(st));
@@ -293,6 +344,7 @@ function restoreState() {
   let st = null;
   try { st = JSON.parse(sessionStorage.getItem(KEEP) || 'null'); } catch (e) {}
   if (!st) return;
+  if (st.t && st.t !== TCODE) { setTest(st.t); drawList(); }
   if (st.scr === 'viewBox' && st.vid && RESULTS.some(r => Number(r.id) === Number(st.vid))) { openView(st.vid); return; }
   if (st.scr === 'itemsBox' && [8, 19].includes(Number(ME.id))) { $('itemsBtn').onclick(); return; }
   if (st.scr === 'takeBox' && st.cid && kidOf(st.cid) && itemsReady()) {
@@ -312,11 +364,12 @@ function restoreState() {
 }
 function drawList() {
   const q = $('q').value.trim();
-  const L = RESULTS.filter(r => { const k = kidOf(r.child_id); return !q || (k && matchKid(k, q)); });
-  $('cnt').textContent = RESULTS.length ? '— ' + RESULTS.length + '건' : '';
+  const MY = RESULTS.filter(r => (r.test_code || 'bbrs') === TCODE);
+  const L = MY.filter(r => { const k = kidOf(r.child_id); return !q || (k && matchKid(k, q)); });
+  $('cnt').textContent = MY.length ? '— ' + T().nm + ' ' + MY.length + '건' : '';
   $('noItems').style.display = itemsReady() ? 'none' : 'block';
   $('noItems').className = itemsReady() ? 'out' : 'out err';
-  $('noItems').textContent = itemsReady() ? '' : '아직 문항 글이 다 들어 있지 않습니다 (' + Object.keys(ITEMS).length + ' / 105). 아래 「문항 넣기」에서 센터 검사지 문항을 넣어 주세요.';
+  $('noItems').textContent = itemsReady() ? '' : '아직 ' + T().nm + ' 문항 글이 다 들어 있지 않습니다 (' + itemsHave() + ' / ' + T().nos.length + '). 아래 「문항 넣기」에서 센터 검사지 문항을 넣어 주세요.';
   $('list').innerHTML = L.length
     ? '<table class="lst"><tr><th>평가일</th><th>아동</th><th>평가자</th><th>심각 · 매우 심각</th><th></th></tr>'
       + L.map(r => {
@@ -353,11 +406,11 @@ function openTake(cid) {
   if (!itemsReady()) { show('문항 글이 다 들어 있지 않아 검사를 할 수 없습니다. 「문항 넣기」부터 해 주세요.', false); return; }
   const k = kidOf(cid); if (!k) return;
   hideMsg();
-  PICK = k; ANS = new Array(N_ITEMS).fill(0); DIRTY = false;
+  PICK = k; ANS = new Array(T().len).fill(0); DIRTY = false;
   $('t_kid').value = k.id + '번 ' + (k.name || '');
   $('t_date').value = today(); $('t_rater').value = ''; $('t_rel').value = '모';
   let h = '';
-  for (let i = 1; i <= N_ITEMS; i++) {
+  for (const i of T().nos) {
     h += '<div class="q" id="q' + i + '"><span class="no">' + i + '.</span><span class="tx">' + esc(ITEMS[i]) + '</span>'
        + '<span class="pk">' + [1, 2, 3, 4, 5].map(v => '<button type="button" data-i="' + i + '" data-v="' + v + '">' + v + '</button>').join('') + '</span></div>';
   }
@@ -375,18 +428,18 @@ $('qs').addEventListener('click', e => {
   drawCnt();
 });
 function drawCnt() {
-  const n = ANS.filter(v => v > 0).length;
-  $('ansCnt').innerHTML = '답한 문항 <b>' + n + '</b> / ' + N_ITEMS;
+  const n = T().nos.filter(i => ANS[i - 1] > 0).length;
+  $('ansCnt').innerHTML = '답한 문항 <b>' + n + '</b> / ' + T().nos.length;
 }
 $('jumpMiss').onclick = () => {
-  const i = ANS.findIndex(v => !v);
-  if (i < 0) { show('모든 문항에 답했습니다.', true); return; }
-  const row = $('q' + (i + 1)); row.classList.add('miss'); row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const no = T().nos.find(i => !ANS[i - 1]);
+  if (!no) { show('모든 문항에 답했습니다.', true); return; }
+  const row = $('q' + no); row.classList.add('miss'); row.scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 let SAVING = false;
 $('takeSave').onclick = async () => {
   if (SAVING || !PICK) return;
-  const miss = ANS.map((v, i) => v ? 0 : i + 1).filter(Boolean);
+  const miss = T().nos.filter(i => !ANS[i - 1]);
   if (miss.length) {
     miss.forEach(n => $('q' + n).classList.add('miss'));
     show('답하지 않은 문항이 ' + miss.length + '개 있습니다 — ' + miss.slice(0, 15).join(', ') + (miss.length > 15 ? ' …' : ''), false);
@@ -395,9 +448,9 @@ $('takeSave').onclick = async () => {
   if (!$('t_date').value) { show('평가일을 적어 주세요.', false); return; }
   SAVING = true; $('takeSave').disabled = true; $('takeSave').textContent = '저장 중…';
   try {
-    const row = { child_id: PICK.id, test_date: $('t_date').value, rater: $('t_rater').value.trim() || null,
+    const row = { test_code: TCODE, child_id: PICK.id, test_date: $('t_date').value, rater: $('t_rater').value.trim() || null,
                   relation: $('t_rel').value, answers: ANS.slice(), scores: calcScores(ANS) };
-    const r = await sb.from('nl_bbrs_results').insert(row).select('id, child_id, test_date, rater, relation, answers, scores, created_at');
+    const r = await sb.from('nl_bbrs_results').insert(row).select('id, test_code, child_id, test_date, rater, relation, answers, scores, created_at');
     if (r.error) throw r.error;
     if (!r.data || !r.data.length) throw new Error('저장된 줄이 없습니다 (권한 확인)');
     RESULTS.unshift(r.data[0]); DIRTY = false;
@@ -418,9 +471,11 @@ function barHtml(s, sc) {
 function openView(id) {
   const r = RESULTS.find(x => Number(x.id) === Number(id)); if (!r) return;
   CURVIEW = r;
+  const TT = TESTS[r.test_code || 'bbrs'] || TESTS.bbrs;
+  const SCALES = TT.scales;
   const k = kidOf(r.child_id) || { id: r.child_id, name: '', birth: '' };
-  const sc = calcScores(r.answers || []);
-  let h = '<div class="sheet"><h2>벅스 유아 행동평가척도 프로파일</h2><div class="org">자라는나무 아동발달센터</div>'
+  const sc = calcScores(r.answers || [], SCALES);
+  let h = '<div class="sheet"><h2>' + esc(TT.ptitle) + '</h2><div class="org">자라는나무 아동발달센터</div>'
     + '<table class="rtbl" style="margin-bottom:10px;"><tr><th>이름</th><td>' + esc(k.name || '') + '</td><th>평가일</th><td>' + esc(korDate(r.test_date)) + '</td></tr>'
     + '<tr><th>생년월일</th><td>' + esc(k.birth || '') + '</td><th>나이</th><td>' + esc(ageText(k.birth, r.test_date)) + '</td></tr>'
     + '<tr><th>평가자</th><td>' + esc(r.rater || '') + '</td><th>아동과의 관계</th><td>' + esc(r.relation || '') + '</td></tr></table>'
@@ -456,32 +511,50 @@ $('printBtn').onclick = () => window.print();
 
 // ── 문항 넣기 ──
 function parseItems(t) {
-  const L = String(t || '').split(/\r?\n/).map(x => x.replace(/^\s*\d{1,3}\s*[.)]\s*/, '').replace(/[·.…\s]+$/, '').trim()).filter(Boolean);
-  return L;
+  // 앞에 번호가 있으면 그 번호로 · 없으면 차례대로 (초․중등은 63번을 건너뜀)
+  const lines = String(t || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const nos = T().nos, out = {};
+  let k = 0, bad = [];
+  lines.forEach(x => {
+    const m = x.match(/^(\d{1,3})\s*[.)]\s*(.*)$/);
+    let no, body;
+    if (m) { no = Number(m[1]); body = m[2]; k = nos.indexOf(no) + 1; }
+    else { no = nos[k]; body = x; k++; }
+    body = String(body || '').replace(/[·.…\s□]+$/, '').trim();
+    if (!no || !nos.includes(no)) { bad.push(x.slice(0, 20)); return; }
+    if (body) out[no] = body;
+  });
+  return { map: out, bad: bad };
 }
 $('itemsBtn').onclick = () => {
   if (![8, 19].includes(Number(ME.id))) { show('문항 넣기는 원장 · 행정만 할 수 있습니다.', false); return; }
   hideMsg();
-  const cur = []; for (let i = 1; i <= N_ITEMS; i++) cur.push(ITEMS[i] ? i + '. ' + ITEMS[i] : '');
-  $('itemsTx').value = Object.keys(ITEMS).length ? cur.join('\n') : '';
+  $('itemsTitle').textContent = '문항 넣기 — ' + T().nm;
+  $('itemsSub').innerHTML = '센터가 가지고 있는 ' + esc(T().nm) + ' 검사지의 문항을 <b>한 줄에 한 문항씩</b> 붙여넣으세요. 앞의 번호(「1.」)는 있어도 없어도 됩니다.'
+    + (TCODE === 'bbrs2' ? ' <b>63번은 원본에도 없어 1~110번 중 109문항</b>입니다.' : ' 1~105번입니다.')
+    + ' 넣은 문항은 이 센터 안에서만 보입니다.';
+  $('itemsTx').value = T().nos.filter(i => ITEMS[i]).map(i => i + '. ' + ITEMS[i]).join('\n');
   $('itemsTx').oninput();
   screen('itemsBox');
 };
 $('itemsTx').oninput = () => {
-  const n = parseItems($('itemsTx').value).length;
-  $('itemsCnt').innerHTML = '문항 <b style="color:' + (n === N_ITEMS ? '#3B6D11' : '#c62828') + '">' + n + '</b> / ' + N_ITEMS;
+  const p = parseItems($('itemsTx').value), n = Object.keys(p.map).length, need = T().nos.length;
+  $('itemsCnt').innerHTML = '문항 <b style="color:' + (n === need ? '#3B6D11' : '#c62828') + '">' + n + '</b> / ' + need
+    + (p.bad.length ? ' · <span style="color:#c62828">번호가 맞지 않는 줄 ' + p.bad.length + '개</span>' : '');
 };
 $('itemsSave').onclick = async () => {
-  const L = parseItems($('itemsTx').value);
-  if (L.length !== N_ITEMS) { show('문항이 ' + L.length + '개입니다. 한 줄에 한 문항씩 105개를 넣어 주세요.', false); return; }
-  if (L.some(x => x.length > 300)) { show('300자가 넘는 줄이 있습니다. 두 문항이 한 줄에 붙지 않았는지 봐 주세요.', false); return; }
+  const p = parseItems($('itemsTx').value), need = T().nos;
+  const miss = need.filter(i => !p.map[i]);
+  if (p.bad.length) { show('번호가 맞지 않는 줄이 있습니다 — ' + p.bad.join(' / '), false); return; }
+  if (miss.length) { show('빠진 문항이 있습니다 — ' + miss.slice(0, 20).join(', ') + (miss.length > 20 ? ' …' : ''), false); return; }
+  if (need.some(i => p.map[i].length > 300)) { show('300자가 넘는 줄이 있습니다. 두 문항이 한 줄에 붙지 않았는지 봐 주세요.', false); return; }
   $('itemsSave').disabled = true;
-  const rows = L.map((b, i) => ({ test_code: 'bbrs', item_no: i + 1, body: b, updated_at: new Date().toISOString() }));
+  const rows = need.map(i => ({ test_code: TCODE, item_no: i, body: p.map[i], updated_at: new Date().toISOString() }));
   const r = await sb.from('nl_test_items').upsert(rows, { onConflict: 'test_code,item_no' }).select('item_no');
   $('itemsSave').disabled = false;
-  if (r.error || !r.data || r.data.length !== N_ITEMS) { show('저장하지 못했습니다 — ' + (r.error ? r.error.message : '저장된 문항 ' + (r.data || []).length + '개'), false); return; }
-  ITEMS = {}; L.forEach((b, i) => { ITEMS[i + 1] = b; });
-  screen('listBox'); drawList(); show('문항 105개를 저장했습니다.', true);
+  if (r.error || !r.data || r.data.length !== need.length) { show('저장하지 못했습니다 — ' + (r.error ? r.error.message : '저장된 문항 ' + (r.data || []).length + '개'), false); return; }
+  ITEMSALL[TCODE] = Object.assign({}, p.map); ITEMS = ITEMSALL[TCODE];
+  screen('listBox'); drawList(); show(T().nm + ' 문항 ' + need.length + '개를 저장했습니다.', true);
 };
 
 // ── 오가기 ──
@@ -511,7 +584,7 @@ async function afterLogin(user) {
   $('mainBox').style.display = '';
   $('who').textContent = me.name + ' (' + (me.role || '') + ')';
   if (!CAN_EDIT()) { $('listBox').innerHTML = '<div class="empty">이 화면은 관리자 · 행정 · 데스크만 씁니다.</div>'; return; }
-  if (await loadAll()) { drawList(); restoreState(); }
+  if (await loadAll()) { setTest('bbrs'); drawList(); restoreState(); }
 }
 (async () => {
   const { data } = await sb.auth.getSession();
