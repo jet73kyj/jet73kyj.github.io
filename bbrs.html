@@ -271,6 +271,39 @@ function matchKid(k, q) { return /^\d+$/.test(q) ? String(k.id) === q : String(k
 function screen(which) {
   ['listBox', 'itemsBox', 'takeBox', 'viewBox'].forEach(id => { $(id).style.display = id === which ? '' : 'none'; });
   window.scrollTo(0, 0);
+  SCR = which; keepState();
+}
+// 새로고침해도 같은 창 (2026-10-31) — 이 탭만 · 검사 중이면 답한 것 · 평가일 · 평가자까지
+let SCR = 'listBox';
+const KEEP = 'nl_bbrs_state';
+function keepState() {
+  try {
+    const st = { scr: SCR };
+    if (SCR === 'takeBox' && PICK) Object.assign(st, { cid: PICK.id, ans: ANS, date: $('t_date').value, rater: $('t_rater').value, rel: $('t_rel').value });
+    if (SCR === 'viewBox' && CURVIEW) st.vid = CURVIEW.id;
+    sessionStorage.setItem(KEEP, JSON.stringify(st));
+  } catch (e) {}
+}
+function restoreState() {
+  let st = null;
+  try { st = JSON.parse(sessionStorage.getItem(KEEP) || 'null'); } catch (e) {}
+  if (!st) return;
+  if (st.scr === 'viewBox' && st.vid && RESULTS.some(r => Number(r.id) === Number(st.vid))) { openView(st.vid); return; }
+  if (st.scr === 'itemsBox' && [8, 19].includes(Number(ME.id))) { $('itemsBtn').onclick(); return; }
+  if (st.scr === 'takeBox' && st.cid && kidOf(st.cid) && itemsReady()) {
+    openTake(st.cid);
+    if (st.date) $('t_date').value = st.date;
+    if (st.rater) $('t_rater').value = st.rater;
+    if (st.rel) $('t_rel').value = st.rel;
+    (st.ans || []).forEach((v, i) => {
+      if (!v) return;
+      ANS[i] = v;
+      const row = $('q' + (i + 1));
+      if (row) row.querySelectorAll('button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) === Number(v)));
+    });
+    DIRTY = ANS.some(v => v > 0);
+    drawCnt(); keepState();
+  }
 }
 function drawList() {
   const q = $('q').value.trim();
@@ -330,7 +363,7 @@ function openTake(cid) {
 $('qs').addEventListener('click', e => {
   const b = e.target.closest('button[data-i]'); if (!b) return;
   const i = Number(b.dataset.i), v = Number(b.dataset.v);
-  ANS[i - 1] = v; DIRTY = true;
+  ANS[i - 1] = v; DIRTY = true; keepState();
   const row = $('q' + i);
   row.classList.remove('miss');
   row.querySelectorAll('button').forEach(x => x.classList.toggle('on', Number(x.dataset.v) === v));
@@ -442,6 +475,8 @@ $('itemsSave').onclick = async () => {
 function backList() { if (DIRTY && !confirm('답한 문항이 저장되지 않았습니다. 나갈까요?')) return; DIRTY = false; hideMsg(); screen('listBox'); drawList(); }
 $('takeBack').onclick = backList; $('viewBack').onclick = backList; $('itemsBack').onclick = backList;
 $('q').addEventListener('input', drawList);
+['t_date', 't_rater', 't_rel'].forEach(id => $(id).addEventListener('input', keepState));
+['t_date', 't_rel'].forEach(id => $(id).addEventListener('change', keepState));
 $('kq').addEventListener('input', () => { PICK = null; $('kpick').innerHTML = ''; drawDrop(); });
 $('kq').addEventListener('blur', () => setTimeout(() => { $('kdrop').style.display = 'none'; }, 150));
 $('kq').addEventListener('keydown', e => {
@@ -463,7 +498,7 @@ async function afterLogin(user) {
   $('mainBox').style.display = '';
   $('who').textContent = me.name + ' (' + (me.role || '') + ')';
   if (!CAN_EDIT()) { $('listBox').innerHTML = '<div class="empty">이 화면은 관리자 · 행정 · 데스크만 씁니다.</div>'; return; }
-  if (await loadAll()) drawList();
+  if (await loadAll()) { drawList(); restoreState(); }
 }
 (async () => {
   const { data } = await sb.auth.getSession();
