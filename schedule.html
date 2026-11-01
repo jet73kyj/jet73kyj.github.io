@@ -5897,9 +5897,12 @@ async function layNewSchedule(schedId, fromDate){
 async function refreshRuns(scheduleId){
   try {
     // 예정·쉼·휴무를 지운다. 나눠 진행하는 발추 줄([분산5회])은 남긴다
+    //   오늘부터만 지운다 — 지난 날짜는 손대지 않는다 (2026-11-02)
+    //   (지난 휴무·쉼을 지웠다 다시 깔면 선생님이 확인한 날이 풀렸음)
     const { data: olds } = await sb.from('nl_sessions')
       .select('id, memo')
       .eq('schedule_id', scheduleId).eq('month_key', mon)
+      .gte('plan_date', todayKr())
       .in('status', ['예정','쉼','휴무']);
     const kill = (olds || []).filter(v => !isSplitRun(v)).map(v => v.id);
     if (kill.length) await sb.from('nl_sessions').delete().in('id', kill);
@@ -6957,7 +6960,11 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
   //   옛 줄  — 끝날 = 그 날 하루 전 · 끝난달 = 이 달 (다음 달부터 안 나옴)
   //   새 줄  — 시작날 = 그 날
   //   비어 있으면 예전처럼 달 단위로 끊는다
-  const _d = String(applyD || '').trim();
+  let _d = String(applyD || '').trim();
+  // 비우면 오늘부터 (보는 달이 앞날이면 그 달 1일) — 지난 기록은 손대지 않는다 (2026-11-02)
+  if (!_d) { const _t0 = todayKr(), _f0 = mon + '-01'; _d = (_t0 > _f0) ? _t0 : _f0; }
+  // 지우는 것은 오늘부터만 (변경 시작일을 지난 날짜로 적어도 지난 줄은 그대로)
+  const _cutDel = (_d > todayKr()) ? _d : todayKr();
   let oldUpd, newFrom = null;
   if (_d) {
     const dd = new Date(_d + 'T00:00:00');
@@ -7066,11 +7073,12 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     //    그 날 앞의 회기(이미 한 수업)는 옛 시각 그대로 남는다
     if (_d) {
       await sb.from('nl_sessions').delete()
-        .eq('schedule_id', edRow.id).gte('plan_date', _d)
+        .eq('schedule_id', edRow.id).gte('plan_date', _cutDel)
         .in('status', ['예정','쉼','휴무']);
     } else {
       await sb.from('nl_sessions').delete()
         .eq('schedule_id', edRow.id).gte('month_key', mon)
+        .gte('plan_date', _cutDel)
         .in('status', ['예정','쉼','휴무']);
     }
 
@@ -7114,7 +7122,8 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     await sb.from('nl_sessions').delete()
       .eq('therapy_id', edRow.therapy_id)
       .is('schedule_id', null)
-      .gte('month_key', mon).in('status', ['예정','쉼','휴무']);
+      .gte('month_key', mon).gte('plan_date', _cutDel)
+      .in('status', ['예정','쉼','휴무']);
 
     // ⑤ 새 요일로 이번 달 회기를 깐다
     await sb.rpc('nl_make_sessions', { p_month: mon });
