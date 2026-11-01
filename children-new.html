@@ -1221,6 +1221,7 @@ $('saveNew').onclick = async () => {
     // ── 수업 ──
     let ok = 0;
     const months = {};
+    const newScs = [];
     for (const L of lsns) {
       const { data: th, error: te } = await sb.from('nl_therapies').insert({
         child_id: data.id, therapy_type_id: L.tt, support_type_id: L.st,
@@ -1230,29 +1231,46 @@ $('saveNew').onclick = async () => {
       }).select('id').single();
       if (te) { extra += '\n⚠️ 수업을 넣지 못했습니다. ' + te.message; continue; }
 
-      const { error: se } = await sb.from('nl_therapy_schedules').insert({
+      const { data: scRow, error: se } = await sb.from('nl_therapy_schedules').insert({
         therapy_id: th.id, weekday: L.wd, start_time: L.hm + ':00',
         therapist_id: L.th, duration: L.du,
         week1: true, week2: true, week3: true, week4: true,
         from_date: L.from, to_date: L.to
-      });
+      }).select('id').single();
       if (se) { extra += '\n⚠️ 수업요일을 넣지 못했습니다. ' + se.message; continue; }
 
       TAKEN[L.wd + '|' + L.hm + '|' + L.th] = true;
       ok++;
       const mk = (L.from || '').slice(0, 7);
       if (mk) months[mk] = true;
+      if (scRow && scRow.id) newScs.push({ id: scRow.id, from: mk });
     }
     if (ok) extra += '\n수업 ' + ok + '개';
 
     // ── 회기 깔기 ──
     if (ok && data.status === '치료중') {
+      // 새 요일줄마다 시작 달부터 이번 달까지 깐다 (2026-11-02)
+      //   nl_make_sessions 는 이제 오늘 앞 날짜를 안 깐다 — 늦게 등록한 수업의 지난 날짜는
+      //   그 요일줄만 까는 nl_remake_schedule_month 로 (지난 달도 빠짐없이)
       const now = new Date();
-      months[now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')] = true;
-      for (const mk of Object.keys(months)) {
-        try { await sb.rpc('nl_make_sessions', { p_month: mk }); } catch (me) {}
+      const curMk = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      const layBad = [];
+      for (const sc of newScs) {
+        let mk = (sc.from && sc.from < curMk) ? sc.from : curMk;
+        for (let guard = 0; guard < 24 && mk <= curMk; guard++) {
+          try {
+            const { error: le } = await sb.rpc('nl_remake_schedule_month', { p_schedule_id: sc.id, p_month: mk });
+            if (le) layBad.push(mk + ' ' + (le.message || '오류'));
+          } catch (me) { layBad.push(mk + ' 서버에 닿지 못함'); }
+          let yy = Number(mk.slice(0, 4)), mm = Number(mk.slice(5, 7)) + 1;
+          if (mm > 12) { mm = 1; yy++; }
+          mk = yy + '-' + String(mm).padStart(2, '0');
+        }
       }
-      extra += '\n회기도 깔았습니다.';
+      for (const mk of Object.keys(months)) {
+        if (mk > curMk) { try { await sb.rpc('nl_make_sessions', { p_month: mk }); } catch (me) {} }
+      }
+      extra += layBad.length ? ('\n⚠️ 회기를 일부 깔지 못했습니다 — ' + layBad.join(' / ')) : '\n회기도 깔았습니다.';
     } else if (ok) {
       extra += '\n⚠️ 상태가 「치료중」이 아니라 회기는 아직 안 깔립니다.';
     }
