@@ -576,9 +576,10 @@ function areaShareOf(r, tt){
   return a ? Number(a.share_pct) || 0 : 0;
 }
 let PAYM = [], TFEES = [];   // 그 달 · 지난달 납부 줄 · 학부모 수업료 (5:5 셈에만)
+let GFEES = {};   // 그룹반 번호 -> 1인당 학부모 금액 (그룹 5:5 셈에만 · 2026-11-02)
 let SHAREMISS = false;
 // 그 회기의 학부모 1회 결제 단가 — 납부 메모 [요일줄단가요일줄:금액] → 없으면 담당 선생님 학부모 수업료
-function payUnitOf(s, sc, dur){
+function payUnitOf(s, sc, dur, noFee){
   const mk = String(s.month_key || mon);
   const sid = Number(s.schedule_id || 0);
   for (const p of PAYM) {
@@ -590,6 +591,7 @@ function payUnitOf(s, sc, dur){
       if (a === sid && b > 0) return b;
     }
   }
+  if (noFee) return 0;
   const th = Number((sc && sc.therapist_id) || s.therapist_id);
   const f = TFEES.filter(x => Number(x.therapist_id) === th && String(x.from_month || '') <= mk)
     .sort((a, b) => String(b.from_month).localeCompare(String(a.from_month)))[0];
@@ -795,7 +797,7 @@ function calc(){
     //   옛 방식(메모에 「심리」 + 특별 단가)은 영역별 단가가 없을 때만 (지난 자료 보호)
     const tt2 = tt || (s.therapy_id ? TPTT[s.therapy_id] : null) || null;
     const aFee = isGrp ? 0 : areaFeeOf(r, tt2);
-    const shp  = isGrp ? 0 : areaShareOf(r, tt2);   // 5:5 (2026-10-28)
+    const shp  = areaShareOf(r, tt2);   // 5:5 (2026-10-28) · 그룹도 (2026-11-02 미술공개수업)
     const myA = TH_AREAS[thId] || [];
     if (tt2 && myA.length && myA.indexOf(Number(tt2)) < 0 && AREAMISS.indexOf(Number(tt2)) < 0) AREAMISS.push(Number(tt2));
     const isSp = !aFee && r.special_fee && String(s.memo||'').includes('심리');
@@ -804,7 +806,16 @@ function calc(){
     const part = s._unpaid ? 0 : (rest ? rest / 40 : Number(s.minutes || 40) / 40);
     let fee, unit = 0, ulab = '';
     const gFee = isGrp ? (areaGrpOf(r, tt2) || Number(r.group_fee) || 0) : 0;
-    if (shp && !isGrp) {
+    if (shp && isGrp) {
+      // 그룹 5:5 — 그 그룹반 1인당 학부모 금액(납부 메모 [요일줄단가] 먼저)의 몇 % (2026-11-02)
+      const pu = payUnitOf(s, sc, dur, true) || GFEES[sc._grp] || 0;
+      if (!pu) SHAREMISS = true;
+      k.m40 += part;
+      unit = pu * shp / 100; fee = unit * part; ulab = '5:5 그룹 · ' + ttName(tt2);
+      k.cid = s.child_id;
+      (k.shareMk = k.shareMk || {})[String(s.month_key || mon)] = shp;
+    }
+    else if (shp) {
       // 5:5 — 그 회 학부모 결제 단가의 몇 % · 리뷰 할인은 아래에서 아동 · 달마다 한 번 뺀다
       const pu = payUnitOf(s, sc, dur);
       if (!pu) SHAREMISS = true;
@@ -1300,6 +1311,9 @@ async function loadEvals(){
     const r2 = await sb.from('nl_therapist_fees').select('therapist_id, from_month, fee_40, fee_50, fee_60');
     if (r2.error) throw r2.error;
     TFEES = r2.data || [];
+    const r3 = await sb.from('nl_groups').select('id, fee');
+    if (r3.error) throw r3.error;
+    GFEES = {}; (r3.data || []).forEach(g => { GFEES[g.id] = Number(g.fee) || 0; });
   } catch (e) { console.error('5:5 셈 자료 읽기 실패', e); }
 }
 
