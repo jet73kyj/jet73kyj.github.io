@@ -55,6 +55,8 @@
            border:1px solid #ECE8E3; border-radius:8px; font-size:14px; font-family:inherit; }
   .asked { margin-top:10px; background:#FBEDE6; border-left:3px solid #C2553A;
            border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap; }
+  .replied { margin-top:8px; background:#EEF5EC; border-left:3px solid #3B6D11;
+           border-radius:8px; padding:10px 12px; font-size:13.5px; white-space:pre-wrap; }
   .msg { margin-top:10px; font-size:13.5px; white-space:pre-wrap; }
   .msg.err { color:#993C1D; }
   .sheetlogo { text-align:center; margin-top:20px; }
@@ -79,7 +81,7 @@
   @media (max-width:640px) { .sheet { padding:14px; } }
   @media print {
     body { background:#fff; }
-    .hd, .tools, .act, .askbox, .asked, .msg, .noprint { display:none !important; }
+    .hd, .tools, .act, .askbox, .asked, .replied, .msg, .noprint { display:none !important; }
     .wide { padding:0; } .sheet { padding:20px; }
   }
 </style>
@@ -121,7 +123,7 @@ let ME = null, ALL = [], CUR = null;
 async function load(){
   ALL = [];
   const { data, error } = await sb.from('nl_pay_share')
-    .select('id, month_key, ver, sheet_html, net, published_at, seen_at, ask_text, ask_at')
+    .select('id, month_key, ver, sheet_html, net, published_at, seen_at, ask_text, ask_at, reply_text, reply_at')
     .eq('therapist_id', ME.id)
     .order('month_key', { ascending: false }).order('ver', { ascending: false });
   if (error) { $('body').innerHTML = '<div class="empty">불러오지 못했습니다.<br>' + esc(error.message) + '</div>'; return false; }
@@ -151,6 +153,7 @@ function draw(){
     +   '<button id="askBtn" class="bt">문의하기</button>'
     + '</div>'
     + (CUR.ask_text ? '<div class="asked">보낸 문의 (' + md(CUR.ask_at) + ')\n' + esc(CUR.ask_text) + '</div>' : '')
+    + (CUR.ask_text && CUR.reply_text ? '<div class="replied">센터 답변 (' + md(CUR.reply_at) + ')\n' + esc(CUR.reply_text) + '</div>' : '')
     + '<div class="askbox" id="askBox"><textarea id="askTx" maxlength="500" placeholder="어느 아동 · 어느 날짜가 다른지 적어 주세요 (500자까지)"></textarea>'
     +   '<div class="act" style="margin-top:8px;"><button id="askSend" class="bt">보내기</button>'
     +   '<button id="askNo" class="bt">닫기</button></div></div>'
