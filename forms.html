@@ -126,6 +126,13 @@
   .gml .ft .w { grid-column:1 / span 2; }
   .gmchk { cursor:pointer; user-select:none; }
   .gml .gpr { display:none; white-space:pre-wrap; }
+  .gfm input[data-g], .gfm input[data-x], .gfm textarea { border:1px dashed #d8c7b3; background:#fffdf9; font-family:inherit; font-size:12px; padding:1px 4px; box-sizing:border-box; }
+  .gfm textarea { width:100%; resize:vertical; }
+  .gfm .gpr { display:none; white-space:pre-wrap; text-align:left; }
+  .gfm.locked textarea { display:none !important; }
+  .gfm.locked .gpr { display:block !important; }
+  .gfm.locked .gmchk { cursor:default; }
+  .gfm.locked input[data-g]::placeholder { color:transparent; }
   .dsheet.gsheet { page-break-after:always; }
   /* 책갈피 라벨 모양 갈래 (2026-10-09 은정님) — 고른 라벨만 흰 바탕 · 위 카멜 띠 · 아래 선과 이어짐 */
   .gmtabs { display:flex; gap:4px; align-items:flex-end; flex-wrap:wrap; margin:0 auto 12px; max-width:780px;
@@ -178,6 +185,10 @@
     body.print-doc .gml input::placeholder { color:transparent !important; }
     body.print-doc .gml td input { font-size:9.5px !important; padding:0 !important; }
     body.print-doc .gml .gpr { display:block !important; }
+    body.print-doc .gfm input { border:none !important; background:transparent !important; }
+    body.print-doc .gfm input::placeholder { color:transparent !important; }
+    body.print-doc .gfm textarea { display:none !important; }
+    body.print-doc .gfm .gpr { display:block !important; }
     body.print-doc .gmno { color:#111 !important; font-weight:normal !important; }
     body.print-doc .gsheet:last-of-type { page-break-after:auto; }
     body.print-doc .dsheet { border:none; padding:0; max-width:none; margin:0; font-size:11px; }
@@ -1177,57 +1188,78 @@ function gmLetter(d) {
     +   '<div class="w">전화) ' + i('tel', '24%') + ' &nbsp; 전송) ' + i('fax', '24%') + ' &nbsp; E-mail) ' + i('mail', '30%') + '</div>'
     + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
 }
-function gmBox(on, lab) { return '<span class="gmchk">' + (on ? '☑' : '☐') + ' ' + lab + '</span>'; }
-function gmRefer(k) {
+// 의뢰서 · 검사결과서 · 진단서 — 칸에 적고 공문과 함께 저장 (2026-11-03 은정님)
+//   적은 글은 공문 줄(nl_gongmun.data)에 함께 담김 · 칸 이름 r_ 의뢰서 / t_ 검사결과서 / x_ 진단서
+//   ☑ 표시는 c_ 로 시작하는 칸 ('1' = 체크) · 진단서 주민번호는 저장하지 않음 (data-x)
+function gmBox(d, key, lab) {
+  const on = d && d['c_' + key] === '1';
+  return '<span class="gmchk" data-gc="' + key + '">' + (on ? '☑' : '☐') + ' ' + lab + '</span>';
+}
+function gfI(d, k, w, ph) {
+  return '<input type="text" data-g="' + k + '" value="' + esc((d && d[k]) || '') + '" style="width:' + (w || '100%') + ';"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + '>';
+}
+function gfA(d, k, h) {
+  const v = esc((d && d[k]) || '');
+  return '<textarea data-g="' + k + '" style="height:' + (h || 60) + 'px;">' + v + '</textarea><div class="gpr" data-p="' + k + '">' + v + '</div>';
+}
+function gfDate(d, p) {
+  return gfI(d, p + 'yy', '52px') + ' 년 ' + gfI(d, p + 'mm', '34px') + ' 월 ' + gfI(d, p + 'dd', '34px') + ' 일';
+}
+function gmRefer(k, d) {
+  d = d || {};
   const nm = esc(k.name || ''), bd = esc(k.birth || '');
-  const cell = 'style="border:1px solid #333;padding:5px 6px;"';
-  return '<div class="dsheet gsheet" data-sheet="refer"><table>'
+  return '<div class="dsheet gsheet gfm" data-sheet="refer"><table>'
     + '<colgroup><col style="width:12%"><col style="width:12%"><col style="width:22%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:14%"></colgroup>'
-    + '<tr><td colspan="4" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;">발달재활서비스 의뢰서</td><th>병록번호</th><td colspan="2"></td></tr>'
-    + '<tr><th>연 번 호</th><td colspan="2"></td></tr>'
+    + '<tr><td colspan="4" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;">발달재활서비스 의뢰서</td><th>병록번호</th><td colspan="2">' + gfI(d, 'r_rec') + '</td></tr>'
+    + '<tr><th>연 번 호</th><td colspan="2">' + gfI(d, 'r_seq') + '</td></tr>'
     + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + nm + '</td><th>생년월일</th><td colspan="2">' + bd + '</td></tr>'
-    + '<tr><th>주 소</th><td colspan="5" style="height:30px;"></td></tr>'
-    + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(0, '시 각') + '<br>' + gmBox(0, '청 각') + '<br>' + gmBox(0, '언 어') + '</td>'
-    +   '<td colspan="2">' + gmBox(0, '뇌병변') + '<br>' + gmBox(0, '지 적') + '<br>' + gmBox(0, '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">&nbsp;</div></th></tr>'
+    + '<tr><th>주 소</th><td colspan="5" style="height:30px;">' + gfI(d, 'r_addr') + '</td></tr>'
+    + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(d, 'r_d1', '시 각') + '<br>' + gmBox(d, 'r_d2', '청 각') + '<br>' + gmBox(d, 'r_d3', '언 어') + '</td>'
+    +   '<td colspan="2">' + gmBox(d, 'r_d4', '뇌병변') + '<br>' + gmBox(d, 'r_d5', '지 적') + '<br>' + gmBox(d, 'r_d6', '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">' + gfI(d, 'r_onset', '100%', '예: 2024. 3.') + '</div></th></tr>'
     + '<tr><th colspan="7">발달재활 서비스 필요 분야*(서비스 필요영역에 ☑표 하세요)</th></tr>'
     + '<tr><th colspan="2">영역</th><th colspan="5">세부영역</th></tr>'
-    + '<tr><td colspan="2">' + gmBox(0, '신체발달') + '</td><td>' + gmBox(0, '감각') + '</td><td colspan="2">' + gmBox(0, '소근육') + '</td><td colspan="2">' + gmBox(0, '대근육') + '</td></tr>'
-    + '<tr><td colspan="2">' + gmBox(0, '의사소통') + '</td><td>' + gmBox(0, '구문/의미') + '</td><td colspan="2">' + gmBox(0, '음운/청력') + '</td><td colspan="2">' + gmBox(0, '화용') + '</td></tr>'
-    + '<tr><td colspan="2">' + gmBox(0, '심리행동') + '</td><td>' + gmBox(0, '행동문제') + '</td><td colspan="2">' + gmBox(0, '정서/심리') + '</td><td colspan="2">' + gmBox(0, '사회성') + '</td></tr>'
-    + '<tr><td colspan="2" style="text-align:center;">선택사항</td><td colspan="5">' + gmBox(0, '지능') + '</td></tr>'
+    + '<tr><td colspan="2">' + gmBox(d, 'r_a1', '신체발달') + '</td><td>' + gmBox(d, 'r_a11', '감각') + '</td><td colspan="2">' + gmBox(d, 'r_a12', '소근육') + '</td><td colspan="2">' + gmBox(d, 'r_a13', '대근육') + '</td></tr>'
+    + '<tr><td colspan="2">' + gmBox(d, 'r_a2', '의사소통') + '</td><td>' + gmBox(d, 'r_a21', '구문/의미') + '</td><td colspan="2">' + gmBox(d, 'r_a22', '음운/청력') + '</td><td colspan="2">' + gmBox(d, 'r_a23', '화용') + '</td></tr>'
+    + '<tr><td colspan="2">' + gmBox(d, 'r_a3', '심리행동') + '</td><td>' + gmBox(d, 'r_a31', '행동문제') + '</td><td colspan="2">' + gmBox(d, 'r_a32', '정서/심리') + '</td><td colspan="2">' + gmBox(d, 'r_a33', '사회성') + '</td></tr>'
+    + '<tr><td colspan="2" style="text-align:center;">선택사항</td><td colspan="5">' + gmBox(d, 'r_a4', '지능') + '</td></tr>'
     + '<tr><th colspan="7">향후 치료에 대한 소견<div style="font-weight:normal;font-size:10px;">( 언어, 청능, 미술, 음악, 행동, 놀이, 심리운동, 재활심리, 감각재활, 운동재활 등 필요한 발달재활서비스에 대한 소견 )</div></th></tr>'
-    + '<tr><td colspan="7" style="height:120px;"></td></tr>'
+    + '<tr><td colspan="7" style="height:120px;vertical-align:top;">' + gfA(d, 'r_op', 116) + '</td></tr>'
     + '<tr><td colspan="7" style="line-height:2;">첨부 검사자료 및 세부영역 검사 결과에 따라 위와 같이 진단함.<br>※ 세부영역 검사결과서[서식4-2] 및 검사자료 사본첨부</td></tr>'
-    + '<tr><td colspan="7" style="text-align:center;line-height:2.4;padding:14px 6px;">년 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 일<br>(서명 또는 인)'
-    +   '<div style="text-align:left;line-height:2;margin-top:14px;">병 · 의원 주소(전화번호) :<br>병 · 의원 명 :<br>의사면허번호 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )과 전문의 의사명 :</div></td></tr>'
+    + '<tr><td colspan="7" style="text-align:center;line-height:2.4;padding:14px 6px;">' + gfDate(d, 'r_') + '<br>(서명 또는 인)'
+    +   '<div style="text-align:left;line-height:2;margin-top:14px;">병 · 의원 주소(전화번호) : ' + gfI(d, 'r_haddr', '68%') + '<br>병 · 의원 명 : ' + gfI(d, 'r_hname', '60%')
+    +   '<br>의사면허번호 : ' + gfI(d, 'r_lic', '22%') + ' ( ' + gfI(d, 'r_dept', '14%') + ' )과 전문의 의사명 : ' + gfI(d, 'r_doc', '20%') + '</div></td></tr>'
     + '</table></div>';
 }
-function gmDetail(k) {
+function gmDetail(k, d) {
+  d = d || {};
   const nm = esc(k.name || ''), bd = esc(k.birth || '');
   let rows = '';
-  for (let r = 0; r < 5; r++) rows += '<tr><td style="height:68px;"></td><td></td><td></td></tr>';
-  return '<div class="dsheet gsheet" data-sheet="detail"><h2>세부영역 검사결과서</h2><table>'
+  for (let r = 1; r <= 5; r++) rows += '<tr><td style="height:68px;vertical-align:top;">' + gfA(d, 't_s' + r, 62) + '</td><td style="vertical-align:top;">' + gfA(d, 't_t' + r, 62)
+    + '</td><td style="vertical-align:top;">' + gfA(d, 't_r' + r, 62) + '</td></tr>';
+  return '<div class="dsheet gsheet gfm" data-sheet="detail"><h2>세부영역 검사결과서</h2><table>'
     + '<colgroup><col style="width:10%"><col style="width:10%"><col style="width:30%"><col style="width:50%"></colgroup>'
     + '<tr><th rowspan="2">신청인</th><th>성 명</th><td style="height:30px;">' + nm + '</td><th>생년월일 &nbsp; ' + bd + '</th></tr>'
-    + '<tr><th>주 소</th><td colspan="2" style="height:30px;"></td></tr>'
+    + '<tr><th>주 소</th><td colspan="2" style="height:30px;">' + gfI(d, 't_addr') + '</td></tr>'
     + '</table><table style="margin-top:-1px;"><colgroup><col style="width:14%"><col style="width:14%"><col></colgroup>'
-    + '<tr><th colspan="2">영 역</th><td>' + gmBox(0, '신체발달') + ' &nbsp; ' + gmBox(0, '의사소통') + ' &nbsp; ' + gmBox(0, '심리행동') + ' &nbsp; ' + gmBox(0, '선택(지능)') + '</td></tr>'
+    + '<tr><th colspan="2">영 역</th><td>' + gmBox(d, 't_a1', '신체발달') + ' &nbsp; ' + gmBox(d, 't_a2', '의사소통') + ' &nbsp; ' + gmBox(d, 't_a3', '심리행동') + ' &nbsp; ' + gmBox(d, 't_a4', '선택(지능)') + '</td></tr>'
     + '<tr><th>세부영역</th><th>검사도구명<br>(검사기관)</th><th>검사 결과</th></tr>' + rows + '</table></div>';
 }
-function gmDiag(k) {
+function gmDiag(k, d) {
+  d = d || {};
   const nm = esc(k.name || '');
-  return '<div class="dsheet gsheet" data-sheet="diag"><table>'
+  return '<div class="dsheet gsheet gfm" data-sheet="diag"><table>'
     + '<colgroup><col style="width:11%"><col style="width:13%"><col style="width:26%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:14%"></colgroup>'
-    + '<tr><td colspan="5" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;letter-spacing:10px;">진 단 서</td><th>병록번호</th><td></td></tr>'
-    + '<tr><th>연 번 호</th><td></td></tr>'
-    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + nm + '</td><th>주민등록번호</th><td colspan="2"></td></tr>'
-    + '<tr><th>주 소</th><td colspan="5" style="height:30px;"></td></tr>'
-    + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(0, '시 각') + '<br>' + gmBox(0, '청 각') + '<br>' + gmBox(0, '언 어') + '</td>'
-    +   '<td colspan="2">' + gmBox(0, '지 적') + '<br>' + gmBox(0, '뇌병변') + '<br>' + gmBox(0, '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">&nbsp;</div></th></tr>'
-    + '<tr><th colspan="2">향후 치료에 대한 소견<div style="font-weight:normal;font-size:9.5px;">(언어, 청능, 미술, 음악, 행동, 놀이, 심리운동, 재활심리, 감각재활, 운동재활 등 필요한 발달재활서비스에 대한 소견)</div></th><td colspan="5" style="height:70px;"></td></tr>'
+    + '<tr><td colspan="5" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;letter-spacing:10px;">진 단 서</td><th>병록번호</th><td>' + gfI(d, 'x_rec') + '</td></tr>'
+    + '<tr><th>연 번 호</th><td>' + gfI(d, 'x_seq') + '</td></tr>'
+    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + nm + '</td><th>주민등록번호</th><td colspan="2"><input type="text" data-x="xrrn" style="width:100%;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td></tr>'
+    + '<tr><th>주 소</th><td colspan="5" style="height:30px;">' + gfI(d, 'x_addr') + '</td></tr>'
+    + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(d, 'x_d1', '시 각') + '<br>' + gmBox(d, 'x_d2', '청 각') + '<br>' + gmBox(d, 'x_d3', '언 어') + '</td>'
+    +   '<td colspan="2">' + gmBox(d, 'x_d4', '지 적') + '<br>' + gmBox(d, 'x_d5', '뇌병변') + '<br>' + gmBox(d, 'x_d6', '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">' + gfI(d, 'x_onset', '100%', '예: 2024. 3.') + '</div></th></tr>'
+    + '<tr><th colspan="2">향후 치료에 대한 소견<div style="font-weight:normal;font-size:9.5px;">(언어, 청능, 미술, 음악, 행동, 놀이, 심리운동, 재활심리, 감각재활, 운동재활 등 필요한 발달재활서비스에 대한 소견)</div></th><td colspan="5" style="height:70px;vertical-align:top;">' + gfA(d, 'x_op', 90) + '</td></tr>'
     + '<tr><td colspan="7" style="line-height:2.2;">첨부 검사자료 결과에 따라 위와 같이 진단함.<br>* 검사자료 사본 첨부</td></tr>'
-    + '<tr><td colspan="7" style="text-align:center;line-height:2.4;padding:30px 6px 16px;">년 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 일<br>(서명 또는 인)'
-    +   '<div style="text-align:left;line-height:2.4;margin-top:20px;">병·의원 주소(전화번호) :<br>병·의원 명 :<br>의사면허번호 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; )과 전문의 의사성명 :</div></td></tr>'
+    + '<tr><td colspan="7" style="text-align:center;line-height:2.4;padding:30px 6px 16px;">' + gfDate(d, 'x_') + '<br>(서명 또는 인)'
+    +   '<div style="text-align:left;line-height:2.4;margin-top:20px;">병·의원 주소(전화번호) : ' + gfI(d, 'x_haddr', '68%') + '<br>병·의원 명 : ' + gfI(d, 'x_hname', '60%')
+    +   '<br>의사면허번호 : ' + gfI(d, 'x_lic', '22%') + ' ( ' + gfI(d, 'x_dept', '14%') + ' )과 전문의 의사성명 : ' + gfI(d, 'x_doc', '20%') + '</div></td></tr>'
     + '</table></div>';
 }
 function gmDefaults(date) {
@@ -1257,7 +1289,7 @@ function gmCtl(d) {
 async function openRefer(keep) {
   GM_MODE = 'refer';
   $('dvTitle').textContent = '발달의뢰서 모음 — 공문 · 의뢰서 · 세부영역 검사결과서 · 진단서';
-  $('dvHint').textContent = '공문 칸(점선)은 고칠 수 있습니다 · 의뢰서 등은 빈 서식이며 ☐ 를 누르면 ☑ 로 바뀝니다 · 인쇄 단추로 고른 서식만 인쇄';
+  $('dvHint').textContent = '점선 칸은 모두 적을 수 있습니다 · ☐ 를 누르면 ☑ · 용지 안 「저장」을 누르면 공문 · 의뢰서 · 결과서 · 진단서가 함께 저장되고 아래 목록에 남습니다 (진단서 주민번호는 저장 안 됨)';
   $('dvBody').innerHTML = '<div style="padding:20px;color:#888;">불러오는 중…</div>';
   try {
     const [b, k] = await Promise.all([
@@ -1293,10 +1325,12 @@ function gmRender0(d) {
     return;
   }
   const kid = GM && GM.child ? GM.child : {};
+  const xrrn = ($('dvBody').querySelector('[data-x=xrrn]') || {}).value || '';
   const tabs = '<div class="gmtabs">' + [['letter', '공문'], ['refer', '의뢰서'], ['detail', '검사결과서'], ['diag', '진단서']]
     .map(([k, l]) => '<button type="button" data-gtab="' + k + '"' + (GM_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
-  $('dvBody').innerHTML = gmCtl(d) + tabs + gmLetter(d) + gmRefer(kid) + gmDetail(kid) + gmDiag(kid);
+  $('dvBody').innerHTML = gmCtl(d) + tabs + gmLetter(d) + gmRefer(kid, d) + gmDetail(kid, d) + gmDiag(kid, d);
   gmTab(GM_TAB);
+  if (xrrn) { const xe = $('dvBody').querySelector('[data-x=xrrn]'); if (xe) xe.value = xrrn; }
   gmStamp();
   gmBindRefer();
 }
@@ -1309,6 +1343,8 @@ function gmTab(k) {
 function gmRead() {
   const d = {};
   document.querySelectorAll('#gmLetter [data-g]').forEach(el => { d[el.dataset.g] = el.value; });
+  document.querySelectorAll('#dvBody .gfm [data-g]').forEach(el => { if (el.value.trim()) d[el.dataset.g] = el.value; });
+  document.querySelectorAll('#dvBody .gfm [data-gc]').forEach(el => { if (el.textContent.startsWith('☑')) d['c_' + el.dataset.gc] = '1'; });
   d.date = $('gmDate') ? $('gmDate').value : '';
   if (GM_MODE === 'staff') { d.kind = 'staff'; d.sub = GM_SUB; }
   if (GM_MODE === 'claim') d.kind = 'claim';
@@ -1328,8 +1364,16 @@ function gmBindRefer() {
   const body = $('dvBody');
   body.querySelectorAll('[data-gtab]').forEach(b => b.onclick = () => gmTab(b.dataset.gtab));
   body.querySelectorAll('.gmchk').forEach(el => el.onclick = () => {
+    const sh = el.closest('.dsheet'); if (sh && sh.classList.contains('locked')) return;
+    GM_DIRTY = true;
     el.textContent = el.textContent.startsWith('☐') ? el.textContent.replace('☐', '☑') : el.textContent.replace('☑', '☐');
   });
+  body.querySelectorAll('.gfm').forEach(F => F.addEventListener('input', e => {
+    const f = e.target && e.target.dataset && e.target.dataset.g;
+    const pr = f ? F.querySelector('.gpr[data-p="' + f + '"]') : null;
+    if (pr) pr.textContent = e.target.value;
+    if (f) GM_DIRTY = true;
+  }));
   const L = $('gmLetter');
   L.addEventListener('input', e => {
     const f = e.target && e.target.dataset && e.target.dataset.g;
@@ -1482,7 +1526,7 @@ async function gmLoadList() {
       ? (kindOf(g) === 'staff' && ((g.data.sub || 'join') === GM_SUB))
       : kindOf(g) === GM_MODE);
     box.innerHTML = head(rows.length) + (rows.map(g => '<div class="gl-r' + (GM && String(GM.id) === String(g.id) ? ' on' : '') + '" data-gid="' + g.id + '"><span class="gl-t">대가 ' + g.year + ' - '
-        + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' : '') + '</span>'
+        + String(g.no).padStart(3, '0') + '호 · ' + esc(gmDot(g.issued_on)) + ' · ' + esc(g.title) + (g.child_id ? ' · ' + g.child_id + '번' + (function () { const kk = GM_KIDS.find(x => String(x.id) === String(g.child_id)); return kk && kk.name ? ' ' + esc(kk.name) : ''; })() : '') + '</span>'
         + (CAN_EDIT ? '<button type="button" class="gl-x" data-gdel="' + g.id + '" title="이 공문 지우기">✕ 지우기</button>' : '') + '</div>').join('')
       || '<div class="gl-e">아직 저장한 공문이 없습니다</div>');
     // 지우기 (2026-10-09 은정님) — 관리자만 (서버 nl_gongmun_del) · 가장 마지막 번호면 다음 공문이 그 번호를 다시 씀
@@ -1539,6 +1583,7 @@ function placeTools() {
     html += B('print', '인쇄', false, GM_SAVING);
     const L = $('gmLetter');
     if (L) { L.classList.toggle('locked', lock); L.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); }
+    body.querySelectorAll('.gfm').forEach(F => { F.classList.toggle('locked', lock); F.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); });
     ['gmKid', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
     document.querySelectorAll('.gmcl select, .gmcl input, .gmcl button').forEach(el => { el.disabled = lock; });
   } else if (DOC_KIND === 'org' || DOC_KIND === 'info') {
