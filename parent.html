@@ -726,11 +726,28 @@ $('npBtn').onclick = async () => {
   try {
     const { error } = await sb.auth.updateUser({ password: a + PW_TAIL });
     if (error) throw error;
-    await sb.rpc('nl_parent_done');
+    // 표의 「비번 바꿔야 함」을 끈다 — 실패하면 다음 로그인 때 또 묻게 되므로 알린다 (2026-11-03)
+    const dn = await sb.rpc('nl_parent_done');
+    if (dn && dn.error) console.warn('nl_parent_done', dn.error);
     $('pwBox').style.display = 'none';
     await afterLogin();
   } catch (e) {
-    show($('npMsg'), '바꾸지 못했습니다.\n잠시 뒤에 다시 해 주세요.', false);
+    // 까닭을 그대로 보여 준다 (2026-11-03 · 전에는 늘 「잠시 뒤에」만 떠서 원인을 몰랐음)
+    console.warn('비밀번호 바꾸기', e);
+    const code = String((e && (e.code || e.error_code)) || '');
+    const msg  = String((e && e.message) || e || '');
+    let why;
+    if (code === 'same_password' || /different from the old/i.test(msg))
+      why = '임시 비밀번호와 같은 번호입니다.\n다른 4자리로 정해 주세요.';
+    else if (code === 'weak_password' || /weak|pwned|leaked|compromised/i.test(msg))
+      why = '이 번호는 쓸 수 없는 번호입니다.\n다른 4자리로 정해 주세요.';
+    else if (code === 'reauthentication_needed' || /reauth/i.test(msg))
+      why = '로그인한 지 오래되었습니다.\n나갔다가 임시 비밀번호로 다시 로그인해 주세요.';
+    else if (/session|jwt|not authenticated/i.test(msg))
+      why = '로그인이 끊겼습니다.\n임시 비밀번호로 다시 로그인해 주세요.';
+    else
+      why = '바꾸지 못했습니다.\n(' + (code || msg || '알 수 없는 오류') + ')\n이 글을 센터에 알려 주세요.';
+    show($('npMsg'), why, false);
   } finally {
     $('npBtn').disabled = false; $('npBtn').textContent = '이 번호로 정하기';
   }
