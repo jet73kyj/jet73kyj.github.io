@@ -447,6 +447,8 @@ function drawSlip(kind){
     + '<div style="display:flex;gap:6px;">'
     + '<button id="favBtn" class="ghost">⭐ 자주 쓰는 것</button>'
     + '<button id="prevBtn" class="ghost">↩ 지난달 것 가져오기</button>'
+    + (kind === '수입' ? '<button id="xlIn" class="ghost" title="하나은행 통장 거래내역 엑셀 (인건비 통장 → 정부지원금 · 본인부담금 통장 → 본인부담금)">📥 통장 엑셀로 쓰기</button>'
+       + '<input id="xlInFile" type="file" accept=".xls,.xlsx" style="display:none;">' : '')
     + '<button id="newSlip">＋ 새로 쓰기</button></div></div>';
 
   // 자주 쓰는 것 — 목 단추를 누르면 적요가 펼쳐진다 (속은 fillFavBox 가 채움)
@@ -915,6 +917,33 @@ async function saveFav(kind){
   }
 }
 
+// 통장 거래내역 엑셀 → { acct, mon, rows:[{d, sender, memo, amt}] }
+function bankParse(aoa){
+  let acct = '', head = -1, mon = '';
+  for (let i = 0; i < Math.min(aoa.length, 20); i++) {
+    const line = (aoa[i] || []).map(v => String(v == null ? '' : v)).join(' ');
+    const m = line.match(/계좌번호\s*:\s*([0-9-]+)/); if (m) acct = m[1];
+    const p = line.match(/조회기간\s*:\s*(\d{4})\.(\d{2})\./); if (p) mon = p[1] + '-' + p[2];
+    const cells = (aoa[i] || []).map(v => String(v == null ? '' : v).trim());
+    if (cells.includes('거래일시') && cells.some(c => c.indexOf('입금액') === 0)) { head = i; break; }
+  }
+  if (head < 0) return { err: '「거래일시 · 입금액」 칸을 찾지 못했습니다' };
+  const H = aoa[head].map(v => String(v == null ? '' : v).trim());
+  const ci = n => H.findIndex(h => h.indexOf(n) === 0);
+  const cD = ci('거래일시'), cS = ci('보낸분'), cA = ci('입금액'), cM = H.indexOf('메모');
+  const rows = [];
+  for (let i = head + 1; i < aoa.length; i++) {
+    const r = aoa[i] || [];
+    const ds = String(r[cD] == null ? '' : r[cD]).trim();
+    const dm = ds.match(/^(\d{4})\.(\d{2})\.(\d{2})/); if (!dm) continue;
+    const amt = Number(String(r[cA] == null ? '' : r[cA]).replace(/[^0-9.-]/g, '')) || 0;
+    if (amt <= 0) continue;
+    rows.push({ d: dm[1] + '-' + dm[2] + '-' + dm[3], sender: String(r[cS] == null ? '' : r[cS]).trim(),
+                memo: cM >= 0 ? String(r[cM] == null ? '' : r[cM]).trim() : '', amt });
+  }
+  return { acct, mon, rows };
+}
+
 function bindSlip(kind){
   // 자주 쓰는 것
   $('favBtn').onclick = () => {
@@ -982,6 +1011,53 @@ function bindSlip(kind){
     };
   });
 
+  // 통장 엑셀로 수입결의서 채우기 (2026-11-04 은정님)
+  //   인건비 통장(348803) → 정부지원금 / 본인부담금 통장(348791) → 본인부담금
+  //   한 달 한 장 · 내역 = 입금 한 건씩 「9/1 보낸분메모」 · 채우기만 하고 저장은 「저장」 단추로
+  if ($('xlIn')) {
+    $('xlIn').onclick = () => { if (slipLeaveOk()) { $('xlInFile').value = ''; $('xlInFile').click(); } };
+    $('xlInFile').onchange = async (ev) => {
+      const f = ev.target.files && ev.target.files[0]; if (!f) return;
+      try {
+        if (!window.XLSX) await new Promise((ok, no) => {
+          const sc = document.createElement('script');
+          sc.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+          sc.onload = ok; sc.onerror = () => no(new Error('엑셀 읽는 도구를 불러오지 못했습니다'));
+          document.head.appendChild(sc);
+        });
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+        const b = bankParse(aoa);
+        if (b.err) { alert('❌ ' + b.err + '\n\n하나은행 거래내역 엑셀인지 확인해 주세요.'); return; }
+        const isGov = /348803$/.test(b.acct), isSelf = /348791$/.test(b.acct);
+        if (!isGov && !isSelf) { alert('❌ 계좌번호를 알아보지 못했습니다 (' + (b.acct || '없음') + ').\n인건비 통장(348803) 또는 본인부담금 통장(348791) 엑셀만 됩니다.'); return; }
+        const mons = Array.from(new Set(b.rows.map(r => r.d.slice(0, 7))));
+        if (!b.rows.length) { alert('입금 줄이 없습니다.'); return; }
+        if (mons.length > 1 || mons[0] !== mk()) {
+          alert('❌ 엑셀은 ' + mons.join(' · ') + ' 입금입니다.\n위에서 그 달(' + mons[0] + ')을 고른 뒤 다시 올려 주세요.\n(한 달씩 올려 주세요)');
+          return;
+        }
+        let use = b.rows, skip = [];
+        if (isGov) { use = b.rows.filter(r => r.sender.indexOf('정부') >= 0); skip = b.rows.filter(r => r.sender.indexOf('정부') < 0); }
+        else { skip = b.rows.filter(r => r.sender.indexOf('이자') >= 0); use = b.rows.filter(r => r.sender.indexOf('이자') < 0); }
+        const word = isGov ? '정부지원금' : '본인부담금';
+        const code = CODES.find(c => c.kind === '세입' && String(c.mok || '').indexOf(word) >= 0);
+        if (!code) { alert('❌ 목 「' + word + '」를 찾지 못했습니다.'); return; }
+        if (!use.length) { alert(word + ' 입금이 없습니다.'); return; }
+        const had = slipsOfMonth('수입').filter(x => Number(x.code_id) === Number(code.id));
+        const total = use.reduce((a, r) => a + r.amt, 0);
+        if (!confirm(Number(MM) + '월 ' + word + ' — ' + use.length + '건 · 합계 ' + won(total) + '원'
+          + (skip.length ? '\n\n넣지 않은 입금 ' + skip.length + '건 (' + won(skip.reduce((a, r) => a + r.amt, 0)) + '원)\n'
+              + (isGov ? '  정부 입금이 아닌 줄 — 필요하면 따로 써 주세요' : '  이자 줄 — 「이자」 목으로 따로 써 주세요') : '')
+          + (had.length ? '\n\n⚠ 이 달 「' + code.mok + '」 결의서가 이미 ' + had.length + '장 있습니다.\n새로 채우면 한 장이 더 생깁니다 (저장하기 전까지는 안 생김).' : '')
+          + '\n\n쓰기 창에 채울까요? (확인 뒤 「저장」을 눌러야 저장됩니다)')) return;
+        const rows = use.map(r => ({ item: Number(r.d.slice(5, 7)) + '/' + Number(r.d.slice(8, 10)) + ' ' + r.sender + r.memo, amount: r.amt }));
+        openForm('수입', { code_id: code.id, title: word + ' ' + use.length + '건', attach: '통장사본', rows: rows });
+      } catch (e) {
+        alert('❌ 엑셀을 읽지 못했습니다.\n' + (e.message || e));
+      }
+    };
+  }
   $('newSlip').onclick = () => {
     if (!slipLeaveOk()) return;
     EDIT = null;
