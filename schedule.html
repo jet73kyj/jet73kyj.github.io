@@ -1678,7 +1678,7 @@
     <div class="edsec-t">변경</div>
     <div class="pgrid">
       <div>
-        <label for="ed_apply">변경 시작일 <span style="color:#9aa294;">(비우면 이 달 처음부터)</span></label>
+        <label for="ed_apply">변경 시작일 <span style="color:#9aa294;">(비우면 이 달 처음부터 · 사업 · 치료 종류도 이날부터)</span></label>
         <input id="ed_apply" type="date">
       </div>
       <!-- 시작·종료 시간 — 9:00 부터 10분 단위 (2026-09-22 은정님)
@@ -6536,21 +6536,63 @@ $('edRest').onclick = async () => {
 };
 
 // 치료 종류는 수업 전체에 한 칸 — 지난 기록이 있으면 바꾸지 않고 새 수업으로 (2026-10-08 · 52번 언어→감통이 지난 회기까지 덮어쓴 일)
+// 사업마다 쓸 수 있는 회기 방식 (서버 규칙 chk_count_mode_by_support 와 같게 · 2026-11-04)
+const DEV_MODES = ['4회만', '발4+발추1', '발4+센1', '발4+5주발추'];
+const NONDEV_MODES = ['매주', '4회만', '주차선택', '발추대체'];
+function edModeOk(st, mode){ return (Number(st) === 2 ? DEV_MODES : NONDEV_MODES).includes(mode); }
+// 사업을 바꾸면 회기 방식을 그 사업에 맞는 것으로 저절로 (2026-11-04)
+$('ed_st2').addEventListener('change', function(){
+  const st = Number($('ed_st2').value), m = $('ed_cnt').value;
+  if (edModeOk(st, m)) return;
+  $('ed_cnt').value = (st === 2) ? '4회만' : (m === '4회만' ? '4회만' : '매주');
+  if (typeof drawEdWks === 'function') drawEdWks();
+});
 async function edTtGuard(){
   if (!edRow) return true;
+  if (!edModeOk($('ed_st2').value, $('ed_cnt').value)) {
+    alert('이 사업에는 「' + $('ed_cnt').value + '」 회기 방식을 쓸 수 없습니다.\n회기 방식을 다시 골라 주세요.\n\n저장하지 않았습니다.');
+    return false;
+  }
   // 사업이 치료지원 · 방과후(3·4·6·7)면 서버 장치가 치료 종류를 언어 · 작업으로 저절로 바꾼다 (nl_therapy_area_trg)
   const _nst = Number($('ed_st2').value), _ntt = [3, 6].includes(_nst) ? 1 : [4, 7].includes(_nst) ? 2 : Number($('ed_tt').value);
-  if (_ntt === Number(edRow._tt)) return true;
+  // 사업만 바뀌어도 지난 기록이 있으면 나눈다 (한 수업에 사업이 섞이면 기록지 · 통계가 어긋남 — 점검 34)
+  if (_ntt === Number(edRow._tt) && _nst === Number(edRow.support_type_id)) return true;
   const d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   const q = await sb.from('nl_sessions').select('id').eq('therapy_id', edRow.therapy_id).lt('plan_date', today)
     .in('status', ['완료', '결석', '보강']).limit(1);
   if (q.error) { alert('지난 기록을 확인하지 못해 저장하지 않았습니다.\n' + q.error.message); return false; }
   if ((q.data || []).length) {
-    // 막지 않고 「이날부터 바꾸기」 상자를 연다 (2026-10-16)
-    openSplitBox();
+    // 지난 기록이 있으면 「변경 시작일」부터 새 수업으로 나눈다 — 따로 상자 없이 저장 한 번 (2026-11-04 은정님)
+    await edSplitBySave();
     return false;
   }
   return true;
+}
+async function edSplitBySave(){
+  const from = String($('ed_apply').value || '').trim() || (mon + '-01');
+  let r;
+  try { r = await sb.rpc('nl_split_therapy', edSpArgs(true, from)); }
+  catch (e) { r = { error: { message: '서버에 닿지 못했습니다' } }; }
+  if (r.error) { alert('❌ 저장하지 못했습니다. 아무것도 바뀌지 않았습니다.\n\n' + r.error.message); return; }
+  const d = new Date(from + 'T00:00:00');
+  const fTxt = (d.getMonth() + 1) + '월 ' + d.getDate() + '일';
+  if (!confirm('[' + (edRow._cid || '') + '] ' + (edRow._name || '') + '\n\n'
+    + fTxt + '부터 ' + (SFULL[Number($('ed_st2').value)] || '') + '(으)로 바뀝니다.\n'
+    + fTxt + ' 앞의 기록은 지금 사업 그대로 남습니다.\n\n'
+    + String(r.data || '').split(' / ').join('\n')
+    + '\n\n이대로 저장할까요?')) return;
+  const b = $('edSave'); b.disabled = true; b.textContent = '저장 중…';
+  try {
+    const x = await sb.rpc('nl_split_therapy', edSpArgs(false, from));
+    if (x.error) { alert('❌ 저장하지 못했습니다. 아무것도 바뀌지 않았습니다.\n\n' + x.error.message); return; }
+    alert('✅ ' + x.data);
+    const cid = edRow._cid;
+    $('edBox').style.display = 'none'; edRow = null;
+    await loadMonth(); draw();
+    if (typeof ovlNotice === 'function') ovlNotice(cid);
+  } catch (e) {
+    alert('❌ 저장하지 못했습니다.\n' + (e.message || e));
+  } finally { b.disabled = false; b.textContent = '저장'; }
 }
 // ===== 이날부터 새 수업으로 (2026-10-16 · 58번) =====
 //   지난 기록이 있는 수업의 치료 종류 · 사업을 바꾸면, 서버 nl_split_therapy 가 한 번에
@@ -6561,11 +6603,11 @@ function edNextM1(){
   if (m > 12) { m = 1; y++; }
   return y + '-' + String(m).padStart(2, '0') + '-01';
 }
-function edSpArgs(preview){
+function edSpArgs(preview, from){
   edSyncTime();
   const st = Number($('ed_st2').value);
   const tt = [3, 6].includes(st) ? 1 : [4, 7].includes(st) ? 2 : Number($('ed_tt').value);
-  return { p_schedule_id: edRow.id, p_from: $('ed_spFrom').value || null, p_support: st, p_tt: tt,
+  return { p_schedule_id: edRow.id, p_from: from || $('ed_spFrom').value || null, p_support: st, p_tt: tt,
            p_therapist: Number($('ed_th').value), p_weekday: $('ed_wd').value,
            p_time: $('ed_t1').value || String(edRow.start_time || '').slice(0, 5),
            p_dur: Number($('ed_t2').value) || 40, p_count_mode: $('ed_cnt').value, p_preview: preview };
@@ -6800,6 +6842,7 @@ $('edSave').onclick = async () => {
     ovlNotice(edRow && edRow._cid);   // 겹침 알림 (2026-10-06)
   } catch (e) {
     edmsg('❌ 옮기지 못했습니다.\n' + e.message, false);
+    alert('❌ 저장하지 못했습니다.\n\n' + e.message);
   } finally {
     $('edSave').disabled = false; $('edSave').textContent = '저장';
   }
