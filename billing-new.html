@@ -495,7 +495,7 @@
 
   <div class="tools">
     <input id="mk" type="month" value="2026-08">
-    <input id="q" type="search" placeholder="아동 이름 · 입금자명" style="width:190px;">
+    <input id="q" type="search" placeholder="아동 이름 · 입금자명 · 메모 · 보호자" style="width:240px;">
     <button id="load">불러오기</button>
     <span class="paytabs">
       <button class="ptab on" data-pay="all" id="tabAll">전체</button>
@@ -1045,6 +1045,7 @@ async function afterLogin(user) {
   if (!ef.error && ef.data && ef.data.length) {
     EVALFEES = ef.data.filter(x => x.active !== false);
   }
+  loadSearchAll();   // 찾기용 — 모든 달 납부 메모 · 보호자 이름 (기다리지 않음)
 
   const nT = CHILDREN.filter(x => x.status === '치료중').length;
   const nW = CHILDREN.length - nT;
@@ -1651,6 +1652,40 @@ function buildRows(childId, mk) {
 }
 
 // 아동의 입금자명 — 이번 달에 없으면 지난달 것을 이어받는다
+// 찾기용 — 모든 달 납부 메모 · 보호자 이름 (2026-11-04 은정님)
+//   부모님이 몇 달에 한 번씩 아버님 · 어머님 이름으로 입금하셔서 넓힘
+//   화면을 열 때 한 번 1,000줄씩 나눠 읽어 둔다. 못 읽으면 이 달 · 지난달만 찾는다
+let SRCH = {};   // 아동번호(글자) -> 찾기 글
+async function loadSearchAll(){
+  const add = (cid, t) => { if (!t) return; const k = String(cid); SRCH[k] = (SRCH[k] || '') + ' ' + t; };
+  const next = {};
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('nl_payments').select('id, child_id, support_type_id, memo')
+        .not('memo', 'is', null).order('id').range(from, from + 999);
+      if (error) { console.warn('찾기용 메모 못 읽음', error.message); return; }
+      (data || []).forEach(x => {
+        const m = memoOf(x, Number(x.support_type_id) === 2);
+        if (m) { const k = String(x.child_id); next[k] = (next[k] || '') + ' ' + m; }
+      });
+      if (!data || data.length < 1000) break;
+    }
+    const g1 = await sb.from('nl_guardians').select('child_id, name');
+    if (!g1.error) (g1.data || []).forEach(x => { if (x.name) { const k = String(x.child_id); next[k] = (next[k] || '') + ' ' + x.name; } });
+    const g2 = await sb.from('nl_children').select('id, guardian');
+    if (!g2.error) (g2.data || []).forEach(x => { if (x.guardian) { const k = String(x.id); next[k] = (next[k] || '') + ' ' + x.guardian; } });
+    SRCH = next;
+    if ($('q').value.trim() && LOADED_MK) drawAll();
+  } catch (e) { console.warn('찾기용 자료 못 읽음', e); }
+}
+function memoAllOf(childId) {
+  const out = [SRCH[String(childId)] || ''];
+  [SAVED[childId], PREV[childId]].forEach(sv => {
+    Object.keys(sv || {}).forEach(k => { const m = memoOf(sv[k], Number(k) === 2); if (m) out.push(m); });
+  });
+  const nt = PAYNOTE[String(childId)]; if (nt) out.push(nt);
+  return out.join(' ');
+}
 function payerOf(childId) {
   const cur = memoOf((SAVED[childId] || {})[2], true);
   if (cur) return cur;
@@ -1794,7 +1829,8 @@ function drawAll() {
     if (!q) return true;
     if (String(c.id) === q) return true;               // 아동 번호로 찾기
     if ((c.name || '').toLowerCase().includes(q)) return true;
-    return payerOf(c.id).toLowerCase().includes(q);   // 입금자명으로도 찾기
+    if (payerOf(c.id).toLowerCase().includes(q)) return true;   // 입금자명으로도 찾기
+    return memoAllOf(c.id).toLowerCase().includes(q);           // 메모 · 특이사항에 적힌 학부모 이름 (2026-11-04)
   });
 
   // 미납만 / 완납만 걸러내기
