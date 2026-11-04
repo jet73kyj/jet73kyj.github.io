@@ -3062,7 +3062,11 @@ async function _autoKeep(cid, mk) {
   if (String($('pChild').value) !== String(cid) || mkNow() !== mk || !LOADED) return;   // 그 사이 다른 아동 · 달
   const moved = _payFirstFix();
   if (!LOGID && !SLOTS.length && !VOUCHER.length) return;          // 수업도 결제도 없는 달은 만들지 않음
-  if ((LOGID && !moved) || SAVING) return;
+  // 저장된 회차가 날짜 차례가 아니면 저장해서 차례대로 (2026-11-05 · 47번 10월)
+  const ds = (ITEMS || []).slice().sort((x, y) => Number(x.seq_no) - Number(y.seq_no))
+    .map(x => x.service_date ? String(x.service_date).slice(0, 10) : '9999-99-99');
+  const unsorted = ds.some((d, k) => k > 0 && d < ds[k - 1]);
+  if ((LOGID && !moved && !unsorted) || SAVING) return;
   await saveRecord({ quiet: true });
 }
 
