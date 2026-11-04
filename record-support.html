@@ -485,7 +485,14 @@ async function afterLogin(user) {
   kbView('list');
   kbLoad();
   // 주소로 아동 · 달을 받으면 그 기록지 (기록지 점검 [기록지 열기] · 2026-10-22)
-  const _q = new URLSearchParams(location.search), _qc = _q.get('c'), _qm = _q.get('m'), _qs = _q.get('s');
+  // 새로고침해도 보던 기록지 그대로 (2026-11-04 은정님) — 이 탭에서만 기억 · 주소로 받은 것이 먼저
+  let _LAST = null; try { _LAST = JSON.parse(sessionStorage.getItem('nl_rs_last') || 'null'); } catch (e) {}
+  const _q0 = new URLSearchParams(location.search), _useUrl = /^\d+$/.test(_q0.get('c') || '');
+  const _q = _useUrl ? _q0 : new URLSearchParams(_LAST ? { c: _LAST.c || '', m: _LAST.m || '', s: _LAST.s || '', t: _LAST.t || '' } : {});
+  const _qc = _q.get('c'), _qm = _q.get('m'), _qs = _q.get('s');
+  if (!_useUrl && _LAST && !_LAST.c && /^\d{4}-\d{2}$/.test(_LAST.m || '') && $('pMonth').value !== _LAST.m) {
+    $('pMonth').value = _LAST.m; await buildPairs(); drawPairSelect(); kbLoad();
+  }
   if (/^\d+$/.test(_qc || '') && /^\d{4}-\d{2}$/.test(_qm || '')) {
     if ($('pMonth').value !== _qm) { $('pMonth').value = _qm; await buildPairs(); drawPairSelect(); }
     let i = PAIRS.findIndex(p => String(p.child.id) === _qc && (!_qs || String(p.support_type_id) === _qs));
@@ -494,7 +501,8 @@ async function afterLogin(user) {
       $('pChild').value = String(i);
       const o = $('pChild').options[$('pChild').selectedIndex], qq = $('pChildQ'); if (qq && o) qq.value = o.text;
       await loadOne();
-    } else alert(Number(_qm.slice(5)) + '월 목록에 그 아동이 없습니다.');
+      if (!_useUrl && _LAST && _LAST.y > 0) setTimeout(() => window.scrollTo(0, _LAST.y), 50);
+    } else if (_useUrl) alert(Number(_qm.slice(5)) + '월 목록에 그 아동이 없습니다.');
   }
 }
 
@@ -1534,6 +1542,15 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
     if (document.activeElement !== q) q.value = (o && o.value !== '') ? o.text : '';
   }).observe(sel, { childList: true });
 })();
+
+// 보던 자리(아동 · 달 · 내린 자리)를 이 탭에 적어 둔다 (2026-11-04)
+window.addEventListener('pagehide', function(){
+  try {
+    if (typeof ME === 'undefined' || !ME || !$('pMonth')) return;
+    if ((typeof KB_VIEW !== 'undefined' && KB_VIEW === 'list') || !LOADED || !cur || !cur.child) { sessionStorage.setItem('nl_rs_last', JSON.stringify({ m: $('pMonth').value })); return; }
+    sessionStorage.setItem('nl_rs_last', JSON.stringify({ c: String(cur.child.id), m: $('pMonth').value, s: String(cur.support_type_id || ''), y: Math.round(window.scrollY || 0) }));
+  } catch (e) {}
+});
 </script>
 
 </body>
