@@ -1688,7 +1688,8 @@ async function buildSum(){
   const ids = rows.map(r => r.id);
   const [pv, sal, ex, psh, ssh, dmm] = await Promise.all([
     sb.from('nl_th_private').select('therapist_id, bank, account_no'),   // 근로자 계좌도 함께 (2026-10-04)
-    sb.from('nl_salary').select('staff_id, base_pay, pension, health, care, employ, income_tax, local_tax').eq('month_key', mon),
+    // 저장 안 한 달은 가장 최근 저장 달 금액 그대로 (2026-11-04 은정님)
+    sb.from('nl_salary').select('staff_id, month_key, base_pay, pension, health, care, employ, income_tax, local_tax').lte('month_key', mon).order('month_key', { ascending: false }).range(0, 999),
     sb.from('nl_tax_extra').select('name, nonprofit, taxfree, from_month, to_month, memo').lte('from_month', mon),
     // 이름 옆 딱지 (2026-10-05) — 위탁: 공개 · 확인 / 근로자: 급여명세서 발송 · 확인
     sb.from('nl_pay_share').select('therapist_id, ver, seen_at').eq('month_key', mon),
@@ -1702,9 +1703,19 @@ async function buildSum(){
   const lastOf = (rows, k) => { const o = {}; (rows || []).forEach(x => { if (!o[x[k]] || x.ver > o[x[k]].ver) o[x[k]] = x; }); return o; };
   PSH = lastOf(psh.data, 'therapist_id'); SSH = lastOf(ssh.data, 'staff_id');
   DM = {}; (dmm.data || []).forEach(x => { DM[x.who + '|' + x.col] = x.memo || ''; });
+  // 직원마다 그 달 줄 → 없으면 가장 최근 저장 달 줄 (차례가 늦은 달부터라 처음 것이 가장 최근)
+  { const pick = {}; (sal.data || []).forEach(x => { if (!pick[x.staff_id]) pick[x.staff_id] = x; });
+    sal.data = Object.values(pick); }
   const sids = (sal.data || []).map(x => x.staff_id);
   let SNM = {};
-  if (sids.length) { const { data: nm } = await sb.from('nl_therapists').select('id, name').in('id', sids); (nm || []).forEach(x => { SNM[x.id] = x.name; }); }
+  if (sids.length) {
+    const { data: nm, error: nme } = await sb.from('nl_therapists').select('id, name, left_on').in('id', sids);
+    if (nme) { box.innerHTML = '<div class="ctwarn">직원 이름을 불러오지 못했습니다. ' + esc(nme.message) + '</div>'; return; }
+    const LEFT = {}; (nm || []).forEach(x => { SNM[x.id] = x.name; LEFT[x.id] = x.left_on; });
+    // 퇴사일이 그 달 1일보다 앞이면 지난달 금액을 가져오지 않음 (그 달에 저장한 줄은 그대로)
+    sal.data = sal.data.filter(x => x.month_key === mon || !LEFT[x.staff_id] || LEFT[x.staff_id] >= mon + '-01');
+  }
+  const carryTag = x => x.month_key === mon ? '' : monNo(x.month_key) + '월 금액 그대로';
   const exs = (ex.data || []).filter(x => !x.to_month || x.to_month >= mon);
   // 교육청 지원금액 — 달마다 직접 적음 (nl_tax_month · 2026-10-03)
   EDU = { amount: null, memo: '' }; PAYMEMO = { wage: '', fee: '', fuel: '' }; RET = { from: '', names: '', acc: '', w: 0, f: 0 };
@@ -1725,12 +1736,12 @@ async function buildSum(){
     wageNet: r.wage ? r.wage - r.wkShare : r.netFee, netFee: r.wage ? r.netFee : 0, fuel: r.fuel, fuelName: r.fuelName }));
   (sal.data || []).forEach(x => {
     const net = (x.base_pay || 0) - (x.pension || 0) - (x.health || 0) - (x.care || 0) - (x.employ || 0) - (x.income_tax || 0) - (x.local_tax || 0);
-    SUMROWS.push({ id: x.staff_id, who: x.staff_id + '번 ' + (SNM[x.staff_id] || ''), bank: (PV[x.staff_id] || {}).bank || '', acc: (PV[x.staff_id] || {}).account_no || '', wageNet: net, netFee: 0, fuel: 0, emp: true });
+    SUMROWS.push({ id: x.staff_id, who: x.staff_id + '번 ' + (SNM[x.staff_id] || ''), bank: (PV[x.staff_id] || {}).bank || '', acc: (PV[x.staff_id] || {}).account_no || '', wageNet: net, netFee: 0, fuel: 0, emp: true, carry: carryTag(x) });
   });
   TAXROWS = rows.map(r => r.insured
       ? { name: r.name, np: r.wage, tf: r.taxBase, note: '근로 + 프리랜서 (비영리 = 4대보험 신고금액 · 면세 = 과세대상액)' }
       : { name: r.name, np: r.taxBase, tf: 0, note: '프리랜서 3.3% (비영리 = 과세대상액)' });
-  (sal.data || []).forEach(x => TAXROWS.push({ name: SNM[x.staff_id] || (x.staff_id + '번'), np: x.base_pay || 0, tf: 0, note: '급여명세서 근로자 (비영리 = 기본급)' }));
+  (sal.data || []).forEach(x => TAXROWS.push({ name: SNM[x.staff_id] || (x.staff_id + '번'), np: x.base_pay || 0, tf: 0, note: '급여명세서 근로자 (비영리 = 기본급)' + (carryTag(x) ? ' (' + carryTag(x) + ')' : '') }));
   exs.forEach(x => TAXROWS.push({ name: x.name, np: x.nonprofit || 0, tf: x.taxfree || 0, note: '추가 줄' + (x.to_month ? ' · ' + x.to_month + '까지' : '') + (x.memo ? ' · ' + x.memo : '') }));
   drawSum();
 }
@@ -1742,7 +1753,7 @@ function drawSum(){
   box.innerHTML = '<div class="cthd">' + mon.slice(0, 4) + '년 ' + monNo(mon) + '월 지급 모음</div>'
     + '<table class="sumt"><thead><tr><th>이름</th><th>은행 · 계좌</th><th class="n">급여 실수령액</th><th class="n">실지급액 (면세)</th>'
     + '<th class="n">주유 · 교통비</th><th class="n">이체 합계</th></tr></thead><tbody>'
-    + SUMROWS.map(r => '<tr><td>' + esc(r.who) + ' ' + sumBadge(r) + (r.emp ? ' <span class="small">(급여명세서)</span>' : '') + '</td>'
+    + SUMROWS.map(r => '<tr><td>' + esc(r.who) + ' ' + sumBadge(r) + (r.emp ? ' <span class="small">(급여명세서)</span>' : '') + (r.carry ? ' <span class="stb gr" title="이 달 급여명세서를 아직 저장하지 않아 지난달 금액을 그대로 씁니다">' + esc(r.carry) + '</span>' : '') + '</td>'
         + '<td>' + esc(r.bank) + ' <span class="acc">' + esc(r.acc) + '</span></td>'
         + '<td class="n">' + (r.wageNet ? won(r.wageNet) + dmIn(r.id, 'wage') : '–') + '</td><td class="n">' + (r.netFee ? won(r.netFee) + dmIn(r.id, 'fee') : '–') + '</td>'
         + '<td class="n">' + (r.fuel ? won(r.fuel) + ' <span class="small">' + esc(r.fuelName || '') + '</span>' + dmIn(r.id, 'fuel') : '–') + '</td>'
