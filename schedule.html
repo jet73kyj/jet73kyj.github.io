@@ -6588,6 +6588,7 @@ async function edSplitBySave(){
     alert('✅ ' + x.data);
     const cid = edRow._cid;
     $('edBox').style.display = 'none'; edRow = null;
+    try { await reloadRowsAll(); } catch (e) {}
     await loadMonth(); draw();
     if (typeof ovlNotice === 'function') ovlNotice(cid);
   } catch (e) {
@@ -6836,6 +6837,8 @@ $('edSave').onclick = async () => {
       + (wantSp
           ? '\n＋' + wantSp + ' 딱지를 붙이고, 발추 1회기를 만들었습니다.'
           : '\n나눠 진행 표시는 꺼져 있습니다.'), true);
+    // 수업 · 요일줄을 서버에서 다시 읽는다 — 다시 열면 옛 값이 보이던 것 (2026-11-04)
+    try { await reloadRowsAll(); await loadMonth(); } catch (e) {}
     // 상자 셋 · 찾기 창도 다시 센다 (2026-10-01 전체 점검)
     await loadNeed();
     draw();
@@ -10840,16 +10843,15 @@ async function afterLogin(user){
   } catch (e) {}
   THS = THS_ALL;
 
-  const { data: sc, error: e3 } = await sb.from('nl_therapy_schedules')
-    .select('id, therapy_id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date, week1, week2, week3, week4');
+  const { data: sc, error: e3 } = await allRows('nl_therapy_schedules',
+    'id, therapy_id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date, week1, week2, week3, week4');
   if (e3) { show('❌ 시간표 조회 실패\n'+e3.message, false); return; }
-  const { data: tp } = await sb.from('nl_therapies')
-    .select('id, child_id, therapy_type_id, support_type_id, monthly_count, count_mode');
+  const { data: tp } = await allRows('nl_therapies',
+    'id, child_id, therapy_type_id, support_type_id, monthly_count, count_mode');
   // 종결한 아동도 함께 가져온다.
   //   종결하면 지난 달 시간표까지 사라지던 문제가 있었다.
   //   그 달에 수업요일이 살아 있는지(끝난달)로 갈리므로 상태로 거르지 않는다
-  const { data: kids } = await sb.from('nl_children')
-    .select('id, name, birth, status');
+  const { data: kids } = await allRows('nl_children', 'id, name, birth, status');
 
   const tpMap={}; (tp||[]).forEach(x=>tpMap[x.id]=x);
   const kdMap={}; (kids||[]).forEach(x=>kdMap[x.id]=x);
@@ -11945,17 +11947,27 @@ async function ovlNotice(cid){
 // 수업 · 요일줄 · 아동 목록을 다시 읽는다 (2026-10-06)
 //   처음 열 때만 읽어, 다른 화면(아동 목록 등)에서 넣은 새 아동이 탭을 닫기 전까지 안 보였다 (151번)
 //   처음 여는 코드와 같은 글을 그대로 옮긴 것 — 고칠 때는 두 곳을 함께
+// 1,000줄씩 끝까지 읽기 (2026-11-04) — 수업 표가 1,000줄에 가까워 뒷줄이 조용히 잘릴 수 있음
+async function allRows(tbl, cols){
+  let out = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from(tbl).select(cols).order('id').range(from, from + 999);
+    if (error) return { data: null, error };
+    out = out.concat(data || []);
+    if (!data || data.length < 1000) break;
+  }
+  return { data: out, error: null };
+}
 async function reloadRowsAll(){
-  const { data: sc, error: e3 } = await sb.from('nl_therapy_schedules')
-    .select('id, therapy_id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date, week1, week2, week3, week4');
+  const { data: sc, error: e3 } = await allRows('nl_therapy_schedules',
+    'id, therapy_id, weekday, start_time, therapist_id, duration, from_month, to_month, from_date, to_date, week1, week2, week3, week4');
   if (e3) return false;
-  const { data: tp } = await sb.from('nl_therapies')
-    .select('id, child_id, therapy_type_id, support_type_id, monthly_count, count_mode');
+  const { data: tp } = await allRows('nl_therapies',
+    'id, child_id, therapy_type_id, support_type_id, monthly_count, count_mode');
   // 종결한 아동도 함께 가져온다.
   //   종결하면 지난 달 시간표까지 사라지던 문제가 있었다.
   //   그 달에 수업요일이 살아 있는지(끝난달)로 갈리므로 상태로 거르지 않는다
-  const { data: kids } = await sb.from('nl_children')
-    .select('id, name, birth, status');
+  const { data: kids } = await allRows('nl_children', 'id, name, birth, status');
   if (!tp || !kids) return false;   // 하나라도 못 읽으면 지금 목록 그대로 (화면이 비지 않게)
 
   const tpMap={}; (tp||[]).forEach(x=>tpMap[x.id]=x);
