@@ -969,6 +969,7 @@ function drawTT() {
 //   보호자 서명은 종이에 직접
 // ════════════════════════════════════════════════════════════════
 const PC_CATS = ['수업일시 변경', '결제일 변경', '결제금액 변경'];
+let PC_SHOWHID = false;   // 뺀 줄 펼쳐 보기 (2026-11-04)
 async function loadPc() {
   PCROWS = []; PCERR = '';
   if (!cur) return;
@@ -1003,8 +1004,10 @@ function drawPc() {
   const area = ['작업', '물리', '언어'].map(a => '<span' + (a === tt ? ' class="on"' : '') + '>' + a + '</span>').join(' / ');
   const catHtml = cat => PC_CATS.map(x => '<span' + (cat === x ? ' class="on"' : '') + '>' + x + '</span>').join('<br>');
 
-  let rows = '', vn = 0;
+  let rows = '', vn = 0, nh = 0;
   PCROWS.forEach((r, i) => {
+    if (r.hidden) nh++;
+    if (r.hidden && !PC_SHOWHID) return;   // 뺀 줄은 감춤 · 「뺀 줄 보기」로 펼침 (2026-11-04 은정님)
     if (!r.hidden) vn++;
     const lead = (r.is_manual && r.on_date ? esc(pcDate(r.on_date)) + ' ' : '');
     rows += '<tr class="pcrow' + (r.hidden ? ' pc-hid' : '') + '" data-i="' + i + '">'
@@ -1026,6 +1029,9 @@ function drawPc() {
   for (let k = vn; k < 15; k++) {
     rows += '<tr class="pcblank"><td style="text-align:center;">' + (k + 1) + '</td><td class="pc-cat">' + catHtml('') + '</td><td></td><td></td></tr>';
   }
+  if (nh) rows += '<tr class="no-print"><td colspan="4" style="text-align:right;border:none;">'
+    + '<button type="button" class="pcshowhid" style="background:none;border:none;color:#8a8279;font-size:12px;text-decoration:underline;cursor:pointer;width:auto !important;margin:0 !important;">'
+    + (PC_SHOWHID ? '뺀 줄 감추기' : '뺀 줄 ' + nh + '개 보기') + '</button></td></tr>';
   // 직접 줄 넣기 — 화면에서만
   rows += '<tr class="no-print pcadd"><td style="text-align:center;font-weight:bold;">＋</td>'
     + '<td><select id="pcNewCat">' + PC_CATS.map(x => '<option>' + x + '</option>').join('') + '</select></td>'
@@ -1083,6 +1089,7 @@ $('pcSheet').addEventListener('keydown', e => {
 });
 $('pcSheet').addEventListener('click', async e => {
   const b = e.target.closest('button'); if (!b || PC_BUSY || !cur) return;
+  if (b.classList.contains('pcshowhid')) { PC_SHOWHID = !PC_SHOWHID; drawPc(); return; }
   const tr = b.closest('tr'); const r = (tr && tr.dataset.i != null) ? PCROWS[Number(tr.dataset.i)] : null;
   PC_BUSY = true;
   try {
@@ -1091,7 +1098,7 @@ $('pcSheet').addEventListener('click', async e => {
       pcMsg('✓ 저장했습니다.', true);
     } else if (b.classList.contains('pchide') && r) {
       await pcUpsert(pcRowVals(tr, r, !r.hidden));
-      pcMsg(r.hidden ? '✓ 서식에 되살렸습니다.' : '✓ 서식에서 뺐습니다. (화면에는 흐리게 남고 인쇄에는 안 나옵니다)', true);
+      pcMsg(r.hidden ? '✓ 서식에 되살렸습니다.' : '✓ 대장에서 뺐습니다. (아래 「뺀 줄 보기」로 되살릴 수 있습니다)', true);
     } else if (b.classList.contains('pcdel') && r && r.is_manual) {
       if (!confirm('이 줄을 지울까요?')) { PC_BUSY = false; return; }
       const { data, error } = await sb.from('nl_pay_change_notes').delete()
