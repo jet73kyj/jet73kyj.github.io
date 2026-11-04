@@ -1014,7 +1014,10 @@ function drawPc() {
       + '<td class="pcno" style="text-align:center;">' + (r.hidden ? '—' : vn) + '</td>'
       + '<td class="pc-cat">' + catHtml(r.category) + '</td>'
       + '<td><div class="pctxt-w no-print">- ' + lead
-      + '<input type="text" class="pctext" maxlength="300" value="' + pcAttr(r.auto_text) + '" title="고칠 수 있습니다 · 비우고 저장하면 처음 글로">'
+      + (r.is_manual
+          ? '<input type="text" class="pctext" maxlength="300" value="' + pcAttr(r.auto_text) + '" title="고칠 수 있습니다">'
+          // 저절로 만든 줄은 기록지를 따름 — 글은 고치지 않음 (2026-11-04 은정님 · 기록지를 고쳐도 옛 글이 남던 것)
+          : '<span class="pctext-ro">' + esc(r.auto_text || '') + '</span>')
       + (r.is_manual ? '<span style="color:#A39C95;font-size:10.5px;white-space:nowrap;">(직접)</span>' : '') + '</div>'
       + '<div class="pctext-p">- ' + lead + esc(r.auto_text || '') + '</div>'
       + '<input type="text" class="pcnote" maxlength="300" value="' + pcAttr(r.note) + '" placeholder="사유 (예: 학부모 카드 미소지)">'
@@ -1068,7 +1071,7 @@ function pcRowVals(tr, r, hidden) {
               note: tr.querySelector('.pcnote').value.trim() || null, hidden: !!hidden };
   const tx = tr.querySelector('.pctext') ? tr.querySelector('.pctext').value.trim() : String(r.auto_text || '');
   if (r.is_manual) v.manual_text = tx || String(r.auto_text || '');
-  else if (tx !== String(r.auto_text || '').trim()) v.manual_text = tx || null;
+  else v.manual_text = null;   // 저절로 만든 줄은 늘 기록지 글 (2026-11-04)
   return v;
 }
 async function pcUpsert(row) {
@@ -1130,7 +1133,7 @@ function pcPendingN() {
   let n = 0;
   document.querySelectorAll('#pcSheet tr.pcrow').forEach(tr => {
     const r = PCROWS[Number(tr.dataset.i)]; if (!r) return;
-    const tx = tr.querySelector('.pctext');
+    const tx = tr.querySelector('input.pctext');
     if (tr.querySelector('.pcnote').value.trim() !== String(r.note || '').trim()
         || (tx && tx.value.trim() !== String(r.auto_text || '').trim())) n++;
   });
