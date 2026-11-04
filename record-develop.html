@@ -1062,6 +1062,7 @@ async function loadOne() {
     rpLoad(cid, mk);
     plLoad(cid, mk);
     _rdRemember();
+    _autoKeep(cid, mk);              // 화면과 서버가 같은 기록지를 보게 — 여는 순간 저장 (2026-11-05)
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -1424,6 +1425,11 @@ function _sogWarn() {
     const note = String((tr.querySelector('.st_note') || {}).value || '').trim();
     const k = _sogKey(tr);
     if (/^(예외|포기$)/.test(no)) { w.style.display = 'none'; w.innerHTML = ''; return; }
+    // 결제가 수업보다 앞섬 — 소급결제가 아니다. 그날 수업한 것 (2026-11-05 은정님)
+    if (k.prov && k.appr && k.appr < k.prov) {
+      w.innerHTML = '결제(' + md(k.appr) + ')가 수업(' + md(k.prov) + ')보다 앞섭니다 — 소급결제가 아닙니다. 그날 수업했다면 제공일자를 ' + md(k.appr) + '로 고쳐 주세요.';
+      w.className = 'sogWarn no-print sbad'; w.style.display = 'block'; return;
+    }
     if (k.prov && k.appr && k.prov !== k.appr && mkNow() >= SOG_FROM) {
       if (k.prov.slice(0, 7) !== k.appr.slice(0, 7)) {
         w.innerHTML = '결제(' + md(k.appr) + ')가 수업(' + md(k.prov) + ')과 다른 달 — 소급결제는 그 달 안에서만 됩니다. 위 「사실 확인서」를 작성해 주세요.';
@@ -2754,8 +2760,7 @@ function rcSugHtml(r, i) {
   const n = Number(r.item_no);
   if (i == null) return '';
   if (n === 10) return rcSug10(r, i);
-  if (n === 3) return '<div class="rcsug">→ 2타임 연속 수업이면 오류가 아닙니다. 둘째 결제가 둘째 시작 30분 뒤면 사유서(예시 3 · '
-                      + FC_EXNAME[3] + ')를 남겨 주세요</div>';
+  if (n === 3) return '';   // 「2타임 연속 수업이면…」 안내 없앰 (2026-11-05 은정님)
   if (![1, 12, 18, 19, 20].includes(n) || RC_SUGSHOWN[i]) return '';
   RC_SUGSHOWN[i] = true;
   const g = rcSuggest(i);
@@ -2998,7 +3003,48 @@ function _prefillStatusFromVoucher() {
 // ─────────────────────────────────────────────
 // 저장
 // ─────────────────────────────────────────────
-async function saveRecord() {
+// ── 화면과 서버가 늘 같은 기록지를 본다 (2026-11-05 은정님) ──
+//   ① 그 달 기록지를 처음 여는 순간, 화면이 채운 일정표(날짜 · 시각 · 승인번호)를 바로 저장
+//      (전에는 「저장」을 눌러야 서버에 생겨, 서버 점검이 「기록지 없음」으로 엉뚱한 글을 냈다 — 79번 10월)
+//   ② 결제가 제공일자보다 앞서면 그날 수업한 것 (결제는 수업보다 앞설 수 없다)
+//      → 제공일자를 결제일로 맞추고 바로 저장. 소급결제는 결제가 수업보다 뒤일 때만
+//   10월 기록지부터 (9월은 인쇄 · 서명이 끝나 손대지 않음)
+const AUTO_FROM = '2026-10';
+function _payFirstFix() {
+  if (mkNow() < AUTO_FROM) return 0;
+  const mk = mkNow();
+  const trs = document.querySelectorAll('#statusTbl tbody tr');
+  let n = 0;
+  for (let i = 0; i < SESSIONS; i++) {
+    const tr = trs[i]; if (!tr) continue;
+    const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
+    if (!no || /^(예외|포기$)/.test(no)) continue;
+    const k = _sogKey(tr);
+    if (!k.prov || !k.appr || k.appr >= k.prov || k.appr.slice(0, 7) !== mk) continue;
+    const dot = k.appr.replace(/-/g, '.');
+    _calFire($('s1_provDate_' + (i + 1)), dot);
+    const sp = tr.querySelector('.st_provDate');
+    if (sp) _calFire(sp, dot);
+    n++;
+  }
+  if (n) {
+    try { _markManual(); } catch (e) {}
+    try { buildCalendar(); } catch (e) {}
+    DIRTY = true; setSaveBtn('before');
+  }
+  return n;
+}
+async function _autoKeep(cid, mk) {
+  if (IMPORTED || mk < AUTO_FROM) return;
+  try { await _pairVouchers(); } catch (e) {}
+  if (String($('pChild').value) !== String(cid) || mkNow() !== mk || !LOADED) return;   // 그 사이 다른 아동 · 달
+  const moved = _payFirstFix();
+  if (!LOGID && !SLOTS.length && !VOUCHER.length) return;          // 수업도 결제도 없는 달은 만들지 않음
+  if ((LOGID && !moved) || SAVING) return;
+  await saveRecord({ quiet: true });
+}
+
+async function saveRecord(opts) {
   if (IMPORTED) { alert('구글에서 옮겨 온 기록이라 보기만 됩니다.'); return; }
   if (!LOADED || !childId) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
   const mk = mkNow();
@@ -3102,7 +3148,8 @@ async function saveRecord() {
     loadRcBox(childId, mk);          // 저장 뒤 서버 점검 다시 받기 (2026-10-02)
     kbLoad();                        // 아동 단추 색도 다시 (2026-10-22)
   } catch (e) {
-    alert('❌ 저장하지 못했습니다.\n' + e.message);
+    if (opts && opts.quiet === true) console.warn('기록지 자동 저장 실패', e);   // 여는 순간 저장 — 실패하면 「저장 전」으로 둠
+    else alert('❌ 저장하지 못했습니다.\n' + e.message);
     setSaveBtn('before');
   } finally {
     setTimeout(() => { SAVING = false; }, 300);
