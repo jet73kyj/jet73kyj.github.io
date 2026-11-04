@@ -1019,6 +1019,7 @@ async function loadOne() {
     });
     TMAN = {};
     RCSRV = null;                    // 앞 아동 점검 값이 섞여 그려지지 않게 (2026-10-02)
+    RC_EDITED = new Set();
 
     LOGID = lg.data ? lg.data.id : null;
     ITEMS = [];
@@ -2577,6 +2578,7 @@ async function loadRcBox(cid, mk) {
     if (error) return;
     if (Number($('pChild').value) !== Number(cid)) return;      // 그 사이 다른 아동을 불렀으면 그리지 않음
     RCSRV = (data || []).filter(r => Number(r.child_id) === Number(cid));
+    RC_EDITED = new Set();           // 서버가 새로 셌으니 고친 회차 표시를 풂 (2026-11-05)
     // 글 속 다른 아동 이름 (표 잠금 그대로 — 볼 수 있는 아동만, 못 보면 번호)
     const ids = rcIds(RCSRV).kid.filter(id => !RCKID[id]);
     if (ids.length) {
@@ -2615,6 +2617,23 @@ function rcNamed(r, kidName, thName) {
 let RCKID = {};            // 점검 글에 나온 다른 아동 번호 → 이름
 let RCSRV = null;
 const RC_LOCAL = new Set([12, 19, 20, 24]);   // 빠른 결제(1) · 제공일자 ≠ 승인일자(18) · 시간 겹침(10)은 서버 한 곳 (2026-10-23) · 21~23은 화면 칸 검사
+// 저장 전에 고친 회차 — 서버 빨간 글을 그리지 않는다 (2026-11-05 은정님)
+//   서버 점검은 「저장된」 기록지를 보므로, 고친 뒤 저장 전까지는 옛 판정이다
+//   저장하면 서버가 다시 세어 새 판정을 그린다 (loadRcBox 에서 풂)
+let RC_EDITED = new Set();
+document.addEventListener('input', e => {
+  const t = e.target; if (!t) return;
+  let i = null;
+  const m = String(t.id || '').match(/^s1_(provDate|startTime|endTime)_(\d+)$/);
+  if (m) i = Number(m[2]) - 1;
+  else if (t.classList && (t.classList.contains('st_provDate') || t.classList.contains('st_apprDate') || t.classList.contains('st_apprNo'))) {
+    const tr = t.closest('tr');
+    i = tr ? [...document.querySelectorAll('#statusTbl tbody tr')].indexOf(tr) : -1;
+  }
+  if (i == null || i < 0 || RC_EDITED.has(i)) return;
+  RC_EDITED.add(i);
+  try { rcDraw(); } catch (er) {}
+});
 function rcDraw() {
   const box = $('rcBox');
   if (!box || !LOADED) return;
@@ -2623,6 +2642,7 @@ function rcDraw() {
   // 15 · 16 (변경 계약서)은 위 붉은 상자가 맡는다
   // 점검 셈은 서버 한 곳 (2026-10-23 은정님) — 화면은 적는 칸 검사(50분 · 승인번호 두 회차 · 다른 달 날짜)만 더한다
   const rows = RCSRV.filter(r => !RC_LOCAL.has(Number(r.item_no)) && ![15, 16].includes(Number(r.item_no)))
+    .filter(r => { const i = rcRowOf(r); return i == null || !RC_EDITED.has(i); })   // 저장 전 고친 회차 (2026-11-05)
     .concat(rcRuleLocal());
   let bad = 0;
   rows.forEach(r => { if (rcPlace(r)) bad++; });
@@ -2632,6 +2652,8 @@ function rcDraw() {
   box.innerHTML = bad
     ? '<b>기록지 점검 — 고칠 곳 ' + bad + '군데</b> · 기록지 안 빨간 칸을 확인해 주세요 (고친 뒤 저장하면 다시 셉니다)'
     : '기록지 점검 — 고칠 곳 없음';
+  if (RC_EDITED.size) box.innerHTML += '<br>· 고친 ' + [...RC_EDITED].sort((a, b) => a - b).map(i => (i + 1) + '회째').join(' · ')
+    + ' — 저장하면 다시 점검합니다';
   box.style.display = 'block';
   fcRefresh();
 }
