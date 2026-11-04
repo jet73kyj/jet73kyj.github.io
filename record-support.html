@@ -121,7 +121,8 @@
   .q_pay { font-size:11.5px; color:#4A433F; margin-top:3px; line-height:1.35; text-align:center; }
   .q_pay.red, input.red { color:#c62828 !important; font-weight:bold; }
   .q_pay.red, input.red { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  @media print { .q_pay { font-size:9.5px; margin-top:1px; } }
+  @media print { .q_pay { display:none !important; } }   /* 결제 정보는 화면에만 (2026-11-04) */
+  .q_fix { margin-top:3px; padding:2px 8px; font-size:11px; border:1px solid #c62828; background:#fff; color:#c62828; border-radius:5px; cursor:pointer; width:auto !important; }
 
   @media print {
     /* 발달재활 기록지와 같은 여백 (2026-09-10)
@@ -1156,25 +1157,50 @@ function payFixText(p) {
   const m = isShift(p) ? String(p.flag).match(/고정\s*([0-9:]+-[0-9:]+)/) : null;
   return m ? m[1] : payClsText(p);
 }
-function payRed(p, man) { return !!(p && p.flag && !isShift(p) && !man); }
-function payLine(p, man) {
-  if (!p) return '';
-  let s = '결제 ' + esc(_hm5(p.paid_time));
-  if (isShift(p) && !man) {
-    const m = String(p.flag).match(/고정\s*([0-9:]+-[0-9:]+)/);
-    s += '<br><span class="q_shift">고정 ' + esc(m ? m[1] : '') + ' → 시각 고침</span>';
-  } else if (p.flag && !man) s += '<br>⚠ ' + esc(p.flag);
-  return s;
+// 결제 정보는 숨기고, 수업 시작 + 40분보다 이른 결제만 빨갛게 · 대안 시각 (2026-11-04 은정님)
+//   시각 칸을 고치면 그 자리에서 다시 셈 → 맞으면 빨간 글이 사라짐 (저장하면 서버가 다시 판정)
+function _min(hm) { const m = String(hm || '').match(/(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+function _hmOf(n) { return String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'); }
+function payDur(p) { const a = _min(p && p.cls_start), b = _min(p && p.cls_end); return (a != null && b != null && b > a) ? b - a : 40; }
+function payEarly(p, timeText) {
+  if (!p || !p.paid_time) return false;
+  const st = _min(timeText) != null ? _min(timeText) : _min(p.cls_start);
+  const pt = _min(p.paid_time);
+  return st != null && pt != null && pt < st + 40;
+}
+function payAlt(p) {
+  const pt = _min(p.paid_time); if (pt == null) return '';
+  const st = Math.floor((pt - 40) / 10) * 10;
+  return _hmOf(st) + '-' + _hmOf(st + payDur(p));
+}
+function payRed(p, timeText) { return payEarly(p, timeText); }
+function payLine(p, timeText, i) {
+  if (!payEarly(p, timeText)) return '';
+  return '⚠ 결제 ' + esc(_hm5(p.paid_time)) + ' — 수업 시작 40분 전 결제'
+    + '<br>대안: 수업 ' + esc(payAlt(p))
+    + '<br><button type="button" class="q_fix" data-i="' + i + '">이대로 고치기</button>';
 }
 function paintRow(tr) {
   const i = Number(tr.dataset.i), p = PAY[i] || null;
-  const red = payRed(p, EDITED[i]);
+  const tv = tr.querySelector('.q_time').value;
+  const red = payRed(p, tv);
   tr.querySelector('.q_date').classList.toggle('red', red);
   tr.querySelector('.q_time').classList.toggle('red', red);
   const pd = tr.querySelector('.q_pay');
   pd.classList.toggle('red', red);
-  pd.innerHTML = payLine(p, EDITED[i]);
+  pd.innerHTML = payLine(p, tv, i);
 }
+// 「이대로 고치기」 — 시각 칸에 대안을 넣음 (저장은 「저장」 단추)
+$('seqBody').addEventListener('click', e => {
+  const b = e.target.closest('.q_fix'); if (!b) return;
+  const tr = b.closest('tr'); if (!tr) return;
+  const i = Number(tr.dataset.i), p = PAY[i] || null; if (!p) return;
+  tr.querySelector('.q_time').value = payAlt(p);
+  MAN[i] = true; EDITED[i] = true;
+  if (typeof markDirty === 'function') markDirty();
+  paintRow(tr);
+  if (typeof drawTT === 'function') drawTT();
+});
 // 선생님이 일자·시간 칸을 고치면 그 회는 「직접 고침」 → 검정
 $('seqBody').addEventListener('input', e => {
   if (!e.target.matches('.q_date, .q_time')) return;
@@ -1219,7 +1245,7 @@ function buildSeq() {
       dVal = payDateText(p); tVal = payClsText(p);
       if (dVal !== savedD || tVal !== timeVal || String(it.voucher_no || '') !== String(p.appr_no || '')) AUTOCHG = true;
     }
-    const red = payRed(p, false);
+    const red = payRed(p, tVal);
     const tr = document.createElement('tr');
     tr.dataset.i = String(i);
     tr.innerHTML =
@@ -1227,7 +1253,7 @@ function buildSeq() {
       + '<div style="font-weight:bold;margin-bottom:4px;">' + (i+1) + '회</div>'
       + '<input type="text" class="q_date' + (red ? ' red' : '') + '" value="' + esc(dVal) + '" style="text-align:center;">'
       + '<input type="text" class="q_time' + (red ? ' red' : '') + '" value="' + esc(tVal) + '" style="text-align:center;margin-top:3px;">'
-      + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, false) + '</div>'
+      + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, tVal, i) + '</div>'
       + '</td>'
       + '<td><textarea class="q_content" style="min-height:64px;">' + esc(it.content || '') + '</textarea></td>'
       + '<td><textarea class="q_react" style="min-height:64px;">' + esc(it.reaction || '') + '</textarea></td>';
@@ -1326,7 +1352,7 @@ async function saveRecord() {
     } catch (e4) {}
     EDITED = [];
     document.querySelectorAll('#seqBody tr').forEach(tr => { if (tr.dataset.i != null) paintRow(tr); });
-    try { await loadPc(); } catch (e5) {}
+    try { await loadPc(); drawPc(); } catch (e5) {}   // 대장도 다시 그림 (2026-11-04 — 읽기만 하고 안 그리던 것)
     kbLoad();                        // 아동 단추 색 다시 (2026-10-22)
   } catch (e) {
     alert('❌ 저장하지 못했습니다.\n' + e.message);
