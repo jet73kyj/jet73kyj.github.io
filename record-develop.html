@@ -3148,6 +3148,25 @@ async function saveRecord(opts) {
         makeup_memo: null
       });
     }
+    // 회차는 제공일자 차례로 다시 세운다 (2026-11-05 은정님 · 47번 10월 — 27일 수업을 2일로 당겨 2일이 4회째에 있었음)
+    //   한 회차의 내용(시간 · 승인 · 이용자 상태 · 결과 · 특이사항 · 소급 · 담당 · 서비스 종류)은 통째로 옮긴다
+    //   날짜 빈 회차(포기 등)는 맨 뒤 · 10월 기록지부터 (9월은 서명이 끝나 손대지 않음)
+    let reordered = false;
+    if (mk >= AUTO_FROM) {
+      const order = items.map((it, k) => ({ it, k }))
+        .sort((a, b) => {
+          const da = a.it.service_date || '9999-99-99', db = b.it.service_date || '9999-99-99';
+          if (da !== db) return da < db ? -1 : 1;
+          const ta = a.it.start_time || '99:99', tb = b.it.start_time || '99:99';
+          if (ta !== tb) return ta < tb ? -1 : 1;
+          return a.k - b.k;
+        });
+      reordered = order.some((o, k) => o.k !== k);
+      if (reordered) {
+        const sorted = order.map((o, k) => Object.assign(o.it, { seq_no: k + 1 }));
+        items.length = 0; sorted.forEach(x => items.push(x));
+      }
+    }
     // 회차 줄은 다 만든 뒤에 바꾼다 (2026-09-21)
     //   전에는 먼저 지우고 나서 만들어 넣었는데, 넣다가 실패하면(시간 글자 잘못 등)
     //   적어 둔 내용이 모두 사라졌다 → 옛 줄을 들고 있다가 실패하면 되돌린다
@@ -3169,6 +3188,7 @@ async function saveRecord(opts) {
     setSaveBtn('done');
     loadRcBox(childId, mk);          // 저장 뒤 서버 점검 다시 받기 (2026-10-02)
     kbLoad();                        // 아동 단추 색도 다시 (2026-10-22)
+    if (reordered) setTimeout(() => { DIRTY = false; try { loadOne(); } catch (e) {} }, 350);   // 날짜 차례로 다시 그림 (2026-11-05)
   } catch (e) {
     if (opts && opts.quiet === true) console.warn('기록지 자동 저장 실패', e);   // 여는 순간 저장 — 실패하면 「저장 전」으로 둠
     else alert('❌ 저장하지 못했습니다.\n' + e.message);
