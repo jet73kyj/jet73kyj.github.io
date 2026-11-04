@@ -117,6 +117,8 @@
           white-space:nowrap; }
   .slot.on { background:#4a7c59; border-color:#4a7c59; color:#fff; font-weight:600; }
   .askhint { font-size:12.5px; color:#9aa19c; padding:6px 2px; width:100%; }
+  .askhint.slotfail { color:#C2553A; }
+  .slotretry { margin-top:8px; padding:7px 16px; border:1px solid #C2553A; background:#fff; color:#C2553A; border-radius:8px; font-size:13px; font-weight:700; width:auto; cursor:pointer; }
   .askbtns { display:flex; gap:8px; }
   .askbtns .popbtn { flex:1; }
   .popbtn.gray { background:#9aa19c; }
@@ -1911,11 +1913,17 @@ async function openX8Ask() {
   const box = w.querySelector('#x8Slots');
   let pick = null;
   let slots = [];
+  let fail = false;
   try {
-    const { data } = await sb.rpc('nl_parent_x8_slots', { p_child: CURKID, p_mk: mk });
+    const { data, error } = await sb.rpc('nl_parent_x8_slots', { p_child: CURKID, p_mk: mk });
+    if (error) throw error;
     slots = data || [];
-  } catch (e) { slots = []; }
-  if (!slots.length) {
+  } catch (e) { console.error('발추 빈 자리 불러오기 실패', e); fail = true; slots = []; }
+  if (fail) {
+    // 못 불러온 것을 「빈 자리 없음」으로 감추지 않는다 (2026-11-05) — 다시 찾기는 창을 새로 연다
+    box.innerHTML = SLOTFAIL;
+    box.querySelector('.slotretry').onclick = () => { w.remove(); openX8Ask(); };
+  } else if (!slots.length) {
     box.innerHTML = '<div class="askhint">고르실 수 있는 빈 자리가 없습니다. 센터로 말씀해 주세요.</div>';
   } else {
     const th = THRS[slots[0].therapist_id];
@@ -2154,12 +2162,20 @@ function slotDay(sd) {
 }
 async function freeSlots(thr, last) {
   try {
-    const { data: fs } = await sb.rpc('nl_free_slots', {
+    const { data: fs, error } = await sb.rpc('nl_free_slots', {
       p_therapist_id: Number(thr), p_last: last, p_child: CURKID
     });
+    if (error) throw error;
     return fs || [];
-  } catch (e) { return []; }
+  } catch (e) {
+    // 못 불러온 것을 「빈 자리 없음」으로 감추지 않는다 (2026-11-05)
+    console.error('빈 자리 불러오기 실패', e);
+    return null;
+  }
 }
+const SLOTFAIL = '<div class="askhint slotfail">⚠ 빈 자리를 불러오지 못했습니다.<br>'
+  + '잠시 뒤 아래 단추를 눌러 주세요.<br>'
+  + '<button type="button" class="slotretry">다시 찾기</button></div>';
 function newPairKey() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   const b = new Uint8Array(16); crypto.getRandomValues(b);
@@ -2217,12 +2233,31 @@ async function openAsk(d) {
                      : (isDev ? monthEnd(d.d) : null);
   const box = w.querySelector('#askSlots');
 
-  const slotsA = grp ? [] : await freeSlots(d.thr, last);
-  let slotsB = [], lastB = null, isDevB = false;
+  let slotsA = [], slotsB = [], lastB = null, isDevB = false;
+  let failA = false, failB = false;
   if (partner) {
     isDevB = partner.st === 2;
     lastB = isDevB ? monthEnd(d.d) : null;
-    slotsB = await freeSlots(partner.thr, lastB);
+  }
+  async function fetchSlots() {
+    if (grp) return;
+    const a = await freeSlots(d.thr, last);
+    failA = a === null; slotsA = a || [];
+    if (partner) {
+      const b = await freeSlots(partner.thr, lastB);
+      failB = b === null; slotsB = b || [];
+    }
+  }
+  await fetchSlots();
+  // 「다시 찾기」 — 창을 닫지 않고 그 자리에서 다시 불러온다
+  function bindRetry() {
+    box.querySelectorAll('.slotretry').forEach(b => {
+      b.onclick = async () => {
+        box.innerHTML = '빈 자리를 찾는 중...';
+        await fetchSlots();
+        redraw();
+      };
+    });
   }
 
   function bindPick(sel, fn) {
@@ -2244,7 +2279,9 @@ async function openAsk(d) {
       sh += '<button class="slot" data-sd="' + s.slot_date + '" data-st="' + s.slot_time + '">'
           + slotDay(s.slot_date) + ' ' + String(s.slot_time).slice(0, 5) + '</button>';
     });
-    if (!slotsA.length) {
+    if (failA) {
+      sh += SLOTFAIL;
+    } else if (!slotsA.length) {
       sh += '<div class="askhint">'
           + (isDev ? '이 달 안에 빈 자리가 없습니다. 센터로 말씀해 주세요.'
                    : '빈 자리가 없습니다. 센터로 말씀해 주세요.')
@@ -2255,6 +2292,7 @@ async function openAsk(d) {
     box.innerHTML = sh;
     pick = null;
     bindPick('.slot', ds => { pick = ds.later ? null : { d: ds.sd, t: ds.st }; });
+    bindRetry();
   }
 
   // 두 수업 — 두 선생님이 잇달아 비는 시간 먼저 (원칙 11 · 2026-09-22)
@@ -2302,20 +2340,23 @@ async function openAsk(d) {
 
     // 잇달아 비는 시간이 없으면 수업마다 따로 (두 번 오셔야 함)
     pairMode = 'split';
-    const lst = (arr, key, dev) => {
+    const lst = (arr, key, dev, fail) => {
       let h = '<button class="slot on" data-k="' + key + '" data-later="1">나중에 정할게요</button>';
       arr.slice(0, 40).forEach(s => {
         h += '<button class="slot" data-k="' + key + '" data-sd="' + s.slot_date + '" data-st="' + s.slot_time + '">'
            + slotDay(s.slot_date) + ' ' + String(s.slot_time).slice(0, 5) + '</button>';
       });
-      if (!arr.length) h += '<div class="askhint">' + (dev ? '이 달 안에 ' : '') + '빈 자리가 없습니다. 센터로 말씀해 주세요.</div>';
+      if (fail) h += SLOTFAIL;
+      else if (!arr.length) h += '<div class="askhint">' + (dev ? '이 달 안에 ' : '') + '빈 자리가 없습니다. 센터로 말씀해 주세요.</div>';
       return h;
     };
-    box.innerHTML = '<div class="askwarn">두 수업을 잇달아 받을 시간이 없어요. 수업마다 따로 골라 주세요 (두 번 오셔야 해요).</div>'
+    box.innerHTML = ((failA || failB) ? ''
+        : '<div class="askwarn">두 수업을 잇달아 받을 시간이 없어요. 수업마다 따로 골라 주세요 (두 번 오셔야 해요).</div>')
       + '<div class="asksub">' + esc(d.t + ' ' + d.nm) + (isDev ? ' · 이 달 안에' : '') + '</div>'
-      + lst(slotsA, 'a', isDev)
+      + lst(slotsA, 'a', isDev, failA)
       + '<div class="asksub">' + esc(partner.t + ' ' + partner.nm) + (isDevB ? ' · 이 달 안에' : '') + '</div>'
-      + lst(slotsB, 'b', isDevB);
+      + lst(slotsB, 'b', isDevB, failB);
+    bindRetry();
     ['a', 'b'].forEach(k => {
       bindPick('.slot[data-k="' + k + '"]', ds => {
         const v = ds.later ? null : { d: ds.sd, t: ds.st };
