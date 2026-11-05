@@ -95,6 +95,8 @@
   .pc-tbl .pcbtns { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
   .pc-tbl .pcbtns button { padding:3px 8px; font-size:11.5px; border:1px solid #E4E0DA; background:#fff; border-radius:6px; cursor:pointer; width:auto; margin:0; }
   .pc-tbl tr.pc-hid td { color:#bbb; background:#FAFAF8; }
+  .pc-tbl tr.pc-edit .pctxt-w, .pc-tbl tr.pc-edit .pctext-p { color:#bbb; text-decoration:line-through; }
+  .pc-edit-note { font-size:11px; color:#B5651D; margin-bottom:2px; }
   .pc-tbl tr.pc-hid .pc-cat span.on { border-color:#ccc; color:#bbb; }
   .pc-tbl tr.pcadd td { background:#FBF5EE; }
   .pc-tbl tr.pcadd select, .pc-tbl tr.pcadd input { font-size:11.5px; padding:3px 5px; border:1px solid #E4E0DA; border-radius:4px; }
@@ -1061,6 +1063,26 @@ function drawPc() {
     + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
   box.style.display = 'block';
   if ($('pcEdit')) $('pcEdit').style.display = 'none';
+  pcMarkEdited();
+}
+// 기록지에서 고치고 아직 저장 안 한 회 — 대장의 그 회 줄을 바로 흐리게 (2026-11-05 은정님)
+//   대장은 저장된 기록지로 서버가 세므로, 저장하면 서버가 다시 세어 새 줄을 그린다
+function pcMarkEdited() {
+  const ed = new Set();
+  (PAY || []).forEach((p, i) => { if (EDITED[i] && p && p.appr_no) ed.add('pay|' + p.appr_no); });
+  document.querySelectorAll('#pcSheet tr.pcrow').forEach(tr => {
+    const r = PCROWS[Number(tr.dataset.i)]; if (!r) return;
+    const on = ed.has(String(r.row_key || ''));
+    tr.classList.toggle('pc-edit', on);
+    let t = tr.querySelector('.pc-edit-note');
+    if (on && !t) {
+      const td = tr.children[2]; if (!td) return;
+      t = document.createElement('div'); t.className = 'pc-edit-note no-print';
+      t.textContent = '기록지에서 고친 회 — 저장하면 다시 셉니다';
+      td.insertBefore(t, td.firstChild);
+    }
+    if (!on && t) t.remove();
+  });
 }
 function pcMsg(t, ok) { const m = $('pcMsg'); if (m) { m.textContent = t; m.style.color = ok ? '#3B6D11' : '#c62828'; } }
 let PC_BUSY = false;
@@ -1210,6 +1232,7 @@ $('seqBody').addEventListener('click', e => {
   if (typeof markDirty === 'function') markDirty();
   paintRow(tr);
   if (typeof drawTT === 'function') drawTT();
+  pcMarkEdited();
 });
 // 선생님이 일자·시간 칸을 고치면 그 회는 「직접 고침」 → 검정
 $('seqBody').addEventListener('input', e => {
@@ -1219,6 +1242,7 @@ $('seqBody').addEventListener('input', e => {
   EDITED[Number(tr.dataset.i)] = true;
   paintRow(tr);
   drawTT();
+  pcMarkEdited();
 });
 // 두 칸을 모두 비우고 나가면 다시 카드 결제 내용으로
 $('seqBody').addEventListener('change', e => {
@@ -1231,6 +1255,7 @@ $('seqBody').addEventListener('change', e => {
   if (p) { qd.value = payDateText(p); qt.value = payFixText(p); }
   paintRow(tr);
   drawTT();
+  pcMarkEdited();
 });
 
 function buildSeq() {
