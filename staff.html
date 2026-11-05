@@ -115,7 +115,7 @@ function guide(login, pw) {
   return '자라는나무 나무링크 직원 계정 안내\n'
     + '주소 ' + HOME + '\n'
     + '아이디 ' + login + ' / 임시 비밀번호 ' + pw + '\n'
-    + '처음 들어오시면 비밀번호를 새로 정해 주세요.';
+    + '처음 들어오시면 비밀번호를 새로 정해 주세요 (8자 이상 · 영문과 숫자).';
 }
 
 function showRes(el, html, ok) {
@@ -167,6 +167,7 @@ $('nBtn').onclick = async () => {
     showRes($('nRes'),
       esc(name) + ' 선생님 계정을 만들었습니다 (직원 ' + d.staff_id + '번)\n'
       + '아이디 <b>' + esc(d.login_id) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
+      + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="nCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('nCopy').onclick = () => copyText($('nCopy'), t);
     $('nName').value = '';
@@ -191,6 +192,7 @@ async function attachAcc(btn) {
     showRes($('rRes'),
       esc(btn.dataset.nm) + ' 선생님 계정을 만들었습니다 (직원 ' + d.staff_id + '번)\n'
       + '아이디 <b>' + esc(d.login_id) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
+      + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="mCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('mCopy').onclick = () => copyText($('mCopy'), t);
     load();
@@ -212,6 +214,7 @@ async function resetPw(btn) {
     showRes($('rRes'),
       esc(btn.dataset.nm) + ' 선생님 비밀번호를 초기화했습니다\n'
       + '로그인 <b>' + esc(d.login) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
+      + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="rCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('rCopy').onclick = () => copyText($('rCopy'), t);
     load();
