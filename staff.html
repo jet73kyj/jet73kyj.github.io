@@ -166,7 +166,6 @@ $('nBtn').onclick = async () => {
     const t = guide(d.login_id, d.temp_password);
     showRes($('nRes'),
       esc(name) + ' 선생님 계정을 만들었습니다 (직원 ' + d.staff_id + '번)\n'
-      + '아이디 <b>' + esc(d.login_id) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
       + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="nCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('nCopy').onclick = () => copyText($('nCopy'), t);
@@ -191,7 +190,6 @@ async function attachAcc(btn) {
     const t = guide(d.login_id, d.temp_password);
     showRes($('rRes'),
       esc(btn.dataset.nm) + ' 선생님 계정을 만들었습니다 (직원 ' + d.staff_id + '번)\n'
-      + '아이디 <b>' + esc(d.login_id) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
       + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="mCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('mCopy').onclick = () => copyText($('mCopy'), t);
@@ -213,7 +211,6 @@ async function resetPw(btn) {
     const t = guide(d.login, d.temp_password);
     showRes($('rRes'),
       esc(btn.dataset.nm) + ' 선생님 비밀번호를 초기화했습니다\n'
-      + '로그인 <b>' + esc(d.login) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
       + '<span style="display:block;margin:6px 0;padding:8px 10px;background:#fff;border:1px solid #ddd;border-radius:6px;white-space:pre-line;color:#333">' + esc(t) + '</span>'
       + '<button id="rCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
     $('rCopy').onclick = () => copyText($('rCopy'), t);
