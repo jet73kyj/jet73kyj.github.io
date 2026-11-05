@@ -87,6 +87,7 @@
     <button class="tab on" data-t="biz">사업별</button>
     <button class="tab" data-t="kid">아동별</button>
     <button class="tab" data-t="th">선생님</button>
+    <button class="tab" data-t="prof">선생님 기여</button>
     <button class="tab" data-t="flow">신규·종결</button>
     <button class="tab" data-t="area">치료 영역</button>
     <button class="tab" data-t="move">사업 이동</button>
@@ -208,6 +209,7 @@ function draw(){
   else if (TAB === 'flow') drawFlowTab();
   else if (TAB === 'move') drawMove();
   else if (TAB === 'age') drawAge();
+  else if (TAB === 'prof') drawProf();
   else drawArea();
 }
 
@@ -713,9 +715,119 @@ async function drawAge(){
   $('agmon').onchange = () => { AGMON = $('agmon').value; drawAge(); };
 }
 
-document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => { TAB = b.dataset.t; draw(); });
+// ⑧ 선생님 기여 (2026-11-05 은정님) — 매출 − 위탁수수료 − 재료비 = 기여 · 기여 − 고정비 나눔 = 순이익
+//   매출 · 위탁수수료는 「선생님」 갈래와 같은 셈 · 완료 회기는 그 달 날짜 · 40분 이상 완료 회기
+//   임대료 · 관리비(nl_month_overhead) · 재료비(nl_th_material)는 원장님이 달마다 적음
+let PMON = null, PROF = {}, PSEQ = 0, PDIRTY = false;
+async function loadProf(mk){
+  const [o, m, d, ol] = await Promise.all([
+    sb.from('nl_month_overhead').select('month_key, rent, mgmt').eq('month_key', mk).maybeSingle(),
+    sb.from('nl_th_material').select('therapist_id, amount').eq('month_key', mk),
+    sb.rpc('nl_stats_done', { p_month: mk }),
+    sb.from('nl_month_overhead').select('month_key, rent, mgmt').lt('month_key', mk).order('month_key', { ascending: false }).limit(1)
+  ]);
+  const er = o.error || m.error || d.error;
+  if (er) throw er;
+  const mat = {}; (m.data || []).forEach(x => { mat[x.therapist_id] = Number(x.amount) || 0; });
+  const done = {}; (d.data || []).forEach(x => { done[x.therapist_id] = Number(x.done) || 0; });
+  const prev = (ol.data || [])[0] || null;
+  return { oh: o.data || null, prev: prev, mat: mat, done: done };
+}
+async function drawProf(){
+  const ms = Array.from(new Set(TH.map(r => r.month_key))).sort();
+  if (!ms.length) { $('body').innerHTML = '<div class="card">선생님 매출은 2026년 9월부터 셉니다. 이 해에는 자료가 없습니다.</div>'; return; }
+  if (!PMON || ms.indexOf(PMON) < 0) PMON = ms.indexOf(prevMkOf(nowMk())) >= 0 ? prevMkOf(nowMk()) : ms[ms.length - 1];
+  const mk = PMON, seq = ++PSEQ;
+  if (!PROF[mk]) {
+    $('body').innerHTML = '<div class="load">불러오는 중…</div>';
+    try { const v = await loadProf(mk); if (seq !== PSEQ || TAB !== 'prof') return; PROF[mk] = v; }
+    catch (e) { if (seq !== PSEQ) return; $('body').innerHTML = '<div class="err">선생님 기여를 가져오지 못했습니다.\n' + esc(e.message || e) + '</div>'; return; }
+  }
+  const P = PROF[mk];
+  const g = {};
+  const G = t => g[t] || (g[t] = { t: t, rev: 0, pay: 0, done: 0 });
+  TH.filter(r => r.month_key === mk && r.therapist_id != null).forEach(r => { G(r.therapist_id).rev += Number(r.amt) || 0; });
+  PAY.filter(p => p.month_key === mk).forEach(p => { G(p.therapist_id).pay += Number(p.total) || 0; });
+  Object.keys(P.done).forEach(t => { G(Number(t)).done = P.done[t]; });
+  Object.keys(P.mat).forEach(t => { G(Number(t)); });
+  const arr = Object.values(g).filter(o => o.rev || o.pay || o.done || P.mat[o.t]).sort((a, b) => a.t - b.t);
+  const oh = P.oh || P.prev || {};
+  const rent = Number(oh.rent) || 0, mgmt = Number(oh.mgmt) || 0, fix = rent + mgmt;
+  const tdone = sumBy(arr, o => o.done);
+  const num = v => (v == null || v === '') ? '' : Number(v).toLocaleString('ko-KR');
+  const rows = arr.map(o => {
+    const mat = Number(P.mat[o.t]) || 0;
+    const con = o.rev - o.pay - mat;
+    const share = tdone ? Math.round(fix * o.done / tdone) : 0;
+    const net = con - share;
+    return { o: o, mat: mat, con: con, share: share, net: net, rate: o.rev ? net / o.rev : null };
+  });
+  const T = k => sumBy(rows, r => k(r));
+  let h = '<div class="card"><div class="ct">선생님 기여 &nbsp; <select id="pmon">'
+        + ms.slice().reverse().map(k => '<option value="' + k + '"' + (k === mk ? ' selected' : '') + '>' + monNo(k) + '월</option>').join('')
+        + '</select></div>'
+        + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 12px;font-size:13.5px;">'
+        + '<b>고정비 (' + monNo(mk) + '월)</b>'
+        + '<label>임대료 <input id="p_rent" class="pin" inputmode="numeric" value="' + num(oh.rent) + '"></label>'
+        + '<label>관리비 <input id="p_mgmt" class="pin" inputmode="numeric" value="' + num(oh.mgmt) + '"></label>'
+        + (P.oh ? '' : (P.prev ? '<span class="nd">' + monNo(P.prev.month_key) + '월 값을 미리 채움 · 아직 저장 전</span>' : '<span class="nd">아직 없음</span>'))
+        + '<span style="flex:1"></span><button id="psave" type="button">💾 저장 전</button><span id="pmsg" style="font-size:12.5px;"></span></div>'
+        + '<div class="tw"><table><tr><th class="l">선생님</th><th>완료 회기</th><th>매출</th><th>위탁수수료</th><th>재료비</th><th>기여</th><th>고정비 나눔</th><th>순이익</th><th>순이익률</th></tr>';
+  rows.forEach(r => {
+    const o = r.o;
+    h += '<tr><td class="l">' + o.t + '번 ' + esc(THN[o.t] || '') + '</td><td>' + o.done + '회</td><td>' + won(o.rev) + '</td>'
+       + '<td>' + (o.pay ? won(o.pay) : '<span class="nd">공개 전</span>') + '</td>'
+       + '<td><input class="pin pmat" data-t="' + o.t + '" inputmode="numeric" value="' + num(P.mat[o.t]) + '" placeholder="0"></td>'
+       + '<td>' + won(r.con) + '</td><td>' + won(r.share) + '</td>'
+       + '<td><b' + (r.net < 0 ? ' style="color:var(--coral)"' : '') + '>' + won(r.net) + '</b></td>'
+       + '<td>' + (r.rate == null ? '<span class="nd">–</span>' : Math.round(r.rate * 1000) / 10 + '%') + '</td></tr>';
+  });
+  const tr = T(r => r.o.rev), tn = T(r => r.net);
+  h += '<tr class="tot"><td class="l">합계</td><td>' + tdone + '회</td><td>' + won(tr) + '</td><td>' + won(T(r => r.o.pay)) + '</td><td>' + won(T(r => r.mat)) + '</td>'
+     + '<td>' + won(T(r => r.con)) + '</td><td>' + won(T(r => r.share)) + '</td><td>' + won(tn) + '</td><td>' + (tr ? Math.round(tn / tr * 1000) / 10 + '%' : '') + '</td></tr>';
+  h += '</table></div><div class="note">매출 · 위탁수수료 — 「선생님」 갈래와 같은 셈입니다 (위탁수수료는 정산에서 선생님께 공개한 마지막 판의 총액 · 공개 전이면 0원으로 셈).<br>'
+     + '완료 회기 — 그 달 날짜에 완료한 40분 이상 회기입니다 (쪼개기 조각 · 평가 · 체험은 빼고 셈).<br>'
+     + '기여 = 매출 − 위탁수수료 − 재료비 · 고정비 나눔 = (임대료 + 관리비) × 그 선생님 완료 회기 ÷ 전체 완료 회기 · 순이익 = 기여 − 고정비 나눔 · 순이익률 = 순이익 ÷ 매출<br>'
+     + '4대보험 · 소모품 · 교구 등 그 밖의 비용은 빼지 않았습니다.</div></div>'
+     + '<style>.pin{width:100px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;text-align:right;font-size:13px;}</style>';
+  $('body').innerHTML = h;
+  const btn = $('psave');
+  const setBtn = st => { btn.disabled = st === 'busy'; btn.textContent = st === 'busy' ? '저장 중…' : st === 'ok' ? '✓ 저장됨' : '💾 저장 전';
+    btn.style.background = st === 'ok' ? '#3c7a4a' : '#fff'; btn.style.color = st === 'ok' ? '#fff' : ''; };
+  setBtn(PDIRTY || !P.oh ? 'dirty' : 'ok');
+  const fmt = el => { const v = String(el.value).replace(/[^0-9]/g, ''); el.value = v ? Number(v).toLocaleString('ko-KR') : ''; };
+  document.querySelectorAll('#body .pin').forEach(el => el.addEventListener('input', () => { fmt(el); PDIRTY = true; setBtn('dirty'); }));
+  $('pmon').onchange = () => {
+    if (PDIRTY && !confirm('저장하지 않은 금액이 있습니다. 다른 달로 갈까요?')) { $('pmon').value = mk; return; }
+    PDIRTY = false; PMON = $('pmon').value; drawProf(); };
+  btn.onclick = async () => {
+    const nv = el => { const v = String(el.value).replace(/[^0-9]/g, ''); return v === '' ? null : Number(v); };
+    setBtn('busy'); $('pmsg').textContent = '';
+    try {
+      const r1 = await sb.from('nl_month_overhead').upsert({ month_key: mk, rent: nv($('p_rent')), mgmt: nv($('p_mgmt')) }, { onConflict: 'month_key' }).select('month_key');
+      if (r1.error) throw r1.error;
+      if (!r1.data || !r1.data.length) throw new Error('고정비가 저장되지 않았습니다 (권한)');
+      const up = [], del = [];
+      document.querySelectorAll('#body .pmat').forEach(el => { const v = nv(el), t = Number(el.dataset.t);
+        if (v == null || v === 0) { if (P.mat[t] != null) del.push(t); } else up.push({ month_key: mk, therapist_id: t, amount: v }); });
+      if (up.length) { const r2 = await sb.from('nl_th_material').upsert(up, { onConflict: 'month_key,therapist_id' }).select('therapist_id');
+        if (r2.error) throw r2.error; if (!r2.data || r2.data.length !== up.length) throw new Error('재료비가 저장되지 않았습니다 (권한)'); }
+      if (del.length) { const r3 = await sb.from('nl_th_material').delete().eq('month_key', mk).in('therapist_id', del); if (r3.error) throw r3.error; }
+      PDIRTY = false; delete PROF[mk]; await drawProf();
+      $('pmsg').textContent = '✓ 저장했습니다';
+    } catch (e) {
+      setBtn('dirty'); $('pmsg').innerHTML = '<span style="color:var(--coral)">저장하지 못했습니다 — ' + esc(e.message || e) + '</span>';
+    }
+  };
+}
+window.addEventListener('beforeunload', e => { if (PDIRTY) { e.preventDefault(); e.returnValue = ''; } });
+
+document.querySelectorAll('#tabs .tab').forEach(b => b.onclick = () => {
+  if (TAB === 'prof' && PDIRTY && b.dataset.t !== 'prof' && !confirm('저장하지 않은 금액이 있습니다. 다른 갈래로 갈까요?')) return;
+  if (b.dataset.t !== 'prof') PDIRTY = false;
+  TAB = b.dataset.t; draw(); });
 $('home').onclick = () => { location.href = 'index.html'; };
-$('yr').onchange = () => { YEAR = Number($('yr').value); KSEL = null; KMON = null; TMON = null; AMON = null; MMON = null; EMON = null; NBMON = null; EBMON = null; AGMON = null; AGE = {}; load(); };
+$('yr').onchange = () => { YEAR = Number($('yr').value); PMON = null; PROF = {}; KSEL = null; KMON = null; TMON = null; AMON = null; MMON = null; EMON = null; NBMON = null; EBMON = null; AGMON = null; AGE = {}; load(); };
 
 (async () => {
   const { data } = await sb.auth.getSession();
