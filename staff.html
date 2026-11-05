@@ -139,13 +139,18 @@ async function load() {
     + '<td>' + t.id + '</td>'
     + '<td>' + esc(t.name) + '</td>'
     + '<td>' + esc(t.role) + '</td>'
-    + '<td>' + (t.login_id ? '<b>' + esc(t.login_id) + '</b>' : '메일로 로그인') + '</td>'
+    + '<td>' + (t.login_id ? '<b>' + esc(t.login_id) + '</b>'
+              : (t.login_email ? '메일로 로그인' : '<span class="tag warn">계정 없음</span>')) + '</td>'
     + '<td>' + (t.active === false ? '<span class="tag warn">퇴사</span>'
               : (t.must_change ? '<span class="tag warn">비번 정하기 전</span>' : '<span class="tag">사용 중</span>')) + '</td>'
-    + '<td>' + (Number(t.id) === 8 || !t.login_email ? ''
-              : '<button class="rst" data-id="' + t.id + '" data-nm="' + esc(t.name) + '">비번 초기화</button>') + '</td>'
+    + '<td>' + (Number(t.id) === 8 ? ''
+              : (!t.login_email
+                  ? (t.active === false ? ''
+                     : '<button class="mk main" data-id="' + t.id + '" data-nm="' + esc(t.name) + '">계정 만들기</button>')
+                  : '<button class="rst" data-id="' + t.id + '" data-nm="' + esc(t.name) + '">비번 초기화</button>')) + '</td>'
     + '</tr>').join('');
   document.querySelectorAll('.rst').forEach(b => { b.onclick = () => resetPw(b); });
+  document.querySelectorAll('.mk').forEach(b => { b.onclick = () => attachAcc(b); });
 }
 
 $('nBtn').onclick = async () => {
@@ -172,6 +177,29 @@ $('nBtn').onclick = async () => {
     $('nBtn').disabled = false; $('nBtn').textContent = '계정 만들기';
   }
 };
+
+// 이미 있는 직원 줄에 로그인 계정만 붙이기 (2026-11-05)
+async function attachAcc(btn) {
+  if (!confirm(btn.dataset.id + '번 ' + btn.dataset.nm + ' 선생님 로그인 계정을 만들까요?\n아이디는 namu' + String(btn.dataset.id).padStart(3, '0') + ' 입니다.')) return;
+  btn.disabled = true; btn.textContent = '만드는 중...';
+  try {
+    const res = await callFn('staff-create', { staff_id: Number(btn.dataset.id) });
+    if (!res.ok) { showRes($('rRes'), '만들지 못했습니다.\n' + esc(res.data.message || ('오류 ' + res.status)), false); return; }
+    const d = res.data;
+    if (!d.login_id || !d.temp_password) { showRes($('rRes'), '만들지 못했습니다.\n서버 함수가 아직 옛 판입니다.', false); return; }
+    const t = guide(d.login_id, d.temp_password);
+    showRes($('rRes'),
+      esc(btn.dataset.nm) + ' 선생님 계정을 만들었습니다 (직원 ' + d.staff_id + '번)\n'
+      + '아이디 <b>' + esc(d.login_id) + '</b> · 임시 비밀번호 <b>' + esc(d.temp_password) + '</b>\n'
+      + '<button id="mCopy">안내 문구 복사</button>  이 비밀번호는 지금만 보입니다', true);
+    $('mCopy').onclick = () => copyText($('mCopy'), t);
+    load();
+  } catch (e) {
+    showRes($('rRes'), '만들지 못했습니다.\n' + esc(e && e.message ? e.message : e), false);
+  } finally {
+    btn.disabled = false; btn.textContent = '계정 만들기';
+  }
+}
 
 async function resetPw(btn) {
   if (!confirm(btn.dataset.nm + ' 선생님 비밀번호를 초기화할까요?\n지금 쓰시는 비밀번호로는 더 이상 못 들어옵니다.')) return;
