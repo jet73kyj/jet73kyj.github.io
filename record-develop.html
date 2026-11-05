@@ -263,11 +263,12 @@
 <style>
   /* 지난달 남은 것 — 「상담 · 보고서」 옆 작은 빨간 글자 단추 (2026-11-05 은정님) */
   #kbBox.kbinline { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; max-width:none; margin:0 0 0 6px; padding:0; vertical-align:middle; }
+  #kbBox.kbinline .kbpast2 { flex-direction:row !important; }
   #kbBox .kbpast2 { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:12px; color:#B3261E; }
   #kbBox .kbpast2 b { font-weight:700; margin-right:2px; }
   #kbBox .kbpast2 i { font-style:normal; color:#8a837c; margin:0 2px 0 4px; }
-  #kbBox button.kbchip { width:auto !important; min-height:0 !important; margin:0 !important; padding:2px 8px !important; font-size:12px !important; font-weight:600;
-    border-radius:6px !important; background:#D93A2B !important; border:1px solid #D93A2B !important; color:#fff !important; display:inline-block; line-height:1.4; cursor:pointer; }
+  #kbBox.kbinline button.kb.kbchip, #kbBox button.kb.kbchip { width:auto !important; min-height:0 !important; margin:0 !important; padding:2px 8px !important; font-size:12px !important; font-weight:600;
+    border-radius:6px !important; background:#D93A2B !important; border:1px solid #D93A2B !important; color:#fff !important; display:inline-block !important; flex:0 0 auto !important; line-height:1.4; cursor:pointer; white-space:nowrap; }
   #kbBox .kberr { font-size:12px; color:#c62828; }
 </style>
 </head>
