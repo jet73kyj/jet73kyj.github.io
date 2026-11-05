@@ -361,6 +361,23 @@ function lineText(r){
   if (r.item_no >= 31 && r.item_no <= 35) d = d.replace(/\s*—\s*[^—]+$/, '');   // 끝의 「— 결제가 이름」은 딱지와 같음
   return d;
 }
+// 치료지원 미작성은 회마다 따로 쓰지 않고 한 줄로 — 「1·2·3회 미작성」 (2026-11-05 은정님)
+//   서버 줄(회마다 하나)은 그대로 두고 화면에서만 합침 · 기한 글은 끝에 한 번
+function mergeMiss(gr){
+  const miss = gr.filter(r => r.item_no === 41 && r.kind === '치료지원' && /^\d+\|\d+$/.test(String(r.item_key || '')));
+  if (!miss.length) return gr;
+  const seqs = miss.map(r => Number(String(r.item_key).split('|')[1])).sort((x, y) => x - y);
+  const due = (String(miss[0].detail || '').match(/작성 중 · 기한 \d+월 15일/) || [''])[0];
+  const allW = miss.every(isWriting);
+  const one = Object.assign({}, miss[0], {
+    on_date: null,
+    detail: seqs.join('·') + '회 미작성' + (allW && due ? ' · ' + due : ''),
+    state: allW ? miss[0].state : (miss.find(r => !isWriting(r)) || miss[0]).state
+  });
+  const out = []; let put = false;
+  gr.forEach(r => { if (miss.indexOf(r) < 0) out.push(r); else if (!put) { out.push(one); put = true; } });
+  return out;
+}
 function lineHtml(r, i){
   const it = ITEM[r.item_no] || ['?','g0'];
   const st = r.item_no === 9 ? '' : rcState(r).replace(/^<div class="rcst dim">(선생님이 고치면 사라짐|센터가 장을 정리하면 사라짐)<\/div>$/, '');
@@ -496,7 +513,7 @@ function draw(){
         h += '<tr' + (gr.every(isDone) ? ' class="done"' : '') + '>'
           + '<td style="white-space:nowrap;">' + (GROUPV === 'th' ? esc(r0.kind || '') : (r0.therapist_id ? r0.therapist_id + '번 ' + esc(THNM[r0.therapist_id] || '') : '—')) + '</td>'
           + '<td class="cid">' + r0.child_id + '번 ' + esc(KIDNM[r0.child_id] || '') + '</td>'
-          + '<td class="det">' + gr.map(r => lineHtml(r, ROWS.indexOf(r))).join('')
+          + '<td class="det">' + mergeMiss(gr).map(r => lineHtml(r, ROWS.indexOf(r))).join('')
           + (notes.length ? '<div style="margin-top:4px;font-size:12px;color:#6D4C41;background:#FFF8E1;padding:3px 7px;border-radius:5px;">특이사항 · '
              + notes.map(esc).join('<br>') + '</div>' : '') + '</td>'
           + '<td>' + grpCell(gr) + '</td></tr>';
