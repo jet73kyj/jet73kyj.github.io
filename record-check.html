@@ -286,7 +286,7 @@ async function run(){
   const k = $('mon').value;
   $('body').innerHTML = '<div class="load">' + monNo(k) + '월 기록지를 점검하고 있습니다…</div>';
   const [a, b, c, lg, st] = await Promise.all([
-    sb.rpc('nl_rc_open', { p_month: k }),   // 점검 줄 + 상태 (발달 · 치료지원 · 센터 · 미작성 모두 · 2026-10-23)
+    sb.rpc('nl_rc_my', { p_month: k }),   // 점검 줄 + 상태 (발달 · 치료지원 · 센터 · 미작성 모두 · 2026-10-23)
     sb.from('nl_rc_cases').select('id, grp, name, need_doc, sort_no').eq('active', true).order('sort_no'),
     sb.from('nl_rc_results').select('child_id, item_no, item_key, case_id, doc_done, memo, checked_at, checked_by, checked_detail').eq('month_key', k),
     Promise.resolve({ data: [] }),
@@ -626,7 +626,7 @@ function okHtml(r, i){
 }
 // [확인] · [확인 취소] 뒤 — 상태만 서버에서 다시 받음 (판단은 서버 한 곳)
 async function refreshState(){
-  const { data, error } = await sb.rpc('nl_rc_open', { p_month: $('mon').value });
+  const { data, error } = await sb.rpc('nl_rc_my', { p_month: $('mon').value });
   if (error || !data) return;
   const m = {};
   data.forEach(x => { m[x.child_id + '|' + x.item_no + '|' + (x.item_key || '') + '|' + (x.detail || '')] = x; });

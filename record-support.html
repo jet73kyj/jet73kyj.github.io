@@ -685,7 +685,7 @@ function kbView(v) {
 let KB_AUTO = false;
 async function kbMonth(k) {
   // 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 기록지 점검 화면과 같은 상태
-  const { data, error } = await sb.rpc('nl_rc_open', { p_month: k });
+  const { data, error } = await sb.rpc('nl_rc_my', { p_month: k });
   if (error) throw error;
   const out = {};
   (data || []).forEach(r => {

@@ -363,7 +363,7 @@ async function ctTabs(refetch) {
   if (refetch) {
     const req = ++CT_REQ;
     try {
-      const { data, error } = await sb.rpc('nl_rc_open', { p_month: mv });
+      const { data, error } = await sb.rpc('nl_rc_my', { p_month: mv });
       if (req !== CT_REQ) return;
       CT_RED = {};
       if (!error) (data || []).forEach(r => {

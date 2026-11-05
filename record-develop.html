@@ -845,7 +845,7 @@ const KB_LIST = n => (n >= 10 && n <= 14) || n === 18;      // 기록지를 고�
 async function kbMonth(k) {
   // 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 기록지 점검 화면과 같은 상태
   //   참고 · 작성 중 · 끝 → 뺌 / 제출 대기 → 옅은 주황 / 선생님이 고칠 줄 → 빨강 / 그 밖 → 주황(서류)
-  const { data, error } = await sb.rpc('nl_rc_open', { p_month: k });
+  const { data, error } = await sb.rpc('nl_rc_my', { p_month: k });
   if (error) throw error;
   let rows = (data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }))
     .filter(r => r.kind === '발달재활' && r.item_no < 31 && r.item_no !== 25
@@ -2633,7 +2633,7 @@ async function loadRcBox(cid, mk) {
   if (!box) return;
   box.style.display = 'none';
   try {
-    const { data, error } = await sb.rpc('nl_record_check', { p_month: mk });
+    const { data, error } = await sb.rpc('nl_rc_dev_my', { p_month: mk, p_child: Number(cid) });   // 셈은 서버가 전부 · 받는 건 이 아동만 (2026-11-05)
     if (error) return;
     if (Number($('pChild').value) !== Number(cid)) return;      // 그 사이 다른 아동을 불렀으면 그리지 않음
     RCSRV = (data || []).filter(r => Number(r.child_id) === Number(cid));
