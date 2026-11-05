@@ -192,6 +192,7 @@
   }
   function put() {
     homeName();
+    if (document.getElementById('nlTopBar')) return;   // 위쪽 단추 띠가 맡음 (2026-11-05)
     if (document.getElementById('nlReload')) return;
     var ref = findRef();
     if (!ref || !ref.parentNode) return;
@@ -389,15 +390,112 @@
     for (var i = 0; i < els.length; i++) { var t = (els[i].textContent || '').trim(); if (t === '처음으로' || t === '홈' || t === '로그아웃') return els[i]; }
     return null;
   }
+  // ── 위쪽 단추 띠 (2026-11-05 은정님) ──
+  //   모든 직원 화면 맨 위에 같은 띠 · 늘 같은 차례 [☰ 메뉴] [새로고침] [홈] [로그아웃]
+  //   전에는 「홈」 단추 옆에 끼워 넣어, 화면마다(기록지는 용지 쪽) 자리가 달랐다
+  //   화면에 있던 「홈」 · 「로그아웃」은 그 단추를 그대로 옮겨 온다 → 하는 일 · 「나가시겠습니까?」 물음은 그대로
+  //   홈 화면에는 두지 않음 · 인쇄에 안 나옴
+  function tx(e) { return (e.textContent || '').trim(); }
+  function seen(e) { return !!(e.offsetWidth || e.offsetHeight || (e.getClientRects && e.getClientRects().length)); }
+  function outer(e) {                       // <a><button>처음으로</button></a> 는 바깥 a 째로
+    var a = e.parentElement;
+    if (a && a.tagName === 'A' && tx(a) === tx(e)) return a;
+    return e;
+  }
+  function findBtn(names) {
+    var els = document.querySelectorAll('button, a'), vis = null, any = null;
+    for (var i = 0; i < els.length; i++) {
+      var e = els[i];
+      if (names.indexOf(tx(e)) < 0) continue;
+      if (e.closest && (e.closest('#nlTopBar') || e.closest('#nlMenuPanel'))) continue;
+      e = outer(e);
+      if (!vis && seen(e)) vis = e;
+      any = e;
+    }
+    return vis || any;
+  }
+  function barCss() {
+    if (document.getElementById('nlTopBarCss')) return;
+    var st = document.createElement('style'); st.id = 'nlTopBarCss';
+    st.textContent = '#nlTopBar{display:flex;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap;'
+      + 'padding:8px 16px;background:#fff;border-bottom:1px solid #ECE8E3;position:relative;z-index:40;box-sizing:border-box;width:100%;}'
+      + '#nlTopBar .nltb{display:inline-flex;align-items:center;justify-content:center;width:auto !important;height:auto !important;'
+      + 'margin:0 !important;padding:6px 12px !important;font-size:13px !important;font-weight:600 !important;line-height:1.3 !important;'
+      + 'background:#fff !important;color:#4A433F !important;border:1px solid #E4E0DA !important;border-radius:8px !important;'
+      + 'text-decoration:none !important;cursor:pointer;white-space:nowrap;box-shadow:none !important;}'
+      + '#nlTopBar .nltb:hover{background:#F8F1E8 !important;}'
+      + '#nlTopBar .nltb.home{color:#B07A4A !important;}'
+      + '#nlTopBar a.nltb-wrap{display:inline-flex;text-decoration:none;margin:0;padding:0;}'
+      + '@media print{#nlTopBar{display:none !important;}}';
+    document.head.appendChild(st);
+  }
+  function take(el, bar, cls) {             // 화면 단추를 띠로 옮김
+    if (el.tagName === 'A' && el.querySelector('button')) {
+      el.className = 'nltb-wrap';
+      var inner = el.querySelector('button');
+      inner.classList.add('nltb'); if (cls) inner.classList.add(cls);
+    } else {
+      el.classList.add('nltb'); if (cls) el.classList.add(cls);
+    }
+    el.style.marginRight = ''; el.style.marginLeft = '';
+    bar.appendChild(el);
+  }
+  function ensureBar() {
+    if (!ME || isHome() || !document.body) return;
+    barCss();
+    var bar = document.getElementById('nlTopBar');
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'nlTopBar'; bar.className = 'no-print';
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
+    // 띠 밖에 남은 옛 새로고침 · 메뉴 단추는 치움
+    ['nlReload', 'nlMenuBtn'].forEach(function (id) {
+      document.querySelectorAll('#' + id).forEach(function (e) { if (!bar.contains(e)) e.remove(); });
+    });
+    if (!document.getElementById('nlMenuBtn') && menuItems().length) {
+      var m = document.createElement('button');
+      m.id = 'nlMenuBtn'; m.type = 'button'; m.className = 'nltb'; m.textContent = '☰ 메뉴'; m.title = '다른 화면으로 바로 이동';
+      m.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); openPanel(m); };
+      bar.insertBefore(m, bar.firstChild);
+    }
+    if (!document.getElementById('nlReload')) {
+      var r = document.createElement('button');
+      r.id = 'nlReload'; r.type = 'button'; r.className = 'nltb'; r.textContent = '새로고침'; r.title = '화면을 새로 읽기';
+      r.onclick = function (ev) { ev.preventDefault(); w.location.reload(); };
+      var mb = document.getElementById('nlMenuBtn');
+      if (mb && mb.parentNode === bar) bar.insertBefore(r, mb.nextSibling); else bar.insertBefore(r, bar.firstChild);
+    }
+    var hasHome = bar.querySelector('[data-nltb="home"]'), hasOut = bar.querySelector('[data-nltb="out"]');
+    var h = findBtn(['홈', '처음으로']);
+    if (h && !hasHome) { if (!h.querySelector('button') && tx(h) === '처음으로') h.textContent = '홈'; h.setAttribute('data-nltb', 'home'); take(h, bar, 'home'); }
+    else if (h && hasHome && seen(h)) h.style.display = 'none';          // 화면이 다시 그린 두 번째 홈
+    if (!bar.querySelector('[data-nltb="home"]')) {                       // 화면에 홈 단추가 없으면 새로
+      var a = document.createElement('a'); a.href = 'index.html'; a.textContent = '홈';
+      a.setAttribute('data-nltb', 'home'); a.className = 'nltb home'; bar.appendChild(a);
+    }
+    var o = findBtn(['로그아웃']);
+    if (o && !hasOut) { o.setAttribute('data-nltb', 'out'); take(o, bar, ''); }
+    else if (o && hasOut && seen(o)) o.style.display = 'none';
+    if (!bar.querySelector('[data-nltb="out"]')) {                        // 화면에 로그아웃이 없으면 새로 (매일 점검 · 통계 등)
+      var lo = document.createElement('button'); lo.type = 'button'; lo.textContent = '로그아웃';
+      lo.setAttribute('data-nltb', 'out'); lo.className = 'nltb';
+      lo.onclick = function (ev) {
+        ev.preventDefault();
+        var go = function () { try { w.nlKeepOff && w.nlKeepOff(); } catch (e) {} w.location.href = 'index.html'; };
+        var c = getSb();
+        try { if (c && c.auth) c.auth.signOut().then(go, go); else go(); } catch (e) { go(); }
+      };
+      bar.appendChild(lo);
+    }
+    // 차례 맞춤 — 메뉴 · 새로고침 · 홈 · 로그아웃
+    ['nlMenuBtn', 'nlReload'].forEach(function (id) { var e = document.getElementById(id); if (e && e.parentNode === bar) bar.appendChild(e); });
+    var hh = bar.querySelector('[data-nltb="home"]'); if (hh) bar.appendChild(hh);
+    var oo = bar.querySelector('[data-nltb="out"]'); if (oo) bar.appendChild(oo);
+  }
+  var BAR_BUSY = false;
   function putMenu() {
-    if (!ME || isHome() || document.getElementById('nlMenuBtn') || !menuItems().length) return;
-    var ref = findRef(); if (!ref || !ref.parentNode) return;
-    var b = document.createElement('button');
-    b.id = 'nlMenuBtn'; b.type = 'button'; b.className = ref.className; b.textContent = '☰ 메뉴'; b.title = '다른 화면으로 바로 이동';
-    b.style.marginRight = '6px'; b.style.width = 'auto'; b.style.marginTop = '0';
-    try { var hh = ref.getBoundingClientRect().height; if (hh) b.style.height = hh + 'px'; } catch (e) {}
-    b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); openPanel(b); };
-    ref.parentNode.insertBefore(b, ref);
+    if (BAR_BUSY) return; BAR_BUSY = true;
+    w.requestAnimationFrame(function () { BAR_BUSY = false; try { ensureBar(); } catch (e) { console.warn('위쪽 단추 띠', e); } });
   }
   function startLive(client) {
     if (typeof NLLive !== 'undefined') return;   // 화면이 스스로 켜는 곳
@@ -409,8 +507,12 @@
       if (!r || !r.data) return;
       ME = { id: Number(id), role: String(r.data.role || '').trim() };
       if (w.NL_MENU) putMenu(); else loadScript('nl-menu.js', putMenu);
-      try { new MutationObserver(function () { if (!document.getElementById('nlMenuBtn')) putMenu(); })
-              .observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+      try { new MutationObserver(function (ms) {
+              // 띠 안에서만 바뀐 것은 건너뜀 (돌고 돌지 않게)
+              var bar = document.getElementById('nlTopBar');
+              if (bar && ms.every(function (x) { return bar === x.target || bar.contains(x.target); })) return;
+              putMenu();
+            }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
       startLive(client);
       // 푸시 알림 동의 · 등록 (2026-10-05) — 그 기기에서 아직 답하지 않았으면 동의 창
       var go = function () { try { if (w.NLPush) NLPush.start({ sb: client, kind: 'staff', who: ME.id }); } catch (e) {} };

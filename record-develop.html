@@ -3805,6 +3805,8 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
   box.addEventListener('mousedown', e => {
     const d = e.target.closest('div[data-i]'); if (!d) return;
     e.preventDefault(); pick(hits[Number(d.dataset.i)]);
+    // 마우스로 골라도 바로 불러오기 (2026-11-05 은정님)
+    { const b = document.getElementById('pLoad'); if (b) setTimeout(() => { b.click(); q.blur(); }, 0); }
   });
   q.addEventListener('blur', () => setTimeout(() => {
     box.style.display = 'none';
