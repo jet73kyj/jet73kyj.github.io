@@ -411,6 +411,21 @@
     </div>
     <div id="rtNow" style="font-size:12.5px;color:#666;margin-top:8px;"></div>
     <div id="rtMsg" class="out" style="display:none;"></div>
+    <!-- 학부모 수업료 (1회) — nl_therapist_fees · 원장님만 · 지급 단가와 따로 저장 (2026-11-05) -->
+    <div id="pfBox" style="margin-top:16px;padding-top:12px;border-top:1px dashed #E6DED4;">
+      <div style="font-weight:600;font-size:14px;margin-bottom:6px;">학부모 수업료 (1회)
+        <span style="font-weight:normal;font-size:12px;color:#888;">— 납부 계산이 이 금액으로 셈합니다 · 넣은 달부터 계속 적용</span></div>
+      <div class="evalrow">
+        <div><label for="pf_from">적용 시작 달</label><input id="pf_from" type="month"></div>
+        <div><label for="pf40">40분</label><input id="pf40" data-won type="text" inputmode="numeric" style="width:100px;"></div>
+        <div><label for="pf50">50분</label><input id="pf50" data-won type="text" inputmode="numeric" placeholder="비우면 ×1.25" style="width:100px;"></div>
+        <div><label for="pf60">60분</label><input id="pf60" data-won type="text" inputmode="numeric" placeholder="비우면 ×1.5" style="width:100px;"></div>
+        <div><label for="pfx">발추 (1회)</label><input id="pfx" data-won type="text" inputmode="numeric" placeholder="없으면 비움" style="width:100px;"></div>
+        <button id="pfSave" class="addb">학부모 수업료 저장</button>
+      </div>
+      <div id="pfNow" style="font-size:12.5px;color:#666;margin-top:8px;"></div>
+      <div id="pfMsg" class="out" style="display:none;"></div>
+    </div>
   </div>
 
   <!-- 평가 안내 -->
@@ -1146,6 +1161,73 @@ $('pubBtn').onclick = async () => {
 };
 
 // ===== 평가 넣기 =====
+// ===== 학부모 수업료 (2026-11-05) =====
+let PFEES = [], PF_ERR = '', PF_DIRTY = false, PF_SAVING = false;
+async function loadPfees(){
+  const { data, error } = await sb.from('nl_therapist_fees')
+    .select('id, therapist_id, from_month, fee_40, fee_50, fee_60, fee_extra').order('from_month');
+  PF_ERR = error ? error.message : ''; PFEES = error ? [] : (data || []);
+}
+function pfNowRow(){
+  return PFEES.filter(x => Number(x.therapist_id) === Number(thId) && x.from_month <= mon)
+              .sort((a, b) => a.from_month < b.from_month ? -1 : 1).pop() || null;
+}
+function setPfBtn(st){
+  const b = $('pfSave'); if (!b) return;
+  b.disabled = st === 'busy';
+  b.textContent = st === 'busy' ? '저장 중…' : st === 'ok' ? '✓ 저장됨' : '💾 학부모 수업료 저장 전';
+  b.style.background = st === 'ok' ? '#3c7a4a' : '#fff';
+  b.style.color = st === 'ok' ? '#fff' : '#2F2926';
+}
+function pfMsg(t, ok){ const e = $('pfMsg'); e.textContent = t; e.className = 'out ' + (ok ? 'ok' : 'err'); e.style.display = t ? 'block' : 'none'; }
+function drawPfBox(){
+  if (!$('pfBox')) return;
+  if (PF_SAVING) return;
+  const r = pfNowRow();
+  $('pfNow').innerHTML = PF_ERR ? '<b style="color:#c62828;">학부모 수업료를 읽지 못했습니다 — ' + esc(PF_ERR) + '</b>'
+    : r ? '지금 적용 — ' + esc(r.from_month) + '부터 <b>' + won(r.fee_40) + '</b> / ' + won(r.fee_50) + ' / ' + won(r.fee_60) + '원'
+          + (r.fee_extra ? ' · 발추 ' + won(r.fee_extra) + '원' : '')
+        : '<b style="color:#c62828;">이 달에 적용되는 학부모 수업료가 없습니다.</b> 납부 계산은 아동마다 「적용단가」가 있어야 셈합니다.';
+  $('pf_from').value = mon;
+  $('pf40').value = r && r.fee_40 ? r.fee_40 : '';
+  $('pf50').value = r && r.fee_50 ? r.fee_50 : '';
+  $('pf60').value = r && r.fee_60 ? r.fee_60 : '';
+  $('pfx').value  = r && r.fee_extra ? r.fee_extra : '';
+  PF_DIRTY = false; setPfBtn(r ? 'ok' : 'dirty'); pfMsg('', true);
+}
+['pf_from', 'pf40', 'pf50', 'pf60', 'pfx'].forEach(id => {
+  const el = $(id); if (el) el.addEventListener('input', () => { PF_DIRTY = true; setPfBtn('dirty'); });
+});
+window.addEventListener('beforeunload', e => { if (PF_DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+$('pfSave').onclick = async () => {
+  const from = $('pf_from').value;
+  const f40 = numOf($('pf40').value);
+  if (!thId) { pfMsg('선생님을 먼저 고르세요.', false); return; }
+  if (!/^\d{4}-\d{2}$/.test(from || '')) { pfMsg('적용 시작 달을 고르세요.', false); return; }
+  if (!f40) { pfMsg('40분 금액을 넣으세요.', false); return; }
+  const row = { therapist_id: thId, from_month: from, fee_40: f40,
+    fee_50: numOf($('pf50').value) || Math.round(f40 * 1.25),
+    fee_60: numOf($('pf60').value) || Math.round(f40 * 1.5),
+    fee_extra: numOf($('pfx').value) };
+  const old = PFEES.find(x => Number(x.therapist_id) === Number(thId) && x.from_month === from);
+  if (!confirm((THS.find(t => Number(t.id) === Number(thId)) || {}).name + ' 선생님 학부모 수업료를 ' + from + '부터\n'
+     + '40분 ' + won(row.fee_40) + ' / 50분 ' + won(row.fee_50) + ' / 60분 ' + won(row.fee_60) + '원'
+     + (row.fee_extra ? ' · 발추 ' + won(row.fee_extra) + '원' : '') + '\n으로 ' + (old ? '고칠까요?' : '넣을까요?'))) return;
+  PF_SAVING = true; setPfBtn('busy');
+  try {
+    const res = old ? await sb.from('nl_therapist_fees').update(row).eq('id', old.id).select('id')
+                    : await sb.from('nl_therapist_fees').insert(row).select('id');
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) throw new Error('저장되지 않았습니다 (권한).');
+    await loadPfees();
+    PF_SAVING = false; drawPfBox();
+    pfMsg('✅ 저장했습니다. ' + from + '부터 적용됩니다.', true);
+  } catch (e) {
+    PF_SAVING = false; setPfBtn('dirty');
+    pfMsg('❌ 저장하지 못했습니다.\n' + (e && e.message ? e.message : e), false);
+  }
+};
+
 // ===== 지급 단가 =====
 // 지금 고른 달·치료사의 단가를 칸에 채워 보여준다
 function drawRateBox(){
@@ -1172,6 +1254,7 @@ function drawRateBox(){
     $('rt_ev1').value = ''; $('rt_ev2').value = ''; $('rt_ev3').value = ''; $('rt_fname').value = '주유비';
   }
   $('rt_from').value = mon;
+  drawPfBox();
   drawAreaInputs();
 }
 // 영역별 단가 칸 — 체크한 치료 영역(고치기 창이 열려 있으면 그 체크) + 단가가 들어 있는 영역
@@ -1614,6 +1697,7 @@ async function afterLogin(user){
   $('mainBox').style.display  = 'block';
   await loadUnconf();
   await loadPub();
+  await loadPfees();
   calc();
   drawWorkDays();
   initCard();
