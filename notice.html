@@ -93,6 +93,8 @@
   .fchip button { width:auto; margin:0; padding:0 6px; border:none; background:none; color:#993C1D; font-size:13px; }
   .fchip.link { cursor:pointer; color:var(--cam); padding-right:10px; } .fchip.link:hover { background:var(--camL); }
   .ntfiles { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+/* 업무 계정 보기 전용 — 개인 계정(21번 등) · 2026-11-05 */
+body.ro .addbox, body.ro button[data-del], body.ro button[data-pin] { display:none !important; }
 </style>
 </head>
 <body>
@@ -476,7 +478,7 @@ function clearForm() {
 async function afterLogin(user) {
   const { data: me, error: e1 } = await sb
     .from('nl_therapists')
-    .select('id, name, role, active')
+    .select('id, name, role, active, work_of')
     .eq('login_email', user.email.toLowerCase())
     .maybeSingle();
 
@@ -485,7 +487,9 @@ async function afterLogin(user) {
   nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
 
   const can = [8, 19].includes(Number(me.id)) || /관리자|행정/.test(me.role || '');
-  if (!can) {
+  const viewOnly = !can && !!me.work_of;   // 개인 계정 — 올라간 공지를 보기만 (2026-11-05)
+  if (viewOnly) document.body.classList.add('ro');
+  if (!can && !viewOnly) {
     show($('msg'), '⚠️ 공지는 관리자·행정 선생님만 올릴 수 있습니다.', false);
     nlKeepOff();
   try { await sb.auth.signOut(); } catch (e) {}
@@ -506,7 +510,7 @@ async function afterLogin(user) {
     });
   } catch (e) {}
 
-  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨';
+  $('who').textContent = me.name + ' (' + me.role + ') 님으로 로그인됨' + (viewOnly ? ' · 보기 전용' : '');
   $('loginBox').style.display = 'none';
   $('mainBox').style.display  = 'block';
   clearForm();

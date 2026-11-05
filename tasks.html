@@ -159,6 +159,13 @@
   .mn .addr { border:none; background:none; color:var(--cam); padding:4px 0 0; font-size:12.5px; }
   .mn .addr:hover { background:none; text-decoration:underline; }
   .mn .rdone { margin-top:6px; color:#2e7d32; font-size:13px; white-space:pre-wrap; }
+/* 업무 계정 할 일 보기 전용 — 개인 계정(21번 등) · 2026-11-05 */
+body.ro #body [data-tk], body.ro #body [data-mv], body.ro #body [data-del], body.ro #body [data-ns],
+body.ro #body [data-ms], body.ro #body [data-msave], body.ro #body [data-medit], body.ro #body [data-nedit],
+body.ro #body [data-mcancel], body.ro #body .addr, body.ro #body #freeopen, body.ro #body #remake,
+body.ro #body #nadd, body.ro #body #ropen, body.ro #body a[href="work-guides.html"] { display:none !important; }
+body.ro #body .cb, body.ro #body input, body.ro #body textarea, body.ro #body select { pointer-events:none; }
+.robar { margin:0 auto 10px; max-width:1100px; padding:10px 14px; border-radius:10px; background:#FBF5EE; border:1px solid #F0E4D6; color:#7a5a3a; font-size:13px; }
 </style>
 </head>
 <body>
@@ -180,6 +187,7 @@ const $ = id => document.getElementById(id);
 // 원장님 · 행정(19) · 홍보(10) — 선생님은 내 것만 (2026-10-10)
 const CAN_SEE = [8, 19, 10];
 let IS_BOSS = false;
+let VIEW_ONLY = false;   // 업무 계정 할 일을 보기만 (2026-11-05)
 const STATES = ['할 일', '하는 중', '끝냄', '미룸', '못 함'];
 const SCL = { '할 일':'s1', '하는 중':'s2', '끝냄':'s3', '미룸':'s4', '못 함':'s5' };
 // 화면 글자 — 서버 값 「하는 중」은 「진행 중」으로 보임 (2026-10-10)
@@ -335,7 +343,7 @@ async function load(){
     if (!pe) PREV = pv || [];
   }
   // 오늘 화면이면 오늘 몫 늘 하는 일을 저절로 넣음 (흐린 「예정」으로 남지 않게 · 한 번만)
-  if (DAY === today() && !AUTO_MADE[DAY] && PREV.some(x => x.on_date === DAY)) {
+  if (!VIEW_ONLY && DAY === today() && !AUTO_MADE[DAY] && PREV.some(x => x.on_date === DAY)) {
     AUTO_MADE[DAY] = true;
     const mk = await sb.rpc('nl_make_tasks', { p_date: DAY });
     if (!mk.error && Number(mk.data) > 0) return load();
@@ -945,14 +953,20 @@ $('home').onclick = () => { location.href = 'index.html'; };
 (async () => {
   const { data } = await sb.auth.getSession();
   if (!data || !data.session) { location.replace('index.html'); return; }
-  const { data: me, error } = await sb.from('nl_therapists').select('id, name').eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name, work_of').eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
   if (error || !me) { $('body').innerHTML = '<div class="card err">직원 표에 이 이메일이 없습니다.</div>'; return; }
   nlKeep(me.id);
   ME_ID = Number(me.id);
-  if (CAN_SEE.indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="card err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+  if (CAN_SEE.indexOf(Number(me.id)) < 0) {
+    // 개인 계정 — 업무 계정의 할 일을 보기만 (끝냄 체크는 사무실 컴퓨터에서 · 2026-11-05)
+    if (!me.work_of) { $('body').innerHTML = '<div class="card err">이 화면을 볼 권한이 없습니다.</div>'; return; }
+    VIEW_ONLY = true;
+    document.body.classList.add('ro');
+    $('body').insertAdjacentHTML('beforebegin', '<div class="robar">' + me.work_of + '번 업무 계정의 할 일을 <b>보기만</b> 합니다. 끝냄 체크 · 메모는 사무실 컴퓨터에서 해 주세요.</div>');
+  }
   IS_BOSS = ME_ID === 8;
-  if (!IS_BOSS) WHO = String(ME_ID);   // 선생님은 내 것만
-  $('whoami').textContent = me.name + ' 님으로 로그인됨';
+  if (!IS_BOSS) WHO = String(VIEW_ONLY ? me.work_of : ME_ID);   // 선생님은 내 것만 · 개인 계정은 업무 계정 것
+  $('whoami').textContent = me.name + ' 님으로 로그인됨' + (VIEW_ONLY ? ' · 보기 전용' : '');
   const { data: st } = await sb.from('nl_therapists').select('id, name, role, left_on').order('id');
   STAFF = (st || []).filter(s => !s.left_on && !/치료사/.test(s.role || ''));
   { const kr = await readAll(() => sb.from('nl_children').select('id, name, birth, status').order('name').order('id')); KIDS = kr.data || []; }
