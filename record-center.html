@@ -223,6 +223,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
+<script src="nl-kidtabs.js"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script>
@@ -347,7 +348,58 @@ function drawKidList() {
   const _ids = {};
   list.forEach(p => { if (p.child.status !== '종결' && p.child.status !== '타기관이용') _ids[p.child.id] = 1; });
   if ($('pCount')) $('pCount').textContent = '아동 ' + Object.keys(_ids).length + '명';
+  ctTabs(true);
 }
+
+// ── 아동 책갈피 (2026-11-05 은정님) — 선생님 계정 · 오른쪽 옆면에 맡은 아동 이름
+//   빨강 = 고칠 것 (기록지 점검 · 기한 지난 미작성) · 흰색 = 없음 · 옅은 회색 = 지금 보는 아동
+//   끝났는지는 서버 nl_rc_open 한 곳 (기록지 점검 화면과 같음) · 찾기 칸 · 불러오기 단추는 감춤
+let CT_RED = {}, CT_REQ = 0, CT_AUTO = false;
+async function ctTabs(refetch) {
+  if (!ME || _isAllView(ME.role) || !window.NLKidTabs) return;
+  const kw = document.querySelector('.kidpickwrap'); if (kw) kw.style.display = 'none';
+  if ($('pLoad')) $('pLoad').style.display = 'none';
+  const mv = $('pMonth').value || mkNow();
+  if (refetch) {
+    const req = ++CT_REQ;
+    try {
+      const { data, error } = await sb.rpc('nl_rc_open', { p_month: mv });
+      if (req !== CT_REQ) return;
+      CT_RED = {};
+      if (!error) (data || []).forEach(r => {
+        if (r.kind !== '센터' || Number(r.therapist_id) !== Number(ME.id)) return;
+        if (r.state === '참고' || r.state === '작성 중' || r.state === '끝') return;
+        CT_RED[r.child_id] = 1;
+      });
+    } catch (e) { if (req !== CT_REQ) return; }
+  }
+  const all = $('pAll') && $('pAll').checked;
+  const list = PAIRS.filter(p => all || !p.dup);
+  const items = list.map(p => ({ i: PAIRS.indexOf(p), p: p, red: !!CT_RED[p.child.id] }));
+  items.sort((x, y) => (y.red - x.red) || String(x.p.child.name).localeCompare(String(y.p.child.name)));
+  const mon = Number(mv.slice(5, 7)) + '월';
+  NLKidTabs.show('<div class="nltabhd">' + mon + '</div>' + (items.length ? items.map(o => {
+    const on = LOADED && cur && PAIRS.indexOf(cur) === o.i;
+    return '<button type="button" class="nltab' + (o.red ? ' red' : '') + (on ? ' on' : '') + '" data-ci="' + o.i + '"'
+      + ' title="' + esc(o.p.child.name || '') + (o.red ? ' · 고칠 것 있음' : '') + '">' + esc(o.p.child.name || '')
+      + (o.p.support === 5 ? '<small>방과후</small>' : '') + '</button>';
+  }).join('') : '<div class="nltabhd">아동 없음</div>'));
+  if (!CT_AUTO && !LOADED && items.length) {
+    CT_AUTO = true;
+    setTimeout(() => { if (!LOADED) { $('pChild').value = String(items[0].i); loadOne(); } }, 0);
+  }
+}
+document.addEventListener('click', async e => {
+  const b = e.target && e.target.closest && e.target.closest('#nlKidTabs button.nltab[data-ci]');
+  if (!b) return;
+  const prev = $('pChild').value;
+  $('pChild').value = b.dataset.ci;
+  const o = $('pChild').options[$('pChild').selectedIndex], q = $('pChildQ'); if (q && o) q.value = o.text;
+  await loadOne();
+  if (!LOADED || !cur || String(PAIRS.indexOf(cur)) !== b.dataset.ci) $('pChild').value = prev;   // 「불러올까요?」에서 취소
+  ctTabs(false);
+  window.scrollTo(0, 0);
+});
 
 async function afterLogin(user) {
   const { data: me, error: e1 } = await sb
@@ -393,6 +445,7 @@ async function afterLogin(user) {
   // 새로고침해도 보던 기록지 그대로 (2026-11-04 은정님) — 이 탭에서만 기억 · 주소로 받은 것이 먼저
   let _LAST = null; try { _LAST = JSON.parse(sessionStorage.getItem('nl_rc_last') || 'null'); } catch (e) {}
   const _q0 = new URLSearchParams(location.search), _useUrl = /^\d+$/.test(_q0.get('c') || '');
+  if (_useUrl || (_LAST && _LAST.c)) CT_AUTO = true;   // 보던 아동을 되살리므로 책갈피 첫 아동을 저절로 열지 않음
   const _q = _useUrl ? _q0 : new URLSearchParams(_LAST ? { c: _LAST.c || '', m: _LAST.m || '', s: _LAST.s || '', t: _LAST.t || '' } : {});
   const _qc = _q.get('c'), _qm = _q.get('m'), _qs = _q.get('s');
   if (!_useUrl && _LAST && !_LAST.c && /^\d{4}-\d{2}$/.test(_LAST.m || '') && $('pMonth').value !== _LAST.m) {
@@ -570,6 +623,7 @@ async function loadOne() {
     drawAll(lg.data);
     DIRTY = false;
     setSaveBtn(LOGID ? 'done' : 'before');
+    ctTabs(false);   // 책갈피 — 지금 보는 아동 (2026-11-05)
   } catch (e) {
     alert('불러오지 못했습니다.\n' + e.message);
   } finally {
@@ -739,6 +793,7 @@ async function saveRecord() {
     $('pInfo').textContent = mk + ' · 저장됨';
     DIRTY = false;
     setSaveBtn('done');
+    ctTabs(true);    // 책갈피 색 다시 (2026-11-05)
   } catch (e) {
     alert('❌ 저장하지 못했습니다.\n' + e.message);
     setSaveBtn('before');

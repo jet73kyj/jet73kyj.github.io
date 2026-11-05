@@ -493,6 +493,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
+<script src="nl-kidtabs.js"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script>
@@ -698,6 +699,7 @@ async function afterLogin(user) {
   const _q = new URLSearchParams(location.search);
   if (/^\d+$/.test(_q.get('c') || '') && /^\d{4}-\d{2}$/.test(_q.get('m') || '')) LAST = { cid: _q.get('c'), mv: _q.get('m') };
   if (LAST && /^\d{4}-\d{2}$/.test(LAST.mv || '')) $('pMonth').value = LAST.mv;
+  if (LAST && LAST.cid) KB_AUTO = true;   // 보던 아동을 되살리므로 책갈피 첫 아동을 저절로 열지 않음
   await buildChildList();
   if (LAST && LAST.cid && !CHILDREN.some(c => String(c.id) === String(LAST.cid)) && KIDS[LAST.cid]) CHILDREN.push(KIDS[LAST.cid]);
   drawChildSelect();
@@ -869,20 +871,22 @@ function kbView(v) {
     const c0 = document.querySelector('.container'); if (c0) c0.style.display = '';
     return;
   }
-  KB_VIEW = v;
+  // 선생님 — 기록지는 늘 보이고, 아동은 오른쪽 책갈피로 고름 (2026-11-05 은정님 · 찾기 칸 · 단추 화면 없앰)
+  KB_VIEW = 'sheet';
   const cont = document.querySelector('.container');
-  $('kbBox').style.display = v === 'list' ? '' : 'none';
-  $('kbBack').style.display = v === 'sheet' ? '' : 'none';
-  if (cont) cont.style.display = v === 'sheet' ? '' : 'none';
-  if (v === 'sheet' && child) $('kbBackTxt').textContent = month + '월 · ' + (child.name || '');
+  $('kbBox').style.display = $('kbBox').innerHTML.trim() ? '' : 'none';   // 지난달 남은 것만
+  $('kbBack').style.display = 'none';
+  if (cont) cont.style.display = '';
+  const kw = document.querySelector('.kidpickwrap'); if (kw) kw.style.display = 'none';
+  if ($('pLoad')) $('pLoad').style.display = 'none';
 }
+let KB_AUTO = false;
 function _kbKid(id) { return KIDS[id] || KB_NAME[id] || { id: id, name: id + '번' }; }
 function _kbBtn(k, id, o, cur) {
   const c = _kbKid(id);
   let cls = 'kb', tag = '';
-  if (o && o.fix) { cls += ' fix'; tag = String(o.fix + o.doc); }
-  else if (o && o.doc) { cls += ' doc'; tag = String(o.doc); }
-  else if (o && o.wait) { cls += ' wait'; tag = String(o.wait); }
+  // 고칠 것이 있으면 무조건 빨강 (2026-11-05 은정님 — 서류 · 확인 기다림도 나누지 않음)
+  if (o && (o.fix || o.doc || o.wait)) { cls += ' fix'; tag = String(o.fix + o.doc + o.wait); }
   if (String(childId) === String(id) && k === (($('pMonth').value) || mkNow()) && LOADED) cls += ' on';
   const th = (_isAllView(ME.role) && o) ? Object.keys(o.th).map(t => THERAPISTS[t] || '').filter(Boolean).join('·') : '';
   return '<button type="button" class="' + cls + '" data-k="' + k + '" data-c="' + id + '">'
@@ -911,15 +915,32 @@ function kbDraw(months, got) {
   if (cur) Object.keys(cur).forEach(id => { if (ids.indexOf(id) < 0) ids.push(id); });
   const bad = ids.filter(id => cur && cur[id]).sort(cur ? ord(cur) : undefined);
   const ok = ids.filter(id => !(cur && cur[id]));
-  h += '<div class="kbcur"><div class="kbhd">' + mon(mv) + ' 기록지</div>';
-  if (ids.length) h += '<div class="kbgrid">' + bad.map(id => _kbBtn(mv, id, cur[id])).join('') + ok.map(id => _kbBtn(mv, id, null)).join('') + '</div>';
-  else h += '<div class="kbnote">이 달 발달재활 아동이 없습니다.</div>';
-  h += '<div class="kbnote"><span class="kb fix">빨강</span>기록지 고치기 <span class="kb doc">주황</span>서류 챙기기 <span class="kb wait">옅은 주황</span>센터 확인 기다림'
-     + (errs.length ? '<br><span style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</span>' : '') + '</div></div>';
+  if (errs.length) h += '<div class="kbnote" style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</div>';
   box.innerHTML = h;
+  box.style.display = h ? '' : 'none';
+  // 이 달 아동은 오른쪽 책갈피 (2026-11-05 은정님) — 빨강 = 고칠 것 · 흰색 = 없음 · 옅은 회색 = 지금 보는 아동
+  const tab = (id, o) => {
+    const c = _kbKid(id);
+    const on = String(childId) === String(id) && LOADED;
+    const red = !!(o && (o.fix || o.doc || o.wait));
+    return '<button type="button" class="kb nltab' + (red ? ' red' : '') + (on ? ' on' : '') + '" data-k="' + mv + '" data-c="' + id + '"'
+      + ' title="' + esc(c.name || '') + (red ? ' · 고칠 것 있음' : '') + '">' + esc(c.name || '')
+      + (c.status === '종결' ? '<small>종결</small>' : '') + '</button>';
+  };
+  if (window.NLKidTabs) {
+    if (ids.length) NLKidTabs.show('<div class="nltabhd">' + mon(mv) + '</div>'
+      + bad.map(id => tab(id, cur[id])).join('') + ok.map(id => tab(id, null)).join(''));
+    else NLKidTabs.show('<div class="nltabhd">' + mon(mv) + ' 아동 없음</div>');
+  }
+  // 처음 열면 맨 위 아동을 바로 불러옴 (빈 기록지 화면이 남지 않게)
+  if (!KB_AUTO && !LOADED && ids.length) {
+    KB_AUTO = true;
+    const first = document.querySelector('#nlKidTabs button.nltab[data-c]');
+    if (first) setTimeout(() => { if (!LOADED) first.click(); }, 0);
+  }
 }
 document.addEventListener('click', async e => {
-  const b = e.target && e.target.closest && e.target.closest('#kbBox button.kb[data-c]');
+  const b = e.target && e.target.closest && e.target.closest('#kbBox button.kb[data-c], #nlKidTabs button.kb[data-c]');
   if (!b) return;
   const k = b.dataset.k, cid = b.dataset.c;
   if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n그래도 다른 기록지를 불러올까요?\n(적어 둔 내용은 사라집니다)')) return;
