@@ -867,26 +867,34 @@ async function kbLoad() {
   const months = [];
   for (let k = _kbMon(now, -6) < KB_FROM ? KB_FROM : _kbMon(now, -6); k < now; k = _kbMon(k, 1)) if (k !== mv) months.push(k);
   months.push(mv);
-  if (!box.innerHTML) box.innerHTML = '<div class="kbnote">고칠 것을 세고 있습니다…</div>';
-  // 한 달씩 차례로 · 실패하면 한 번 더 (2026-11-05 — 여러 달을 한꺼번에 부르면 서버가 늦어 못 읽는 일)
-  const got = [];
-  for (const k of months) {
+  // 화면은 바로 연다 (2026-11-05 은정님 — 열리는 데 너무 오래 걸림)
+  //   ① 책갈피를 곧바로 그림 — 전에 센 결과(이 탭에 10분 보관)가 있으면 그 색, 없으면 흰색
+  //   ② 이 달 → 지난달 차례로 서버에 묻고, 한 달 받을 때마다 색을 다시 칠함
+  //   점검 한 달에 3~4초 (2026-11-05 · 선생님 계정) — 기다리지 않고 기록지를 먼저 씀
+  const ck = k => 'nl_kb_dev_' + ME.id + '_' + k;
+  const cached = k => { try { const o = JSON.parse(sessionStorage.getItem(ck(k)) || 'null'); return (o && Date.now() - o.t < 600e3) ? o.v : null; } catch (e) { return null; } };
+  const got = months.map(k => [k, cached(k) || {}]);
+  const draw = async () => {
+    KB = {}; got.forEach(([k, v]) => { KB[k] = v; });
+    const need = [];
+    got.forEach(([k, v]) => { if (v) Object.keys(v).forEach(id => { if (!KIDS[id] && !KB_NAME[id]) need.push(Number(id)); }); });
+    if (need.length) {
+      try { const { data } = await sb.from('nl_children').select('id, name, birth, status').in('id', [...new Set(need)]);
+            (data || []).forEach(x => { KB_NAME[x.id] = x; }); } catch (e) {}
+    }
+    if (req === KB_REQ) kbDraw(months, got);
+  };
+  await draw();
+  const order = [mv].concat(months.filter(k => k !== mv).reverse());
+  for (const k of order) {
     let r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
     if (!r[1]) r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
     if (req !== KB_REQ) return;
-    got.push(r);
+    const i = got.findIndex(x => x[0] === k);
+    if (r[1]) { got[i] = r; try { sessionStorage.setItem(ck(k), JSON.stringify({ t: Date.now(), v: r[1] })); } catch (e) {} }
+    else if (!cached(k)) got[i] = r;              // 못 읽었고 보관도 없으면 「못 읽음」
+    await draw();
   }
-  if (req !== KB_REQ) return;
-  KB = {}; got.forEach(([k, v]) => { KB[k] = v; });
-  // 지난달 남은 것 중 목록에 없는 아동 이름
-  const need = [];
-  got.forEach(([k, v]) => { if (v) Object.keys(v).forEach(id => { if (!KIDS[id] && !KB_NAME[id]) need.push(Number(id)); }); });
-  if (need.length) {
-    const { data } = await sb.from('nl_children').select('id, name, birth, status').in('id', [...new Set(need)]);
-    (data || []).forEach(x => { KB_NAME[x.id] = x; });
-    if (req !== KB_REQ) return;
-  }
-  kbDraw(months, got);
 }
 // 첫 화면은 단추만 · 단추를 누르면 기록지만 (2026-10-22 은정님)
 let KB_VIEW = 'list';

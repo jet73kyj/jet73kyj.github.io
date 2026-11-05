@@ -703,17 +703,23 @@ async function kbLoad() {
   const months = [];
   for (let k = _kbMon(now, -6) < KB_FROM ? KB_FROM : _kbMon(now, -6); k < now; k = _kbMon(k, 1)) if (k !== mv) months.push(k);
   months.push(mv);
-  if (!box.innerHTML) box.innerHTML = '<div class="kbnote">고칠 것을 세고 있습니다…</div>';
-  // 한 달씩 차례로 · 실패하면 한 번 더 (2026-11-05 — 여러 달을 한꺼번에 부르면 서버가 늦어 못 읽는 일)
-  const got = [];
-  for (const k of months) {
+  // 화면은 바로 연다 (2026-11-05 은정님 — 열리는 데 너무 오래 걸림)
+  //   ① 책갈피를 곧바로 그림 — 전에 센 결과(이 탭에 10분 보관)가 있으면 그 색, 없으면 흰색
+  //   ② 이 달 → 지난달 차례로 서버에 묻고, 한 달 받을 때마다 색을 다시 칠함
+  const ck = k => 'nl_kb_sup_' + ME.id + '_' + k;
+  const cached = k => { try { const o = JSON.parse(sessionStorage.getItem(ck(k)) || 'null'); return (o && Date.now() - o.t < 600e3) ? o.v : null; } catch (e) { return null; } };
+  const got = months.map(k => [k, cached(k) || {}]);
+  kbDraw(months, got);
+  const order = [mv].concat(months.filter(k => k !== mv).reverse());
+  for (const k of order) {
     let r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
     if (!r[1]) r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
     if (req !== KB_REQ) return;
-    got.push(r);
+    const i = got.findIndex(x => x[0] === k);
+    if (r[1]) { got[i] = r; try { sessionStorage.setItem(ck(k), JSON.stringify({ t: Date.now(), v: r[1] })); } catch (e) {} }
+    else if (!cached(k)) got[i] = r;
+    kbDraw(months, got);
   }
-  if (req !== KB_REQ) return;
-  kbDraw(months, got);
 }
 // 아동 · 사업 단추 — 서버 줄에 사업 번호가 없으면 그 아동의 모든 사업에 붙임
 function _kbCnt(v, cid, st) { if (!v) return 0; return (v[cid + '|' + st] || 0) + (v[cid + '|'] || 0); }
