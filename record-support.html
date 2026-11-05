@@ -195,6 +195,17 @@
   .form-actions .fa-right a, .form-actions .fa-right button { display:inline-flex; align-items:center; box-sizing:border-box;
     text-decoration:none !important; border-radius:6px; padding:8px 18px; font-size:13px; line-height:1.2; cursor:pointer; }
 </style>
+
+<style>
+  /* 지난달 남은 것 — 「상담 · 보고서」 옆 작은 빨간 글자 단추 (2026-11-05 은정님) */
+  #kbBox.kbinline { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; max-width:none; margin:0 0 0 6px; padding:0; vertical-align:middle; }
+  #kbBox .kbpast2 { display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:12px; color:#B3261E; }
+  #kbBox .kbpast2 b { font-weight:700; margin-right:2px; }
+  #kbBox .kbpast2 i { font-style:normal; color:#8a837c; margin:0 2px 0 4px; }
+  #kbBox button.kbchip { width:auto !important; min-height:0 !important; margin:0 !important; padding:2px 8px !important; font-size:12px !important; font-weight:600;
+    border-radius:6px !important; background:#D93A2B !important; border:1px solid #D93A2B !important; color:#fff !important; display:inline-block; line-height:1.4; cursor:pointer; }
+  #kbBox .kberr { font-size:12px; color:#c62828; }
+</style>
 </head>
 <body>
 
@@ -230,6 +241,14 @@
 <!-- 아동 단추 (2026-10-22 은정님) — 선생님 첫 화면 · 고칠 것이 있으면 빨강 · 지난달 남은 것도 끝날 때까지 -->
 <div id="kbBox" class="no-print"></div>
 <div id="kbBack" class="no-print" style="display:none;"><button type="button" id="kbBackBtn">‹ 아동 목록</button><span id="kbBackTxt"></span></div>
+<script>
+// 지난달 남은 것 상자를 「상담 · 보고서」 옆으로 (2026-11-05 은정님)
+(function () {
+  var kb = document.getElementById('kbBox'), ref = document.getElementById('pCount');
+  if (kb && ref && ref.parentNode) { ref.parentNode.insertBefore(kb, ref); kb.classList.add('kbinline'); }
+})();
+</script>
+
 
 <div class="container">
   <div class="page-title" id="pageTitle">치료지원 누가기록서</div>
@@ -684,7 +703,14 @@ async function kbLoad() {
   for (let k = _kbMon(now, -6) < KB_FROM ? KB_FROM : _kbMon(now, -6); k < now; k = _kbMon(k, 1)) if (k !== mv) months.push(k);
   months.push(mv);
   if (!box.innerHTML) box.innerHTML = '<div class="kbnote">고칠 것을 세고 있습니다…</div>';
-  const got = await Promise.all(months.map(k => kbMonth(k).then(v => [k, v]).catch(() => [k, null])));
+  // 한 달씩 차례로 · 실패하면 한 번 더 (2026-11-05 — 여러 달을 한꺼번에 부르면 서버가 늦어 못 읽는 일)
+  const got = [];
+  for (const k of months) {
+    let r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
+    if (!r[1]) r = await kbMonth(k).then(v => [k, v]).catch(e => [k, null, e]);
+    if (req !== KB_REQ) return;
+    got.push(r);
+  }
   if (req !== KB_REQ) return;
   kbDraw(months, got);
 }
@@ -702,8 +728,9 @@ function kbDraw(months, got) {
   let h = '';
   const errs = got.filter(([k, v]) => !v);
   const past = got.filter(([k, v]) => k !== mv && v && Object.keys(v).length);
+  // 지난달 남은 것 — 「상담 · 보고서」 옆에 작은 빨간 이름 단추 (2026-11-05 은정님)
   if (past.length) {
-    h += '<div class="kbpast"><div class="kbhd">⚠ 지난 달 남은 것 — 다 고칠 때까지 남습니다</div>';
+    h += '<span class="kbpast2"><b>지난달 남은 것</b>';
     past.forEach(([k, v]) => {
       const list = [];
       Object.keys(v).forEach(key => {
@@ -712,14 +739,17 @@ function kbDraw(months, got) {
         sts.forEach(s2 => { if (!list.some(o => o.c.id == cid && o.st == s2)) list.push({ c: c, st: s2, n: _kbCnt(v, cid, s2) }); });
       });
       list.sort((x, y) => String(x.c.name).localeCompare(String(y.c.name)));
-      h += '<div class="kbm">' + mon(k) + '</div><div class="kbgrid">' + list.map(o => _kbBtn(k, o.c, o.st, o.n)).join('') + '</div>';
+      h += '<i>' + mon(k) + '</i>' + list.map(o =>
+        '<button type="button" class="kb kbchip" data-k="' + k + '" data-c="' + o.c.id + '" data-s="' + o.st + '" title="' + mon(k) + ' · ' + esc(SUPNAME[o.st] || '') + ' · 고칠 것 있음">'
+        + esc(o.c.name || (o.c.id + '번')) + '</button>').join('');
     });
-    h += '</div>';
+    h += '</span>';
   }
   const v = (got.find(([k]) => k === mv) || [])[1] || null;
   const items = PAIRS.map(p => ({ c: p.child, st: p.support_type_id, n: _kbCnt(v, p.child.id, p.support_type_id) }));
   items.sort((x, y) => (y.n > 0) - (x.n > 0) || String(x.c.name).localeCompare(String(y.c.name)) || x.st - y.st);
-  if (errs.length) h += '<div class="kbnote" style="color:#c62828;">' + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 읽지 못했습니다</div>';
+  if (errs.length) h += '<span class="kberr" title="' + esc(errs.map(([k, v, e]) => mon(k) + ': ' + ((e && e.message) || '')).join(' / ')) + '">'
+                     + errs.map(([k]) => mon(k)).join(', ') + ' 점검을 못 읽음 (새로고침)</span>';
   box.innerHTML = h;
   box.style.display = h ? '' : 'none';
   // 이 달 아동은 오른쪽 책갈피 (2026-11-05 은정님) — 빨강 = 고칠 것 · 흰색 = 없음 · 옅은 회색 = 지금 보는 아동
