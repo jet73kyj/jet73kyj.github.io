@@ -424,7 +424,8 @@ function draw(){
   const kindHit = r => KINDV === '전체' || (KINDV === '미작성' ? r.item_no === 41 : r.kind === KINDV);
   const counted = r => r.item_no !== 9 && !isWriting(r);
   const left = ROWS.filter(r => !isDone(r) && counted(r));
-  const base = (VIEW === 'left' ? ROWS.filter(r => !isDone(r)) : ROWS).filter(hit).filter(kindHit);
+  // 「남은 것」에도 작성 중(기한 전 미작성)은 회색으로 보임 — 남은 점검 숫자에는 안 셈 (2026-11-05 은정님)
+  const base = (VIEW === 'left' ? ROWS.filter(r => !isDone(r) || isWriting(r)) : ROWS).filter(hit).filter(kindHit);
   const list = base.filter(r => !THF || Number(r.therapist_id || 0) === THF);
   const nList = ROWS.filter(r => isList(r) && r.item_no < 31).length;
   const n41 = ROWS.filter(r => r.item_no === 41).length;
