@@ -1170,6 +1170,11 @@
   body.isth #shortTop, body.isth #gapTop, body.isth #prevHint, body.isth #short,
   body.isth #gapBox, body.isth #prevBox, body.isth #allok, body.isth #dock { display:none !important; }
 
+  /* 출근 안 하는 선생님 칸 — 이름은 그대로 · 회색 (2026-11-06) */
+  th.thoff { background:#ECEAE7 !important; color:#9A948E !important; }
+  th.thoff .thname, th.thoff .thkind { color:#9A948E !important; }
+  .thoffl { font-size:10.5px; color:#8A847E; font-weight:normal; margin-top:2px; }
+  td.thoffc { background:repeating-linear-gradient(135deg,#F3F2F0,#F3F2F0 6px,#ECEAE7 6px,#ECEAE7 12px) !important; }
 </style>
 </head>
 <body>
@@ -2377,6 +2382,32 @@ function dropHoliDup(list) {
 }
 let WORKX  = {};        // 날짜#치료사 -> { s, e } 「나오는 날」(추가근무) 시각 (2026-09-11)
 let THDAYS = {};        // 치료사 -> 요일 -> { works, f, l } 출근 요일·첫 수업·마지막 수업 (nl_therapist_days)
+// 출근 안 하는 요일인가 — 출근 표가 없는 선생님은 막지 않음 · 그 날 「나오는 날」이면 출근 (2026-11-06)
+function thOffWd(thId, w, dd){
+  const t = THDAYS[Number(thId)];
+  if (!t) return false;
+  if (dd && WORKX[String(dd) + '#' + thId]) return false;
+  const r = t[w];
+  return !r || !r.works;
+}
+// 이 달 그 요일에 「나오는 날」이 하루라도 있나 (요일별 보기 머리 글)
+function thXOnWd(thId, w){
+  return Object.keys(WORKX).some(k => { const p = k.split('#'); return Number(p[1]) === Number(thId) && String(p[0]).slice(0,7) === mon && wdOf(p[0]) === w; });
+}
+// 출근 안 하는 선생님 칸을 회색으로 — 이름은 그대로 · 머리에 「출근 안 함」 (2026-11-06 은정님)
+//   cols = 회색으로 칠할 열 번호(교시 칸 0 다음부터 1, 2, …)
+function shadeOffCols(cols){
+  if (!cols.length) return;
+  const set = new Set(cols);
+  document.querySelectorAll('#gbody > tr').forEach(tr => {
+    let i = 0;
+    Array.from(tr.children).forEach(td => {
+      const n = td.colSpan || 1;
+      if (n === 1 && set.has(i)) td.classList.add('thoffc');
+      i += n;
+    });
+  });
+}
 // 점선 ＋(보강 넣기)는 2026년 8월 화면에서만 쓴다.
 // 7월에는 시스템에 회기가 없어 메울 회기를 못 고르기 때문이다.
 // 9월부터는 주황색 ＋(보강 잡기)로만 넣는다.
@@ -3963,10 +3994,14 @@ function drawWeek(){
         + '<div class="thname">' + d + '요일</div>'
         + '<div class="thkind">' + dayNo(dates[i2]) + '일</div></th>').join('')
     + '</tr><tr>'
-    + DAYS.map(() => ths.map(x =>
-        '<th class="wkth"><div class="thkind">' + x.id + '. '
-        + esc(String(x.name || '').slice(0,3)) + '</div></th>').join('')).join('')
+    + DAYS.map((d, i2) => ths.map(x => {
+        const off = thOffWd(x.id, d, dates[i2]);
+        return '<th class="wkth' + (off ? ' thoff' : '') + '"><div class="thkind">' + x.id + '. '
+          + esc(String(x.name || '').slice(0,3)) + '</div>' + (off ? '<div class="thoffl">출근 안 함</div>' : '') + '</th>';
+      }).join('')).join('')
     + '</tr>';
+  const _offCols = [];
+  DAYS.forEach((d, i2) => ths.forEach((x, j) => { if (thOffWd(x.id, d, dates[i2])) _offCols.push(1 + i2 * ths.length + j); }));
 
   $('gbody').innerHTML = SLOTS.map(s => {
     const sat = satOf(s.no);
@@ -4046,6 +4081,7 @@ function drawWeek(){
         }).join('')
       + '</tr>';
   }).join('');
+  shadeOffCols(_offCols);   // 출근 안 하는 날 칸 회색 (2026-11-06)
 }
 
 // 주간 보기의 ＋ — 치료사를 고른 뒤 창을 연다
@@ -5017,8 +5053,17 @@ function drawHead(){
   const ths = thShown();
   const w = (88 / Math.max(ths.length, 1)).toFixed(3) + '%';
   $('ghead').innerHTML = '<tr><th class="hcol" style="width:12%">교시</th>'
-    + ths.map(t=>'<th style="width:' + w + '"><div class="thname">'+esc(t.name)+'</div>'
-        + '<div class="thkind thno">'+t.id+'번</div></th>').join('') + '</tr>';
+    + ths.map(t=>{
+        const off = thOffWd(t.id, wd, null);
+        return '<th style="width:' + w + '"' + (off ? ' class="thoff"' : '') + '><div class="thname">'+esc(t.name)+'</div>'
+          + '<div class="thkind thno">'+t.id+'번</div>'
+          + (off ? '<div class="thoffl">출근 안 함' + (thXOnWd(t.id, wd) ? ' · 나오는 날 있음' : '') + '</div>' : '') + '</th>';
+      }).join('') + '</tr>';
+}
+function shadeDayOff(){
+  const ths = thShown(), cols = [];
+  ths.forEach((t, j) => { if (thOffWd(t.id, wd, null)) cols.push(j + 1); });
+  shadeOffCols(cols);
 }
 
 function draw(){
@@ -5051,6 +5096,7 @@ function draw(){
   // 이름 줄도 함께 다시 그린다 — 치료사 체크를 바꾸면 아래 칸과 어긋나던 것 (2026-09-17)
   drawHead();
   drawDay();
+  shadeDayOff();
   afterDraw();
 }
 
