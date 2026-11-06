@@ -414,6 +414,11 @@ function fmtBirth(b) {
 }
 function _hm(v) { const m = String(v||'').match(/(\d{1,2}):(\d{2})/);
   return m ? m[1].padStart(2,'0') + ':' + m[2] : null; }
+function pcToday() {
+  const k = new Date(Date.now() + 9 * 3600 * 1000);   // 한국 날짜
+  const y = k.getUTCFullYear(), m = k.getUTCMonth() + 1;
+  return (y === year && m === month) ? y + '-' + String(m).padStart(2, '0') + '-' + String(k.getUTCDate()).padStart(2, '0') : '';
+}
 function d2iso(s) { const m = String(s||'').replace(/[^0-9]/g,'');
   return m.length === 8 ? m.slice(0,4)+'-'+m.slice(4,6)+'-'+m.slice(6,8) : null; }
 
@@ -1096,7 +1101,8 @@ function drawPc() {
   // 직접 줄 넣기 — 화면에서만
   rows += '<tr class="no-print pcadd"><td style="text-align:center;font-weight:bold;">＋</td>'
     + '<td><select id="pcNewCat">' + PC_CATS.map(x => '<option>' + x + '</option>').join('') + '</select></td>'
-    + '<td><input type="text" id="pcNewDate" placeholder="날짜 ' + year + '-09-02" style="width:150px !important;margin:0 0 4px !important;">'
+    // 이번 달 기록지를 볼 때만 오늘 날짜를 미리 넣어 둠 (고칠 수 있음) · 지난달은 빈칸 (2026-11-06)
+    + '<td><input type="text" id="pcNewDate" value="' + pcToday() + '" placeholder="날짜 ' + year + '-09-02" style="width:150px !important;margin:0 0 4px !important;">'
     + '<input type="text" id="pcNewText" maxlength="300" placeholder="변경 내용 (예: 결제금액 중 20,000은 학부모 개인 결제)"></td>'
     + '<td><div class="pcbtns"><button type="button" id="pcNewBtn">넣기</button></div></td></tr>';
 
