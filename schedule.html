@@ -3403,13 +3403,24 @@ function drawFind(){
   const IDSOF = {}, GRPOF = {};
   const grp = [];
   {
+    // 요일이 바뀐 것도 한 줄로 (2026-11-06 은정님 · 167번 금 → 화)
+    //   같은 아동 · 같은 수업 · 같은 사업이고 앞 요일줄이 끝난 뒤 다음 요일줄이 시작하면 이어 붙인다
+    //   기간이 겹치는 요일줄(주 2회)은 따로 둔다
+    const stOf = x => String(x.from_date || ((x.from_month || '0000-00') + '-00'));
     const gm = {};
     hit.forEach(r => {
-      const k = r._cid + '|' + r.therapy_id + '|' + r.weekday + '|' + r.support_type_id;
-      if (!gm[k]) { gm[k] = []; grp.push(gm[k]); }
-      gm[k].push(r);
+      const k = r._cid + '|' + r.therapy_id + '|' + r.support_type_id;
+      (gm[k] = gm[k] || []).push(r);
     });
-    const stOf = x => String(x.from_date || ((x.from_month || '0000-00') + '-00'));
+    Object.values(gm).forEach(rows => {
+      rows.sort((a, b) => stOf(a).localeCompare(stOf(b)));
+      const chains = [];
+      rows.forEach(r => {
+        const c = chains.find(ch => { const L = ch[ch.length - 1]; return fEndOf(L) < fStartOf(r); });
+        if (c) c.push(r); else chains.push([r]);
+      });
+      chains.forEach(ch => grp.push(ch));
+    });
     grp.forEach((rows, i) => {
       rows.sort((a, b) => stOf(a).localeCompare(stOf(b)));
       const own = rows[rows.length - 1];
@@ -3419,6 +3430,14 @@ function drawFind(){
     });
   }
   const idsOf = r => IDSOF[r.id] || [r.id];
+  // 묶인 요일줄의 이 달 날짜 — 요일이 바뀌었으면 각 요일줄이 살아 있던 날만 이어 붙인다
+  const fDaysOf = r => {
+    const gr = GRPOF[r.id] || [r];
+    if (gr.every(x => x.weekday === r.weekday)) return fDates(mon, r.weekday);
+    const out = [];
+    gr.forEach(x => fDates(mon, x.weekday).forEach(d => { if (d >= fStartOf(x) && d <= fEndOf(x) && out.indexOf(d) < 0) out.push(d); }));
+    return out.sort();
+  };
   $('findTitle').textContent = '🔍 ' + names.join(' · ') + ' — 수업 ' + grp.length + '건';
 
   // 요일줄에 안 딸린 회기(직접 보강 · 이월 보강 · 선보강)도 함께 보여 준다
@@ -3515,13 +3534,16 @@ function drawFind(){
     const _uniq = a => a.filter((v, i) => v !== '' && a.indexOf(v) === i);
     //   시각이 바뀐 줄은 실제 시각으로 (2:00 과 2:20 이 같은 교시로 보이지 않게)
     const _hms = _uniq(_gr.map(x => String(x.start_time || '').slice(0, 5)));
-    const _whenTxt = (_hms.length > 1) ? _hms.map(h12).join('→') : h12(sl.hm);
+    const _wds = _uniq(_gr.map(x => x.weekday));
+    const _whenTxt = (_wds.length > 1)
+      ? _uniq(_gr.map(x => x.weekday + ' ' + h12(String(x.start_time || '').slice(0, 5)))).join(' → ')
+      : (_hms.length > 1) ? _hms.map(h12).join('→') : h12(sl.hm);
     const _thTxt = _uniq(_gr.map(x => {
       const t2 = THS_ALL.find(t => t.id === x.therapist_id);
       return t2 ? t2.id + '번 ' + (t2.name || '') : '';
     })).join('→');
     const _durTxt = _uniq(_gr.map(x => String(x.duration || ''))).join('→');
-    const days = fDates(mon, r.weekday);
+    const days = fDaysOf(r);
     const slot = {}, other = [], bunsan = [];
     _rl.forEach(x => {
       if (x.status === '쉼') return;
@@ -3630,7 +3652,7 @@ function drawFind(){
       + '<div class="fr-top">'
         + '<span class="fr-nm">' + (r._cid ? '[' + r._cid + '] ' : '') + esc(r._name)
           + (bd(KIDBD[r._cid]) ? ' <span class="cbd">' + bd(KIDBD[r._cid]) + '</span>' : '') + '</span>'
-        + '<span class="fr-when">' + r.weekday + ' ' + _whenTxt + '</span>'
+        + '<span class="fr-when">' + (_wds.length > 1 ? '' : r.weekday + ' ') + _whenTxt + '</span>'
         + '<span class="fr-th">' + (FTOP[r.support_type_id] || STYPE[r.support_type_id] || '') + ' · '
           + (TTYPE[r._tt] || '') + ' · '
           + _thTxt + ' · '
@@ -3924,6 +3946,14 @@ function mkTail(x){
 // 쪼개기 조각(10·20·30분)은 붙는 40분 수업이 든 칸에 담는다 (2026-11-06 은정님)
 //   조각이 수업 끝(16:40 등)에 붙으면 다음 교시 칸에 따로 그려져 수업이 두 타임처럼 보이던 것
 //   붙을 수업 = 같은 날 · 같은 아동 · 같은 선생님 · 40분 이상 · 예정 · 완료 · 보강 (시각이 가장 가까운 것)
+// 요일줄이 살아 있는 첫날 · 마지막 날 (찾기 창 이어 붙이기 · 2026-11-06)
+function fStartOf(x){ return String(x.from_date || (x.from_month ? x.from_month + '-01' : '0000-00-00')); }
+function fEndOf(x){
+  if (x.to_date) return String(x.to_date);
+  if (x.to_month) { const p = String(x.to_month).split('-'); const d = new Date(Number(p[0]), Number(p[1]), 0);
+    return x.to_month + '-' + String(d.getDate()).padStart(2, '0'); }
+  return '9999-12-31';
+}
 function cellSlot(s){
   if (!(s && s.makeup_for && Number(s.minutes || 40) < 40)) return slotNoOf(s);
   const pm = toMin(String(s.start_time || '').slice(0,5));
