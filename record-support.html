@@ -1083,7 +1083,7 @@ function drawPc() {
       + '</td>'
       + '<td><div class="pcbtns no-print">'
       + '<button type="button" class="pcsave">저장</button>'
-      + '<button type="button" class="pchide">' + (r.hidden ? '되살리기' : '빼기') + '</button>'
+      + (!r.is_manual || r.hidden ? '<button type="button" class="pchide">' + (r.hidden ? '되살리기' : '빼기') + '</button>' : '')
       + (r.is_manual ? '<button type="button" class="pcdel">지우기</button>' : '')
       + '</div></td></tr>';
   });
