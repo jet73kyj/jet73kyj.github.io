@@ -249,6 +249,9 @@
   .later-r .lnm { flex:1 1 220px; color:#8a5a2b; font-weight:600; }
   .later-r .llb { color:#8a8279; }
   .later-r input { width:auto !important; margin:0 !important; }
+  .later-r .lsave { width:auto !important; margin:0 !important; padding:6px 12px; border:1px solid #E4E0DA;
+                    border-radius:8px; background:#fff; color:#4A433F; cursor:pointer; font-size:13px; }
+  .later-r .lsave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   .pay .ksave2:disabled { background:#bbb; color:#fff; border-color:#bbb; }
   .kidfoot .ksave { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
   .kidfoot .ksave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
@@ -1770,7 +1773,9 @@ function fillLater(box, childId, parts) {
       r = document.createElement('div'); r.className = 'later-r'; r.dataset.lst = w.st;
       r.innerHTML = '<span class="lnm"></span>'
         + '<span class="llb">받은 날</span><input class="dt lday" type="date" value="' + (o && o.paid_on ? o.paid_on : '') + '">'
-        + '<input class="tx lmemo" type="text" placeholder="승인번호" value="' + esc(o ? memoOf(o, false) : '') + '">';
+        // 승인번호는 그 줄이 낸 날이 있을 때만 (미납 줄에 상자 메모가 따라오지 않게)
+        + '<input class="tx lmemo" type="text" placeholder="승인번호" value="' + esc(o && o.paid_on ? memoOf(o, false) : '') + '">'
+        + '<button type="button" class="lsave' + (o && o.paid_on ? ' done' : '') + '" data-ttl="저장 전">' + (o && o.paid_on ? '\u2713 저장됨' : '저장 전') + '</button>';
       el.appendChild(r);
     }
     r.querySelector('.lnm').textContent = (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
@@ -3765,6 +3770,12 @@ $('kids').addEventListener('click', e => {
     return;
   }
 
+  // 따로 받을 수업 줄의 「저장」 — 카드 쪽을 저장 (수업료 줄은 상자 날짜 그대로 · 이 줄은 제 날짜) (2026-11-06)
+  if (e.target.classList.contains('lsave')) {
+    saveKid(Number(e.target.closest('.kid').dataset.child), e.target, 'card');
+    return;
+  }
+
   // 카드 저장 · 계좌 저장 — 그 쪽만 저장한다
   if (e.target.classList.contains('ksave2')) {
     saveKid(Number(e.target.closest('.kid').dataset.child),
@@ -4105,7 +4116,7 @@ function unDone(el){
             || (stEl && stEl.dataset.st === '2');
   const ch = CHANGED[kid.dataset.child] = CHANGED[kid.dataset.child] || {};
   ch[bank ? 'bank' : 'card'] = true;
-  kid.querySelectorAll('.ksave, .ksave2').forEach(b => {
+  kid.querySelectorAll('.ksave, .ksave2, .lsave').forEach(b => {
     if (!b.classList.contains('done')) return;
     b.classList.remove('done');
     b.textContent = b.dataset.ttl || '저장 전';
