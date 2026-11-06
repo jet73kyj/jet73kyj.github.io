@@ -243,6 +243,12 @@
                  background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3;
                  border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
   .pay .ksave2.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .later { margin-top:6px; }
+  .later-r { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 8px; margin-top:4px;
+             background:#FFF6EC; border:1px solid #F0D9BF; border-radius:8px; font-size:13px; }
+  .later-r .lnm { flex:1 1 220px; color:#8a5a2b; font-weight:600; }
+  .later-r .llb { color:#8a8279; }
+  .later-r input { width:auto !important; margin:0 !important; }
   .pay .ksave2:disabled { background:#bbb; color:#fff; border-color:#bbb; }
   .kidfoot .ksave { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
   .kidfoot .ksave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
@@ -1740,6 +1746,37 @@ function cardUnsaved(childId) {
   const cal = CALC[childId], sv = SAVED[childId] || {};
   return !!(cal && cal.cardSts && cal.cardSts.some(st => !sv[st]));
 }
+// 따로 받을 수업 — 카드 쪽이 이미 납부완료(날짜 있음)인데 저장 줄이 없는 금액 줄 (2026-11-06 은정님)
+//   그 줄만 「받은 날 · 승인번호」 칸이 생기고, 비워 두면 미납으로 저장된다
+//   한 번 따로 저장한 줄은 메모 끝 [따로] 로 남아 다음에도 따로 보인다
+//   카드가 아직 미납이면 새 수업도 지금처럼 상자 날짜 하나로 함께 받는다
+function isLater(p) { return !!(p && /\[따로\]/.test(String(p.memo || ''))); }
+function laterSts(childId, parts) {
+  const sv = SAVED[childId] || {};
+  const mainPaid = Object.keys(sv).some(k => Number(k) !== 2 && !isLater(sv[k]) && sv[k].paid_on);
+  return parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0)
+    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]))
+    .map(p => ({ st: Number(p.st), amt: Number(p.amt) }));
+}
+function fillLater(box, childId, parts) {
+  const el = box.querySelector('.later'); if (!el) return;
+  const sv = SAVED[childId] || {};
+  const want = laterSts(childId, parts);
+  el.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
+  want.forEach(w => {
+    let r = el.querySelector('.later-r[data-lst="' + w.st + '"]');
+    if (!r) {
+      const o = sv[w.st];
+      r = document.createElement('div'); r.className = 'later-r'; r.dataset.lst = w.st;
+      r.innerHTML = '<span class="lnm"></span>'
+        + '<span class="llb">받은 날</span><input class="dt lday" type="date" value="' + (o && o.paid_on ? o.paid_on : '') + '">'
+        + '<input class="tx lmemo" type="text" placeholder="승인번호" value="' + esc(o ? memoOf(o, false) : '') + '">';
+      el.appendChild(r);
+    }
+    r.querySelector('.lnm').textContent = (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
+  });
+  el.style.display = want.length ? '' : 'none';
+}
 
 function sideMissing(childId) {
   const cal = CALC[childId];
@@ -2338,10 +2375,11 @@ function drawKid(c) {
     + '<span class="ap"></span><span class="ct"></span><span class="up">카드 합계</span>'
     + '<span class="am cardtotal">0원</span></div>';
 
+  // 「따로 받을 수업」 줄([따로])은 상자 날짜 · 승인번호에서 뺀다 (2026-11-06)
   const cp = Object.keys(sv).map(k => sv[k])
-    .find(p => Number(p.support_type_id) !== 2 && p.paid_on);
+    .find(p => Number(p.support_type_id) !== 2 && !isLater(p) && p.paid_on);
   const cm = Object.keys(sv).map(k => sv[k])
-    .find(p => Number(p.support_type_id) !== 2 && memoOf(p, false));
+    .find(p => Number(p.support_type_id) !== 2 && !isLater(p) && memoOf(p, false));
   // 지난달 차액이 저절로 채워졌으면 저장 전으로 보인다 (2026-10-03)
   const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card);
   // 승인번호는 이번 달 저장분에서만 가져온다. 지난달 것을 끌어오지 않는다.
@@ -2353,6 +2391,7 @@ function drawKid(c) {
     + esc(PAYNOTE[String(c.id)] || '') + '">'
     + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
     + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>'
+    + '<div class="later"></div>'   // 납부완료 뒤 신청한 수업 — 그 줄만 날짜 · 승인번호 (calcKid 가 채움 · 2026-11-06)
     + '</div>';   // .cardbody 닫기
 
   const dev = groups.find(g => g.support_type_id === 2);
@@ -2434,7 +2473,8 @@ function memoOf(p, isBank) {
        .replace(/\s*\[본인부담\d+\]/g, '')
        .replace(/\s*\[본인이월\d+\]/g, '')
        .replace(/\s*\[환불 [^\]]*\]/g, '')
-       .replace(/\s*\[평가유형\d+\]/g, '').trim();
+       .replace(/\s*\[평가유형\d+\]/g, '')
+       .replace(/\s*\[따로\]/g, '').trim();
   if (m === '카드결제' || m === '자동계산' || m === '화면입력' || m === '계좌입금') return '';
   return m;
 }
@@ -2839,6 +2879,7 @@ function calcKid(childId) {
     // 카드 쪽 금액 줄의 지원유형 — 저장 줄이 없는 줄이 하나라도 있으면 미납 · 「카드 저장 전」 (2026-11-06)
     cardSts: parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0).map(p => Number(p.st))
   };
+  fillLater(box, childId, parts);
   // 저장 줄이 없는 카드 금액 줄이 있으면 「카드 저장 전」으로 (2026-11-06)
   if (cardUnsaved(childId)) {
     const kb = box.querySelector('.ksave2[data-only="card"]');
@@ -3037,14 +3078,17 @@ async function saveKid(childId, btn, only) {
     && (!only || (only === 'bank' ? p.st === 2 : p.st !== 2))
   ).map(p => {
     const isBank = (p.st === 2);
-    const day  = isBank ? bankDay  : cardDay;
+    const lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    const day  = isBank ? bankDay : lr ? lr.querySelector('.lday').value : cardDay;
+    const lm = lr ? lr.querySelector('.lmemo').value.trim() : '';
     const memo = isBank ? (bankMemo ? '계좌입금 ' + bankMemo : '계좌입금')
-                        : (cardMemo || '카드결제');
+                        : lr ? (lm || '카드결제') : (cardMemo || '카드결제');
     // 승인번호 칸에 이미 붙어 있는 표시는 지우고 새로 붙인다
     // (안 그러면 저장할 때마다 [리뷰4]가 계속 쌓인다)
     let memo2 = String(memo)
-      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불)[^\]]*\]/g, '')
+      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로)[^\]]*\]/g, '')
       .trim();
+    if (lr) memo2 += ' [따로]';
     {
       const rv0 = box.querySelector('.rv');
       const rvn = rv0 ? numOf(rv0.value) : 0;
