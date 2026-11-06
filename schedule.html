@@ -3220,6 +3220,11 @@ function holiShort(v){
 // 날짜 단추 하나
 //   2026-09-11 고침 — 결석은 회색 · 단추 안에 예정·완료·결석을 늘 적음 ·
 //   보강을 잡을 결석·쉬는 날에는 ＋ (누르면 그 날 창)
+// 미술공개수업(치료 종류 9) 회기인가 (2026-11-06)
+function isArtOpen(x){
+  const r = ROWS_ALL.find(r0 => Number(r0.therapy_id) === Number(x.therapy_id));
+  return !!(r && Number(r._tt) === 9);
+}
 function fBtn(x, mkOf, PARTS, HOSTADD){
   const sp = Number(x.support_type_id) || 0;
   const on = fOn(x);
@@ -3232,6 +3237,8 @@ function fBtn(x, mkOf, PARTS, HOSTADD){
       + (Number(x.run_no) > 0 ? ' ' + monNo(x.month_key || mon) + '-' + x.run_no : '');
     txt = (_hd ? _hd + ' · ' : '')
         + d + '일 ' + (isHoli(x.plan_date) ? holiShort(OFFTXT[String(x.plan_date)]) : '휴가');
+  } else if (isArtOpen(x)) {
+    txt = '공개수업 ' + d + '일';   // 미술공개수업(9) — 첫 1회만 (2026-11-06)
   } else {
     txt = (FABBR[sp] || STYPE[sp] || '') + ' '
         + (Number(x.run_no) > 0 ? monNo(x.month_key || mon) + '-' + x.run_no + ' ' : '') + d + '일';
@@ -3543,7 +3550,7 @@ function drawFind(){
       return t2 ? t2.id + '번 ' + (t2.name || '') : '';
     })).join('→');
     const _durTxt = _uniq(_gr.map(x => String(x.duration || ''))).join('→');
-    const days = fDaysOf(r);
+    let days = fDaysOf(r);
     const slot = {}, other = [], bunsan = [];
     _rl.forEach(x => {
       if (x.status === '쉼') return;
@@ -3555,6 +3562,8 @@ function drawFind(){
       if (days.indexOf(d) >= 0) (slot[d] = slot[d] || []).push(x);
       else other.push(x);
     });
+    // 미술공개수업은 한 번뿐 — 빈 회색 단추를 안 그린다 (2026-11-06)
+    if (Number(r._tt) === 9) days = days.filter(d => slot[d]);
     // 한 날에 원래 줄이 둘 이상이면 오류 (두 벌) — 줄 끝에 빨간 글
     let dup = 0, nOn = 0;
     const main = days.map(d => {
