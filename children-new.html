@@ -2255,6 +2255,23 @@ async function saveCard(cid, kind, btn) {
     btn.disabled = false;
   }
 }
+// 적고 저장을 안 누른 카드 칸을 한꺼번에 저장 (아래 「저장」에서 부름 · 2026-11-06)
+async function saveCardsPending(cid) {
+  const box = $('e_cards');
+  if (!box || box.style.display === 'none') return '';
+  const els = Array.from(box.querySelectorAll('.cardin'))
+    .filter(el => el.value.trim() !== String(CARD_ORIG[el.dataset.kind] || '').trim());
+  if (!els.length) return '';
+  const now = new Date().toISOString();
+  const rows = els.map(el => ({ child_id: cid, kind: el.dataset.kind, memo: el.value.trim() || null,
+                                updated_by: MEID, updated_at: now }));
+  const { data, error } = await sb.from('nl_child_cards').upsert(rows, { onConflict: 'child_id,kind' }).select('kind');
+  if (error) throw error;
+  if (!data || data.length !== rows.length) throw new Error('서버에 ' + (data ? data.length : 0) + '줄만 들어갔습니다');
+  els.forEach(el => { CARD_ORIG[el.dataset.kind] = el.value.trim(); });
+  drawCardView();
+  return '\n카드번호 ' + rows.length + '칸을 저장했습니다.';
+}
 // 적고 저장을 안 누른 카드 칸
 function cardPendingN() {
   const box = $('e_cards');
@@ -2715,6 +2732,10 @@ $('saveEdit').onclick = async () => {
     } catch (ge) { gmsg += '\n⚠️ 연락처는 저장하지 못했습니다. ' + ge.message; }
     try { gmsg += await saveGrade(edId); await loadGrade(edId); }
     catch (ge) { gmsg += '\n⚠️ 등급은 저장하지 못했습니다. ' + ge.message; }
+    // 지원 카드번호 — 칸 옆 「저장」을 안 누르고 아래 「저장」을 눌러도 함께 저장 (2026-11-06)
+    //   전에는 아래 「저장」이 글자 화면으로 돌아가며 적은 카드번호를 말없이 버렸다
+    try { gmsg += await saveCardsPending(edId); }
+    catch (ce) { gmsg += '\n⚠️ 카드번호는 저장하지 못했습니다. ' + (ce.message || ce); }
 
     const cNow = ALL.find(x => x.id === edId);
     if (cNow) drawBasic(cNow);
