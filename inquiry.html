@@ -911,6 +911,9 @@ const URGENT = ['평가중','일정조율중','자리대기'];
 const CAN_SEE = [8, 19];
 
 let ALL = [];        // 문의 전체
+// 정규 수업 중인 아동 — 문의 중 목록에서 숨김 (2026-11-06 은정님 · 목록이 길어서)
+//   오늘 살아 있는 요일줄(nl_live_rows)이 있는 아동 · 「정규수업 중 ○건 보기」로 펼침 · 이름 찾기에는 그대로 나옴
+let INCLASS = {}, SHOWCLASS = false;
 let KIDS = [];       // 아동 이름표 (번호 -> 이름)
 let ME = null;       // 로그인한 직원
 let stFilter = '진행중';   // 진행중 = 문의 중 / 끝남 = 치료시작 · 타기관이용 (2026-10-08)
@@ -1144,6 +1147,7 @@ function draw() {
       && (kidName(r.child_id).toLowerCase().includes(q) || String(r.child_id) === q);
     if (REPMISS) return kidRepMissN(r.child_id) > 0;
     if (stFilter === '끝남') return DONE.indexOf(r.status) >= 0;
+    if (!SHOWCLASS && INCLASS[r.child_id]) return false;   // 정규 수업 중 — 숨김 (2026-11-06)
     return DONE.indexOf(r.status) < 0;   // 문의 중 (연락대기 · 상담문의중 · 평가중 · 자리대기 · 일정조율중)
   });
 
@@ -1165,6 +1169,7 @@ function draw() {
   });
 
   const goneN = ALL.filter(r => DONE.indexOf(r.status) >= 0).length;
+  const clsN = ALL.filter(r => DONE.indexOf(r.status) < 0 && INCLASS[r.child_id]).length;
   $('mainT').textContent = stFilter === '끝남' ? '끝난 문의 목록' : '문의 중 아동 목록';
   $('mainDesc').textContent = stFilter === '끝남'
     ? '치료시작 · 타기관이용'
@@ -1178,6 +1183,8 @@ function draw() {
         : (missN ? ' · <a href="#" id="repLink" style="color:#c62828;font-weight:bold;">보고서 없음 '
                    + missN + '건</a>' : ''))
     + (q ? ' · 「' + esc(q) + '」 로 찾는 중' : '')
+    + (clsN && stFilter !== '끝남' && !q && !REPMISS
+        ? ' · <a href="#" id="clsLink" style="color:#8a5a2b;">' + (SHOWCLASS ? '정규수업 중 ' + clsN + '건 숨기기' : '정규수업 중 ' + clsN + '건 숨김 · 보기') + '</a>' : '')
     + (goneN && stFilter !== '끝남'
         ? ' · <a href="#" id="goneLink" style="color:#00695c;">끝난 문의 '
           + goneN + '건 보기</a>' : '')
@@ -1185,6 +1192,8 @@ function draw() {
         ? ' · <a href="#" id="backLink" style="color:#00695c;">문의 중으로 돌아가기</a>' : '');
   const rl = document.getElementById('repLink');
   if (rl) rl.onclick = (ev) => { ev.preventDefault(); REPMISS = !REPMISS; draw(); };
+  const cl = document.getElementById('clsLink');
+  if (cl) cl.onclick = (ev) => { ev.preventDefault(); SHOWCLASS = !SHOWCLASS; draw(); };
   const gl = document.getElementById('goneLink');
   if (gl) gl.onclick = (ev) => { ev.preventDefault(); stFilter = '끝남'; draw(); };
   const bl = document.getElementById('backLink');
@@ -4086,6 +4095,15 @@ async function afterLogin(user) {
     .order('inquiry_date', { ascending: false });
   if (error) { show('❌ 문의 목록 조회 실패\n' + error.message, false); return; }
   ALL = data || [];
+  try {
+    const td0 = today();
+    const { data: lv, error: le } = await sb.rpc('nl_live_rows', { p_month: td0.slice(0, 7), p_grace: 0 });
+    if (le) throw le;
+    INCLASS = {};
+    (lv || []).forEach(r => {
+      if ((!r.live_from || String(r.live_from) <= td0) && (!r.live_to || String(r.live_to) >= td0)) INCLASS[r.child_id] = true;
+    });
+  } catch (e) { INCLASS = {}; console.warn('정규 수업 아동 못 읽음', e); }
 
   // 평가 관리에 쓰는 자료들
   const [et, ef, th, ev] = await Promise.all([
