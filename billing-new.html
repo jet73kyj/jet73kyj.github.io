@@ -1729,7 +1729,16 @@ function sideSaved(childId, side) {
   const ch = CHANGED[childId];
   if (ch && ch[side]) return false;
   const ks = Object.keys(SAVED[childId] || {});
-  return side === 'bank' ? ks.some(k => Number(k) === 2) : ks.some(k => Number(k) !== 2);
+  if (side === 'bank') return ks.some(k => Number(k) === 2);
+  if (cardUnsaved(childId)) return false;
+  return ks.some(k => Number(k) !== 2);
+}
+// 카드 쪽에 금액은 있는데 저장 줄이 없는 줄이 있는가 (2026-11-06)
+//   수업료를 저장(납부완료)한 뒤 추가 수업을 넣으면, 추가수업 줄은 저장 줄이 없는데도
+//   「✓ 저장됨」 · 완납으로 보이던 일을 막는다
+function cardUnsaved(childId) {
+  const cal = CALC[childId], sv = SAVED[childId] || {};
+  return !!(cal && cal.cardSts && cal.cardSts.some(st => !sv[st]));
 }
 
 function sideMissing(childId) {
@@ -1739,7 +1748,7 @@ function sideMissing(childId) {
   const ks = Object.keys(sv);
   const cardSaved = ks.some(k => Number(k) !== 2);
   const bankSaved = ks.some(k => Number(k) === 2);
-  return (cal.card > 0 && !cardSaved) || (cal.bank > 0 && !bankSaved);
+  return (cal.card > 0 && !cardSaved) || cardUnsaved(childId) || (cal.bank > 0 && !bankSaved);
 }
 
 function isUnpaid(childId) {
@@ -2826,8 +2835,15 @@ function calcKid(childId) {
   box.dataset.parts = JSON.stringify(parts);
   CALC[childId] = {
     card: parts.filter(p => Number(p.st) !== 2).reduce((a, p) => a + (Number(p.amt) || 0), 0),
-    bank: parts.filter(p => Number(p.st) === 2).reduce((a, p) => a + (Number(p.amt) || 0), 0)
+    bank: parts.filter(p => Number(p.st) === 2).reduce((a, p) => a + (Number(p.amt) || 0), 0),
+    // 카드 쪽 금액 줄의 지원유형 — 저장 줄이 없는 줄이 하나라도 있으면 미납 · 「카드 저장 전」 (2026-11-06)
+    cardSts: parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0).map(p => Number(p.st))
   };
+  // 저장 줄이 없는 카드 금액 줄이 있으면 「카드 저장 전」으로 (2026-11-06)
+  if (cardUnsaved(childId)) {
+    const kb = box.querySelector('.ksave2[data-only="card"]');
+    if (kb && kb.classList.contains('done')) { kb.classList.remove('done'); kb.textContent = kb.dataset.ttl || '카드 저장 전'; }
+  }
   syncX8(box);
 }
 
