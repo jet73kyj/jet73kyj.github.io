@@ -255,7 +255,9 @@
     const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'nlDb'; bt.textContent = '📅'; bt.setAttribute('aria-label', '달력에서 고르기');
     // 칸 넓이 — 원래 날짜 칸이 칸을 꽉 채우던 자리(제목 + 칸 하나)면 꽉 채우고, 아니면 날짜만큼
     const sibs = [...el.parentNode.children].filter(x => x !== el && x.tagName !== 'LABEL' && x.tagName !== 'SPAN');
-    if (!el.style.width) box.style.width = sibs.length ? '150px' : '100%';
+    if (!el.style.width) box.style.width = sibs.length ? '170px' : '100%';
+    // 「2026-11-06」 열 자리 + 📅 단추가 다 보이게 — 화면이 좁게 준 칸(140px 등)도 170px 아래로는 안 줄임 (2026-11-06)
+    box.style.minWidth = '170px';
     el.parentNode.insertBefore(box, el); box.append(tx, bt, el);
     // 원래 칸은 감춤 — 화면의 꾸밈(아이디 선택자)이 이기지 않게 칸에 직접 !important
     ['position:absolute', 'right:0', 'bottom:0', 'width:1px', 'height:1px', 'opacity:0', 'pointer-events:none', 'border:0', 'padding:0', 'margin:0', 'min-width:0']
