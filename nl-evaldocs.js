@@ -479,6 +479,8 @@
       +     'border:1px solid #cfd6cc;background:#fff;color:#444;font-size:13px;cursor:pointer;">닫기</button>'
       + '</div>'
       + '<div class="ik-m" style="margin-top:14px;">불러오는 중...</div>'
+      + '<div style="margin-top:16px;font-weight:bold;">평가 일정</div>'
+      + '<div class="ik-e" style="margin-top:4px;">불러오는 중...</div>'
       + '<div style="margin-top:16px;font-weight:bold;">초기 상담지</div>'
       + '<div class="ik-q" style="margin-top:4px;">불러오는 중...</div>'
       + '<div style="margin-top:16px;font-weight:bold;">평가보고서</div>'
@@ -516,6 +518,7 @@
         + '</div>';
     }
 
+    drawEvals(wrap.querySelector('.ik-e'), cid);
     drawIntakeNotes(wrap.querySelector('.ik-q'), cid, c ? c.birth : null);
 
     const box = wrap.querySelector('.ik-d');
@@ -545,6 +548,45 @@
         ? { cid: cid, kid: kid, source: '타기관', view: true }
         : { cid: cid, kid: kid, source: '센터', evalId: Number(g.ev), title: g.title, date: g.date, view: true });
     });
+  }
+
+  // ---------- 평가 일정 (2026-11-06) — 보기 전용 ----------
+  //   날짜 · 시각 · 종류 · 개수(구성) · 상태 · 담당 · 취소 뺌
+  //   선생님 계정은 서버 잠금대로 자기가 맡은 평가만 보임 (nl_evals_therapist_read)
+  async function drawEvals(box, cid) {
+    const [ev, ty, fe, th] = await Promise.all([
+      SB.from('nl_evaluations').select('id, eval_date, eval_time, eval_type_id, item_cnt, fee, status, therapist_id')
+        .eq('child_id', cid).neq('status', '취소').order('eval_date', { ascending: false }),
+      SB.from('nl_eval_types').select('id, name'),
+      SB.from('nl_eval_fees').select('name, amount, active'),
+      SB.from('nl_therapists').select('id, name')
+    ]);
+    if (!document.getElementById('nlIntakeWrap')) return;
+    if (ev.error) { box.innerHTML = '<div style="color:#999;">평가 일정을 불러오지 못했습니다.</div>'; return; }
+    const list = ev.data || [];
+    if (!list.length) { box.innerHTML = '<div style="color:#999;padding:4px 0;">잡힌 평가가 없습니다.</div>'; return; }
+    const TN = {}; (ty.data || []).forEach(x => TN[x.id] = x.name || '');
+    const HN = {}; (th.data || []).forEach(x => HN[x.id] = x.name || '');
+    const feeOf = nm => { const f = (fe.data || []).find(x => x.active !== false && String(x.name || '').indexOf(nm) >= 0); return f ? Number(f.amount) : null; };
+    const fJi = feeOf('지능'), fBy = feeOf('베일리');
+    const wk = ['일', '월', '화', '수', '목', '금', '토'];
+    const tm = t => { if (!t) return ''; const [h, m] = String(t).split(':').map(Number); return (h < 12 ? '오전 ' : '오후 ') + ((h % 12) || 12) + ':' + String(m).padStart(2, '0'); };
+    const what = e => {
+      const nm = TN[e.eval_type_id] || '평가', n = Number(e.item_cnt) || 1, fee = Number(e.fee);
+      if (nm.indexOf('심리') >= 0) return n >= 2 ? '심리 + 지능' : (fJi != null && fee === fJi ? '지능평가' : nm);
+      if (nm.indexOf('발달') >= 0 && n === 1 && fBy != null && fee === fBy) return nm + ' · 베일리';
+      return nm + ' · ' + n + '개';
+    };
+    box.innerHTML = list.map(e => {
+      const d = e.eval_date ? new Date(e.eval_date + 'T00:00:00') : null;
+      const dt = d ? (d.getMonth() + 1) + '월 ' + d.getDate() + '일(' + wk[d.getDay()] + ')' : '날짜 미정';
+      const stc = e.status === '완료' ? '#2e7d32' : '#b26a00';
+      return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:7px 0;border-bottom:1px solid #eee;">'
+        + '<span style="font-weight:600;">' + esc(dt) + (e.eval_time ? ' ' + esc(tm(e.eval_time)) : '') + '</span>'
+        + '<span>' + esc(what(e)) + '</span>'
+        + (e.therapist_id && HN[e.therapist_id] ? '<span style="color:#777;">' + esc(HN[e.therapist_id]) + ' 선생님</span>' : '')
+        + '<span style="margin-left:auto;color:' + stc + ';font-weight:600;">' + esc(e.status || '예정') + '</span></div>';
+    }).join('');
   }
 
   // ---------- 초기 상담지 (2026-10-08) — 보기 전용 ----------
