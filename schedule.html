@@ -3921,6 +3921,22 @@ function mkTail(x){
 
 // 주간 · 하루 보기 — 쪼개기 조각을 같은 칸 그 아동 40분 수업 카드 안에 「+10」으로 접는다 (2026-10-16)
 //   요일별 보기(splitOf)와 같은 모양 · 붙을 수업(예정 · 완료 · 보강)이 없으면 조각 카드를 그대로 그린다
+// 쪼개기 조각(10·20·30분)은 붙는 40분 수업이 든 칸에 담는다 (2026-11-06 은정님)
+//   조각이 수업 끝(16:40 등)에 붙으면 다음 교시 칸에 따로 그려져 수업이 두 타임처럼 보이던 것
+//   붙을 수업 = 같은 날 · 같은 아동 · 같은 선생님 · 40분 이상 · 예정 · 완료 · 보강 (시각이 가장 가까운 것)
+function cellSlot(s){
+  if (!(s && s.makeup_for && Number(s.minutes || 40) < 40)) return slotNoOf(s);
+  const pm = toMin(String(s.start_time || '').slice(0,5));
+  let best = null, bd = 1e9;
+  SESS.forEach(h => {
+    if (h === s || String(h.plan_date) !== String(s.plan_date)) return;
+    if (Number(h.child_id) !== Number(s.child_id) || Number(h.therapist_id) !== Number(s.therapist_id)) return;
+    if (Number(h.minutes || 40) < 40 || !['예정', '완료', '보강'].includes(h.status)) return;
+    const d = Math.abs(toMin(String(h.start_time || '').slice(0,5)) - pm);
+    if (d < bd) { bd = d; best = h; }
+  });
+  return best && bd <= 90 ? slotNoOf(best) : slotNoOf(s);
+}
 function foldParts(list){
   list.forEach(x => { x._parts = null; });
   const parts = list.filter(x => x.makeup_for && Number(x.minutes || 40) < 40);
@@ -3977,7 +3993,7 @@ function drawWeek(){
     if (isAnchor(s)) return;   // 발추 쪼개기 자리표는 칸에 안 그린다 (2026-10-28)
     if (!s.plan_date || !dset.has(s.plan_date)) return;
     if (!thIds.has(Number(s.therapist_id))) return;
-    const k = slotNoOf(s) + '_' + wdOf(s.plan_date)
+    const k = cellSlot(s) + '_' + wdOf(s.plan_date)
             + '_' + s.therapist_id;
     (cell[k] = cell[k] || []).push(s);
   });
@@ -4567,7 +4583,7 @@ function drawOne(){
     if (isAnchor(s)) return;   // 발추 쪼개기 자리표는 칸에 안 그린다 (2026-10-28)
     if (s.plan_date !== oneDate) return;
     if (!thIds.has(Number(s.therapist_id))) return;
-    const k = slotNoOf(s) + '_' + s.therapist_id;
+    const k = cellSlot(s) + '_' + s.therapist_id;
     (cell[k] = cell[k] || []).push(s);
   });
   Object.values(cell).forEach(a => a.sort((x,y) =>
@@ -5188,7 +5204,7 @@ function drawDay(){
     if (!isMk(s) || !s.plan_date) return;
     if (String(s.plan_date).slice(0,7) !== mon) return;
     if (wdOf(s.plan_date) !== wd) return;
-    const k = slotNoOf(s) + '_' + s.therapist_id;
+    const k = cellSlot(s) + '_' + s.therapist_id;
     (mkCell[k] = mkCell[k] || []).push(s);
   });
 
