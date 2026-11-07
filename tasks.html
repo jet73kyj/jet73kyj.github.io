@@ -188,6 +188,9 @@ const $ = id => document.getElementById(id);
 const CAN_SEE = [8, 19, 10];
 let IS_BOSS = false;
 let VIEW_ONLY = false;   // 업무 계정 할 일을 보기만 (2026-11-05)
+// 행정(19번)도 늘 하는 일을 봄 · 자기 몫은 더하고 고침 (2026-11-07 은정님) — 지우기는 원장님만
+let RULE_EDIT = false;
+const ruleMine = r => IS_BOSS || (RULE_EDIT && Number(r.staff_id) === ME_ID);
 const STATES = ['할 일', '하는 중', '끝냄', '미룸', '못 함'];
 const SCL = { '할 일':'s1', '하는 중':'s2', '끝냄':'s3', '미룸':'s4', '못 함':'s5' };
 // 화면 글자 — 서버 값 「하는 중」은 「진행 중」으로 보임 (2026-10-10)
@@ -585,11 +588,11 @@ function draw(){
   // ③ 접은 묶음 — 늘 하는 일 설정 · 직원별 · 이 달 일지
   //   늘 하는 일 (2026-10-23 정리) — 한 일에 한 줄 · 주기와 쉬는 날은 딱지 · 「⋯」 안에 고치기 · 끄기 · 지우기
   //   입력 칸은 「＋ 늘 하는 일 더하기」나 줄을 눌러 고칠 때만 열림 · 긴 설명은 「? 주기 고르는 법」 안에
-  if (IS_BOSS) {
+  if (IS_BOSS || RULE_EDIT) {
     const td = today();
     const gname = r => (GUIDES.find(g => Number(g.id) === Number(r.guide_id)) || {}).title || '';
     const sids = [...new Set(RULES.map(r => String(r.staff_id)))];
-    const rrow = r => '<div class="rr' + (r.active ? '' : ' off') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '" data-rid="' + r.id + '" title="눌러서 고치기">'
+    const rrow = r => '<div class="rr' + (r.active ? '' : ' off') + (String(r.id) === String(EDIT_RID) ? ' redit' : String(r.id) === String(NEW_RID) ? ' rnew' : '') + '"' + (ruleMine(r) ? ' data-rid="' + r.id + '" title="눌러서 고치기"' : ' title="원장님만 고칩니다"') + '>'
       + '<span class="rt">' + esc(r.title) + '</span>'
       + '<span class="chip c">' + esc(ruleText(r)) + '</span>'
       + '<span class="chip">' + (r.skip_off ? (r.cycle === '매일' ? '쉬는 날 건너뜀' : '쉬는 날이면 다음 출근 날') : '쉬는 날에도 그대로') + '</span>'
@@ -597,9 +600,9 @@ function draw(){
       + (r.to_date ? '<span class="chip">~ ' + esc(r.to_date) + '</span>' : '')
       + (r.guide_id ? '<span class="chip" title="업무 안내서">📖 ' + esc(gname(r)) + '</span>' : '')
       + (r.active ? '' : '<span class="chip">꺼 둠</span>')
-      + '<button type="button" class="dots" data-rmenu="' + r.id + '" title="고치기 · 끄기 · 지우기">⋯</button>'
+      + (ruleMine(r) ? '<button type="button" class="dots" data-rmenu="' + r.id + '" title="고치기 · 끄기' + (IS_BOSS ? ' · 지우기' : '') + '">⋯</button>'
       + '<span class="rmenu"><button type="button" data-redit="' + r.id + '">고치기</button><button type="button" data-ra="' + r.id + '">' + (r.active ? '끄기' : '켜기') + '</button>'
-      + '<button type="button" class="rdel" data-rdel="' + r.id + '">지우기</button></span></div>';
+      + (IS_BOSS ? '<button type="button" class="rdel" data-rdel="' + r.id + '">지우기</button>' : '') + '</span>' : '') + '</div>';
     const formOpen = RFORM || EDIT_RID;
     h += '<details class="card fold" data-fold="rules"' + (FOLD.rules ? ' open' : '') + '><summary class="ct">늘 하는 일 <span class="dim" style="font-weight:400">— 새벽 5시에 그날 목록으로 저절로 들어갑니다</span></summary>'
       + '<div class="row" style="justify-content:flex-end;margin-bottom:6px">' + (formOpen ? '' : '<button type="button" class="pri" id="ropen">＋ 늘 하는 일 더하기</button>') + '</div>'
@@ -607,7 +610,7 @@ function draw(){
                       : '<div class="dim">아직 늘 하는 일이 없습니다.</div>')
       + (formOpen ? '<div class="rform"><div class="fh">' + (EDIT_RID ? '늘 하는 일 고치기' : '늘 하는 일 더하기') + '</div><div class="g2">'
         + '<div class="f"><label>할 일</label><input id="rtitle" placeholder="예) 예외지급 청구 확인"></div>'
-        + '<div class="f"><label>누가</label><select id="rwho">' + STAFF.map(s => '<option value="' + s.id + '">' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select></div>'
+        + '<div class="f"><label>누가</label><select id="rwho"' + (IS_BOSS ? '' : ' disabled') + '>' + STAFF.filter(s => IS_BOSS || Number(s.id) === ME_ID).map(s => '<option value="' + s.id + '">' + esc(s.id + '번 ' + s.name) + '</option>').join('') + '</select></div>'
         + '<div class="f" style="grid-column:1/-1"><label>언제 — 월 · 주 · 일 가운데 필요한 것만 고르세요</label><div class="dial">'
         +   '<span>월</span><select id="rmon"><option value="">적용 없음</option><option value="all">매달</option>' + Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '월</option>').join('') + '</select>'
         +   '<span>주</span><select id="rwk"><option value="">적용 없음</option><option value="all">매주</option>' + [1, 2, 3, 4, 5].map(i => '<option value="' + i + '">' + WK[i] + ' 주</option>').join('') + '</select>'
@@ -930,7 +933,7 @@ function bind(){
     const title = $('rtitle').value.trim(), dr = dialRule();
     if (!title) { rmsg('⚠ 늘 하는 일을 적어 주세요', false); return; }
     if (dr.err) { rmsg('⚠ ' + dr.err, false); return; }
-    const row = Object.assign({ staff_id: Number($('rwho').value), title: title, skip_off: $('rskip').checked, guide_id: $('rguide').value ? Number($('rguide').value) : null }, dr.row);
+    const row = Object.assign({ staff_id: IS_BOSS ? Number($('rwho').value) : ME_ID, title: title, skip_off: $('rskip').checked, guide_id: $('rguide').value ? Number($('rguide').value) : null }, dr.row);
     const b = $('radd'); if (b.disabled) return; b.disabled = true; b.textContent = '저장 중…';
     const q = EDIT_RID ? sb.from('nl_task_rules').update(row).eq('id', EDIT_RID).select('id') : sb.from('nl_task_rules').insert(row).select('id');
     const { data, error } = await q;
@@ -965,6 +968,7 @@ $('home').onclick = () => { location.href = 'index.html'; };
     $('body').insertAdjacentHTML('beforebegin', '<div class="robar">' + me.work_of + '번 업무 계정의 할 일을 <b>보기만</b> 합니다. 끝냄 체크 · 메모는 사무실 컴퓨터에서 해 주세요.</div>');
   }
   IS_BOSS = ME_ID === 8;
+  RULE_EDIT = !VIEW_ONLY && ME_ID === 19;
   if (!IS_BOSS) WHO = String(VIEW_ONLY ? me.work_of : ME_ID);   // 선생님은 내 것만 · 개인 계정은 업무 계정 것
   $('whoami').textContent = me.name + ' 님으로 로그인됨' + (VIEW_ONLY ? ' · 보기 전용' : '');
   const { data: st } = await sb.from('nl_therapists').select('id, name, role, left_on').order('id');
