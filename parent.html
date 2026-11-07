@@ -2482,9 +2482,30 @@ async function loadPay() {
   } catch (e) {}
   const SAVEDK = {};
   (cur || []).forEach(r => { if (Number(r.amount) > 0) SAVEDK[r.child_id] = true; });
+  // 저장 전 달 — 센터 납부 계산 화면이 셈한 금액을 그대로 「예정」으로 (nl_pay_preview · 2026-11-07 은정님)
+  //   따로 셈하지 않는다. 센터 화면에 보이는 금액 · 줄 그대로
+  const PVAT = {}, PVRV = {};
+  try {
+    const noSave = ids.filter(id => !SAVEDK[id]);
+    if (noSave.length) {
+      const { data: pv } = await sb.from('nl_pay_preview')
+        .select('child_id, parts, updated_at').in('child_id', noSave).eq('month_key', CURMK);
+      (pv || []).forEach(x => {
+        let any = false;
+        (x.parts || []).forEach(p => {
+          if (!(Number(p.amt) > 0)) return;
+          cur.push({ child_id: x.child_id, support_type_id: Number(p.st), amount: Number(p.amt), paid_on: null,
+                     month_key: CURMK, carry_over: Number(p.co) || 0, _est: true, _pv: p });
+          PVRV[x.child_id] = (PVRV[x.child_id] || 0) + (Number(p.rv) || 0);
+          any = true;
+        });
+        if (any) { EST[x.child_id] = true; PVAT[x.child_id] = x.updated_at; }
+      });
+    }
+  } catch (e) { /* 표가 없거나 못 읽으면 지금처럼 「정리 중」 */ }
   const mmP = (+CURMK.slice(5, 7)) + '월';
   let pendHtml = '';   // 그 달 회기가 있는 자녀만 — 아래 회기를 읽은 뒤 채움
-  const pendOf = (hasSes) => KIDS.filter(k => !SAVEDK[k.id] && hasSes[k.id]).map(k =>
+  const pendOf = (hasSes) => KIDS.filter(k => !SAVEDK[k.id] && !EST[k.id] && hasSes[k.id]).map(k =>
     '<div class="needlock">' + (KIDS.length > 1 ? esc(k.name) + ' 아동 · ' : '')
     + (FIXK[k.id]
         ? esc(mmP) + '에 내실 교육비가 없습니다.'
@@ -2614,6 +2635,7 @@ async function loadPay() {
         { p_child: k.id, p_month: CURMK });
       RVC[k.id] = Number(rv || 0) * 5000;
     } catch (e) { RVC[k.id] = 0; }
+    if (EST[k.id]) RVC[k.id] = Number(PVRV[k.id] || 0);   // 예정은 센터 화면의 리뷰 할인 그대로
   }
 
   // 체험 · 추가 수업 설명 줄 — 회기가 아니라 따로 된 표라 학부모 창구에서 가져온다 (2026-10-01)
@@ -2673,7 +2695,10 @@ async function loadPay() {
 
       card.forEach(r => {
         let det;
-        if (Number(r.support_type_id) === 8) {
+        const pvl = r._pv && Array.isArray(r._pv.lines) && r._pv.lines.length ? r._pv.lines : null;
+        if (pvl) {
+          det = pvl.map(l => l.t + (l.cnt ? ' · ' + (Math.round(Number(l.cnt) * 100) / 100) + '회' : ''));
+        } else if (Number(r.support_type_id) === 8) {
           // 발추는 회기로 세지 않는다. 담당 치료사만 보여 준다
           const thn = THRS[X8[k.id]] || '';
           const wd  = devWeekday(k.id);
@@ -2684,8 +2709,8 @@ async function loadPay() {
         } else {
           det = detailOf(k.id, r.support_type_id);
         }
-        const ded = Number(DED[r.support_type_id] || 0);
-        const rvc = Number(RVOF[r.support_type_id] || 0);
+        const ded = r._pv ? Number(r._pv.ded || 0) : Number(DED[r.support_type_id] || 0);
+        const rvc = r._pv ? Number(r._pv.rv || 0) : Number(RVOF[r.support_type_id] || 0);
         const gross = Number(r.amount) + ded + Number(r.carry_over || 0) + rvc;
         let inner = '';
         det.forEach((t, i) => {
@@ -2760,8 +2785,12 @@ async function loadPay() {
   html += '<div class="ptot">' + (+CURMK.slice(5, 7)) + '월 '
         + (anyEst ? '예정 금액 ' : '합계 ') + won(allTot) + '</div>';
   if (anyEst) {
-    html += '<div class="estnote">아직 결제 전이라 시간표를 보고 셈한 금액입니다.<br>'
-          + '리뷰 차감과 평가비는 결제하실 때 반영됩니다.</div>';
+    const at = Object.values(PVAT).sort().pop();
+    const d = at ? new Date(at) : null;
+    html += '<div class="estnote">「예정」은 센터 납부 화면의 금액 그대로입니다'
+          + (d ? ' (' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + d.getHours() + '시 ' + String(d.getMinutes()).padStart(2, '0') + '분 기준)' : '') + '.<br>'
+          + '이 금액으로 미리 내셔도 되고, 센터에서 확정한 뒤 납부완료로 바뀝니다.<br>'
+          + '수업이 바뀌면 금액이 달라질 수 있어요.</div>';
   }
 
   // 아직 안 낸 것

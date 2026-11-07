@@ -1524,6 +1524,7 @@ async function load() {
     });
 
     LOADED_MK = mk;
+    await pvLoad(mk);
 
     // 그 달에 볼 아동을 정한다.
     //   치료중·대기중은 늘 보이고,
@@ -2852,7 +2853,7 @@ function calcKid(childId) {
     parts.forEach(p => {
       if (p.st === 2 || cv <= 0) return;
       const take = Math.min(p.amt, cv);
-      p.amt -= take; cv -= take;
+      p.amt -= take; cv -= take; p.co = take;
     });
   }
 
@@ -2867,7 +2868,7 @@ function calcKid(childId) {
   parts.forEach(p => {
     if (!p.review || cut <= 0) return;
     const take = Math.min(p.amt, cut);
-    p.amt -= take; cut -= take;
+    p.amt -= take; cut -= take; p.rv = take;
   });
 
   const card = parts.filter(p => p.st !== 2).reduce((s, p) => s + p.amt, 0);
@@ -2887,12 +2888,82 @@ function calcKid(childId) {
     cardSts: parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0).map(p => Number(p.st))
   };
   fillLater(box, childId, parts);
+  try { pvBuild(childId, box, parts); } catch (e) { console.warn('예정 미리보기', e); }
   // 저장 줄이 없는 카드 금액 줄이 있으면 「카드 저장 전」으로 (2026-11-06)
   if (cardUnsaved(childId)) {
     const kb = box.querySelector('.ksave2[data-only="card"]');
     if (kb && kb.classList.contains('done')) { kb.classList.remove('done'); kb.textContent = kb.dataset.ttl || '카드 저장 전'; }
   }
   syncX8(box);
+}
+
+// ── 학부모 예정 교육비 = 이 화면이 셈한 금액 그대로 (2026-11-07 은정님) ──────
+//   저장 전 달에도 학부모가 예정 금액을 보고 낼 수 있게, 화면 셈을 nl_pay_preview 에 그대로 담는다
+//   따로 셈하지 않는다 — 아동 상자를 그릴 때마다(값을 고칠 때도) 셈한 결과를 바뀐 것만 보냄
+//   학부모 화면은 저장된 납부가 있으면 그것, 없으면 이 표를 「예정」으로 보여 준다
+let PVSENT = {}, PVNOW = {}, PVQ = {}, PVT = null, PVMK = null;
+async function pvLoad(mk){
+  PVSENT = {}; PVNOW = {}; PVQ = {}; PVMK = mk;
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('nl_pay_preview').select('child_id, parts').eq('month_key', mk).range(from, from + 999);
+      if (error) { console.warn('예정 미리보기 읽기', error.message); return; }
+      (data || []).forEach(r => { PVSENT[r.child_id] = JSON.stringify(r.parts || []); });
+      if (!data || data.length < 1000) break;
+    }
+  } catch (e) { console.warn(e); }
+}
+function pvBuild(childId, box, parts){
+  if (!LOADED_MK || PVMK !== LOADED_MK) return;
+  const out = [];
+  parts.forEach(p => {
+    const st = Number(p.st), amt = Number(p.amt) || 0;
+    const lines = [];
+    if (st === 2) {
+      // 발달재활 본인부담금 — 줄 글은 학부모 화면이 시간표로 그림
+    } else if (st === 8) {
+      const x8 = box.querySelector('.gsum[data-st="8"]'), sel = x8 && x8.querySelector('.xthr');
+      const thr = sel ? ((sel.options[sel.selectedIndex] || {}).text || '') : '';
+      lines.push({ t: (TYPES[8] || '발달추가비용') + (thr ? ' (' + thr + ')' : ''), cnt: x8 ? numOf(x8.querySelector('.xcnt').value) : 0, amt: 0 });
+    } else {
+      box.querySelectorAll('.r.line[data-st="' + st + '"]').forEach(tr => {
+        if (tr.classList.contains('look')) return;
+        const la = numOf(tr.querySelector('.lineamt').textContent);
+        if (la <= 0) return;
+        // 줄 글 = 치료 · 요일 · 시각 (딱지와 선생님 이름은 떼고) · 선생님은 괄호로
+        const de = tr.querySelector('.de');
+        const thr = de && de.querySelector('.thr') ? de.querySelector('.thr').textContent.trim() : '';
+        let lab = '';
+        if (de) { const cp = de.cloneNode(true); cp.querySelectorAll('.gtag, .sttag, .thr, span').forEach(x => x.remove());
+                  lab = String(cp.textContent || '').replace(/[\s·]+$/, '').trim(); }
+        if (tr.querySelector('.gtag')) lab = '그룹 ' + lab;
+        lines.push({ t: lab + (thr ? ' (' + thr + ')' : ''), cnt: Number(String(tr.querySelector('.cnt').value).replace(/[^0-9.]/g, '')) || 0, amt: la });
+      });
+      box.querySelectorAll('.xdiffrow[data-st="' + st + '"]').forEach(tr => {
+        const a = Number(tr.dataset.amt || 0); if (a > 0) lines.push({ t: '1:1 보강 차액', cnt: 0, amt: a });
+      });
+    }
+    const gs = box.querySelector('.gsum[data-st="' + st + '"]');
+    out.push({ st: st, amt: amt, co: Number(p.co) || 0, rv: Number(p.rv) || 0,
+               ded: gs ? (Number(gs.dataset.ded || 0) || 0) : 0, lines: lines });
+  });
+  const js = JSON.stringify(out);
+  PVNOW[childId] = out;
+  if (PVSENT[childId] === js) return;
+  PVQ[childId] = true;
+  clearTimeout(PVT); PVT = setTimeout(pvFlush, 1500);
+}
+async function pvFlush(){
+  const ids = Object.keys(PVQ); PVQ = {};
+  if (!ids.length || !PVMK) return;
+  const rows = ids.map(id => ({ child_id: Number(id), month_key: PVMK, parts: PVNOW[id] || [],
+    total: (PVNOW[id] || []).reduce((t, p) => t + (Number(p.amt) || 0), 0), updated_by: ME_ID, updated_at: new Date().toISOString() }));
+  for (let i = 0; i < rows.length; i += 200) {
+    const part = rows.slice(i, i + 200);
+    const { data, error } = await sb.from('nl_pay_preview').upsert(part, { onConflict: 'child_id,month_key' }).select('child_id');
+    if (error) { console.warn('예정 미리보기 저장 못 함', error.message); return; }
+    (data || []).forEach(r => { PVSENT[r.child_id] = JSON.stringify(PVNOW[r.child_id] || []); });
+  }
 }
 
 function sumAll() {
