@@ -1814,6 +1814,7 @@ async function buildSum(){
   { const { data: em } = await sb.from('nl_tax_month').select('edu_amount, edu_memo, memo_wage, memo_fee, memo_fuel').eq('month_key', mon).maybeSingle();
     if (em) { EDU = { amount: em.edu_amount, memo: em.edu_memo || '' };
               PAYMEMO = { wage: em.memo_wage || '', fee: em.memo_fee || '', fuel: em.memo_fuel || '' }; } }
+  await loadDevDays();
 
   // 프리랜서(4대보험 미가입)는 실 지급액을 「급여 실수령액」 칸에 · 「실지급액 (면세)」 칸은 근로 + 프리랜서만 (2026-10-03 은정님)
   SUMROWS = rows.map(r => ({ id: r.id, who: r.id + '번 ' + r.name, bank: (PV[r.id] || {}).bank || '', acc: (PV[r.id] || {}).account_no || '',
@@ -1828,6 +1829,51 @@ async function buildSum(){
   (sal.data || []).forEach(x => TAXROWS.push({ name: SNM[x.staff_id] || (x.staff_id + '번'), np: x.base_pay || 0, tf: 0, note: '급여명세서 근로자 (비영리 = 기본급)' + (carryTag(x) ? ' (' + carryTag(x) + ')' : '') }));
   exs.forEach(x => TAXROWS.push({ name: x.name, np: x.nonprofit || 0, tf: x.taxfree || 0, note: '추가 줄' + (x.to_month ? ' · ' + x.to_month + '까지' : '') + (x.memo ? ' · ' + x.memo : '') }));
   drawSum();
+}
+// 발달재활서비스 근무일자 — 바우처 결제 내역 기준 (2026-11-07 은정님)
+//   그 달 결제일(service_date) · 제공인력명으로 선생님을 찾음 · 같은 승인번호 합이 0원 이하(취소)면 뺌
+let DEVD = { rows: [], noName: 0, unknown: {}, err: '' };
+async function loadDevDays(){
+  DEVD = { rows: [], noName: 0, unknown: {}, err: '' };
+  const all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb.from('nl_voucher_rows').select('target_id, appr_no, service_date, therapist_name, amount')
+      .gte('service_date', mon + '-01').lte('service_date', monEnd(mon)).order('service_date').range(from, from + 999);
+    if (error) { DEVD.err = error.message; return; }
+    all.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  const sumOf = {};
+  all.forEach(r => { const k = r.target_id + '|' + r.appr_no; sumOf[k] = (sumOf[k] || 0) + (Number(r.amount) || 0); });
+  const byNm = {}; THS.forEach(t => { byNm[String(t.name || '').replace(/\s/g, '')] = t; });
+  const by = {};
+  all.forEach(r => {
+    if ((Number(r.amount) || 0) <= 0 || sumOf[r.target_id + '|' + r.appr_no] <= 0) return;
+    const nm = String(r.therapist_name || '').replace(/\s/g, '');
+    if (!nm) { DEVD.noName++; return; }
+    const t = byNm[nm];
+    if (!t) { DEVD.unknown[r.therapist_name] = 1; return; }
+    const g = by[t.id] = by[t.id] || { id: t.id, name: t.name, days: {}, n: 0 };
+    g.days[String(r.service_date).slice(0, 10)] = 1; g.n++;
+  });
+  DEVD.rows = Object.values(by).sort((a, b) => a.id - b.id);
+}
+function devDaysHtml(){
+  const WK = ['일','월','화','수','목','금','토'];
+  const dd = d => { const x = new Date(d + 'T00:00:00'); return x.getDate() + '(' + WK[x.getDay()] + ')'; };
+  let h = '<div class="cthd" style="margin-top:18px;">발달재활서비스 근무일자 <span class="small">(바우처 결제 내역 기준 · 「발달 올리기」에 올린 결제만)</span></div>';
+  if (DEVD.err) return h + '<div class="ctwarn">바우처 결제를 읽지 못했습니다. ' + esc(DEVD.err) + '</div>';
+  if (!DEVD.rows.length) h += '<div class="small">이 달 바우처 결제가 없습니다. 「발달 올리기」에 이 달 엑셀을 올렸는지 확인해 주세요.</div>';
+  else h += '<table class="sumt"><thead><tr><th>이름</th><th class="n">근무일수</th><th>근무일</th><th class="n">결제 건수</th><th></th></tr></thead><tbody>'
+    + DEVD.rows.map(g => { const ds = Object.keys(g.days).sort();
+        return '<tr><td>' + esc(g.id + '번 ' + g.name) + '</td><td class="n"><b>' + ds.length + '일</b></td>'
+          + '<td>' + ds.map(dd).join(' · ') + '</td><td class="n">' + g.n + '건</td>'
+          + '<td><button type="button" class="ctsm ddcp" data-d="' + ds.map(d => Number(d.slice(8))).join(', ') + '">복사</button></td></tr>'; }).join('')
+    + '</tbody></table>';
+  const un = Object.keys(DEVD.unknown);
+  if (un.length) h += '<div class="ctwarn">선생님 목록에 없는 제공인력 이름 — ' + esc(un.join(' · ')) + ' (빠졌습니다)</div>';
+  if (DEVD.noName) h += '<div class="ctwarn">제공인력 이름이 빈 결제 ' + DEVD.noName + '건은 빠졌습니다.</div>';
+  return h;
 }
 function drawSum(){
   const box = $('sumBox');
@@ -1861,6 +1907,7 @@ function drawSum(){
     +   '<td><input id="pmFuel" type="text" maxlength="500" placeholder="메모" value="' + esc(PAYMEMO.fuel) + '"></td>'
     +   '<td class="n"><button type="button" class="ctsm" id="pmSave">✓ 저장됨</button></td></tr>'
     + '</tfoot></table>'
+    + devDaysHtml()
     + '<div class="cthd" style="margin-top:18px;">세무사전달 &gt; 최정환세무사님<button type="button" class="ctgo" id="sumXls">엑셀 내려받기</button></div>'
     + '<table class="sumt"><thead><tr><th>이름</th><th class="n">비영리</th><th class="n">면세</th><th>비고</th></tr></thead><tbody>'
     + TAXROWS.map(r => '<tr><td>' + esc(r.name) + '</td><td class="n">' + (r.np ? won(r.np) : '–') + '</td><td class="n">' + (r.tf ? won(r.tf) : '–')
@@ -1947,6 +1994,8 @@ function drawSum(){
     tr.querySelector('.xi').focus();
   };
   liveTot();
+  box.querySelectorAll('button.ddcp').forEach(b => { b.onclick = async () => {
+    try { await navigator.clipboard.writeText(b.dataset.d); b.textContent = '✓ 복사됨'; } catch (e) { prompt('아래 글을 복사해 주세요', b.dataset.d); } }; });
   $('sumXls').onclick = downXls;
   $('eduSave').onclick = saveEdu;
   ['eduAmt', 'eduMemo'].forEach(id => { $(id).oninput = () => { $('eduMsg').textContent = '저장 전'; }; });
