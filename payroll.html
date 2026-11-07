@@ -1845,7 +1845,10 @@ async function loadDevDays(){
   }
   const sumOf = {};
   all.forEach(r => { const k = r.target_id + '|' + r.appr_no; sumOf[k] = (sumOf[k] || 0) + (Number(r.amount) || 0); });
-  const byNm = {}; THS.forEach(t => { byNm[String(t.name || '').replace(/\s/g, '')] = t; });
+  // 치료사뿐 아니라 대표(8번) 등 모든 직원 이름으로 찾음 (2026-11-07 — 대표 결제가 빠졌던 것)
+  const { data: stf, error: se } = await sb.from('nl_therapists').select('id, name, role').order('id');
+  if (se) { DEVD.err = se.message; return; }
+  const byNm = {}; (stf || []).concat(THS).forEach(t => { const k = String(t.name || '').replace(/\s/g, ''); if (k && !byNm[k]) byNm[k] = t; });
   const by = {};
   all.forEach(r => {
     if ((Number(r.amount) || 0) <= 0 || sumOf[r.target_id + '|' + r.appr_no] <= 0) return;
