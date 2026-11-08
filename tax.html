@@ -788,6 +788,37 @@ window.addEventListener('beforeunload', e => {
   e.returnValue = '';
 });
 
+// ── 자주 쓰는 것의 가장 최근 결의서 (2026-11-08 은정님) ──
+//   같은 갈래 · 같은 목 · 같은 적요(띄어쓰기 무시)로 가장 최근에 저장한 결의서
+//   단추 글은 올해 목록에서 · 누를 때는 서버에서 다시 찾음 (1월엔 지난해 12월까지)
+function favKey(t){ return String(t || '').replace(/\s+/g, ''); }
+function favLastSlip(kind, f){
+  const k = favKey(f.item);
+  const list = SLIPS.filter(s => s.kind === kind && s.code_id === f.code_id && favKey(s.title) === k);
+  list.sort((a, b) => String(b.slip_date).localeCompare(String(a.slip_date)) || (b.id - a.id));
+  return list[0] || null;
+}
+async function favLastSlipSrv(kind, f){
+  try {
+    const { data, error } = await sb.from('nl_tax_slips')
+      .select('id, slip_date, title, attach')
+      .eq('kind', kind).eq('code_id', f.code_id)
+      .order('slip_date', { ascending: false }).order('id', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    const k = favKey(f.item);
+    const s = (data || []).find(x => favKey(x.title) === k);
+    if (!s) return null;
+    const { data: rw, error: e2 } = await sb.from('nl_tax_slip_rows')
+      .select('item, amount, row_no').eq('slip_id', s.id).order('row_no');
+    if (e2) throw e2;
+    return { slip: s, rows: rw || [] };
+  } catch (e) {
+    const s = favLastSlip(kind, f);
+    return s ? { slip: s, rows: (ROWS[s.id] || []).slice().sort((a, b) => a.row_no - b.row_no) } : null;
+  }
+}
+
 // ── 자주 쓰는 것 상자 채우기 (2026-09-24) ──
 //   목 단추 → 적요 단추. 내역이 담긴 것은 「· 내역 ○줄」
 //   고르면 내역 줄을 금액까지 그대로 채운다. 내역이 없는 옛 항목은 한 줄
@@ -807,22 +838,39 @@ function fillFavBox(kind, openCid){
     $('favList').innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
       + list.map(f => {
           const n = (FAVROWS[f.id] || []).length;
+          const last = favLastSlip(kind, f);
+          const ln = last ? (ROWS[last.id] || []).length : 0;
+          const tag = last
+            ? ' <span style="font-size:12px;color:#A39C95;">· ' + Number(String(last.slip_date).slice(5,7)) + '월 내역 ' + ln + '줄</span>'
+            : (n ? ' <span style="font-size:12px;color:#A39C95;">· 내역 ' + n + '줄</span>' : '');
           return '<button class="ghost favpick" data-f="' + f.id + '"'
-            + ' style="padding:8px 12px;' + (n ? 'border-color:#B07A4A;' : '') + '">'
-            + esc(f.item)
-            + (n ? ' <span style="font-size:12px;color:#A39C95;">· 내역 ' + n + '줄</span>' : '')
+            + ' style="padding:8px 12px;' + ((n || last) ? 'border-color:#B07A4A;' : '') + '">'
+            + esc(f.item) + tag
             + '</button>';
         }).join('')
       + '</div>';
     $('favList').querySelectorAll('.favpick').forEach(b2 => {
-      b2.onclick = () => {
+      b2.onclick = async () => {
         const f = FAVS.find(x => x.id === Number(b2.dataset.f));
         if (!f) return;
-        const fr = FAVROWS[f.id] || [];
-        const rows = fr.length
-          ? fr.map(r => ({ item: r.item, amount: r.amount }))
-          : [{ item: f.item, amount: f.amount || '' }];
-        openForm(kind, { code_id: f.code_id, title: f.item, attach: f.attach, rows: rows });
+        // 같은 목 · 같은 적요로 가장 최근에 저장한 결의서 내역을 먼저 (2026-11-08)
+        let rows = null, attach = f.attach;
+        const last = await favLastSlipSrv(kind, f);
+        if (last && last.rows.length) {
+          rows = last.rows.map(r => ({ item: r.item, amount: r.amount }));
+          if (last.slip.attach) attach = last.slip.attach;
+          if (String(last.slip.slip_date).slice(0,7) === mk()) {
+            alert('이번 달에 이미 쓴 같은 결의서가 있습니다 (' + String(last.slip.slip_date).slice(5,10).replace('-','/') + ').\n'
+              + '그 내역을 채워 새 결의서로 엽니다. 겹치지 않는지 확인해 주세요.');
+          }
+        }
+        if (!rows) {
+          const fr = FAVROWS[f.id] || [];
+          rows = fr.length
+            ? fr.map(r => ({ item: r.item, amount: r.amount }))
+            : [{ item: f.item, amount: f.amount || '' }];
+        }
+        openForm(kind, { code_id: f.code_id, title: f.item, attach: attach, rows: rows });
       };
     });
   };
