@@ -215,6 +215,7 @@
   button.slipsave:disabled { background:#f2f1ee; color:#A39C95; border-color:#ECE8E3; }
   @media print { body { background:#fff; } .wide { padding:0; }
                  .hd { display:none !important; } }
+.favdot{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;border-radius:8px;background:#D8684A;color:#fff !important;font-size:11px;font-weight:700;text-align:center;margin-left:3px;vertical-align:1px;}
 </style>
 </head>
 <body>
@@ -293,6 +294,7 @@ function accHtml(){
 let CODES = [];      // 관·항·목
 let SLIPS = [];      // 그 해 결의서 전부
 let ROWS  = {};      // 결의서 번호 -> 줄 목록
+let PREVSL = [];     // 1월일 때 지난해 12월 결의서 (2026-11-08)
 let OPEN  = 0;       // 그 해 첫 이월액
 let PAPER_IDS = [];  // 인쇄 종이가 그려진 차례 (결의서 번호)
 let FAVS = [];       // 자주 쓰는 적요
@@ -383,10 +385,28 @@ async function loadAll(){
 
   ROWS = {};
   if (SLIPS.length) {
+    // 결의서 번호 200개씩 · 1,000줄씩 나눠 읽기 (본인부담금 결의서는 한 장에 60줄 넘음)
     const ids = SLIPS.map(s => s.id);
-    const { data: rw } = await sb.from('nl_tax_slip_rows')
-      .select('*').in('slip_id', ids).order('row_no');
-    (rw || []).forEach(r => { (ROWS[r.slip_id] = ROWS[r.slip_id] || []).push(r); });
+    for (let i = 0; i < ids.length; i += 200) {
+      const part = ids.slice(i, i + 200);
+      for (let from = 0; ; from += 1000) {
+        const { data: rw, error } = await sb.from('nl_tax_slip_rows')
+          .select('*').in('slip_id', part).order('slip_id').order('row_no').range(from, from + 999);
+        if (error) { alert('결의서 내역을 다 읽지 못했습니다. 새로고침(F5) 해 주세요.\n' + error.message); break; }
+        (rw || []).forEach(r => { (ROWS[r.slip_id] = ROWS[r.slip_id] || []).push(r); });
+        if (!rw || rw.length < 1000) break;
+      }
+    }
+  }
+
+  // 1월이면 지난해 12월 결의서도 (자주 쓰는 것 「미기록」 셈용 · 2026-11-08)
+  PREVSL = [];
+  if (MM === '01') {
+    const py = Number(YY) - 1;
+    const { data: pv } = await sb.from('nl_tax_slips')
+      .select('id, kind, code_id, title, slip_date')
+      .gte('slip_date', py + '-12-01').lte('slip_date', py + '-12-31');
+    PREVSL = pv || [];
   }
 }
 
@@ -792,6 +812,21 @@ window.addEventListener('beforeunload', e => {
 //   같은 갈래 · 같은 목 · 같은 적요(띄어쓰기 무시)로 가장 최근에 저장한 결의서
 //   단추 글은 올해 목록에서 · 누를 때는 서버에서 다시 찾음 (1월엔 지난해 12월까지)
 function favKey(t){ return String(t || '').replace(/\s+/g, ''); }
+// 보는 달 기준 — 이 달에 씀(done) / 지난달엔 썼는데 이 달엔 아직(miss) / 둘 다 아님('')
+function favState(kind, f){
+  const k = favKey(f.item);
+  const same = s => s.kind === kind && s.code_id === f.code_id && favKey(s.title) === k;
+  const cur = SLIPS.filter(s => same(s) && String(s.slip_date).slice(0,7) === mk());
+  if (cur.length) {
+    cur.sort((a, b) => String(a.slip_date).localeCompare(String(b.slip_date)));
+    return { st: 'done', day: String(cur[0].slip_date).slice(5,10).replace('-','/') };
+  }
+  const y = Number(YY), m = Number(MM) - 1;
+  const pk = (m < 1) ? ((y - 1) + '-12') : (YY + '-' + String(m).padStart(2,'0'));
+  const pool = (m < 1) ? PREVSL : SLIPS;
+  if (pool.some(s => same(s) && String(s.slip_date).slice(0,7) === pk)) return { st: 'miss' };
+  return { st: '' };
+}
 function favLastSlip(kind, f){
   const k = favKey(f.item);
   const list = SLIPS.filter(s => s.kind === kind && s.code_id === f.code_id && favKey(s.title) === k);
@@ -830,8 +865,12 @@ function fillFavBox(kind, openCid){
   box.innerHTML = '<div style="font-size:13px;color:#666;margin-bottom:8px;">'
     + '목을 누르면 자주 쓰는 적요가 나옵니다.</div>'
     + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-    + favCs.map(c => '<button class="tab favmok" data-c="' + c.id + '">'
-        + esc(c.mok) + '</button>').join('')
+    + favCs.map(c => {
+        const miss = FAVS.filter(f => f.code_id === c.id && favState(kind, f).st === 'miss').length;
+        return '<button class="tab favmok" data-c="' + c.id + '">' + esc(c.mok)
+          + (miss ? ' <span class="favdot" title="이 달에 아직 안 쓴 적요">' + miss + '</span>' : '')
+          + '</button>';
+      }).join('')
     + '</div><div id="favList" style="margin-top:10px;"></div>';
   const showList = (cid) => {
     const list = FAVS.filter(f => f.code_id === cid);
@@ -843,9 +882,15 @@ function fillFavBox(kind, openCid){
           const tag = last
             ? ' <span style="font-size:12px;color:#A39C95;">· ' + Number(String(last.slip_date).slice(5,7)) + '월 내역 ' + ln + '줄</span>'
             : (n ? ' <span style="font-size:12px;color:#A39C95;">· 내역 ' + n + '줄</span>' : '');
+          const fs = favState(kind, f);
+          const sty = fs.st === 'miss' ? 'border:2px solid #4a3f38;font-weight:600;color:#2F2926;'
+            : fs.st === 'done' ? 'border:1px dashed #D8D2CB;color:#A39C95;background:#FAF9F7;'
+            : ((n || last) ? 'border-color:#B07A4A;' : '');
+          const st2 = fs.st === 'miss' ? ' <span style="font-size:12px;color:#D8684A;font-weight:700;">· 미기록</span>'
+            : fs.st === 'done' ? ' <span style="font-size:12px;color:#5E9A6E;">· ✓ ' + fs.day + ' 씀</span>' : '';
           return '<button class="ghost favpick" data-f="' + f.id + '"'
-            + ' style="padding:8px 12px;' + ((n || last) ? 'border-color:#B07A4A;' : '') + '">'
-            + esc(f.item) + tag
+            + ' style="padding:8px 12px;' + sty + '">'
+            + esc(f.item) + (fs.st === 'done' ? '' : tag) + st2
             + '</button>';
         }).join('')
       + '</div>';
