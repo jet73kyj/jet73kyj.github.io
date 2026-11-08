@@ -588,3 +588,12 @@
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
+
+// ── 비밀번호 보기 · 감추기 눈 단추 (2026-11-08) — nl-pwshow.js 를 불러 붙임 ──
+(function () {
+  if (window.__nlPwShow || document.querySelector('script[src*="nl-pwshow.js"]')) return;
+  var me = document.currentScript && document.currentScript.src;
+  var sc = document.createElement('script');
+  sc.src = me ? me.replace(/nl-login\.js(\?.*)?$/, 'nl-pwshow.js') : 'nl-pwshow.js';
+  document.head.appendChild(sc);
+})();
