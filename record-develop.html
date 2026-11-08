@@ -514,6 +514,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
 <script src="nl-kidtabs.js"></script>
+<script src="nl-recview.js"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script>
@@ -570,6 +571,7 @@ const AREA_MAP = { 1:'언어재활', 2:'감각발달재활', 3:'감각통합',
                    4:'감각발달재활', 5:'음악재활', 6:'기타' };
 
 let ME = null, CHILDREN = [], THERAPISTS = {};
+let ALIVE = {}, ALIVE_ON = false;   // 오늘까지 살아 있는 수업이 있는 아동 (2026-11-09 · 종결 아동 접기)
 let child = null, therapy = null, SCHED = [], GRADE = null;
 let VOUCHER = [], LOGID = null, ITEMS = [];
 let CH_RAW = [];   // 발달재활 수업 원본 (달을 바꿀 때 목록을 다시 만든다)
@@ -663,7 +665,7 @@ function _shareRecordHelp(){
 // 권한 — 관리자·행정은 전체, 치료사는 담당 아동만, 홍보는 못 들어옴
 // ─────────────────────────────────────────────
 function _roleOf(r) { return String(r || '').trim(); }
-function _isAllView(r) { const x = _roleOf(r); return x === '관리자' || x === '행정'; }
+function _isAllView(r) { if (window.NLRec && NLRec.VIEW) return true; const x = _roleOf(r); return x === '관리자' || x === '행정'; }
 function _isBlocked(r) { return _roleOf(r) === '홍보'; }
 function _blockScreen(role) {
   document.getElementById('loginBox').style.display = 'none';
@@ -765,6 +767,7 @@ async function buildChildList() {
   const mk0 = _keepMk(mv);
   const seen = {};
   CHILDREN = [];
+  ALIVE = {}; ALIVE_ON = false;
   const allView = _isAllView(ME.role);
   try {
     const { data, error } = await sb.rpc('nl_live_rows', { p_month: mv, p_grace: 2 });
@@ -773,10 +776,13 @@ async function buildChildList() {
       if (Number(r.support_type_id) !== 2) return;
       if (!allView && String(r.therapist_id) !== String(ME.id)) return;
       const c = KIDS[r.child_id];
-      if (!c || seen[c.id]) return;
+      if (!c) return;
+      if (!window.NLRec || NLRec.rowAlive(r)) ALIVE[c.id] = true;
+      if (seen[c.id]) return;
       seen[c.id] = true;
       CHILDREN.push(c);
     });
+    ALIVE_ON = !!window.NLRec;
     // 그 달 발달재활 회기(보강 포함)를 맡은 선생님에게도 보이게 (2026-10-22 · 66번 9/29 — 담당이 바뀌기 전 달 보강)
     if (!allView) await addMySessKids(mv, seen);
     CHILDREN.sort((a,b) => (a.name||'').localeCompare(b.name||''));
@@ -807,7 +813,9 @@ async function addMySessKids(mv, seen) {
     if (error) return;
     (data || []).forEach(r => {
       const c = KIDS[r.child_id];
-      if (!c || seen[c.id]) return;
+      if (!c) return;
+      ALIVE[c.id] = true;
+      if (seen[c.id]) return;
       seen[c.id] = true;
       CHILDREN.push(c);
     });
@@ -896,6 +904,7 @@ async function kbLoad() {
     await draw();
   }
 }
+window.NLRecRedraw = () => { if (KB_LAST) kbDraw(KB_LAST[0], KB_LAST[1]); };
 // 첫 화면은 단추만 · 단추를 누르면 기록지만 (2026-10-22 은정님)
 let KB_VIEW = 'list';
 function kbView(v) {
@@ -963,12 +972,18 @@ function kbDraw(months, got) {
     const red = !!(o && (o.fix || o.doc || o.wait));
     return '<button type="button" class="kb nltab' + (red ? ' red' : '') + (on ? ' on' : '') + '" data-k="' + mv + '" data-c="' + id + '"'
       + ' title="' + esc(c.name || '') + (red ? ' · 고칠 것 있음' : '') + '">' + esc(c.name || '')
-      + (c.status === '종결' ? '<small>종결</small>' : '') + '</button>';
+      + ((c.status === '종결' || (ALIVE_ON && !ALIVE[id] && CHILDREN.some(x => String(x.id) === String(id)))) ? '<small>종결</small>' : '') + '</button>';
   };
   if (window.NLKidTabs) {
-    if (ids.length) NLKidTabs.show('<div class="nltabhd">' + mon(mv) + '</div>'
-      + bad.map(id => tab(id, cur[id])).join('') + ok.map(id => tab(id, null)).join(''));
-    else NLKidTabs.show('<div class="nltabhd">' + mon(mv) + ' 아동 없음</div>');
+    // 끝난 지 두 달 안의 종결 아동은 「종결 ○명 ▸」 아래로 (2026-11-09 은정님) — 빨강 · 지금 보는 아동은 위에
+    const inList = {}; CHILDREN.forEach(c => { inList[c.id] = 1; });
+    const isEnd = id => ALIVE_ON && inList[id] && !ALIVE[id];
+    const isOn = id => String(childId) === String(id) && LOADED;
+    const items = bad.map(id => ({ html: tab(id, cur[id]), fold: false }))
+      .concat(ok.map(id => ({ html: tab(id, null), fold: isEnd(id) && !isOn(id) })));
+    if (!ids.length) NLKidTabs.show('<div class="nltabhd">' + mon(mv) + ' 아동 없음</div>');
+    else if (window.NLRec) NLKidTabs.show(NLRec.tabsHtml('<div class="nltabhd">' + mon(mv) + '</div>', items));
+    else NLKidTabs.show('<div class="nltabhd">' + mon(mv) + '</div>' + items.map(o => o.html).join(''));
   }
   // 처음 열면 맨 위 아동을 바로 불러옴 (빈 기록지 화면이 남지 않게)
   if (!KB_AUTO && !LOADED && ids.length) {
@@ -1107,6 +1122,9 @@ async function loadOne() {
     });
 
     LOADED = true;
+    // 다시 다니는 아동 — 옛 수업 기록지 (보기만 · 2026-11-09 은정님)
+    if (window.NLRec) NLRec.pastLogs({ sb: sb, cid: childId, sups: [2], page: 'record-develop.html',
+      name: t => THERAPISTS[t] || '', sup: () => '발달재활' });
     drawAll(lg.data);
     DIRTY = false;
     setSaveBtn(LOGID ? 'done' : 'before');
@@ -3130,6 +3148,7 @@ async function _autoKeep(cid, mk) {
 }
 
 async function saveRecord(opts) {
+  if (window.NLRec && NLRec.VIEW) { alert('보기 전용 기록지는 저장할 수 없습니다.'); return; }
   if (IMPORTED) { alert('구글에서 옮겨 온 기록이라 보기만 됩니다.'); return; }
   if (!LOADED || !childId) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
   const mk = mkNow();

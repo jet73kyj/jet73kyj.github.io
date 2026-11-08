@@ -359,6 +359,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
 <script src="nl-kidtabs.js"></script>
+<script src="nl-recview.js"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script>
@@ -380,6 +381,7 @@ const SUPPORTS = [3, 4, 6, 7];          // 치료지원(언어/작업) · 방과
 const TTYPE = { 1:'언어', 2:'작업', 3:'전산화인지', 4:'감각통합', 5:'음악', 6:'일상자립' };
 
 let ME = null, PAIRS = [], THERAPISTS = {}, SUPNAME = {};
+let ALIVE = {}, ALIVE_ON = false;   // 오늘까지 살아 있는 수업이 있는 아동·사업 (2026-11-09 · 종결 아동 접기)
 let TPRAW = [];   // 수업 원본 (서버를 못 부를 때 쓰는 옛 셈)
 let KIDS  = {};   // 아동번호 → 아동 정보
 let cur = null;                          // 고른 아동+지원유형
@@ -434,7 +436,7 @@ function _pickCont(el) {
 // 권한 — 관리자·행정은 전체, 치료사는 담당 아동만, 홍보는 못 들어옴
 // ─────────────────────────────────────────────
 function _roleOf(r) { return String(r || '').trim(); }
-function _isAllView(r) { const x = _roleOf(r); return x === '관리자' || x === '행정'; }
+function _isAllView(r) { if (window.NLRec && NLRec.VIEW) return true; const x = _roleOf(r); return x === '관리자' || x === '행정'; }
 function _isBlocked(r) { return _roleOf(r) === '홍보'; }
 function _blockScreen(role) {
   document.getElementById('loginBox').style.display = 'none';
@@ -544,6 +546,7 @@ async function buildPairs() {
   const allView = _isAllView(ME.role);
   const seen = {};
   PAIRS = [];
+  ALIVE = {}; ALIVE_ON = false;
   try {
     const { data, error } = await sb.rpc('nl_live_rows', { p_month: mv, p_grace: 2 });
     if (error) throw error;
@@ -556,11 +559,13 @@ async function buildPairs() {
       const tpe = TPRAW.find(x => String(x.id) === String(r.therapy_id));
       if (tpe && tpe.ended_on && String(tpe.ended_on).slice(0, 10) < mv + '-01') return;
       const k = c.id + '-' + r.support_type_id;
+      if (!window.NLRec || NLRec.rowAlive(r)) ALIVE[k] = true;
       if (seen[k]) return;
       seen[k] = true;
       PAIRS.push({ child: c, support_type_id: Number(r.support_type_id),
                    therapy_id: r.therapy_id, therapy_type_id: r.therapy_type_id });
     });
+    ALIVE_ON = !!window.NLRec;
     // 그 달 회기(보강 포함)를 맡은 선생님에게도 보이게 (2026-10-22 · 요일줄 담당이 아니어도)
     if (!allView) await addMySessPairs(mv, seen);
     PAIRS.sort((a,b) => (a.child.name||'').localeCompare(b.child.name||'')
@@ -598,6 +603,7 @@ async function addMySessPairs(mv, seen) {
       const c = KIDS[r.child_id];
       if (!c) return;
       const k = c.id + '-' + r.support_type_id;
+      ALIVE[k] = true;
       if (seen[k]) return;
       const tp = TPRAW.find(x => String(x.id) === String(r.therapy_id))
               || TPRAW.find(x => x.nl_children && String(x.nl_children.id) === String(c.id)
@@ -769,10 +775,17 @@ function kbDraw(months, got) {
     const on = LOADED && cur && String(cur.child.id) === String(o.c.id) && Number(cur.support_type_id) === Number(o.st);
     return '<button type="button" class="kb nltab' + (o.n ? ' red' : '') + (on ? ' on' : '') + '" data-k="' + mv + '" data-c="' + o.c.id + '" data-s="' + o.st + '"'
       + ' title="' + esc((o.c.name || '') + ' · ' + (SUPNAME[o.st] || '')) + (o.n ? ' · 고칠 것 있음' : '') + '">' + esc(o.c.name || (o.c.id + '번'))
-      + '<small>' + esc(SUPSHORT(o.st)) + (o.c.status === '종결' ? '·종결' : '') + '</small></button>';
+      + '<small>' + esc(SUPSHORT(o.st)) + ((o.c.status === '종결' || (ALIVE_ON && !ALIVE[o.c.id + '-' + o.st])) ? '·종결' : '') + '</small></button>';
   };
-  if (window.NLKidTabs) NLKidTabs.show('<div class="nltabhd">' + mon(mv) + '</div>'
-    + (items.length ? items.map(tab).join('') : '<div class="nltabhd">아동 없음</div>'));
+  // 끝난 지 두 달 안의 종결 아동은 「종결 ○명 ▸」 아래로 (2026-11-09 은정님) — 빨강 · 지금 보는 아동은 위에
+  const isOn = o => LOADED && cur && String(cur.child.id) === String(o.c.id) && Number(cur.support_type_id) === Number(o.st);
+  const isEnd = o => ALIVE_ON && !ALIVE[o.c.id + '-' + o.st];
+  if (window.NLKidTabs) {
+    if (window.NLRec && items.length) NLKidTabs.show(NLRec.tabsHtml('<div class="nltabhd">' + mon(mv) + '</div>',
+      items.map(o => ({ html: tab(o), fold: !o.n && !isOn(o) && isEnd(o) }))));
+    else NLKidTabs.show('<div class="nltabhd">' + mon(mv) + '</div>'
+      + (items.length ? items.map(tab).join('') : '<div class="nltabhd">아동 없음</div>'));
+  }
   // 처음 열면 맨 위 아동을 바로 불러옴 (빈 기록지 화면이 남지 않게)
   if (!KB_AUTO && !LOADED && items.length) {
     KB_AUTO = true;
@@ -780,6 +793,7 @@ function kbDraw(months, got) {
     if (first) setTimeout(() => { if (!LOADED) first.click(); }, 0);
   }
 }
+window.NLRecRedraw = () => { if (KB_LAST) kbDraw(KB_LAST[0], KB_LAST[1]); };
 // 책갈피 작은 글 — 사업 줄임 (2026-11-05)
 function SUPSHORT(st) { return ({ 3: '치언', 4: '치작', 6: '방치언', 7: '방치작' })[Number(st)] || (SUPNAME[st] || ''); }
 document.addEventListener('click', async e => {
@@ -873,6 +887,9 @@ async function loadOne() {
     } catch (e3) {}
     await loadPc();
     LOADED = true;
+    // 다시 다니는 아동 — 옛 수업 기록지 (보기만 · 2026-11-09 은정님)
+    if (window.NLRec) NLRec.pastLogs({ sb: sb, cid: cur.child.id, sups: SUPPORTS, page: 'record-support.html',
+      name: t => THERAPISTS[t] || '', sup: st => SUPNAME[st] || '', extra: l => '&s=' + l.support_type_id });
     kbView('sheet');
     if (KB_LAST) kbDraw(KB_LAST[0], KB_LAST[1]);
     $('pInfo').textContent = mk + (LOGID ? ' · 저장된 기록 있음' : ' · 새로 작성');
@@ -1360,6 +1377,7 @@ function buildSeq() {
 
 // ── 저장 ──
 async function saveRecord() {
+  if (window.NLRec && NLRec.VIEW) { alert('보기 전용 기록지는 저장할 수 없습니다.'); return; }
   if (!LOADED || !cur) { alert('먼저 아동과 달을 고르고 [불러오기]를 누르세요.'); return; }
   const mk = mkNow();
   SAVING = true;
