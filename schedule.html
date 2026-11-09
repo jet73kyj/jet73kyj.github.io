@@ -3369,6 +3369,7 @@ function fPartGroup(list, origId){
     + esc(lb) + ' - ' + parts + '</span>';
 }
 
+let FIND_RETRY = '';   // 못 찾을 때 한 번만 다시 읽기 (같은 글자로 되풀이하지 않게)
 function drawFind(){
   const q = $('findName').value.trim();
   if (!q) { $('findBox').style.display = 'none'; return; }
@@ -3399,6 +3400,17 @@ function drawFind(){
 
   if (!hit.length) {
     $('findTitle').textContent = '🔍 "' + q + '" 찾기';
+    // 다른 화면(신규 아동 관리 · 아동 목록)에서 방금 넣은 수업은 이 탭 목록에 아직 없을 수 있다 (2026-11-09 · 179번)
+    //   못 찾으면 한 번만 수업 목록을 서버에서 다시 읽고 다시 찾는다
+    if (FIND_RETRY !== q) {
+      FIND_RETRY = q;
+      $('findRows').innerHTML = '<div class="findnone">수업 목록을 다시 읽는 중…</div>';
+      (async () => {
+        try { await reloadRowsAll(); await applyMonthFilter(); } catch (e) {}
+        if ($('findName').value.trim() === q) drawFind();
+      })();
+      return;
+    }
     $('findRows').innerHTML = '<div class="findnone">그 이름의 수업이 없습니다. '
       + '종결한 아동이거나 수업이 아직 없는 아동입니다.</div>';
     return;
