@@ -3415,6 +3415,7 @@ function drawFind(){
       + '종결한 아동이거나 수업이 아직 없는 아동입니다.</div>';
     return;
   }
+  FIND_RETRY = '';
   Object.values(byScd).forEach(a => a.sort((x,y)=>String(x.plan_date).localeCompare(String(y.plan_date))));
 
   const names = Array.from(new Set(hit.map(r => r._name)));
