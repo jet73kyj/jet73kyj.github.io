@@ -4087,9 +4087,9 @@ function drawWeek(){
           const ds2 = dates[i2];
           return ths.map(th3 => {
           const list = dropHoliDup(cell[s.no + '_' + d + '_' + th3.id] || []);
-          // ＋ 단추 — 그 치료사 자리에 바로 넣는다
+          // ＋ 단추 — 그 치료사 자리에 바로 넣는다 (누른 날짜도 함께 — 시작일 처음 값 · 2026-11-09)
           const plus = CAN_EDIT
-            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '">'
+            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '_' + ds2 + '">'
               + '＋</button>'
               + (canOpenAdd()
                   ? '<button class="lnadd" data-mn="'
@@ -4662,7 +4662,7 @@ function drawOne(){
       + ths.map(th3 => {
           const list = dropHoliDup(cell[s.no + '_' + th3.id] || []);
           const plus = CAN_EDIT
-            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '">'
+            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + (oneDate ? '_' + oneDate : '') + '">'
               + '＋ 수업 넣기</button>'
               + (canOpenAdd()
                   ? '<button class="lnadd" data-mn="'
@@ -5862,7 +5862,23 @@ function openAdd(key){
   $('ad_cnt').value = '매주';
   wkOn = [true,true,true,true];
   drawWks();
-  $('ad_start').value = mon + '-01';
+  // 시작일 처음 값 (2026-11-09 · 179번 — 25일 칸에서 넣었는데 1일부터 들어가 지난 4일에도 회기가 깔림)
+  //   주간 · 하루 보기는 누른 날짜 · 요일별 보기는 그 달 그 요일 가운데 오늘 이후 첫 날 (지난 달이면 1일)
+  const _pd = /^\d{4}-\d{2}-\d{2}$/.test(p[2] || '') ? p[2] : '';
+  if (_pd) {
+    const _w = ['일','월','화','수','목','금','토'][new Date(_pd + 'T00:00:00').getDay()];
+    if (_w && _w !== '일') wd = _w;
+    $('addTitle').textContent = wd + '요일 ' + slotT(slot, th ? th.id : null, wd)
+      + ' · ' + (th ? th.name : '') + ' — 수업 넣기';
+  }
+  let _st = _pd;
+  if (!_st) {
+    const _td = todayKr();
+    const _ds = wdDates(mon, wd) || [];
+    _st = _ds.find(d0 => d0 >= _td) || (mon + '-01' > _td ? mon + '-01' : (_ds[0] || mon + '-01'));
+    if (mon < _td.slice(0, 7)) _st = mon + '-01';
+  }
+  $('ad_start').value = _st;
   $('ad_end').value = '';
   admsg('', true); $('adMsg').className = 'out';
   $('edBox').style.display = 'none';
@@ -5891,6 +5907,10 @@ $('adSave').onclick = async () => {
   if (!thOkForTt(tt, thId)) {
     if (!confirm('이 치료사는 그 치료 담당이 아닙니다.\n그래도 넣을까요?')) return;
   }
+
+  // 지난 날짜부터 넣으면 지난 회기가 깔린다 — 한 번 묻기 (2026-11-09)
+  const _sv = $('ad_start').value;
+  if (_sv && _sv < todayKr() && !confirm('시작일 ' + _sv + ' 은 지난 날짜입니다.\n그 날부터 오늘까지의 지난 수업도 시간표에 깔립니다.\n\n이대로 넣을까요?')) return;
 
   // 저장을 여러 번 눌러도 한 번만 들어가게 한다
   if ($('adSave').disabled) return;
