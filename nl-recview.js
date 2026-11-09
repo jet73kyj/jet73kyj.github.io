@@ -116,7 +116,12 @@
         .eq('child_id', o.cid).in('support_type_id', o.sups);
       if (r1.error) return;
       var th = r1.data || [];
-      var ended = th.filter(function (t) { return t.ended_on && String(t.ended_on).slice(0, 10) < td; });
+      // 이어지는 수업(끝난 날 다음 7일 안에 같은 갈래 새 수업)은 뺀다 — 원래 화면에서 보고 고칠 수 있음
+      var day7 = function (d) { var x = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + 7); return x.toISOString().slice(0, 10); };
+      var goesOn = function (t) { return th.some(function (u) { return u.id !== t.id && u.started_on
+        && String(u.started_on).slice(0, 10) >= String(t.started_on || '0000-00-00').slice(0, 10)
+        && String(u.started_on).slice(0, 10) <= day7(t.ended_on); }); };
+      var ended = th.filter(function (t) { return t.ended_on && String(t.ended_on).slice(0, 10) < td && !goesOn(t); });
       if (!ended.length) return;
       var cur = th.filter(function (t) { return !t.ended_on || String(t.ended_on).slice(0, 10) >= td; });
       var curStart = cur.length ? cur.map(function (t) { return String(t.started_on || '0000-00').slice(0, 7); }).sort()[0] : '9999-99';

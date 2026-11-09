@@ -107,7 +107,14 @@ async function load() {
   // 지금 다니는 아동 — 오늘까지 살아 있는 수업이 하나라도 있음
   const NOW = {};
   th.forEach(t => { if (!t.ended_on || String(t.ended_on).slice(0, 10) >= td) NOW[t.child_id] = true; });
-  ROWS = th.filter(t => t.ended_on && String(t.ended_on).slice(0, 10) < td && kindOf(t.support_type_id) && KID[t.child_id])
+  // 이어지는 수업은 뺀다 (2026-11-09 은정님) — 끝난 날 다음 7일 안에 같은 아동 · 같은 갈래 새 수업이 시작
+  //   사업 · 담당 · 요일만 바뀐 것이라 원래 기록지 화면에서 보고 고칠 수 있음
+  const day7 = d => { const x = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + 7); return x.toISOString().slice(0, 10); };
+  const goesOn = t => th.some(u => u.id !== t.id && String(u.child_id) === String(t.child_id)
+    && kindOf(u.support_type_id) === kindOf(t.support_type_id) && u.started_on
+    && String(u.started_on).slice(0, 10) >= String(t.started_on || '0000-00-00').slice(0, 10)
+    && String(u.started_on).slice(0, 10) <= day7(t.ended_on));
+  ROWS = th.filter(t => t.ended_on && String(t.ended_on).slice(0, 10) < td && kindOf(t.support_type_id) && KID[t.child_id] && !goesOn(t))
     .map(t => {
       const k = kindOf(t.support_type_id), a = ym(t.started_on) || '0000-00', z = ym(t.ended_on);
       const lg = logs.filter(l => String(l.child_id) === String(t.child_id) && Number(l.support_type_id) === Number(t.support_type_id)
