@@ -1846,6 +1846,19 @@
         <div id="eg_msg" class="out"></div>
     </div>
 
+    <div id="edStartBox" style="margin:10px 0;padding:10px 12px;background:#F4F7F2;border-left:2px solid #5E9A6E;border-radius:6px;">
+      <div style="font-weight:600;color:#3E6B4B;margin-bottom:6px;">수업 시작일</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="ed_start2" type="date" style="width:auto !important;margin:0 !important;">
+        <button type="button" id="edStartBtn" class="pbtn" style="width:auto !important;margin:0 !important;">시작일 바꾸기</button>
+        <span id="edStartNow" style="font-size:12px;color:#8A817A;"></span>
+      </div>
+      <div style="font-size:11.5px;color:#8A817A;line-height:1.6;margin-top:6px;">
+        늦추면 그 앞의 예정 회기를 지우고, 당기면 그 날부터 회기를 깝니다. 바뀐 달의 회차를 다시 매깁니다.<br>
+        완료 · 결석 · 보강 기록이 있거나 다른 수업과 겹치면 바꾸지 않습니다. 「저장」은 누르지 않아도 됩니다.
+      </div>
+    </div>
+
     <div class="edend">
       <div class="edend-t">수업 끝내기</div>
       <div class="edend-row">
@@ -6088,6 +6101,14 @@ function openEd(scId){
   const r = ROWS.find(x => x.id === scId) || ROWS_ALL.find(x => x.id === scId);
   if (!r) return;
   edRow = r;
+  // 수업 시작일 (2026-11-09 · 179번) — 서버에서 읽어 채움
+  $('ed_start2').value = r.from_date || ''; $('edStartNow').textContent = '';
+  $('edStartBox').style.display = CAN_EDIT ? '' : 'none';
+  if (r.therapy_id) sb.from('nl_therapies').select('started_on').eq('id', r.therapy_id).maybeSingle().then(({ data }) => {
+    if (edRow !== r || !data) return;
+    if (data.started_on) $('ed_start2').value = data.started_on;
+    $('edStartNow').textContent = '지금 ' + (data.started_on || '빈칸');
+  });
   closeSplitBox(false);   // 지난 창의 「이날부터 바꾸기」 상자 닫기 (2026-10-16)
   edWk = [r._w1 !== false, r._w2 !== false, r._w3 !== false, r._w4 !== false];
   drawEdWks();
@@ -7691,6 +7712,29 @@ $('edEnd').onclick = async () => {
   } finally {
     $('edEnd').disabled = false;
   }
+};
+
+// 수업 시작일 바꾸기 (2026-11-09 은정님 · 179번) — 셈 · 지우기 · 깔기는 서버 nl_change_start 한 곳
+$('edStartBtn').onclick = async () => {
+  if (!edRow || !CAN_EDIT) return;
+  const d = $('ed_start2').value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { alert('시작일을 넣어 주세요.'); return; }
+  if (!confirm((edRow._name || '') + ' 수업 시작일을 ' + d + ' 로 바꿀까요?\n\n늦추면 그 앞의 예정 회기를 지우고, 당기면 그 날부터 회기를 깝니다.')) return;
+  $('edStartBtn').disabled = true;
+  try {
+    const { data, error } = await sb.rpc('nl_change_start', { p_therapy: Number(edRow.therapy_id), p_date: d });
+    if (error) { alert('❌ 바꾸지 못했습니다.\n\n' + error.message); return; }
+    const keep = edRow.id;
+    try { await reloadRowsAll(); } catch (e) {}
+    await loadMonth();
+    draw();
+    const nr = ROWS.find(x => x.id === keep) || ROWS_ALL.find(x => x.id === keep);
+    if (nr) edRow = nr;
+    $('edStartNow').textContent = '지금 ' + d;
+    alert('✅ ' + data);
+  } catch (e) {
+    alert('❌ 바꾸지 못했습니다.\n\n' + (e.message || e));
+  } finally { $('edStartBtn').disabled = false; }
 };
 
 // 수업 취소 (등록 취소) — 한 번도 하지 않은 수업을 처음부터 없던 것으로 (2026-11-09 은정님 · 80번)
