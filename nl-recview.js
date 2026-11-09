@@ -100,6 +100,9 @@
   async function pastLogs(o) {
     var req = ++PAST_REQ;
     var btn = document.getElementById('nlPastBtn');
+    // 쓰지 않음 (2026-11-09 은정님) — 다시 다니는 아동은 새 선생님에게 새 수업 기록지만 · 옛 기록은 행정 계정 · 「종결 아동 기록지」로
+    if (btn) btn.style.display = 'none';
+    return;
     if (VIEW) return;
     if (!btn) {
       var anchor = document.getElementById('pIntake'); if (!anchor) return;
