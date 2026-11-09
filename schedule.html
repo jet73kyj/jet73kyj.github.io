@@ -3820,7 +3820,8 @@ function bd(v){
   return s.length >= 10 ? s.slice(2,4) + s.slice(5,7) + s.slice(8,10) : '';
 }
 
-function markFind(){
+// noJump — 다시 그릴 때(저장 · 상태 바꾸기 뒤)는 화면을 옮기지 않는다 (2026-11-09)
+function markFind(noJump){
   document.querySelectorAll('.hit').forEach(el => {
     el.classList.remove('hit'); el.classList.remove('hitnow');
   });
@@ -3868,7 +3869,8 @@ function markFind(){
   if (!hitEls.length) return;
   $('findJump').style.display = '';
   $('findJump').textContent = hitEls.length + '자리 ›';
-  jumpTo(0);
+  hitAt = -1;   // 「○자리 ›」를 누르면 첫 칸부터
+  if (!noJump) jumpTo(0);
 }
 function jumpTo(i){
   if (!hitEls.length) return;
@@ -5191,7 +5193,7 @@ function afterDraw(){
   placeWait();   // 자리 대기 아동 (2026-10-08)
   if (!$('findName').value.trim()) return;
   if (VIEW !== 'day') drawFind();
-  markFind();
+  markFind(true);   // 다시 그릴 때는 찾은 칸으로 화면을 옮기지 않음 (2026-11-09)
 }
 
 
