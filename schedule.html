@@ -1852,6 +1852,10 @@
         <label for="ed_end" title="이날부터 수업이 없습니다">종결일 <span style="font-weight:normal;font-size:11px;">(이날부터 수업 없음)</span></label>
         <input id="ed_end" type="date">
         <button id="edEnd" class="pbtn red">이 수업 종결</button>
+        <button id="edCancel" class="pbtn" style="border:1px solid #D8684A !important;color:#D8684A !important;background:#fff !important;">수업 취소 (등록 취소)</button>
+      </div>
+      <div style="font-size:11.5px;color:#8A817A;line-height:1.6;margin:6px 0 0;">
+        수업 취소 = 한 번도 하지 않은 수업을 지웁니다. 시간표 · 회기 · 수업 줄이 모두 없어지고 통계 · 종결 기록에도 남지 않습니다.
       </div>
       <!-- 종결 사유 묶음 — 통계에서 사유별로 셈 (nl_therapies.end_cat · 2026-10-07) -->
       <div class="edend-row" style="margin-top:12px;">
@@ -7653,6 +7657,33 @@ $('edEnd').onclick = async () => {
     edmsg('❌ 끝내지 못했습니다.\n' + e.message, false);
   } finally {
     $('edEnd').disabled = false;
+  }
+};
+
+// 수업 취소 (등록 취소) — 한 번도 하지 않은 수업을 처음부터 없던 것으로 (2026-11-09 은정님 · 80번)
+//   셈 · 지우기는 서버 nl_therapy_cancel 한 곳 — 걸리는 것이 있으면 아무것도 안 지움
+$('edCancel').onclick = async () => {
+  if (!edRow) return;
+  if (!CAN_EDIT) { alert('대표 · 행정 · 데스크만 수업을 취소할 수 있습니다.'); return; }
+  const _what = (edRow._name || '') + ' · ' + (TTYPE[edRow._tt] || '') + ' · '
+    + (STYPE[edRow.support_type_id] || '') + ' · ' + (edRow.weekday || '') + '요일 ' + String(edRow.start_time || '').slice(0, 5);
+  $('edCancel').disabled = true;
+  try {
+    const { data: chk, error: e0 } = await sb.rpc('nl_therapy_cancel', { p_therapy: Number(edRow.therapy_id), p_check: true });
+    if (e0) { edmsg('❌ 취소할 수 없습니다.\n' + e0.message, false); alert('❌ 취소할 수 없습니다.\n\n' + e0.message); return; }
+    if (!confirm('아래 수업을 「등록 취소」합니다. 처음부터 없던 수업이 됩니다.\n\n  ' + _what + '\n\n' + chk
+      + '\n\n종결 기록 · 통계에도 남지 않고 되돌릴 수 없습니다. 이대로 할까요?')) return;
+    const { data: res, error: e1 } = await sb.rpc('nl_therapy_cancel', { p_therapy: Number(edRow.therapy_id), p_check: false });
+    if (e1) { edmsg('❌ 취소하지 못했습니다.\n' + e1.message, false); alert('❌ 취소하지 못했습니다.\n\n' + e1.message); return; }
+    ROWS = ROWS.filter(x => String(x.therapy_id) !== String(edRow.therapy_id));
+    $('edBox').style.display = 'none'; edRow = null;
+    await loadMonth();
+    draw();
+    alert('✅ ' + res);
+  } catch (e) {
+    edmsg('❌ 취소하지 못했습니다.\n' + (e.message || e), false);
+  } finally {
+    $('edCancel').disabled = false;
   }
 };
 
