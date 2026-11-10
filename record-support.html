@@ -376,7 +376,10 @@ const sb = window.supabase.createClient(URL_, KEY_, {
 });
 const $  = id => document.getElementById(id);
 
-const SESSIONS = 3;                     // 치료지원 = 월 3회
+let SESSIONS = 3;                       // 치료지원 = 월 3회 (아래 SESS4 아동은 4회)
+// 한 달 4회 적는 아동 (2026-11-10 은정님 — 132번만). 아동 번호를 더하면 그 아동도 4회
+const SESS4 = [132];
+const sessOf = p => (p && p.child && SESS4.includes(Number(p.child.id))) ? 4 : 3;
 const SUPPORTS = [3, 4, 6, 7];          // 치료지원(언어/작업) · 방과후치료지원(언어/작업)
 const TTYPE = { 1:'언어', 2:'작업', 3:'전산화인지', 4:'감각통합', 5:'음악', 6:'일상자립' };
 
@@ -832,6 +835,7 @@ async function loadOne() {
   if (!mv) { alert('달을 고르세요.'); return; }
 
   cur = PAIRS[Number(idx)];
+  SESSIONS = sessOf(cur);
   year  = parseInt(mv.split('-')[0], 10);
   month = parseInt(mv.split('-')[1], 10);
   const mk = mkNow();
