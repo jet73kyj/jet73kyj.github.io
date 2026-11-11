@@ -1558,7 +1558,8 @@ async function loadMonth() {
             + ' support_type_id, run_no, makeup_for, minutes, no_makeup, month_key, split_anchor')
       .eq('child_id', CURKID)
       .neq('month_key', CURMK)
-      .not('makeup_for', 'is', null)
+      // 보강 · 조각 + 지난달 몫 발추를 이 달에 하는 것 (2026-11-11 — 105번 10월분 발추 11/12 가 안 보였음)
+      .or('makeup_for.not.is.null,support_type_id.eq.8')
       .gte('plan_date', CURMK + '-01').lte('plan_date', last);
     // 못 한(결석·취소) 다른 달 조각은 빼고 보여 준다
     const ox2 = (ox || []).filter(v => v.status !== '결석' && v.status !== '취소');
@@ -1683,6 +1684,7 @@ async function loadMonth() {
       if (st === '쉼' || st === '휴무' || st === '취소' || st === '보강') return;
       if (r._x) return;   // 체험 · 추가 수업은 회차에서 뺀다
       if (r.makeup_for) return;
+      if (r.month_key && r.month_key !== CURMK) return;   // 다른 달 몫(지난달 발추)은 그 달 번호로 따로
       const k = String(r.support_type_id || 0);
       cnt[k] = (cnt[k] || 0) + 1;
       RUN[r.id] = cnt[k];
@@ -1757,12 +1759,13 @@ async function loadMonth() {
                  + (GRPT[r.therapy_id] && !r.makeup_for ? ' <span class="sup grp">그룹</span>' : '');
 
       // 회차 번호 — 시간표 화면과 같게 「9-1」 방식
+      const otherMk = !r.makeup_for && r.month_key && r.month_key !== CURMK;
       const rn = RUN[r.id]
         ? '<span class="runno">' + (+CURMK.slice(5, 7)) + '-' + RUN[r.id] + '</span>'
-        : '';
+        : (otherMk && r.run_no ? '<span class="runno">' + (+String(r.month_key).slice(5, 7)) + '-' + r.run_no + '</span>' : '');
 
       // 보강이면 원래 어느 달 것인지 밝힌다
-      let mtag = '';
+      let mtag = otherMk ? '<span class="prevmk">' + (+String(r.month_key).slice(5, 7)) + '월분</span>' : '';
       if (r.makeup_for) {
         const o = ORIG[r.makeup_for];
         if (o && o.plan_date) {
