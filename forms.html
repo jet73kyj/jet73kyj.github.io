@@ -1202,17 +1202,23 @@ function gfA(d, k, h) {
   const v = esc((d && d[k]) || '');
   return '<textarea data-g="' + k + '" style="height:' + (h || 60) + 'px;">' + v + '</textarea><div class="gpr" data-p="' + k + '">' + v + '</div>';
 }
+// 성명 · 생년월일 — 세 서식이 함께 쓰는 칸 (2026-11-11 은정님 — 직접 적을 수도 있게)
+//   아동을 고르면 채워지고, 고쳐 적으면 세 서식이 함께 바뀜 · 공문과 함께 저장 (k_name · k_birth)
+function gfKid(d, k, f, w) {
+  const v = (d && d[f] != null && d[f] !== '') ? d[f] : (f === 'k_name' ? (k.name || '') : (k.birth || ''));
+  return '<input type="text" data-g="' + f + '" data-kid="' + f + '" value="' + esc(v) + '" style="width:' + (w || '100%') + ';"'
+    + (f === 'k_birth' ? ' placeholder="2021.03.05"' : '') + '>';
+}
 function gfDate(d, p) {
   return gfI(d, p + 'yy', '52px') + ' 년 ' + gfI(d, p + 'mm', '34px') + ' 월 ' + gfI(d, p + 'dd', '34px') + ' 일';
 }
 function gmRefer(k, d) {
   d = d || {};
-  const nm = esc(k.name || ''), bd = esc(k.birth || '');
   return '<div class="dsheet gsheet gfm" data-sheet="refer"><table>'
     + '<colgroup><col style="width:12%"><col style="width:12%"><col style="width:22%"><col style="width:14%"><col style="width:14%"><col style="width:12%"><col style="width:14%"></colgroup>'
     + '<tr><td colspan="4" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;">발달재활서비스 의뢰서</td><th>병록번호</th><td colspan="2">' + gfI(d, 'r_rec') + '</td></tr>'
     + '<tr><th>연 번 호</th><td colspan="2">' + gfI(d, 'r_seq') + '</td></tr>'
-    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + nm + '</td><th>생년월일</th><td colspan="2">' + bd + '</td></tr>'
+    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + gfKid(d, k, 'k_name') + '</td><th>생년월일</th><td colspan="2">' + gfKid(d, k, 'k_birth') + '</td></tr>'
     + '<tr><th>주 소</th><td colspan="5" style="height:30px;">' + gfI(d, 'r_addr') + '</td></tr>'
     + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(d, 'r_d1', '시 각') + '<br>' + gmBox(d, 'r_d2', '청 각') + '<br>' + gmBox(d, 'r_d3', '언 어') + '</td>'
     +   '<td colspan="2">' + gmBox(d, 'r_d4', '뇌병변') + '<br>' + gmBox(d, 'r_d5', '지 적') + '<br>' + gmBox(d, 'r_d6', '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">' + gfI(d, 'r_onset', '100%', '예: 2024. 3.') + '</div></th></tr>'
@@ -1232,13 +1238,12 @@ function gmRefer(k, d) {
 }
 function gmDetail(k, d) {
   d = d || {};
-  const nm = esc(k.name || ''), bd = esc(k.birth || '');
   let rows = '';
   for (let r = 1; r <= 5; r++) rows += '<tr><td style="height:68px;vertical-align:top;">' + gfA(d, 't_s' + r, 62) + '</td><td style="vertical-align:top;">' + gfA(d, 't_t' + r, 62)
     + '</td><td style="vertical-align:top;">' + gfA(d, 't_r' + r, 62) + '</td></tr>';
   return '<div class="dsheet gsheet gfm" data-sheet="detail"><h2>세부영역 검사결과서</h2><table>'
     + '<colgroup><col style="width:10%"><col style="width:10%"><col style="width:30%"><col style="width:50%"></colgroup>'
-    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td style="height:30px;">' + nm + '</td><th>생년월일 &nbsp; ' + bd + '</th></tr>'
+    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td style="height:30px;">' + gfKid(d, k, 'k_name') + '</td><th style="white-space:nowrap;">생년월일 &nbsp; ' + gfKid(d, k, 'k_birth', '60%') + '</th></tr>'
     + '<tr><th>주 소</th><td colspan="2" style="height:30px;">' + gfI(d, 't_addr') + '</td></tr>'
     + '</table><table style="margin-top:-1px;"><colgroup><col style="width:14%"><col style="width:14%"><col></colgroup>'
     + '<tr><th colspan="2">영 역</th><td>' + gmBox(d, 't_a1', '신체발달') + ' &nbsp; ' + gmBox(d, 't_a2', '의사소통') + ' &nbsp; ' + gmBox(d, 't_a3', '심리행동') + ' &nbsp; ' + gmBox(d, 't_a4', '선택(지능)') + '</td></tr>'
@@ -1246,12 +1251,11 @@ function gmDetail(k, d) {
 }
 function gmDiag(k, d) {
   d = d || {};
-  const nm = esc(k.name || '');
   return '<div class="dsheet gsheet gfm" data-sheet="diag"><table>'
     + '<colgroup><col style="width:11%"><col style="width:13%"><col style="width:26%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:14%"></colgroup>'
     + '<tr><td colspan="5" rowspan="2" style="text-align:center;font-size:19px;font-weight:bold;letter-spacing:10px;">진 단 서</td><th>병록번호</th><td>' + gfI(d, 'x_rec') + '</td></tr>'
     + '<tr><th>연 번 호</th><td>' + gfI(d, 'x_seq') + '</td></tr>'
-    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + nm + '</td><th>주민등록번호</th><td colspan="2"><input type="text" data-x="xrrn" style="width:100%;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td></tr>'
+    + '<tr><th rowspan="2">신청인</th><th>성 명</th><td colspan="2" style="height:30px;">' + gfKid(d, k, 'k_name') + '</td><th>주민등록번호</th><td colspan="2"><input type="text" data-x="xrrn" style="width:100%;" placeholder="인쇄 전에 적기 · 저장 안 됨"></td></tr>'
     + '<tr><th>주 소</th><td colspan="5" style="height:30px;">' + gfI(d, 'x_addr') + '</td></tr>'
     + '<tr><th colspan="2">병 명<div style="font-size:9.5px;">(예견되는 장애 유형에 「√」 표시)</div></th><td>' + gmBox(d, 'x_d1', '시 각') + '<br>' + gmBox(d, 'x_d2', '청 각') + '<br>' + gmBox(d, 'x_d3', '언 어') + '</td>'
     +   '<td colspan="2">' + gmBox(d, 'x_d4', '지 적') + '<br>' + gmBox(d, 'x_d5', '뇌병변') + '<br>' + gmBox(d, 'x_d6', '자폐성') + '</td><th colspan="2">발병 연월일<div style="font-weight:normal;margin-top:6px;">' + gfI(d, 'x_onset', '100%', '예: 2024. 3.') + '</div></th></tr>'
@@ -1275,8 +1279,10 @@ function gmCtl(d) {
   const issued = !!(GM && GM.no);
   return '<div class="gmctl">'
     + '<div class="r"><b>아동</b> <input type="text" id="gmKid" list="gmKidList" placeholder="번호 또는 이름" style="width:180px;"' + (GM && GM.childLabel ? ' value="' + esc(GM.childLabel) + '"' : '') + '>'
-    +   '<datalist id="gmKidList">' + GM_KIDS.map(k => '<option value="' + k.id + '번 ' + esc(k.name || '') + '">').join('') + '</datalist>'
-    +   ' <span style="color:#888;font-size:12px;">고르면 의뢰서 · 결과서 · 진단서 성명 · 생년월일과 공문 평가 날짜 · 평가자가 채워집니다</span></div>'
+    +   '<datalist id="gmKidList">' + GM_KIDS.filter(k => k.status === '치료중' || k.status === '대기중').map(k => '<option value="' + k.id + '번 ' + esc(k.name || '') + '">').join('') + '</datalist>'
+    +   ' <span style="color:#888;font-size:12px;">번호나 이름을 적고 Enter — 의뢰서 · 결과서 · 진단서 성명 · 생년월일과 공문 평가 날짜 · 평가자가 채워집니다</span></div>'
+    + '<div class="r"><b>주소</b> <input type="text" id="gmAddr" placeholder="여기 한 번 적으면 의뢰서 · 결과서 · 진단서 주소에 함께" style="width:420px;" value="' + esc(d.r_addr || d.t_addr || d.x_addr || '') + '">'
+    +   ' <span style="color:#888;font-size:12px;">(주소 · 주민등록번호는 나무링크에 담지 않는 정보라 저절로 채워지지 않습니다)</span></div>'
     + '<div class="r"><b>공문 작성일</b> <input type="date" id="gmDate" value="' + esc(d.date || today) + '"' + (issued ? ' disabled' : '') + '>'
     +   ' <b>번호</b> <span class="gmno" id="gmNoBox">' + (issued ? esc(gmNoText()) : '<span style="color:#9a8b7c;font-weight:400;">저장하면 자동으로 매겨집니다</span>') + '</span>'
     +   '</div>'
@@ -1294,8 +1300,8 @@ async function openRefer(keep) {
   try {
     const [b, k] = await Promise.all([
       sb.from('nl_org_docs').select('data').eq('doc_key', 'gongmun:base').limit(1),
-      GM_KIDS.length ? Promise.resolve({ data: GM_KIDS }) :
-        sb.from('nl_children').select('id, name, birth, status').in('status', ['치료중', '대기중']).order('id')
+      // 늘 새로 읽음 — 화면을 연 뒤 등록한 신규 아동도 바로 찾아지게 (2026-11-11)
+        sb.from('nl_children').select('id, name, birth, status').order('id').range(0, 999)
     ]);
     GM_BASE = (b && b.data && b.data[0] && b.data[0].data) || {};
     GM_KIDS = (k && k.data) || [];
@@ -1306,8 +1312,13 @@ async function openRefer(keep) {
   gmRender(d);
 }
 function gmKidOf(label) {
-  const m = String(label || '').match(/^(\d+)/);
-  return m ? GM_KIDS.find(k => String(k.id) === m[1]) || null : null;
+  const t = String(label || '').trim();
+  const m = t.match(/^(\d+)/);
+  if (m) return GM_KIDS.find(k => String(k.id) === m[1]) || null;
+  if (!t) return null;
+  const nm = t.replace(/\s*\(종결\)$/, '').replace(/\s/g, '');
+  const hit = GM_KIDS.filter(k => String(k.name || '').replace(/\s/g, '') === nm);
+  return hit.length === 1 ? hit[0] : null;     // 같은 이름이 둘이면 번호로
 }
 function gmRender(d) { gmRender0(d); placeTools(); gmLoadList(); }
 function gmRender0(d) {
@@ -1343,7 +1354,7 @@ function gmTab(k) {
 function gmRead() {
   const d = {};
   document.querySelectorAll('#gmLetter [data-g]').forEach(el => { d[el.dataset.g] = el.value; });
-  document.querySelectorAll('#dvBody .gfm [data-g]').forEach(el => { if (el.value.trim()) d[el.dataset.g] = el.value; });
+  document.querySelectorAll('#dvBody .gfm [data-g]').forEach(el => { if (el.dataset.kid) { if (!(el.dataset.g in d)) d[el.dataset.g] = el.value; } else if (el.value.trim()) d[el.dataset.g] = el.value; });
   document.querySelectorAll('#dvBody .gfm [data-gc]').forEach(el => { if (el.textContent.startsWith('☑')) d['c_' + el.dataset.gc] = '1'; });
   d.date = $('gmDate') ? $('gmDate').value : '';
   if (GM_MODE === 'staff') { d.kind = 'staff'; d.sub = GM_SUB; }
@@ -1368,8 +1379,21 @@ function gmBindRefer() {
     GM_DIRTY = true;
     el.textContent = el.textContent.startsWith('☐') ? el.textContent.replace('☐', '☑') : el.textContent.replace('☑', '☐');
   });
+  body.querySelectorAll('.gfm input[data-g]').forEach(x => { x.dataset.was = x.value; });
   body.querySelectorAll('.gfm').forEach(F => F.addEventListener('input', e => {
     const f = e.target && e.target.dataset && e.target.dataset.g;
+    if (e.target.dataset.kid) body.querySelectorAll('[data-kid="' + e.target.dataset.kid + '"]').forEach(x => { if (x !== e.target) x.value = e.target.value; });
+    // 같은 뜻 칸 함께 (2026-11-11) — 의뢰서 · 결과서 · 진단서의 주소 · 병원 · 의사 · 날짜 등 (r_ · t_ · x_ 뒤 이름이 같은 칸)
+    //   다른 서식 칸이 비어 있거나 이 칸의 고치기 전 값과 같을 때만 따라감 (따로 적은 값은 안 덮음)
+    const sm = f && f.match(/^[rtx]_(.+)$/);
+    if (sm && e.target.tagName === 'INPUT') {
+      const before = e.target.dataset.was != null ? e.target.dataset.was : '';
+      body.querySelectorAll('.gfm input[data-g$="_' + sm[1] + '"]').forEach(x => {
+        if (x === e.target || !/^[rtx]_/.test(x.dataset.g) || x.dataset.g.slice(2) !== sm[1]) return;
+        if (x.value === '' || x.value === before) x.value = e.target.value;
+      });
+      e.target.dataset.was = e.target.value;
+    }
     const pr = f ? F.querySelector('.gpr[data-p="' + f + '"]') : null;
     if (pr) pr.textContent = e.target.value;
     if (f) GM_DIRTY = true;
@@ -1409,10 +1433,18 @@ function gmBindRefer() {
   };
   if ($('gmStaff')) $('gmStaff').onchange = staffFill;
   if ($('gmStaff2')) $('gmStaff2').onchange = staffFill;
+  if ($('gmAddr')) $('gmAddr').oninput = () => {
+    const v = $('gmAddr').value;
+    body.querySelectorAll('.gfm input[data-g="r_addr"], .gfm input[data-g="t_addr"], .gfm input[data-g="x_addr"]').forEach(x => { x.value = v; x.dataset.was = v; });
+    GM_DIRTY = true;
+  };
+  if ($('gmKid')) $('gmKid').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('gmKid').blur(); } };
   if ($('gmKid')) $('gmKid').onchange = async () => {
     const k = gmKidOf($('gmKid').value);
     const d = gmRead();
-    GM = Object.assign(GM || {}, { child: k ? { id: k.id, name: k.name, birth: String(k.birth || '').slice(0, 10).replace(/-/g, '.') } : {}, childLabel: $('gmKid').value });
+    GM = Object.assign(GM || {}, { child: k ? { id: k.id, name: k.name, birth: String(k.birth || '').slice(0, 10).replace(/-/g, '.') } : {}, childLabel: k ? k.id + '번 ' + (k.name || '') : $('gmKid').value });
+    if (k) { d.k_name = k.name || ''; d.k_birth = String(k.birth || '').slice(0, 10).replace(/-/g, '.'); }
+    else if ($('gmKid').value.trim()) alert('「' + $('gmKid').value.trim() + '」 아동을 찾지 못했습니다.\n번호(예: 132)나 이름을 다시 적어 주세요. 같은 이름이 둘이면 번호로 적어 주세요.');
     if (k) {
       try {
         const { data } = await sb.from('nl_evaluations').select('eval_date, eval_type_id, therapist_id, status')
@@ -1584,7 +1616,7 @@ function placeTools() {
     const L = $('gmLetter');
     if (L) { L.classList.toggle('locked', lock); L.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); }
     body.querySelectorAll('.gfm').forEach(F => { F.classList.toggle('locked', lock); F.querySelectorAll('input[data-g], textarea[data-g]').forEach(el => { el.readOnly = lock; }); });
-    ['gmKid', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
+    ['gmKid', 'gmAddr', 'gmStaff', 'gmStaff2'].forEach(id => { if ($(id)) $(id).disabled = lock; });
     document.querySelectorAll('.gmcl select, .gmcl input, .gmcl button').forEach(el => { el.disabled = lock; });
   } else if (DOC_KIND === 'org' || DOC_KIND === 'info') {
     const sh = $(DOC_KIND === 'info' ? 'dsInfo' : 'dsOrg');
