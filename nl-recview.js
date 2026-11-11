@@ -11,13 +11,21 @@
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ── ① 보기 전용 ──
+  // 글 칸은 readOnly 로 잠금 (2026-11-11 — 패드 사파리는 disabled 칸 글자를 아주 흐리게 그려 「글이 안 보임」)
+  //   고르는 칸 · 체크 칸만 disabled · 잠긴 칸도 글자는 진하게
+  function lockEl(el) {
+    var t = (el.type || '').toLowerCase();
+    if (el.tagName === 'SELECT' || t === 'checkbox' || t === 'radio' || t === 'file' || t === 'button' || t === 'submit') { if (!el.disabled) el.disabled = true; return; }
+    if (!el.readOnly) el.readOnly = true;
+    if (el.disabled) el.disabled = false;
+  }
   function roCss() {
     if (document.getElementById('nlRoCss')) return;
     var st = document.createElement('style'); st.id = 'nlRoCss';
     st.textContent =
         '#nlKidTabs,#kbBox,#kbBack,.kidpickwrap,#pLoad,#nlPastBtn,#btnSave,.sheetsave,.btn-save{display:none !important;}'
       + 'body.nl-has-tabs{padding-right:0 !important;}'
-      + 'button.nl-ro-hide{display:none !important;}'
+      + 'button.nl-ro-hide{display:none !important;}' + 'input:disabled,textarea:disabled,select:disabled,input[readonly],textarea[readonly]{opacity:1 !important;color:#2F2926 !important;-webkit-text-fill-color:#2F2926 !important;}'
       + '#nlRoBar{position:sticky;top:0;z-index:40;background:#FFF4E5;border-bottom:1px solid #F0D9B5;color:#7E5530;'
       + 'font-size:13px;font-weight:600;padding:8px 16px;}'
       + '@media print{#nlRoBar{display:none !important;}}';
@@ -33,7 +41,7 @@
     var main = document.getElementById('mainBox') || document.body;
     main.querySelectorAll('input, textarea, select').forEach(function (el) {
       if (el.closest('#nlTopBar')) return;
-      if (!el.disabled) el.disabled = true;
+      lockEl(el);
     });
     main.querySelectorAll('button').forEach(function (b) {
       if (!okBtn(b)) b.classList.add('nl-ro-hide');
@@ -71,7 +79,7 @@
     var main = document.getElementById('mainBox') || document.body;
     main.querySelectorAll('input, textarea, select').forEach(function (el) {
       if (el.closest(DESK_OK)) return;
-      if (!el.disabled) el.disabled = true;
+      lockEl(el);
     });
     main.querySelectorAll('button').forEach(function (b) {
       if (b.closest(DESK_OK)) return;
@@ -82,7 +90,7 @@
     if (DESK) return; DESK = true;
     if (!document.getElementById('nlDeskCss')) {
       var st = document.createElement('style'); st.id = 'nlDeskCss';
-      st.textContent = '#btnSave,.sheetsave,.btn-save{display:none !important;}button.nl-ro-hide{display:none !important;}'
+      st.textContent = '#btnSave,.sheetsave,.btn-save{display:none !important;}button.nl-ro-hide{display:none !important;}' + 'input:disabled,textarea:disabled,select:disabled,input[readonly],textarea[readonly]{opacity:1 !important;color:#2F2926 !important;-webkit-text-fill-color:#2F2926 !important;}'
         + '#nlRoBar{position:sticky;top:0;z-index:40;background:#FFF4E5;border-bottom:1px solid #F0D9B5;color:#7E5530;font-size:13px;font-weight:600;padding:8px 16px;}'
         + '@media print{#nlRoBar{display:none !important;}}';
       document.head.appendChild(st);
