@@ -439,7 +439,7 @@ function _pickCont(el) {
 // 권한 — 관리자·행정은 전체, 치료사는 담당 아동만, 홍보는 못 들어옴
 // ─────────────────────────────────────────────
 function _roleOf(r) { return String(r || '').trim(); }
-function _isAllView(r) { if (window.NLRec && NLRec.VIEW) return true; const x = _roleOf(r); return x === '관리자' || x === '행정'; }
+function _isAllView(r) { if (window.NLRec && NLRec.VIEW) return true; const x = _roleOf(r); return x === '관리자' || x === '행정' || x === '데스크'; }
 function _isBlocked(r) { return _roleOf(r) === '홍보'; }
 function _blockScreen(role) {
   document.getElementById('loginBox').style.display = 'none';
@@ -495,6 +495,7 @@ async function afterLogin(user) {
   loadStamp();     // 직인 받아오기 (로그인한 직원만 받을 수 있다)
   ME = me;
   if (_isBlocked(me.role)) { _blockScreen(me.role); return; }
+  if (_roleOf(me.role) === '데스크' && window.NLRec && NLRec.desk) NLRec.desk();   // 데스크 = 보기 전용 (2026-11-11 은정님)
 
   const [th, st, tp] = await Promise.all([
     sb.from('nl_therapists').select('id, name, gender'),

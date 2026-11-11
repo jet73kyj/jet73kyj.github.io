@@ -62,6 +62,48 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startRo); else startRo();
   }
 
+  // ── ①-2 데스크 보기 전용 (2026-11-11 은정님) ──
+  //   데스크(11번)는 모든 아동 기록지를 보고 인쇄만 · 아동 고르기 · 달 · 불러오기 · 책갈피 · 상담 · 보고서는 됨
+  //   칸 잠금 · 저장 단추 감춤 · 기록지 안을 눌러 고치는 창이 뜨지 않게
+  var DESK = false;
+  var DESK_OK = '.picker, #nlKidTabs, #kbBox, #kbBack, .kidpickwrap, #pChildList, header, #nlTopBar, #nlMenuPanel, #nlMenu, .nl-menu, #nlRoBar';
+  function deskLock() {
+    var main = document.getElementById('mainBox') || document.body;
+    main.querySelectorAll('input, textarea, select').forEach(function (el) {
+      if (el.closest(DESK_OK)) return;
+      if (!el.disabled) el.disabled = true;
+    });
+    main.querySelectorAll('button').forEach(function (b) {
+      if (b.closest(DESK_OK)) return;
+      if (!okBtn(b)) b.classList.add('nl-ro-hide');
+    });
+  }
+  function startDesk() {
+    if (DESK) return; DESK = true;
+    if (!document.getElementById('nlDeskCss')) {
+      var st = document.createElement('style'); st.id = 'nlDeskCss';
+      st.textContent = '#btnSave,.sheetsave,.btn-save{display:none !important;}button.nl-ro-hide{display:none !important;}'
+        + '#nlRoBar{position:sticky;top:0;z-index:40;background:#FFF4E5;border-bottom:1px solid #F0D9B5;color:#7E5530;font-size:13px;font-weight:600;padding:8px 16px;}'
+        + '@media print{#nlRoBar{display:none !important;}}';
+      document.head.appendChild(st);
+    }
+    var bar = document.createElement('div'); bar.id = 'nlRoBar';
+    bar.textContent = '데스크 — 기록지 보기 전용입니다. 고치거나 저장할 수 없습니다 (인쇄만 됩니다).';
+    document.body.insertBefore(bar, document.body.firstChild);
+    var busy = false;
+    new MutationObserver(function () { if (busy) return; busy = true; requestAnimationFrame(function () { deskLock(); busy = false; }); })
+      .observe(document.body, { childList: true, subtree: true });
+    deskLock();
+    document.addEventListener('click', function (e) {
+      var t = e.target; if (!t || !t.closest) return;
+      if (t.closest(DESK_OK + ', a, summary')) return;
+      var b = t.closest('button'); if (b && okBtn(b)) return;
+      if (!t.closest('#mainBox, .container')) return;
+      e.stopPropagation(); e.preventDefault();
+    }, true);
+    w.addEventListener('beforeunload', function (e) { e.stopImmediatePropagation(); }, true);
+  }
+
   // ── ② 책갈피 접기 ──
   var FOLD_KEY = 'nl_tab_fold_open';
   function foldOpen() { try { return sessionStorage.getItem(FOLD_KEY) === '1'; } catch (e) { return false; } }
@@ -167,5 +209,5 @@
     bg.addEventListener('click', function (e) { if (e.target === bg || (e.target.id === 'nlPastClose')) bg.remove(); });
   }
 
-  w.NLRec = { VIEW: VIEW, rowAlive: rowAlive, tabsHtml: tabsHtml, pastLogs: pastLogs, today: todayKst };
+  w.NLRec = { VIEW: VIEW, desk: startDesk, rowAlive: rowAlive, tabsHtml: tabsHtml, pastLogs: pastLogs, today: todayKst };
 })(window);
