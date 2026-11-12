@@ -173,19 +173,26 @@
   function css() {
     if (document.getElementById('nlChkCss')) return;
     var st = document.createElement('style'); st.id = 'nlChkCss';
-    st.textContent = '.nlchk{margin:4px 0 8px;padding:10px 12px;border:1px solid #E6E2DD;border-left:3px solid #B07A4A;border-radius:8px;background:#FBF7F2;font-size:13px;}'
-      + '.nlchk .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:700;color:#7E5530;cursor:pointer;}'
-      + '.nlchk .hd span{font-weight:400;color:#999;font-size:12px;}'
-      + '.nlchk .it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid #EFEAE4;line-height:1.45;}'
+    st.textContent = '.nlchk{margin:4px 0 8px;border:1px solid #D9C7B3;border-radius:8px;overflow:hidden;background:#fff;font-size:13px;}'
+      + '.nlchk .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;background:#B07A4A;color:#fff;font-weight:700;font-size:15px;cursor:pointer;}'
+      + '.nlchk .hd span{font-weight:400;color:#fff;font-size:12px;}'
+      + '.nlchk .lg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#F4E9DC;color:#7E5530;}'
+      + '.nlchk .lg i{font-style:normal;background:#fff;border:1px solid #D9C7B3;border-radius:6px;padding:4px 12px;font-size:14px;}'
+      + '.nlchk .lg i b{margin-right:4px;}'
+      + '.nlchk .qs{padding:4px 12px;background:#fff;}'
+      + '.nlchk .it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #EFEAE4;line-height:1.45;color:#444;}'
+      + '.nlchk .it:last-child{border-bottom:0;}'
       + '.nlchk .it.sk .q{color:#aaa;}'
-      + '.nlchk .no{color:#B07A4A;font-weight:700;margin-right:4px;}'
+      + '.nlchk .no{color:#B07A4A;font-weight:700;margin-right:6px;}'
       + '.nlchk .sb{flex:none;display:flex;gap:4px;}'
       + '.nlchk button{width:auto !important;margin:0 !important;min-width:34px;padding:4px 0 !important;border:1px solid #D9D2C9 !important;background:#fff !important;color:#555 !important;border-radius:6px !important;font-size:13px !important;cursor:pointer;}'
       + '.nlchk button.on{background:#B07A4A !important;border-color:#B07A4A !important;color:#fff !important;}'
       + '.nlchk button.ron{background:#D8684A !important;border-color:#D8684A !important;color:#fff !important;}'
-      + '.nlchk .rr{display:flex;align-items:center;gap:6px;padding:4px 0;}.nlchk .rr button{min-width:44px;}'
-      + '.nlchk .sub{margin:8px 0 4px;font-size:12.5px;color:#777;font-weight:700;}'
-      + '.nlchk .res{margin-top:10px;padding:10px 12px;background:#fff;border:1px solid #E6E2DD;border-radius:8px;}'
+      + '.nlchk .rk{padding:8px 12px;background:#FBEDE8;border-top:1px solid #F2D3C8;}'
+      + '.nlchk .rk .sub{font-size:13px;color:#A8452C;font-weight:700;margin-bottom:4px;}'
+      + '.nlchk .rg{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}@media(max-width:640px){.nlchk .rg{grid-template-columns:1fr;}}'
+      + '.nlchk .rr{display:flex;align-items:center;gap:6px;padding:3px 0;color:#555;}.nlchk .rr button{min-width:44px;}'
+      + '.nlchk .res{padding:10px 12px;background:#fff;border-top:1px solid #E6E2DD;}'
       + '.nlchk .res .tt{font-size:16px;font-weight:700;color:#7E5530;}'
       + '.nlchk .res .tt.ev{color:#C04A30;}'
       + '.nlchk .res .sc{color:#666;margin-top:3px;}'
@@ -203,7 +210,7 @@
     if (!band) {
       r.band = null;
       if (mon == null) { r.box.style.display = 'none'; r.box.innerHTML = ''; return; }
-      r.box.innerHTML = '<div class="hd">연령별 체크리스트<span>' + mon + '개월 — 만 2~12세(24~155개월)만 문항이 있습니다</span></div>';
+      r.box.innerHTML = '<div class="hd">퍼포 · 감통 · 심리 선별 체크리스트<span>' + mon + '개월 — 만 2~12세(24~155개월)만 문항이 있습니다</span></div>';
       r.box.style.display = ''; return;
     }
     if (p.band && p.band !== band) band = p.band;   // 저장한 연령 그대로
@@ -211,18 +218,20 @@
     r.v = (p.v && p.band === band) ? p.v : band.q.map(function () { return null; });
     r.r = p.r;
     var done = r.v.filter(function (x) { return x != null; }).length;
-    var h = '<div class="hd" data-k="fold">연령별 체크리스트 · ' + band.name
-      + '<span>' + (mon != null ? mon + '개월 · ' : '') + done + '/15 문항 · 0 거의 없음 · 1 가끔 · 2 자주 · ' + (r.open ? '접기 ▲' : '펼치기 ▼') + '</span></div>';
+    var h = '<div class="hd" data-k="fold">퍼포 · 감통 · 심리 선별 체크리스트 · ' + band.name
+      + '<span>' + (mon != null ? mon + '개월 · ' : '') + done + '/15 문항 · ' + (r.open ? '접기 ▲' : '펼치기 ▼') + '</span></div>';
     if (r.open) {
+      h += '<div class="lg">점수 기준 <i><b>0</b>거의 없음</i><i><b>1</b>가끔</i><i><b>2</b>자주</i></div><div class="qs">';
       band.q.forEach(function (q, i) {
         h += '<div class="it' + (r.v[i] == null ? '' : ' sk') + '"><span class="q"><span class="no">' + (i + 1) + '</span>' + esc(q) + '</span><span class="sb">'
           + [0, 1, 2].map(function (n) { return '<button type="button" data-i="' + i + '" data-n="' + n + '"' + (r.v[i] === n ? ' class="on"' : '') + '>' + n + '</button>'; }).join('')
           + '</span></div>';
       });
-      h += '<div class="sub">공통 확인 — 해당하면 누르기</div>';
+      h += '</div><div class="rk"><div class="sub">공통 확인 — 해당하면 누르기</div><div class="rg">';
       RQ.forEach(function (q, i) {
         h += '<div class="rr"><button type="button" data-r="' + i + '"' + (r.r[i] ? ' class="ron"' : '') + '>R' + (i + 1) + '</button><span>' + esc(q) + '</span></div>';
       });
+      h += '</div></div>';
     }
     var j = judge(band, r.v, r.r);
     h += '<div class="res"><div class="tt' + (j.kind === 'eval' ? ' ev' : '') + '">추천 — ' + esc(j.title) + '</div>'
