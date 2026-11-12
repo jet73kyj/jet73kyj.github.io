@@ -5837,21 +5837,24 @@ function showPick(k){
   $('ad_name').value = '';
   $('ad_hits').innerHTML = '';
   $('ad_pick').style.display = 'block';
-  $('ad_pick').innerHTML = '고른 아동 — ' + esc(k.name) + ' (' + k.id + '번 · '
+  $('ad_pick').innerHTML = '고른 아동 — ' + esc(k.name) + (bd(KIDBD[k.id]) ? ' ' + bd(KIDBD[k.id]) : '') + ' (' + k.id + '번 · '
     + esc(k.status) + ')<span class="x" id="ad_x">✕ 다시 고르기</span>';
   $('ad_x').onclick = clearPick;
 }
 $('ad_name').addEventListener('input', () => {
   const q = $('ad_name').value.trim();
   if (!q) { $('ad_hits').innerHTML = ''; return; }
-  const hit = KIDS.filter(k => (k.name||'').includes(q)).slice(0, 12);
+  // 이름 또는 아동 번호로 찾음 · 동명이인은 생년월일로 가름 (2026-11-12)
+  const qn = q.replace(/번$/, '');
+  const hit = KIDS.filter(k => (k.name||'').includes(q) || String(k.id) === qn).slice(0, 20);
   if (!hit.length) {
-    $('ad_hits').innerHTML = '<div class="hitnone">그런 이름의 아동이 없습니다. '
+    $('ad_hits').innerHTML = '<div class="hitnone">그런 이름 · 번호의 아동이 없습니다. '
       + '아동 관리 화면에서 먼저 등록하세요.</div>';
     return;
   }
   $('ad_hits').innerHTML = hit.map(k =>
     '<span class="hit" data-kid="'+k.id+'">'+esc(k.name)
+    + (bd(KIDBD[k.id]) ? ' ' + bd(KIDBD[k.id]) : '')
     + '<span class="sm"' + (k.status === '종결' ? ' style="color:#c62828;font-weight:bold;"' : '')
     + '>'+k.id+'번 · '+esc(k.status)+'</span></span>').join('');
   $('ad_hits').querySelectorAll('.hit').forEach(el => {
