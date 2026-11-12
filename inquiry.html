@@ -838,6 +838,7 @@
 <script src="nl-evaldocs.js"></script>
 <script src="nl-trials.js"></script>
 <script src="nl-intake.js"></script>
+<script src="nl-sensechk.js?v=1112"></script>
 <script>
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
@@ -1622,6 +1623,7 @@ function dkmShow(text, at) {
   $('dkmDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
   $('d_kmemo').value = t;
   $('d_kmemo').dataset.orig = t;
+  if (window.NLChk) NLChk.refresh($('d_kmemo'));
   KMEDIT = false; kmGoHome();
   memoFit($('d_kmemo'));
   $('dkmMsg').textContent = '';
@@ -1929,6 +1931,7 @@ $('saveDet').onclick = async () => {
       const kk = KIDS.find(k => k.id === data.child_id);
       if (kk) kk.birth = kb[0].birth;
       $('d_birth').dataset.orig = bd;
+      if (window.NLChk) NLChk.refresh($('d_kmemo'));
       $('detTitle').textContent = '문의 ' + data.id + '번 — ' + kidName(data.child_id)
         + (kidBirth6(data.child_id) ? ' ' + kidBirth6(data.child_id) : '');
       ikLoad(data.child_id);
@@ -3669,7 +3672,7 @@ function resetAddBox() {
   ['a_channel','a_area','a_day','a_time','a_action','a_memo',
    'k_name','k_birth','k_guardian','k_phone']
     .forEach(k => $(k).value = '');
-  $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
+  $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
   $('k_evalsum').value = '';
   $('k_age').textContent = '';
   $('k_gender').value = '';
@@ -3765,6 +3768,7 @@ function ageText(b) {
 function drawAge() {
   const t = ageText($('k_birth').value);
   $('k_age').textContent = t ? '만 ' + t : '';
+  if (window.NLChk) NLChk.refresh($('k_memo'));   // 연령별 체크리스트 (2026-11-12)
 }
 // 열기 창 생년월일 나이 (2026-10-14)
 // 열기 창 연락처 (2026-10-30) — 아동 표 대표 번호 + 보호자 표 번호 · 같은 번호는 한 번만
@@ -3796,6 +3800,13 @@ function openIdChild() { const r = ALL.find(x => x.id === openId); return r ? r.
 function drawDAge() {
   const t = ageText($('d_birth').value);
   $('d_age').textContent = t ? '만 ' + t : '';
+  if (window.NLChk) NLChk.refresh($('d_kmemo'));
+}
+// 상담 내용 칸 위 연령별 체크리스트 (2026-11-12 은정님) — 셈 · 글 다루기는 nl-sensechk.js 한 곳
+//   새 문의 = 적은 생년월일 / 열기 창 아동 메모 = 저장된 생년월일 (없으면 적은 값) · 저장은 원래 저장 그대로
+if (window.NLChk) {
+  NLChk.attach($('k_memo'),  { birth: () => $('k_birth').value });
+  NLChk.attach($('d_kmemo'), { birth: () => $('d_birth').dataset.orig || $('d_birth').value });
 }
 $('d_birth').addEventListener('input',  drawDAge);
 $('d_birth').addEventListener('change', drawDAge);
@@ -4008,7 +4019,7 @@ $('saveNew').onclick = async () => {
     ['a_channel','a_area','a_day','a_time','a_action','a_memo',
      'k_name','k_birth','k_guardian','k_phone']
       .forEach(k => $(k).value = '');
-    $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
+    $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
     $('k_evalsum').value = '';
     $('k_gender').value = '';
     $('k_status').value = '대기중';
