@@ -244,6 +244,7 @@
                  border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
   .pay .ksave2.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   .later { margin-top:6px; }
+  .r.tot .up { white-space:nowrap; }
   .evsep { border-top:2px solid #CECBF6; margin-top:12px; padding-top:8px; }
   .later-r { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 8px; margin-top:4px;
              background:#FFF6EC; border:1px solid #F0D9BF; border-radius:8px; font-size:13px; }
@@ -1738,6 +1739,14 @@ function hasBill(childId) {
 //   「완납만」에 들어가던 일(79번 9월)을 막는다
 // 그 쪽(카드·계좌)에 저장된 줄이 있고 바꾼 칸이 없으면 처음부터 「✓ 저장됨」 (2026-09-17)
 //   전에는 늘 「저장 전」으로 그려, 확정해서 저장한 뒤 다시 그리면 저장 안 된 것처럼 보였다
+// 저장한 줄에 낸 날까지 다 있는가 — 낸 날이 비면 단추를 「저장 전」으로 둔다 (2026-11-12 은정님)
+//   [따로] 줄은 제 칸 단추가 따로 보이므로 뺀다
+function sidePaid(childId, side) {
+  const rs = Object.keys(SAVED[childId] || {}).map(k => SAVED[childId][k])
+    .filter(r => side === 'bank' ? Number(r.support_type_id) === 2 : (Number(r.support_type_id) !== 2 && !isLater(r)))
+    .filter(r => Number(r.amount) > 0);
+  return rs.length > 0 && rs.every(r => !!r.paid_on);
+}
 function sideSaved(childId, side) {
   const ch = CHANGED[childId];
   if (ch && ch[side]) return false;
@@ -2407,7 +2416,7 @@ function drawKid(c) {
   const cm = Object.keys(sv).map(k => sv[k])
     .find(p => Number(p.support_type_id) !== 2 && !isLater(p) && memoOf(p, false));
   // 지난달 차액이 저절로 채워졌으면 저장 전으로 보인다 (2026-10-03)
-  const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card);
+  const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card) && sidePaid(c.id, 'card');
   // 승인번호는 이번 달 저장분에서만 가져온다. 지난달 것을 끌어오지 않는다.
   b += '<div class="pay">'
     + '<input class="dt pday" type="date" value="' + (cp ? cp.paid_on : '') + '">'
@@ -2460,8 +2469,8 @@ function drawKid(c) {
            + '<input class="dt bday" type="date" value="' + (ds && ds.paid_on ? ds.paid_on : '') + '">'
            + '<input class="tx bmemo" type="text" placeholder="입금자명" value="'
            + esc(payerOf(c.id)) + '">'
-           + '<button class="ksave2' + (sideSaved(c.id, 'bank') ? ' done' : '') + '" type="button" data-only="bank"'
-           + ' data-ttl="계좌 저장 전">' + (sideSaved(c.id, 'bank') ? '\u2713 저장됨' : '계좌 저장 전') + '</button></div>'
+           + '<button class="ksave2' + (sideSaved(c.id, 'bank') && sidePaid(c.id, 'bank') ? ' done' : '') + '" type="button" data-only="bank"'
+           + ' data-ttl="계좌 저장 전">' + (sideSaved(c.id, 'bank') && sidePaid(c.id, 'bank') ? '\u2713 저장됨' : '계좌 저장 전') + '</button></div>'
            + '<div class="pay"><input class="tx brf" type="text" style="flex:1 1 auto;"'
            + ' placeholder="환불 메모 — 은행 · 예금주 · 끝 4자리 · 금액 · 날짜 (적으면 이번 달 0원)"'
            + ' value="' + esc(srf) + '"></div>')
@@ -3347,8 +3356,15 @@ async function saveKid(childId, btn, only) {
       if (!only) delete CHANGED[childId];
       else { delete CHANGED[childId][only]; if (!Object.keys(CHANGED[childId]).length) delete CHANGED[childId]; }
     }
-    btn.textContent = '\u2713 저장됨';
-    btn.classList.add('done');
+    // 낸 날이 빈 줄이 있으면 「저장 전」으로 남긴다 — 「✓ 저장됨」은 받은 날까지 적은 때만 (2026-11-12)
+    const side = btn.classList.contains('lsave') ? 'later' : (only || 'all');
+    const lst = side === 'later' ? Number((btn.closest('.later-r') || {}).dataset && btn.closest('.later-r').dataset.lst) : 0;
+    const paidOk = side === 'later' ? !!((SAVED[childId] || {})[lst] && SAVED[childId][lst].paid_on)
+                 : side === 'all' ? (sidePaid(childId, 'card') || !Object.keys(SAVED[childId] || {}).some(k => Number(k) !== 2))
+                                    && (sidePaid(childId, 'bank') || !(SAVED[childId] || {})[2])
+                 : sidePaid(childId, side);
+    btn.textContent = paidOk ? '\u2713 저장됨' : (btn.dataset.ttl || '저장 전');
+    btn.classList.toggle('done', paidOk);
     btn.disabled = false;
     setTimeout(() => { SAVING = false; }, 800);
   } catch (e) {
