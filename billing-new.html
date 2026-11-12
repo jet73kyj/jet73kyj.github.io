@@ -2125,11 +2125,10 @@ function drawKid(c) {
 
   const fixed = isFixed(c.id);
   const head = '<div class="kidhead">'
-    + '<span class="kidname">' + c.id + '. ' + esc(c.name) + '</span>'
+    + '<span class="kidname">' + c.id + '. ' + esc(c.name) + (ymd(c.birth) ? ' ' + ymd(c.birth) : '') + '</span>'   // 동명이인 — 이름 뒤 생년월일 (2026-11-12)
     + '<button class="kfix ' + (fixed ? 'yes' : 'no') + '" type="button"'
     + ' title="눌러서 예정과 확정을 오갑니다">'
     + (fixed ? '확정' : '예정') + '</button>'
-    + '<span class="kidno">' + ymd(c.birth) + '</span>'
     + '<span class="kidno">' + esc(c.manager_no) + '</span>'
     + '<span class="ktotal">0원</span></div>';
 
@@ -4124,7 +4123,7 @@ function openExtra(childId) {
   Object.keys(TTYPES).forEach(k => { yo += '<option value="' + k + '">' + esc(TTYPES[k]) + '</option>'; });
   const w = document.createElement('div');
   w.className = 'xlpop';
-  w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + '</h3>'
+  w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + (c && ymd(c.birth) ? ' ' + ymd(c.birth) : '') + '</h3>'
     + '<div class="rw"><label>날짜</label><input type="date" id="xlD" value="' + d0 + '" min="' + LOADED_MK + '-01" max="' + monEndDay(LOADED_MK) + '"></div>'
     + '<div class="rw"><label>시각</label><select id="xlH">' + hs + '</select><select id="xlM">' + ms + '</select>'
     + '<select id="xlN"><option value="40">40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'
