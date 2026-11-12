@@ -3433,7 +3433,8 @@ function drawFind(){
 
   const names = Array.from(new Set(hit.map(r => r._name)));
   const ord = { '월':1,'화':2,'수':3,'목':4,'금':5,'토':6 };
-  hit.sort((a,b) => (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
+  // 동명이인이 섞이지 않게 아동 번호로 먼저 묶는다 (2026-11-12 은정님)
+  hit.sort((a,b) => (Number(a._cid)-Number(b._cid)) || (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
   // 같은 치료 · 같은 요일 · 같은 사업이면 요일줄이 나뉘어도 한 줄로 (2026-09-17)
   //   달 중간에 시각·담당을 바꾸면 요일줄이 둘이 되어 찾기 창이 두 줄로 그려졌다 (127번)
   //   줄의 주인(수정 · 이 미정)은 가장 나중에 시작한 요일줄
@@ -3465,6 +3466,7 @@ function drawFind(){
       GRPOF[own.id] = rows;
       grp[i] = own;
     });
+    grp.sort((a,b) => (Number(a._cid)-Number(b._cid)) || (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
   }
   const idsOf = r => IDSOF[r.id] || [r.id];
   // 묶인 요일줄의 이 달 날짜 — 요일이 바뀌었으면 각 요일줄이 살아 있던 날만 이어 붙인다
