@@ -362,6 +362,7 @@
 <script src="nl-recview.js?v=1111b"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
+<script src="nl-draft.js?v=1112"></script>
 <script>
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
@@ -901,6 +902,7 @@ async function loadOne() {
     drawAll(lg.data);
     DIRTY = false;
     setSaveBtn(LOGID ? 'done' : 'before');
+    setTimeout(() => { if (window.NLDraft) NLDraft.check(); }, 700);   // 적던 글 되살리기 (2026-11-12)
     // 결제 내역으로 칸이 바뀌었으면 「저장 전」
     if (AUTOCHG) { DIRTY = true; setSaveBtn('before');
       $('pInfo').textContent += ' · 카드 결제 내역으로 회기 일자를 채웠습니다 (저장 전)'; }
@@ -1465,6 +1467,7 @@ async function saveRecord() {
     $('pInfo').textContent = mk + ' · 저장됨';
     DIRTY = false;
     setSaveBtn('done');
+    if (window.NLDraft) NLDraft.clear();   // 서버에 들어갔으니 모아 둔 글 지움
     // 저장한 시각으로 서버가 다시 판정 — 빨강 · 결제 변경 관리 대장 다시 (2026-10-23)
     try {
       const pr3 = await sb.rpc('nl_support_pay', { p_therapy: cur.therapy_id, p_month: mk });
@@ -1502,6 +1505,11 @@ function markDirty() {
   setSaveBtn('before');
 }
 document.querySelector('.container').addEventListener('input',  markDirty);
+// 적던 글 잠깐 모아 두기 (2026-11-12) — 이 컴퓨터에만 · 저장하면 지움
+if (window.NLDraft) NLDraft.init({ page: 'rs',
+  sel: '#f_fine, #f_cog, #f_goalL, #f_goalS, #f_opinion, textarea.q_content, textarea.q_react',
+  scope: () => document.querySelector('.container'),
+  key: () => (LOADED && cur && cur.child) ? cur.child.id + '|' + (cur.support_type_id || '') + '|' + (cur.therapy_id || '') + '|' + $('pMonth').value : null });
 document.querySelector('.container').addEventListener('change', markDirty);
 window.addEventListener('beforeunload', e => {
   if (!DIRTY) return;

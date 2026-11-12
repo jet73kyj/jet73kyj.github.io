@@ -517,6 +517,7 @@
 <script src="nl-recview.js?v=1111b"></script>
 <script src="nl-live-alert.js"></script>
 <script src="nl-evaldocs.js"></script>
+<script src="nl-draft.js?v=1112"></script>
 <script>
 
 // ===== 연락처 칸 (2026-10-08) — 숫자만 · 자리 수만큼 · 줄표 저절로 =====
@@ -1129,6 +1130,7 @@ async function loadOne() {
     drawAll(lg.data);
     DIRTY = false;
     setSaveBtn(LOGID ? 'done' : 'before');
+    setTimeout(() => { if (window.NLDraft) NLDraft.check(); }, 700);   // 적던 글 되살리기 (2026-11-12)
     // 저장된 기록지가 시간표와 다르면 시간표 값으로 다시 채웠으니 「저장 전」 (2026-10-02)
     if (SLOTCHG) { DIRTY = true; setSaveBtn('before'); }
     $('pInfo').textContent = mk + ' · 바우처 ' + VOUCHER.length + '건'
@@ -3269,6 +3271,7 @@ async function saveRecord(opts) {
     $('pInfo').textContent = mk + ' · 바우처 ' + VOUCHER.length + '건 · 저장됨';
     DIRTY = false;
     setSaveBtn('done');
+    if (window.NLDraft) NLDraft.clear();   // 서버에 들어갔으니 모아 둔 글 지움
     loadRcBox(childId, mk);          // 저장 뒤 서버 점검 다시 받기 (2026-10-02)
     kbLoad();                        // 아동 단추 색도 다시 (2026-10-22)
     if (reordered) setTimeout(() => { DIRTY = false; try { loadOne(); } catch (e) {} }, 350);   // 날짜 차례로 다시 그림 (2026-11-05)
@@ -3324,6 +3327,10 @@ function markDirty() {
   rcDraw();
 }
 document.querySelector('.container').addEventListener('input',  markDirty);
+// 적던 글 잠깐 모아 두기 (2026-11-12) — 이 컴퓨터에만 · 저장하면 지움
+if (window.NLDraft) NLDraft.init({ page: 'rd', sel: 'textarea.st_result, textarea.st_note',
+  scope: () => document.querySelector('.container'),
+  key: () => (LOADED && $('pChild').value) ? $('pChild').value + '|' + mkNow() : null });
 document.querySelector('.container').addEventListener('change', markDirty);
 window.addEventListener('beforeunload', e => {
   if (!DIRTY) return;
