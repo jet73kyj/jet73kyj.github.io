@@ -156,6 +156,7 @@ const sb = window.supabase.createClient(URL_, KEY_, {
 const $ = id => document.getElementById(id);
 
 let ME = null, ITEMS = [], SENT = {}, fFilter = '안보냄';
+let SMS_BD = {};   // 아동번호 → 생년월일 여섯 자리 · 카드 이름 옆에만 (문자 글에는 안 넣음 · 2026-11-12)
 // 릴스 (2026-10-08 은정님) — 모든 문자에 붙인다
 //   REELS  쓸 수 있는 릴스 (조회수 많은 것 → 조회수 빈 것은 최신 순)
 //   HIST   보낸 기록 { key, cid, news } — 그 집에 보낸 릴스를 다시 안 보내려고
@@ -323,7 +324,7 @@ async function loadAll() {
   const to7 = ymd(addDays(t0, 7));   // 휴무 · 공휴일 수업 안내는 일주일 앞까지 (2026-10-08)
 
   const [kidsR, thsR, gdR, sentR, reelR, pcR] = await Promise.all([
-    sb.from('nl_children').select('id, name, phone'),
+    sb.from('nl_children').select('id, name, phone, birth'),
     sb.from('nl_therapists').select('id, name'),
     sb.from('nl_guardians').select('child_id, name, phone, relation'),
     // 보낸 기록은 오늘부터 일주일 안만 읽는다 (1,000줄 한도 · 2026-09-21 · 2026-10-08 일주일로)
@@ -366,7 +367,7 @@ async function loadAll() {
     });
     if (!part || part.length < 1000) break;
   }
-  const KID = {}; (kidsR.data || []).forEach(k => KID[k.id] = k);
+  const KID = {}; (kidsR.data || []).forEach(k => { KID[k.id] = k; const b = String(k.birth || '').replace(/[^0-9]/g, ''); if (b.length >= 8) SMS_BD[k.id] = b.slice(2, 8); });
   const TH  = {}; (thsR.data  || []).forEach(t => TH[t.id]  = t.name);
   const GD  = {}; (gdR.data   || []).forEach(g => {
     (GD[g.child_id] = GD[g.child_id] || []).push(g);
@@ -865,7 +866,7 @@ function draw() {
       +     esc(kindLabel(it)) + '</span>'
       +   (it.parking ? '<span class="kind k-주차">+ 주차 안내</span>' : '')
       +   (it.news && REEL[it.news] ? '<span class="kind k-릴스">+ ' + reelName(REEL[it.news]) + '</span>' : '')
-      +   '<span class="nm">' + it.cid + '번 ' + esc(it.name) + '</span>'
+      +   '<span class="nm">' + it.cid + '번 ' + esc(it.name) + (SMS_BD[it.cid] && !/ · /.test(it.name) ? ' ' + SMS_BD[it.cid] : '') + '</span>'
       +   '<span class="ph">' + (phs.length ? phs.join(' · ') : '번호 없음') + '</span>'
       +   (done ? '<span class="ph">✅ 보냄</span>' : '')
       + '</div>'

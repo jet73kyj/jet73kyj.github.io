@@ -927,6 +927,10 @@ function kbView(v) {
   if ($('pLoad')) $('pLoad').style.display = 'none';
 }
 let KB_AUTO = false;
+// 동명이인 — 이름 뒤 생년월일 여섯 자리 (2026-11-12 은정님)
+function B6(c) { const s = String((c && c.birth) || '').replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(2, 8) : ''; }
+function NMB(c) { const b = B6(c); return ((c && c.name) || '') + (b ? ' ' + b : ''); }
+function DUPNM(list) { const n = {}; list.forEach(c => { const k = String((c && c.name) || '').trim(); if (k) n[k] = (n[k] || 0) + 1; }); return k => n[String(k || '').trim()] > 1; }
 function _kbKid(id) { return KIDS[id] || KB_NAME[id] || { id: id, name: id + '번' }; }
 function _kbBtn(k, id, o, cur) {
   const c = _kbKid(id);
@@ -936,7 +940,7 @@ function _kbBtn(k, id, o, cur) {
   if (String(childId) === String(id) && k === (($('pMonth').value) || mkNow()) && LOADED) cls += ' on';
   const th = (_isAllView(ME.role) && o) ? Object.keys(o.th).map(t => THERAPISTS[t] || '').filter(Boolean).join('·') : '';
   return '<button type="button" class="' + cls + '" data-k="' + k + '" data-c="' + id + '">'
-    + '<span class="nm">' + esc(c.name || '') + (c.status === '종결' ? '<i>종결</i>' : '') + '</span>'
+    + '<span class="nm">' + esc(NMB(c)) + (c.status === '종결' ? '<i>종결</i>' : '') + '</span>'
     + (tag ? '<b>' + tag + '</b>' : '') + (th ? '<small>' + esc(th) + '</small>' : '') + '</button>';
 }
 function kbDraw(months, got) {
@@ -954,7 +958,7 @@ function kbDraw(months, got) {
     pastBad.forEach(([k, v]) => {
       h += '<i>' + mon(k) + '</i>' + Object.keys(v).sort(ord(v)).map(id =>
         '<button type="button" class="kb kbchip" data-k="' + k + '" data-c="' + id + '" title="' + mon(k) + ' 기록지 · 고칠 것 있음">'
-        + esc(_kbKid(id).name || (id + '번')) + '</button>').join('');
+        + esc(NMB(_kbKid(id)) || (id + '번')) + '</button>').join('');
     });
     h += '</span>';
   }
@@ -968,12 +972,14 @@ function kbDraw(months, got) {
   box.innerHTML = h;
   box.style.display = h ? '' : 'none';
   // 이 달 아동은 오른쪽 책갈피 (2026-11-05 은정님) — 빨강 = 고칠 것 · 흰색 = 없음 · 옅은 회색 = 지금 보는 아동
+  const _dup = DUPNM(CHILDREN);   // 책갈피는 좁아 동명이인일 때만 생년월일 (2026-11-12)
   const tab = (id, o) => {
     const c = _kbKid(id);
     const on = String(childId) === String(id) && LOADED;
     const red = !!(o && (o.fix || o.doc || o.wait));
     return '<button type="button" class="kb nltab' + (red ? ' red' : '') + (on ? ' on' : '') + '" data-k="' + mv + '" data-c="' + id + '"'
-      + ' title="' + esc(c.name || '') + (red ? ' · 고칠 것 있음' : '') + '">' + esc(c.name || '')
+      + ' title="' + esc(NMB(c)) + (red ? ' · 고칠 것 있음' : '') + '">' + esc(c.name || '')
+      + ((_dup(c.name) && B6(c)) ? '<small>' + B6(c) + '</small>' : '')
       + ((c.status === '종결' || (ALIVE_ON && !ALIVE[id] && CHILDREN.some(x => String(x.id) === String(id)))) ? '<small>종결</small>' : '') + '</button>';
   };
   if (window.NLKidTabs) {

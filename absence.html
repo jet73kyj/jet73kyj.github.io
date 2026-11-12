@@ -156,7 +156,9 @@ function dm(d) {
 }
 function hm(t) { return t ? String(t).slice(0,5) : ''; }
 // 「○번 이름」 (2026-09-21)
-function kidName(cid) { return cid + '번' + (KIDS[cid] ? ' ' + KIDS[cid] : ''); }
+// 동명이인 — 이름 뒤 생년월일 여섯 자리 (2026-11-12 은정님)
+let KIDBD = {};
+function kidName(cid) { return cid + '번' + (KIDS[cid] ? ' ' + KIDS[cid] : '') + (KIDBD[cid] ? ' ' + KIDBD[cid] : ''); }
 
 // ── 목록 그리기 ─────────────────────────────────────
 function draw() {
@@ -670,10 +672,10 @@ async function afterLogin(user) {
 
   try {
     const [kd, th] = await Promise.all([
-      sb.from('nl_children').select('id, name'),
+      sb.from('nl_children').select('id, name, birth'),
       sb.from('nl_therapists').select('id, name')
     ]);
-    (kd.data || []).forEach(k => { KIDS[k.id] = k.name; });
+    (kd.data || []).forEach(k => { KIDS[k.id] = k.name; const b = String(k.birth || '').replace(/[^0-9]/g, ''); if (b.length >= 8) KIDBD[k.id] = b.slice(2, 8); });
     (th.data || []).forEach(t => { THRS[t.id] = t.name; });
   } catch (e) {}
 

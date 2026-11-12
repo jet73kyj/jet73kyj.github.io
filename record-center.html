@@ -267,6 +267,10 @@ async function logout() {
   try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
   location.replace('index.html');
 }
+// 동명이인 — 이름 뒤 생년월일 여섯 자리 (2026-11-12 은정님)
+function B6(c) { const s = String((c && c.birth) || '').replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(2, 8) : ''; }
+function NMB(c) { const b = B6(c); return ((c && c.name) || '') + (b ? ' ' + b : ''); }
+function DUPNM(list) { const n = {}; list.forEach(c => { const k = String((c && c.name) || '').trim(); if (k) n[k] = (n[k] || 0) + 1; }); return k => n[String(k || '').trim()] > 1; }
 function fmtBirth(b) {
   if (!b) return '';
   const s = String(b).replace(/\D/g,'');
@@ -331,7 +335,7 @@ function drawKidList() {
         const wd = [...new Set(p.sched.map(s => s.weekday).filter(v => v))].join('·');
         const tn = p.ths.map(v => THERAPISTS[v] || '').filter(v => v).join('·');
         return '<option value="' + i + '" data-cid="' + p.child.id + '"'
-             + ' data-th="' + p.therapy_id + '">' + esc(p.child.name)
+             + ' data-th="' + p.therapy_id + '">' + esc(NMB(p.child))
              + (p.support === 5 ? ' · [방과후]' : '')
              + (tt ? ' · ' + esc(tt) : '')
              + (wd ? ' · ' + esc(wd) : '')
@@ -382,11 +386,13 @@ async function ctTabs(refetch) {
   items.sort((x, y) => (y.red - x.red) || String(x.p.child.name).localeCompare(String(y.p.child.name)));
   const mon = Number(mv.slice(5, 7)) + '월';
   // 끝난 지 두 달 안의 종결 아동은 「종결 ○명 ▸」 아래로 (2026-11-09 은정님) — 빨강 · 지금 보는 아동은 위에
+  const _dup = DUPNM([...new Map(PAIRS.map(p => [p.child.id, p.child])).values()]);   // 책갈피는 동명이인일 때만 생년월일 (2026-11-12)
   const tabOf = o => {
     const on = LOADED && cur && PAIRS.indexOf(cur) === o.i;
     const end = window.NLRec && !o.p.alive;
     return { fold: end && !o.red && !on, html: '<button type="button" class="nltab' + (o.red ? ' red' : '') + (on ? ' on' : '') + '" data-ci="' + o.i + '"'
-      + ' title="' + esc(o.p.child.name || '') + (o.red ? ' · 고칠 것 있음' : '') + '">' + esc(o.p.child.name || '')
+      + ' title="' + esc(NMB(o.p.child)) + (o.red ? ' · 고칠 것 있음' : '') + '">' + esc(o.p.child.name || '')
+      + ((_dup(o.p.child.name) && B6(o.p.child)) ? '<small>' + B6(o.p.child) + '</small>' : '')
       + ((o.p.support === 5 || end) ? '<small>' + (o.p.support === 5 ? '방과후' : '') + (o.p.support === 5 && end ? '·' : '') + (end ? '종결' : '') + '</small>' : '') + '</button>' };
   };
   if (window.NLRec && items.length) NLKidTabs.show(NLRec.tabsHtml('<div class="nltabhd">' + mon + '</div>', items.map(tabOf)));

@@ -626,7 +626,7 @@ function drawPairSelect() {
              ? $('pChild').selectedOptions[0].getAttribute('data-key') : '';
   $('pChild').innerHTML = '<option value="">— 아동을 고르세요 —</option>'
     + PAIRS.map((p,i) => '<option value="' + i + '" data-cid="' + p.child.id + '"'
-        + ' data-key="' + p.child.id + '-' + p.support_type_id + '">' + esc(p.child.name)
+        + ' data-key="' + p.child.id + '-' + p.support_type_id + '">' + esc(NMB(p.child))
         + ' · ' + esc(SUPNAME[p.support_type_id] || '') + '</option>').join('');
   if (keep) {
     const i = PAIRS.findIndex(p => (p.child.id + '-' + p.support_type_id) === keep);
@@ -739,10 +739,14 @@ async function kbLoad() {
 }
 // 아동 · 사업 단추 — 서버 줄에 사업 번호가 없으면 그 아동의 모든 사업에 붙임
 function _kbCnt(v, cid, st) { if (!v) return 0; return (v[cid + '|' + st] || 0) + (v[cid + '|'] || 0); }
+// 동명이인 — 이름 뒤 생년월일 여섯 자리 (2026-11-12 은정님)
+function B6(c) { const s = String((c && c.birth) || '').replace(/[^0-9]/g, ''); return s.length >= 8 ? s.slice(2, 8) : ''; }
+function NMB(c) { const b = B6(c); return ((c && c.name) || '') + (b ? ' ' + b : ''); }
+function DUPNM(list) { const n = {}; list.forEach(c => { const k = String((c && c.name) || '').trim(); if (k) n[k] = (n[k] || 0) + 1; }); return k => n[String(k || '').trim()] > 1; }
 function _kbBtn(k, c, st, n) {
   const on = LOADED && cur && String(cur.child.id) === String(c.id) && Number(cur.support_type_id) === Number(st) && k === ($('pMonth').value || mkNow());
   return '<button type="button" class="kb' + (n ? ' fix' : '') + (on ? ' on' : '') + '" data-k="' + k + '" data-c="' + c.id + '" data-s="' + st + '">'
-    + '<span class="nm">' + esc(c.name || (c.id + '번')) + (c.status === '종결' ? '<i>종결</i>' : '') + '</span>'
+    + '<span class="nm">' + esc(NMB(c) || (c.id + '번')) + (c.status === '종결' ? '<i>종결</i>' : '') + '</span>'
     + (n ? '<b>' + n + '</b>' : '') + '<small>' + esc(SUPNAME[st] || '') + '</small></button>';
 }
 function kbDraw(months, got) {
@@ -764,7 +768,7 @@ function kbDraw(months, got) {
       list.sort((x, y) => String(x.c.name).localeCompare(String(y.c.name)));
       h += '<i>' + mon(k) + '</i>' + list.map(o =>
         '<button type="button" class="kb kbchip" data-k="' + k + '" data-c="' + o.c.id + '" data-s="' + o.st + '" title="' + mon(k) + ' · ' + esc(SUPNAME[o.st] || '') + ' · 고칠 것 있음">'
-        + esc(o.c.name || (o.c.id + '번')) + '</button>').join('');
+        + esc(NMB(o.c) || (o.c.id + '번')) + '</button>').join('');
     });
     h += '</span>';
   }
@@ -776,11 +780,12 @@ function kbDraw(months, got) {
   box.innerHTML = h;
   box.style.display = h ? '' : 'none';
   // 이 달 아동은 오른쪽 책갈피 (2026-11-05 은정님) — 빨강 = 고칠 것 · 흰색 = 없음 · 옅은 회색 = 지금 보는 아동
+  const _dup = DUPNM([...new Map(PAIRS.map(p => [p.child.id, p.child])).values()]);   // 책갈피는 동명이인일 때만 생년월일 (2026-11-12)
   const tab = o => {
     const on = LOADED && cur && String(cur.child.id) === String(o.c.id) && Number(cur.support_type_id) === Number(o.st);
     return '<button type="button" class="kb nltab' + (o.n ? ' red' : '') + (on ? ' on' : '') + '" data-k="' + mv + '" data-c="' + o.c.id + '" data-s="' + o.st + '"'
       + ' title="' + esc((o.c.name || '') + ' · ' + (SUPNAME[o.st] || '')) + (o.n ? ' · 고칠 것 있음' : '') + '">' + esc(o.c.name || (o.c.id + '번'))
-      + '<small>' + esc(SUPSHORT(o.st)) + ((o.c.status === '종결' || (ALIVE_ON && !ALIVE[o.c.id + '-' + o.st])) ? '·종결' : '') + '</small></button>';
+      + '<small>' + ((_dup(o.c.name) && B6(o.c)) ? B6(o.c) + '·' : '') + esc(SUPSHORT(o.st)) + ((o.c.status === '종결' || (ALIVE_ON && !ALIVE[o.c.id + '-' + o.st])) ? '·종결' : '') + '</small></button>';
   };
   // 끝난 지 두 달 안의 종결 아동은 「종결 ○명 ▸」 아래로 (2026-11-09 은정님) — 빨강 · 지금 보는 아동은 위에
   const isOn = o => LOADED && cur && String(cur.child.id) === String(o.c.id) && Number(cur.support_type_id) === Number(o.st);
