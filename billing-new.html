@@ -1760,17 +1760,21 @@ function isLater(p) { return !!(p && /\[따로\]/.test(String(p.memo || ''))); }
 function laterSts(childId, parts) {
   const sv = SAVED[childId] || {};
   const mainPaid = Object.keys(sv).some(k => Number(k) !== 2 && !isLater(sv[k]) && sv[k].paid_on);
+  // 평가비는 그 달 평가가 있으면 늘 「따로 받음」 칸을 둔다 (평가 날 받고 수업료는 나중에 · 2026-11-12 은정님)
+  const evNow = (EVMON[childId] || []).length > 0;
   return parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0)
-    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]))
+    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]) || (Number(p.st) === 9 && evNow))
     .map(p => ({ st: Number(p.st), amt: Number(p.amt) }));
 }
 function fillLater(box, childId, parts) {
   const el = box.querySelector('.later'); if (!el) return;
+  const el9 = box.querySelector('.later9') || el;   // 평가비 칸은 평가비 줄 바로 아래 (2026-11-12)
   const sv = SAVED[childId] || {};
   const want = laterSts(childId, parts);
-  el.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
+  box.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
   want.forEach(w => {
-    let r = el.querySelector('.later-r[data-lst="' + w.st + '"]');
+    const host = w.st === 9 ? el9 : el;
+    let r = box.querySelector('.later-r[data-lst="' + w.st + '"]');
     if (!r) {
       const o = sv[w.st];
       r = document.createElement('div'); r.className = 'later-r'; r.dataset.lst = w.st;
@@ -1779,11 +1783,14 @@ function fillLater(box, childId, parts) {
         // 승인번호는 그 줄이 낸 날이 있을 때만 (미납 줄에 상자 메모가 따라오지 않게)
         + '<input class="tx lmemo" type="text" placeholder="승인번호" value="' + esc(o && o.paid_on ? memoOf(o, false) : '') + '">'
         + '<button type="button" class="lsave' + (o && o.paid_on ? ' done' : '') + '" data-ttl="저장 전">' + (o && o.paid_on ? '\u2713 저장됨' : '저장 전') + '</button>';
-      el.appendChild(r);
+      host.appendChild(r);
     }
-    r.querySelector('.lnm').textContent = (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
+    r.querySelector('.lnm').textContent = w.st === 9
+      ? '평가비 따로 받음 ' + w.amt.toLocaleString() + '원 · 비우면 아래 받은 날과 같이'
+      : (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
   });
-  el.style.display = want.length ? '' : 'none';
+  el.style.display = want.some(w => w.st !== 9 || el9 === el) ? '' : 'none';
+  if (el9 !== el) el9.style.display = want.some(w => w.st === 9) ? '' : 'none';
 }
 
 function sideMissing(childId) {
@@ -2326,7 +2333,8 @@ function drawKid(c) {
     + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
     + '<span class="am"><input class="mn evamt" data-won type="text" inputmode="numeric" value="'
     + (evAmt ? evAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
-    + evalInfoHtml(evRows);
+    + evalInfoHtml(evRows)
+    + '<div class="later later9" style="display:none"></div>';   // 평가비 따로 받음 (2026-11-12)
 
   // 체험 수업 — 저장한 줄이 없으면 그 달 체험 금액(합계)을 채운다 (2026-09-16)
   //   체험이 없고 저장한 것도 없으면 줄을 그리지 않는다
@@ -3156,7 +3164,9 @@ async function saveKid(childId, btn, only) {
     && (!only || (only === 'bank' ? p.st === 2 : p.st !== 2))
   ).map(p => {
     const isBank = (p.st === 2);
-    const lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    let lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    // 평가비 칸을 비워 두었고 전에 따로 저장한 적이 없으면 상자 날짜와 함께 받는다 (2026-11-12)
+    if (lr && p.st === 9 && !lr.querySelector('.lday').value && !isLater((SAVED[childId] || {})[9])) lr = null;
     const day  = isBank ? bankDay : lr ? lr.querySelector('.lday').value : cardDay;
     const lm = lr ? lr.querySelector('.lmemo').value.trim() : '';
     const memo = isBank ? (bankMemo ? '계좌입금 ' + bankMemo : '계좌입금')
