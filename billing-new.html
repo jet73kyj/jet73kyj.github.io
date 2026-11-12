@@ -244,6 +244,7 @@
                  border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
   .pay .ksave2.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   .later { margin-top:6px; }
+  .evsep { border-top:2px solid #CECBF6; margin-top:12px; padding-top:8px; }
   .later-r { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 8px; margin-top:4px;
              background:#FFF6EC; border:1px solid #F0D9BF; border-radius:8px; font-size:13px; }
   .later-r .lnm { flex:1 1 220px; color:#8a5a2b; font-weight:600; }
@@ -1786,7 +1787,7 @@ function fillLater(box, childId, parts) {
       host.appendChild(r);
     }
     r.querySelector('.lnm').textContent = w.st === 9
-      ? '평가비 따로 받음 ' + w.amt.toLocaleString() + '원 · 비우면 아래 받은 날과 같이'
+      ? '평가비 받은 날 · 비우면 위 수업료 받은 날과 같이'
       : (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
   });
   el.style.display = want.some(w => w.st !== 9 || el9 === el) ? '' : 'none';
@@ -2327,14 +2328,19 @@ function drawKid(c) {
   const evPre  = ev ? null : evalPreset(c.id);
   const evT    = ev ? evalTypeOf(ev) : (evPre ? evPre.type : null);
   const evAmt  = ev ? Number(ev.amount) : (evPre ? evPre.amt : 0);
-  b += '<div class="r gsum narrownm" data-st="9" data-manual="1">'
+  // 평가비 — 그 달 평가가 있거나 저장한 평가비가 있으면 수업료 받는 칸 아래 따로 묶는다 (2026-11-12 은정님)
+  //   평가 날 받고 수업료는 나중에 받으므로 「평가비 받은 날 · 승인번호」를 따로 둔다
+  //   평가가 없는 아동은 전처럼 리뷰 차감 위에 한 줄 (손으로 넣을 수 있게)
+  const evSep = !!(evRows.length || (ev && Number(ev.amount) > 0));
+  const evHtml = '<div class="r gsum narrownm" data-st="9" data-manual="1">'
     + '<span class="nm">평가비</span>'
     + '<span class="de">평가 <select class="evsel" style="border:1px solid #888;border-radius:4px;padding:2px 4px;background:#fff;color:#000">' + evalOptions(evT) + '</select></span>'
     + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
     + '<span class="am"><input class="mn evamt" data-won type="text" inputmode="numeric" value="'
     + (evAmt ? evAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
     + evalInfoHtml(evRows)
-    + '<div class="later later9" style="display:none"></div>';   // 평가비 따로 받음 (2026-11-12)
+    + '<div class="later later9" style="display:none"></div>';
+  if (!evSep) b += evHtml;
 
   // 체험 수업 — 저장한 줄이 없으면 그 달 체험 금액(합계)을 채운다 (2026-09-16)
   //   체험이 없고 저장한 것도 없으면 줄을 그리지 않는다
@@ -2387,9 +2393,13 @@ function drawKid(c) {
       + '<span class="up"></span><span class="am rvtxt">0</span></div>';
   }
 
-  b += '<div class="r tot"><span class="nm"></span><span class="de"></span>'
-    + '<span class="ap"></span><span class="ct"></span><span class="up">카드 합계</span>'
+  const totHtml = '<div class="r tot"><span class="nm"></span><span class="de"></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up">' + (evSep ? '카드 합계 (수업료 + 평가비)' : '카드 합계') + '</span>'
     + '<span class="am cardtotal">0원</span></div>';
+  if (evSep) b += '<div class="r tot"><span class="nm"></span><span class="de"></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up">수업료 합계</span>'
+    + '<span class="am lessontotal">0원</span></div>';
+  else b += totHtml;
 
   // 「따로 받을 수업」 줄([따로])은 상자 날짜 · 승인번호에서 뺀다 (2026-11-06)
   const cp = Object.keys(sv).map(k => sv[k])
@@ -2408,6 +2418,7 @@ function drawKid(c) {
     + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
     + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>'
     + '<div class="later"></div>'   // 납부완료 뒤 신청한 수업 — 그 줄만 날짜 · 승인번호 (calcKid 가 채움 · 2026-11-06)
+    + (evSep ? '<div class="evsep">' + evHtml + '</div>' + totHtml : '')
     + '</div>';   // .cardbody 닫기
 
   const dev = groups.find(g => g.support_type_id === 2);
@@ -2883,6 +2894,10 @@ function calcKid(childId) {
   const bank = parts.filter(p => p.st === 2).reduce((s, p) => s + p.amt, 0);
   if (box.querySelector('.cardtotal')) {
     box.querySelector('.cardtotal').textContent = won(card);
+  }
+  if (box.querySelector('.lessontotal')) {
+    const evp = parts.filter(p => Number(p.st) === 9).reduce((s2, p) => s2 + p.amt, 0);
+    box.querySelector('.lessontotal').textContent = won(card - evp);
   }
 
   const total = card + bank;
