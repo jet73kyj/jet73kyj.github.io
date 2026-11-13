@@ -10023,7 +10023,7 @@ async function mkSaveRun() {
   if (!skipBusy) {
     const newS = toMin(String((mkHm || slotHm(slot, th, wdOf(d))) || '').slice(0, 5));
     const q = await sb.from('nl_sessions')
-      .select('id, child_id, therapist_id, start_time, minutes, schedule_id, makeup_for, status')
+      .select('id, child_id, therapist_id, start_time, minutes, schedule_id, makeup_for, status, therapy_id')
       .eq('plan_date', d).in('status', ['예정', '완료', '보강']);
     if (q.error) { mkmsg('그 날 수업을 읽지 못했습니다. 다시 해 주세요.\n' + q.error.message, false); return; }
     const scIds = Array.from(new Set((q.data || []).filter(x => x.schedule_id && !x.minutes).map(x => x.schedule_id)));
@@ -10039,7 +10039,11 @@ async function mkSaveRun() {
       && Number(x.makeup_for) !== Number(mkSess.id)          // 이 결석에 이미 딸린 보강은 고치는 대상
       && toMin(String(x.start_time).slice(0, 5)) < newS + mkMin
       && newS < toMin(String(x.start_time).slice(0, 5)) + lenOf(x));
-    const other = hit.find(x => Number(x.therapist_id) === th && Number(x.child_id) !== Number(mkSess.child_id));
+    // 같은 그룹반 아동을 같은 선생님 · 같은 시각에 함께 보강하는 것은 겹침이 아님 (2026-11-13 은정님)
+    const myG = GTH[mkSess.therapy_id];
+    const sameGrp = x => myG && Number(GTH[x.therapy_id]) === Number(myG)
+      && String(x.start_time).slice(0, 5) === String((mkHm || slotHm(slot, th, wdOf(d))) || '').slice(0, 5);
+    const other = hit.find(x => Number(x.therapist_id) === th && Number(x.child_id) !== Number(mkSess.child_id) && !sameGrp(x));
     if (other) {
       mkmsg('❌ 그 시간에는 이미 선생님 다른 아동 수업이 있습니다.\n'
         + '  ' + dayNo(d) + '일 ' + h12(String(other.start_time).slice(0, 5)) + ' · ' + kidNameOf(other.child_id) + '\n'
