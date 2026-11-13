@@ -2141,16 +2141,19 @@ function setCntOpts(sel, tid, keep) {
   if (!sel) return;
   const psy  = isPsy(tid);
   const dev  = !psy && isDev(tid);
-  const mode = psy ? 'psy' : (dev ? 'dev' : 'cnt');
+  // 언어평가는 4개까지 (2026-11-13 은정님 · 240,000원)
+  const t4   = EVTYPES.find(x => x.id === Number(tid));
+  const lang = !psy && !dev && !!(t4 && String(t4.name).indexOf('언어') >= 0);
+  const mode = psy ? 'psy' : (dev ? 'dev' : (lang ? 'cnt4' : 'cnt'));
   const cur  = keep != null ? String(keep) : sel.value;
   if (sel.dataset.mode !== mode) {
-    const opts = psy ? PSY_OPTS : (dev ? DEV_OPTS : [['1', '1개'], ['2', '2개'], ['3', '3개']]);
+    const opts = psy ? PSY_OPTS : (dev ? DEV_OPTS : [['1', '1개'], ['2', '2개'], ['3', '3개']].concat(lang ? [['4', '4개']] : []));
     sel.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
     sel.dataset.mode = mode;
     sel.style.width = (psy || dev) ? '120px' : '80px';
   }
   const ok = Array.prototype.some.call(sel.options, o => o.value === cur);
-  sel.value = ok ? cur : (psy ? '1' : String(Math.min(3, parseInt(cur, 10) || 1)));
+  sel.value = ok ? cur : (psy ? '1' : String(Math.min(lang ? 4 : 3, parseInt(cur, 10) || 1)));
   const lb = sel.id ? document.querySelector('label[for="' + sel.id + '"]')
                     : (sel.parentElement && sel.parentElement.querySelector('label'));
   if (lb) lb.textContent = (psy || dev) ? '구성' : (sel.id ? '평가 개수' : '개수');
@@ -2197,7 +2200,7 @@ function dvAddRow(e) {
   const stOpt = ['예정','완료','취소'].map(v =>
     '<option value="' + v + '"' + (e && e.status === v ? ' selected' : '') + '>'
     + v + '</option>').join('');
-  const cntOpt = [1,2,3].map(v =>
+  const cntOpt = [1,2,3,4].map(v =>
     '<option value="' + v + '"' + (e && Number(e.item_cnt) === v ? ' selected' : '') + '>'
     + v + '개</option>').join('');
   const html =
