@@ -72,11 +72,41 @@ const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&am
 //   namu-content 로 나가는 창구 nl_content_export() 를 그대로 읽음 — 아동 · 상담 번호 없음
 const AREAS = ['언어','발음','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
 let ROWS = [], AREA = '', MON = '';
+// 유입 경로 (2026-11-15) — nl_inquiry_export(상담 한 건 한 줄 · 갈래 이름) · nl_channel_diff(직원 ≠ 학부모)
+const CH_ORD = ['네이버 블로그','네이버 지도·플레이스','인스타 광고','지인 소개','기관 소개','기타(검색)','기타','안 적음'];
+let INQ = [], DIFF = [], CHERR = '';
 async function load() {
-  const { data, error } = await sb.rpc('nl_content_export');
-  if (error) throw error;
-  ROWS = data || [];
+  const [a, b, c] = await Promise.all([sb.rpc('nl_content_export'), sb.rpc('nl_inquiry_export'), sb.rpc('nl_channel_diff')]);
+  if (a.error) throw a.error;
+  ROWS = a.data || [];
+  CHERR = (b.error ? b.error.message : '') + (c.error ? ' ' + c.error.message : '');
+  INQ = b.data || []; DIFF = c.data || [];
   draw();
+}
+function chanHtml() {
+  if (CHERR) return '<div class="err" style="margin-top:12px;">유입 경로를 불러오지 못했습니다.\n' + esc(CHERR) + '</div>';
+  const ms = [...new Set(INQ.map(r => r.reg_month).filter(Boolean))].sort();
+  const gs = CH_ORD.concat([...new Set(INQ.map(r => r.channel))].filter(g => CH_ORD.indexOf(g) < 0));
+  const cnt = (g, m) => INQ.filter(r => r.channel === g && (!m || r.reg_month === m)).length;
+  const td = n => '<td style="text-align:right;' + (n ? '' : 'color:#D0CBC4;') + '">' + n + '</td>';
+  const tbl = '<div class="tw"><table><thead><tr><th>경로</th>' + ms.map(m => '<th style="text-align:right;">' + esc(Number(m.slice(5)) + '월') + '</th>').join('')
+    + '<th style="text-align:right;">합계</th></tr></thead><tbody>'
+    + gs.filter(g => cnt(g)).map(g => '<tr><td style="white-space:nowrap;">' + esc(g) + '</td>' + ms.map(m => td(cnt(g, m))).join('') + td(cnt(g)) + '</tr>').join('')
+    + '<tr><td style="font-weight:600;">합계</td>' + ms.map(m => td(INQ.filter(r => r.reg_month === m).length)).join('') + td(INQ.length) + '</tr>'
+    + '</tbody></table></div>';
+  const blog = INQ.filter(r => r.channel === '네이버 블로그');
+  const ar = AREAS.concat(['영역 없음']).map(a => [a, blog.filter(r => (r.areas || []).indexOf(a) >= 0).length]).filter(p => p[1]);
+  const diff = DIFF.length
+    ? '<div class="tw"><table><thead><tr><th>아동</th><th>문의일</th><th>직원 값</th><th>학부모 값 (이것으로 셈)</th></tr></thead><tbody>'
+      + DIFF.map(d => '<tr><td>' + esc(d.child_id) + '번</td><td style="white-space:nowrap;">' + esc(d.inquiry_date || '') + '</td><td>' + esc(d.staff_group)
+        + '</td><td>' + esc(d.parent_group) + '</td></tr>').join('') + '</tbody></table></div>'
+    : '<div class="load">다른 상담이 없습니다</div>';
+  return '<div class="card" style="margin-top:12px;"><div class="ttl">월별 · 경로별 상담 수</div>' + tbl
+    + '<div class="note">유입 경로 = 어디서 보고 알았는지 (학부모 질문지 값이 있으면 그것, 없으면 직원 값). 전화 · 톡은 문의 방법이라 「기타」.</div></div>'
+    + '<div class="sum" style="margin-top:12px;">'
+    + '<div class="card"><div class="ttl">네이버 블로그로 온 상담 ' + blog.length + '건 — 콘텐츠 주제 영역</div>'
+    + (ar.length ? bars(ar) : '<div class="load">아직 없습니다</div>') + '</div>'
+    + '<div class="card"><div class="ttl">직원 값과 학부모 값이 다른 상담 ' + DIFF.length + '건</div>' + diff + '</div></div>';
 }
 function bars(pairs) {
   const mx = Math.max(1, ...pairs.map(p => p[1]));
@@ -103,6 +133,7 @@ function draw() {
       : '<tr><td colspan="4" style="text-align:center;color:#A39C95;padding:24px;">등록된 주제가 없습니다.</td></tr>')
     + '</tbody></table></div>'
     + '<div class="note">이 목록은 자라는나무 콘텐츠로 나가는 것과 같습니다 — 질문 · 영역 · 센터 · 등록 월만 나가고, 아동 · 상담 번호와 초기 상담 글은 나가지 않습니다. 고치기는 신규 상담 「열기」 창 「콘텐츠 주제」에서 합니다.</div></div>';
+  $('body').insertAdjacentHTML('beforeend', chanHtml());
   $('fa').onchange = () => { AREA = $('fa').value; draw(); };
   $('fm').onchange = () => { MON = $('fm').value; draw(); };
 }
