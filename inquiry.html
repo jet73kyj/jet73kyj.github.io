@@ -267,6 +267,9 @@
   .gbkidlist div { padding:5px 8px; cursor:pointer; font-size:13px; }
   .gbkidlist div:hover { background:#F7F6F4; }
   #gbMsg { font-size:13px; margin:2px 0 6px; white-space:pre-line; }
+.chHint{font-weight:400;color:#8a8580;font-size:12px}
+.chEtc{display:none;margin-top:6px}
+.chNote{font-size:12px;color:#8a8580;margin-top:4px}
 </style>
 </head>
 <body>
@@ -364,8 +367,11 @@
         <input id="k_phone" type="tel" inputmode="numeric" maxlength="13" autocomplete="off" placeholder="010-0000-0000">
       </div>
       <div>
-        <label for="a_channel">유입경로</label>
-        <input id="a_channel" type="text" placeholder="전화 / 네이버 / 소개 등">
+        <label for="a_channel_s">유입경로 <span class="chHint">어디서 보고 알았나요</span></label>
+        <select id="a_channel_s" class="chSel"></select>
+        <input id="a_channel_e" class="chEtc" type="text" maxlength="40" placeholder="어디서 보고 알았는지 적기">
+        <input id="a_channel" type="hidden">
+        <div class="chNote">전화 · 카톡 · 톡톡은 문의 방법이에요. 어디서 보고 알았는지 여쭤 주세요.</div>
       </div>
       <div>
         <label for="a_status">문의 상태 <span style="color:#c62828;">*</span></label>
@@ -680,8 +686,10 @@
         <input id="d_date" type="date">
       </div>
       <div>
-        <label for="d_channel">유입경로</label>
-        <input id="d_channel" type="text">
+        <label for="d_channel_s">유입경로 <span class="chHint">어디서 보고 알았나요</span></label>
+        <select id="d_channel_s" class="chSel"></select>
+        <input id="d_channel_e" class="chEtc" type="text" maxlength="40" placeholder="어디서 보고 알았는지 적기">
+        <input id="d_channel" type="hidden">
       </div>
       <!-- 생년월일 (2026-10-14 은정님) — 등록 때 빠뜨린 것을 여기서 고친다 · 「저장」 때 아동 표에 -->
       <div>
@@ -1569,6 +1577,50 @@ window.addEventListener('beforeunload', e => {
 // ── 새 문의 등록 창 — 쓰던 것이 있는지 (2026-09-16) ──
 //   등록하면 칸이 비워지므로 「글자가 있음」 = 아직 등록 안 한 것
 //   아동 메모는 틀(MEMO_TMPL)과 다를 때만, 평가 줄은 날짜를 넣었을 때만 센다
+// ── 유입경로 고르기 (2026-11-15 은정님 · namu-content 갈래) ──────────
+//   어디서 보고 알았는지만 고름 (전화 · 카톡 · 톡톡은 문의 방법이라 갈래가 아님)
+//   저장 글자: 갈래 이름 · 기타는 「기타 · 적은 글」 · 서버 nl_channel_group 이 같은 갈래로 셈
+//   숨은 칸 a_channel · d_channel 의 value 를 고르기 칸과 이어 두어 다른 코드는 그대로 씀
+const CH_LIST = ['네이버 블로그','네이버 지도·플레이스','인스타 광고','지인 소개','기관 소개','기타'];
+const CH_TEXT = { '기관 소개':'기관 소개 (어린이집·유치원·병원)', '기타':'기타 (직접 적기)' };
+function chBind(base) {
+  const hid = $(base), sel = $(base + '_s'), etc = $(base + '_e');
+  if (!hid || !sel || !etc) return;
+  sel.innerHTML = '<option value="">— 고르세요 —</option>'
+    + CH_LIST.map(c => '<option value="' + esc(c) + '">' + esc(CH_TEXT[c] || c) + '</option>').join('');
+  let old = '';
+  const show = () => { etc.style.display = sel.value === '기타' ? 'block' : 'none'; };
+  sel.addEventListener('change', show);
+  Object.defineProperty(hid, 'value', {
+    configurable: true,
+    get() {
+      const v = sel.value;
+      if (!v) return '';
+      if (v === '__old') return old;
+      if (v === '기타') { const t = etc.value.trim(); return t ? '기타 · ' + t : '기타'; }
+      return v;
+    },
+    set(val) {
+      const t = String(val == null ? '' : val).trim();
+      const o = sel.querySelector('option[value="__old"]'); if (o) o.remove();
+      old = ''; etc.value = '';
+      if (!t) sel.value = '';
+      else if (CH_LIST.includes(t)) sel.value = t;
+      else if (t.indexOf('기타 · ') === 0) { sel.value = '기타'; etc.value = t.slice(4); }
+      else {
+        old = t;
+        const op = document.createElement('option');
+        op.value = '__old'; op.textContent = '옛 값: ' + t;
+        sel.insertBefore(op, sel.options[1] || null);
+        sel.value = '__old';
+      }
+      show();
+    }
+  });
+  hid.value = '';
+}
+chBind('a_channel'); chBind('d_channel');
+
 let ADD_LEAVING = false;
 function addDraft() {
   if (!$('k_name')) return false;

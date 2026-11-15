@@ -67,7 +67,15 @@ const $ = id => document.getElementById(id);
 const CENTER_TEL = '042-488-6011';
 const AREAS = ['사회정서', '언어', '인지', '운동'];
 const AREA_NAME = { '사회정서':'사회 · 정서', '언어':'언어 · 의사소통', '인지':'인지', '운동':'운동' };
-const CHANNELS = ['네이버 검색 · 블로그', '인스타그램', '지인 소개', '병원 · 기관 소개', '어린이집 · 유치원', '기타'];
+// 유입경로 — 저장은 갈래 이름(v), 학부모께는 문장(t) · 서버 nl_channel_group 과 같은 갈래
+const CHANNELS = [
+  { v: '네이버 블로그',        t: '네이버에서 글을 읽고' },
+  { v: '네이버 지도·플레이스', t: '네이버 지도에서 찾고' },
+  { v: '인스타 광고',          t: '인스타그램 광고를 보고' },
+  { v: '기관 소개',            t: '어린이집·유치원·병원에서 소개받고' },
+  { v: '지인 소개',            t: '아는 분 소개로' },
+  { v: '기타',                 t: '기타 (직접 적기)' }
+];
 
 function esc(s) { return String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -109,7 +117,7 @@ function draw() {
 
   // 1. 유입경로
   html += '<div class="box"><div class="sec">1. 자라는나무를 어떻게 알게 되셨나요?</div><div class="rad">'
-    + CHANNELS.map(c => '<label><input type="radio" name="ch" value="' + esc(c) + '"> ' + esc(c) + '</label>').join('')
+    + CHANNELS.map(c => '<label><input type="radio" name="ch" value="' + esc(c.v) + '"> ' + esc(c.t) + '</label>').join('')
     + '</div><input type="text" id="etc" maxlength="80" placeholder="어떻게 알게 되셨는지 적어 주세요"></div>';
 
   // 2. 주 호소문제
