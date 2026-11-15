@@ -508,7 +508,7 @@
     client.from('nl_therapists').select('id, role').eq('id', id).maybeSingle().then(function (r) {
       if (!r || !r.data) return;
       ME = { id: Number(id), role: String(r.data.role || '').trim() };
-      if (w.NL_MENU) putMenu(); else loadScript('nl-menu.js', putMenu);
+      if (w.NL_MENU) putMenu(); else loadScript('nl-menu.js?v=1111', putMenu);
       try { new MutationObserver(function (ms) {
               // 띠 안에서만 바뀐 것은 건너뜀 (돌고 돌지 않게)
               var bar = document.getElementById('nlTopBar');

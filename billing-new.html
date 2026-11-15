@@ -244,6 +244,8 @@
                  border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
   .pay .ksave2.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
   .later { margin-top:6px; }
+  .r.tot .up { white-space:nowrap; }
+  .evsep { border-top:2px solid #CECBF6; margin-top:12px; padding-top:8px; }
   .later-r { display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 8px; margin-top:4px;
              background:#FFF6EC; border:1px solid #F0D9BF; border-radius:8px; font-size:13px; }
   .later-r .lnm { flex:1 1 220px; color:#8a5a2b; font-weight:600; }
@@ -1737,6 +1739,14 @@ function hasBill(childId) {
 //   「완납만」에 들어가던 일(79번 9월)을 막는다
 // 그 쪽(카드·계좌)에 저장된 줄이 있고 바꾼 칸이 없으면 처음부터 「✓ 저장됨」 (2026-09-17)
 //   전에는 늘 「저장 전」으로 그려, 확정해서 저장한 뒤 다시 그리면 저장 안 된 것처럼 보였다
+// 저장한 줄에 낸 날까지 다 있는가 — 낸 날이 비면 단추를 「저장 전」으로 둔다 (2026-11-12 은정님)
+//   [따로] 줄은 제 칸 단추가 따로 보이므로 뺀다
+function sidePaid(childId, side) {
+  const rs = Object.keys(SAVED[childId] || {}).map(k => SAVED[childId][k])
+    .filter(r => side === 'bank' ? Number(r.support_type_id) === 2 : (Number(r.support_type_id) !== 2 && !isLater(r)))
+    .filter(r => Number(r.amount) > 0);
+  return rs.length > 0 && rs.every(r => !!r.paid_on);
+}
 function sideSaved(childId, side) {
   const ch = CHANGED[childId];
   if (ch && ch[side]) return false;
@@ -1760,17 +1770,21 @@ function isLater(p) { return !!(p && /\[따로\]/.test(String(p.memo || ''))); }
 function laterSts(childId, parts) {
   const sv = SAVED[childId] || {};
   const mainPaid = Object.keys(sv).some(k => Number(k) !== 2 && !isLater(sv[k]) && sv[k].paid_on);
+  // 평가비는 그 달 평가가 있으면 늘 「따로 받음」 칸을 둔다 (평가 날 받고 수업료는 나중에 · 2026-11-12 은정님)
+  const evNow = (EVMON[childId] || []).length > 0;
   return parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0)
-    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]))
+    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]) || (Number(p.st) === 9 && evNow))
     .map(p => ({ st: Number(p.st), amt: Number(p.amt) }));
 }
 function fillLater(box, childId, parts) {
   const el = box.querySelector('.later'); if (!el) return;
+  const el9 = box.querySelector('.later9') || el;   // 평가비 칸은 평가비 줄 바로 아래 (2026-11-12)
   const sv = SAVED[childId] || {};
   const want = laterSts(childId, parts);
-  el.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
+  box.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
   want.forEach(w => {
-    let r = el.querySelector('.later-r[data-lst="' + w.st + '"]');
+    const host = w.st === 9 ? el9 : el;
+    let r = box.querySelector('.later-r[data-lst="' + w.st + '"]');
     if (!r) {
       const o = sv[w.st];
       r = document.createElement('div'); r.className = 'later-r'; r.dataset.lst = w.st;
@@ -1779,11 +1793,14 @@ function fillLater(box, childId, parts) {
         // 승인번호는 그 줄이 낸 날이 있을 때만 (미납 줄에 상자 메모가 따라오지 않게)
         + '<input class="tx lmemo" type="text" placeholder="승인번호" value="' + esc(o && o.paid_on ? memoOf(o, false) : '') + '">'
         + '<button type="button" class="lsave' + (o && o.paid_on ? ' done' : '') + '" data-ttl="저장 전">' + (o && o.paid_on ? '\u2713 저장됨' : '저장 전') + '</button>';
-      el.appendChild(r);
+      host.appendChild(r);
     }
-    r.querySelector('.lnm').textContent = (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
+    r.querySelector('.lnm').textContent = w.st === 9
+      ? '평가비 받은 날 · 비우면 위 수업료 받은 날과 같이'
+      : (TYPES[w.st] || ('지원유형 ' + w.st)) + ' ' + w.amt.toLocaleString() + '원 · 납부완료 뒤 신청';
   });
-  el.style.display = want.length ? '' : 'none';
+  el.style.display = want.some(w => w.st !== 9 || el9 === el) ? '' : 'none';
+  if (el9 !== el) el9.style.display = want.some(w => w.st === 9) ? '' : 'none';
 }
 
 function sideMissing(childId) {
@@ -2108,11 +2125,10 @@ function drawKid(c) {
 
   const fixed = isFixed(c.id);
   const head = '<div class="kidhead">'
-    + '<span class="kidname">' + c.id + '. ' + esc(c.name) + '</span>'
+    + '<span class="kidname">' + c.id + '. ' + esc(c.name) + (ymd(c.birth) ? ' ' + ymd(c.birth) : '') + '</span>'   // 동명이인 — 이름 뒤 생년월일 (2026-11-12)
     + '<button class="kfix ' + (fixed ? 'yes' : 'no') + '" type="button"'
     + ' title="눌러서 예정과 확정을 오갑니다">'
     + (fixed ? '확정' : '예정') + '</button>'
-    + '<span class="kidno">' + ymd(c.birth) + '</span>'
     + '<span class="kidno">' + esc(c.manager_no) + '</span>'
     + '<span class="ktotal">0원</span></div>';
 
@@ -2320,13 +2336,19 @@ function drawKid(c) {
   const evPre  = ev ? null : evalPreset(c.id);
   const evT    = ev ? evalTypeOf(ev) : (evPre ? evPre.type : null);
   const evAmt  = ev ? Number(ev.amount) : (evPre ? evPre.amt : 0);
-  b += '<div class="r gsum narrownm" data-st="9" data-manual="1">'
+  // 평가비 — 그 달 평가가 있거나 저장한 평가비가 있으면 수업료 받는 칸 아래 따로 묶는다 (2026-11-12 은정님)
+  //   평가 날 받고 수업료는 나중에 받으므로 「평가비 받은 날 · 승인번호」를 따로 둔다
+  //   평가가 없는 아동은 전처럼 리뷰 차감 위에 한 줄 (손으로 넣을 수 있게)
+  const evSep = !!(evRows.length || (ev && Number(ev.amount) > 0));
+  const evHtml = '<div class="r gsum narrownm" data-st="9" data-manual="1">'
     + '<span class="nm">평가비</span>'
     + '<span class="de">평가 <select class="evsel" style="border:1px solid #888;border-radius:4px;padding:2px 4px;background:#fff;color:#000">' + evalOptions(evT) + '</select></span>'
     + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
     + '<span class="am"><input class="mn evamt" data-won type="text" inputmode="numeric" value="'
     + (evAmt ? evAmt.toLocaleString() : '') + '" placeholder="0"></span></div>'
-    + evalInfoHtml(evRows);
+    + evalInfoHtml(evRows)
+    + '<div class="later later9" style="display:none"></div>';
+  if (!evSep) b += evHtml;
 
   // 체험 수업 — 저장한 줄이 없으면 그 달 체험 금액(합계)을 채운다 (2026-09-16)
   //   체험이 없고 저장한 것도 없으면 줄을 그리지 않는다
@@ -2379,9 +2401,13 @@ function drawKid(c) {
       + '<span class="up"></span><span class="am rvtxt">0</span></div>';
   }
 
-  b += '<div class="r tot"><span class="nm"></span><span class="de"></span>'
-    + '<span class="ap"></span><span class="ct"></span><span class="up">카드 합계</span>'
+  const totHtml = '<div class="r tot"><span class="nm"></span><span class="de"></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up">' + (evSep ? '카드 합계 (수업료 + 평가비)' : '카드 합계') + '</span>'
     + '<span class="am cardtotal">0원</span></div>';
+  if (evSep) b += '<div class="r tot"><span class="nm"></span><span class="de"></span>'
+    + '<span class="ap"></span><span class="ct"></span><span class="up">수업료 합계</span>'
+    + '<span class="am lessontotal">0원</span></div>';
+  else b += totHtml;
 
   // 「따로 받을 수업」 줄([따로])은 상자 날짜 · 승인번호에서 뺀다 (2026-11-06)
   const cp = Object.keys(sv).map(k => sv[k])
@@ -2389,6 +2415,7 @@ function drawKid(c) {
   const cm = Object.keys(sv).map(k => sv[k])
     .find(p => Number(p.support_type_id) !== 2 && !isLater(p) && memoOf(p, false));
   // 지난달 차액이 저절로 채워졌으면 저장 전으로 보인다 (2026-10-03)
+  // 미납이어도 저장되면 「✓ 저장됨」 (2026-11-14 은정님 · 11/12 「낸 날까지 적어야 저장됨」 규칙을 바꿈)
   const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card);
   // 승인번호는 이번 달 저장분에서만 가져온다. 지난달 것을 끌어오지 않는다.
   b += '<div class="pay">'
@@ -2400,6 +2427,7 @@ function drawKid(c) {
     + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
     + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>'
     + '<div class="later"></div>'   // 납부완료 뒤 신청한 수업 — 그 줄만 날짜 · 승인번호 (calcKid 가 채움 · 2026-11-06)
+    + (evSep ? '<div class="evsep">' + evHtml + '</div>' + totHtml : '')
     + '</div>';   // .cardbody 닫기
 
   const dev = groups.find(g => g.support_type_id === 2);
@@ -2876,6 +2904,10 @@ function calcKid(childId) {
   if (box.querySelector('.cardtotal')) {
     box.querySelector('.cardtotal').textContent = won(card);
   }
+  if (box.querySelector('.lessontotal')) {
+    const evp = parts.filter(p => Number(p.st) === 9).reduce((s2, p) => s2 + p.amt, 0);
+    box.querySelector('.lessontotal').textContent = won(card - evp);
+  }
 
   const total = card + bank;
   box.querySelector('.ktotal').textContent = won(total);
@@ -3156,7 +3188,9 @@ async function saveKid(childId, btn, only) {
     && (!only || (only === 'bank' ? p.st === 2 : p.st !== 2))
   ).map(p => {
     const isBank = (p.st === 2);
-    const lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    let lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    // 평가비 칸을 비워 두었고 전에 따로 저장한 적이 없으면 상자 날짜와 함께 받는다 (2026-11-12)
+    if (lr && p.st === 9 && !lr.querySelector('.lday').value && !isLater((SAVED[childId] || {})[9])) lr = null;
     const day  = isBank ? bankDay : lr ? lr.querySelector('.lday').value : cardDay;
     const lm = lr ? lr.querySelector('.lmemo').value.trim() : '';
     const memo = isBank ? (bankMemo ? '계좌입금 ' + bankMemo : '계좌입금')
@@ -3322,6 +3356,15 @@ async function saveKid(childId, btn, only) {
       if (!only) delete CHANGED[childId];
       else { delete CHANGED[childId][only]; if (!Object.keys(CHANGED[childId]).length) delete CHANGED[childId]; }
     }
+    // 낸 날이 빈 줄이 있으면 「저장 전」으로 남긴다 — 「✓ 저장됨」은 받은 날까지 적은 때만 (2026-11-12)
+    const side = btn.classList.contains('lsave') ? 'later' : (only || 'all');
+    const lst = side === 'later' ? Number((btn.closest('.later-r') || {}).dataset && btn.closest('.later-r').dataset.lst) : 0;
+    const paidOk = side === 'later' ? !!((SAVED[childId] || {})[lst] && SAVED[childId][lst].paid_on)
+                 : side === 'all' ? (sidePaid(childId, 'card') || !Object.keys(SAVED[childId] || {}).some(k => Number(k) !== 2))
+                                    && (sidePaid(childId, 'bank') || !(SAVED[childId] || {})[2])
+                 : sidePaid(childId, side);
+    // 미납이어도 저장되면 「✓ 저장됨」 (2026-11-14)
+    void paidOk;
     btn.textContent = '\u2713 저장됨';
     btn.classList.add('done');
     btn.disabled = false;
@@ -4083,7 +4126,7 @@ function openExtra(childId) {
   Object.keys(TTYPES).forEach(k => { yo += '<option value="' + k + '">' + esc(TTYPES[k]) + '</option>'; });
   const w = document.createElement('div');
   w.className = 'xlpop';
-  w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + '</h3>'
+  w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + (c && ymd(c.birth) ? ' ' + ymd(c.birth) : '') + '</h3>'
     + '<div class="rw"><label>날짜</label><input type="date" id="xlD" value="' + d0 + '" min="' + LOADED_MK + '-01" max="' + monEndDay(LOADED_MK) + '"></div>'
     + '<div class="rw"><label>시각</label><select id="xlH">' + hs + '</select><select id="xlM">' + ms + '</select>'
     + '<select id="xlN"><option value="40">40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'

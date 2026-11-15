@@ -522,6 +522,9 @@
         </div>
         <div id="cnMsg" style="font-size:12.5px; margin-top:6px;"></div>
       </div>
+
+      <!-- 초기 상담지 — 질문지 문자 · 직접 쓰기 (신규 아동 관리와 같은 것 · nl-intake.js · 2026-11-09) -->
+      <div id="ikHere" style="border-top:1px solid #eceee9; margin-top:10px; padding-top:10px;"></div>
     </div>
 
     <!-- ③ 평가 · 상담 메모 -->
@@ -602,6 +605,7 @@
 <script src="nl-login.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script src="nl-trials.js"></script>
+<script src="nl-intake.js"></script>
 <script>
 
 // ===== 연락처 칸 (2026-10-08) — 숫자만 · 자리 수만큼 · 줄표 저절로 =====
@@ -800,6 +804,11 @@ async function afterLogin(user) {
   nlKeep(me.id);   // 대표(8번)만 로그인을 브라우저에 남긴다
   NLDocs.init(sb, me.id);   // 평가보고서 창구 준비 (8·9번만 올리고 봄)
   if (window.NLTrials) NLTrials.init(sb, me.id);   // 체험 수업 칸 준비
+  // 초기 상담지 (신규 아동 관리와 같은 것 · nl-intake.js · 2026-11-09)
+  if (window.NLIntake) {
+    $('ikHere').innerHTML = NLIntake.box();
+    NLIntake.init({ sb, me, kid: id => ALL.find(k => k.id === id) });
+  }
 
   // 2) 아동 불러오기
   const { data, error } = await sb
@@ -1351,6 +1360,7 @@ function openEdit(id) {
   $('e_school').value     = c.school || '';
   $('e_grade').value      = c.grade_year || '';
   emShow(c.memo || '', c.memo_at || null);
+  if (window.NLIntake && $('ikList')) NLIntake.load(c.id);   // 초기 상담지
 
   // 보호자 연락처 — 보호자 표 것을 그대로. 없으면 아동 표 것을 첫 줄로
   GROWS = (GUARD[c.id] || []).map(g => ({

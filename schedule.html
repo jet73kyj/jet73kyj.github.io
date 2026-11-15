@@ -1846,12 +1846,29 @@
         <div id="eg_msg" class="out"></div>
     </div>
 
+    <div id="edStartBox" style="margin:10px 0;padding:10px 12px;background:#F4F7F2;border-left:2px solid #5E9A6E;border-radius:6px;">
+      <div style="font-weight:600;color:#3E6B4B;margin-bottom:6px;">수업 시작일</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="ed_start2" type="date" style="width:auto !important;margin:0 !important;">
+        <button type="button" id="edStartBtn" class="pbtn" style="width:auto !important;margin:0 !important;">시작일 바꾸기</button>
+        <span id="edStartNow" style="font-size:12px;color:#8A817A;"></span>
+      </div>
+      <div style="font-size:11.5px;color:#8A817A;line-height:1.6;margin-top:6px;">
+        늦추면 그 앞의 예정 회기를 지우고, 당기면 그 날부터 회기를 깝니다. 바뀐 달의 회차를 다시 매깁니다.<br>
+        완료 · 결석 · 보강 기록이 있거나 다른 수업과 겹치면 바꾸지 않습니다. 「저장」은 누르지 않아도 됩니다.
+      </div>
+    </div>
+
     <div class="edend">
       <div class="edend-t">수업 끝내기</div>
       <div class="edend-row">
         <label for="ed_end" title="이날부터 수업이 없습니다">종결일 <span style="font-weight:normal;font-size:11px;">(이날부터 수업 없음)</span></label>
         <input id="ed_end" type="date">
         <button id="edEnd" class="pbtn red">이 수업 종결</button>
+        <button id="edCancel" class="pbtn" style="border:1px solid #D8684A !important;color:#D8684A !important;background:#fff !important;">수업 취소 (등록 취소)</button>
+      </div>
+      <div style="font-size:11.5px;color:#8A817A;line-height:1.6;margin:6px 0 0;">
+        수업 취소 = 한 번도 하지 않은 수업을 지웁니다. 시간표 · 회기 · 수업 줄이 모두 없어지고 통계 · 종결 기록에도 남지 않습니다.
       </div>
       <!-- 종결 사유 묶음 — 통계에서 사유별로 셈 (nl_therapies.end_cat · 2026-10-07) -->
       <div class="edend-row" style="margin-top:12px;">
@@ -3365,6 +3382,7 @@ function fPartGroup(list, origId){
     + esc(lb) + ' - ' + parts + '</span>';
 }
 
+let FIND_RETRY = '';   // 못 찾을 때 한 번만 다시 읽기 (같은 글자로 되풀이하지 않게)
 function drawFind(){
   const q = $('findName').value.trim();
   if (!q) { $('findBox').style.display = 'none'; return; }
@@ -3395,15 +3413,28 @@ function drawFind(){
 
   if (!hit.length) {
     $('findTitle').textContent = '🔍 "' + q + '" 찾기';
+    // 다른 화면(신규 아동 관리 · 아동 목록)에서 방금 넣은 수업은 이 탭 목록에 아직 없을 수 있다 (2026-11-09 · 179번)
+    //   못 찾으면 한 번만 수업 목록을 서버에서 다시 읽고 다시 찾는다
+    if (FIND_RETRY !== q) {
+      FIND_RETRY = q;
+      $('findRows').innerHTML = '<div class="findnone">수업 목록을 다시 읽는 중…</div>';
+      (async () => {
+        try { await reloadRowsAll(); await applyMonthFilter(); } catch (e) {}
+        if ($('findName').value.trim() === q) drawFind();
+      })();
+      return;
+    }
     $('findRows').innerHTML = '<div class="findnone">그 이름의 수업이 없습니다. '
       + '종결한 아동이거나 수업이 아직 없는 아동입니다.</div>';
     return;
   }
+  FIND_RETRY = '';
   Object.values(byScd).forEach(a => a.sort((x,y)=>String(x.plan_date).localeCompare(String(y.plan_date))));
 
   const names = Array.from(new Set(hit.map(r => r._name)));
   const ord = { '월':1,'화':2,'수':3,'목':4,'금':5,'토':6 };
-  hit.sort((a,b) => (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
+  // 동명이인이 섞이지 않게 아동 번호로 먼저 묶는다 (2026-11-12 은정님)
+  hit.sort((a,b) => (Number(a._cid)-Number(b._cid)) || (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
   // 같은 치료 · 같은 요일 · 같은 사업이면 요일줄이 나뉘어도 한 줄로 (2026-09-17)
   //   달 중간에 시각·담당을 바꾸면 요일줄이 둘이 되어 찾기 창이 두 줄로 그려졌다 (127번)
   //   줄의 주인(수정 · 이 미정)은 가장 나중에 시작한 요일줄
@@ -3435,6 +3466,7 @@ function drawFind(){
       GRPOF[own.id] = rows;
       grp[i] = own;
     });
+    grp.sort((a,b) => (Number(a._cid)-Number(b._cid)) || (ord[a.weekday]-ord[b.weekday]) || (toMin(a.start_time)-toMin(b.start_time)));
   }
   const idsOf = r => IDSOF[r.id] || [r.id];
   // 묶인 요일줄의 이 달 날짜 — 요일이 바뀌었으면 각 요일줄이 살아 있던 날만 이어 붙인다
@@ -3790,7 +3822,8 @@ function bd(v){
   return s.length >= 10 ? s.slice(2,4) + s.slice(5,7) + s.slice(8,10) : '';
 }
 
-function markFind(){
+// noJump — 다시 그릴 때(저장 · 상태 바꾸기 뒤)는 화면을 옮기지 않는다 (2026-11-09)
+function markFind(noJump){
   document.querySelectorAll('.hit').forEach(el => {
     el.classList.remove('hit'); el.classList.remove('hitnow');
   });
@@ -3838,7 +3871,8 @@ function markFind(){
   if (!hitEls.length) return;
   $('findJump').style.display = '';
   $('findJump').textContent = hitEls.length + '자리 ›';
-  jumpTo(0);
+  hitAt = -1;   // 「○자리 ›」를 누르면 첫 칸부터
+  if (!noJump) jumpTo(0);
 }
 function jumpTo(i){
   if (!hitEls.length) return;
@@ -4070,9 +4104,9 @@ function drawWeek(){
           const ds2 = dates[i2];
           return ths.map(th3 => {
           const list = dropHoliDup(cell[s.no + '_' + d + '_' + th3.id] || []);
-          // ＋ 단추 — 그 치료사 자리에 바로 넣는다
+          // ＋ 단추 — 그 치료사 자리에 바로 넣는다 (누른 날짜도 함께 — 시작일 처음 값 · 2026-11-09)
           const plus = CAN_EDIT
-            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '">'
+            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '_' + ds2 + '">'
               + '＋</button>'
               + (canOpenAdd()
                   ? '<button class="lnadd" data-mn="'
@@ -4645,7 +4679,7 @@ function drawOne(){
       + ths.map(th3 => {
           const list = dropHoliDup(cell[s.no + '_' + th3.id] || []);
           const plus = CAN_EDIT
-            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + '">'
+            ? '<button class="addbtn" data-add2="' + s.no + '_' + th3.id + (oneDate ? '_' + oneDate : '') + '">'
               + '＋ 수업 넣기</button>'
               + (canOpenAdd()
                   ? '<button class="lnadd" data-mn="'
@@ -5161,7 +5195,7 @@ function afterDraw(){
   placeWait();   // 자리 대기 아동 (2026-10-08)
   if (!$('findName').value.trim()) return;
   if (VIEW !== 'day') drawFind();
-  markFind();
+  markFind(true);   // 다시 그릴 때는 찾은 칸으로 화면을 옮기지 않음 (2026-11-09)
 }
 
 
@@ -5805,21 +5839,24 @@ function showPick(k){
   $('ad_name').value = '';
   $('ad_hits').innerHTML = '';
   $('ad_pick').style.display = 'block';
-  $('ad_pick').innerHTML = '고른 아동 — ' + esc(k.name) + ' (' + k.id + '번 · '
+  $('ad_pick').innerHTML = '고른 아동 — ' + esc(k.name) + (bd(KIDBD[k.id]) ? ' ' + bd(KIDBD[k.id]) : '') + ' (' + k.id + '번 · '
     + esc(k.status) + ')<span class="x" id="ad_x">✕ 다시 고르기</span>';
   $('ad_x').onclick = clearPick;
 }
 $('ad_name').addEventListener('input', () => {
   const q = $('ad_name').value.trim();
   if (!q) { $('ad_hits').innerHTML = ''; return; }
-  const hit = KIDS.filter(k => (k.name||'').includes(q)).slice(0, 12);
+  // 이름 또는 아동 번호로 찾음 · 동명이인은 생년월일로 가름 (2026-11-12)
+  const qn = q.replace(/번$/, '');
+  const hit = KIDS.filter(k => (k.name||'').includes(q) || String(k.id) === qn).slice(0, 20);
   if (!hit.length) {
-    $('ad_hits').innerHTML = '<div class="hitnone">그런 이름의 아동이 없습니다. '
+    $('ad_hits').innerHTML = '<div class="hitnone">그런 이름 · 번호의 아동이 없습니다. '
       + '아동 관리 화면에서 먼저 등록하세요.</div>';
     return;
   }
   $('ad_hits').innerHTML = hit.map(k =>
     '<span class="hit" data-kid="'+k.id+'">'+esc(k.name)
+    + (bd(KIDBD[k.id]) ? ' ' + bd(KIDBD[k.id]) : '')
     + '<span class="sm"' + (k.status === '종결' ? ' style="color:#c62828;font-weight:bold;"' : '')
     + '>'+k.id+'번 · '+esc(k.status)+'</span></span>').join('');
   $('ad_hits').querySelectorAll('.hit').forEach(el => {
@@ -5845,7 +5882,23 @@ function openAdd(key){
   $('ad_cnt').value = '매주';
   wkOn = [true,true,true,true];
   drawWks();
-  $('ad_start').value = mon + '-01';
+  // 시작일 처음 값 (2026-11-09 · 179번 — 25일 칸에서 넣었는데 1일부터 들어가 지난 4일에도 회기가 깔림)
+  //   주간 · 하루 보기는 누른 날짜 · 요일별 보기는 그 달 그 요일 가운데 오늘 이후 첫 날 (지난 달이면 1일)
+  const _pd = /^\d{4}-\d{2}-\d{2}$/.test(p[2] || '') ? p[2] : '';
+  if (_pd) {
+    const _w = ['일','월','화','수','목','금','토'][new Date(_pd + 'T00:00:00').getDay()];
+    if (_w && _w !== '일') wd = _w;
+    $('addTitle').textContent = wd + '요일 ' + slotT(slot, th ? th.id : null, wd)
+      + ' · ' + (th ? th.name : '') + ' — 수업 넣기';
+  }
+  let _st = _pd;
+  if (!_st) {
+    const _td = todayKr();
+    const _ds = wdDates(mon, wd) || [];
+    _st = _ds.find(d0 => d0 >= _td) || (mon + '-01' > _td ? mon + '-01' : (_ds[0] || mon + '-01'));
+    if (mon < _td.slice(0, 7)) _st = mon + '-01';
+  }
+  $('ad_start').value = _st;
   $('ad_end').value = '';
   admsg('', true); $('adMsg').className = 'out';
   $('edBox').style.display = 'none';
@@ -5874,6 +5927,10 @@ $('adSave').onclick = async () => {
   if (!thOkForTt(tt, thId)) {
     if (!confirm('이 치료사는 그 치료 담당이 아닙니다.\n그래도 넣을까요?')) return;
   }
+
+  // 지난 날짜부터 넣으면 지난 회기가 깔린다 — 한 번 묻기 (2026-11-09)
+  const _sv = $('ad_start').value;
+  if (_sv && _sv < todayKr() && !confirm('시작일 ' + _sv + ' 은 지난 날짜입니다.\n그 날부터 오늘까지의 지난 수업도 시간표에 깔립니다.\n\n이대로 넣을까요?')) return;
 
   // 저장을 여러 번 눌러도 한 번만 들어가게 한다
   if ($('adSave').disabled) return;
@@ -6051,6 +6108,14 @@ function openEd(scId){
   const r = ROWS.find(x => x.id === scId) || ROWS_ALL.find(x => x.id === scId);
   if (!r) return;
   edRow = r;
+  // 수업 시작일 (2026-11-09 · 179번) — 서버에서 읽어 채움
+  $('ed_start2').value = r.from_date || ''; $('edStartNow').textContent = '';
+  $('edStartBox').style.display = CAN_EDIT ? '' : 'none';
+  if (r.therapy_id) sb.from('nl_therapies').select('started_on').eq('id', r.therapy_id).maybeSingle().then(({ data }) => {
+    if (edRow !== r || !data) return;
+    if (data.started_on) $('ed_start2').value = data.started_on;
+    $('edStartNow').textContent = '지금 ' + (data.started_on || '빈칸');
+  });
   closeSplitBox(false);   // 지난 창의 「이날부터 바꾸기」 상자 닫기 (2026-10-16)
   edWk = [r._w1 !== false, r._w2 !== false, r._w3 !== false, r._w4 !== false];
   drawEdWks();
@@ -7467,6 +7532,16 @@ $('edEnd').onclick = async () => {
   }
   if (!d) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { edmsg('날짜 모양이 다릅니다.', false); return; }
+  // 첫 수업 전에 그만두면 종결일은 첫 수업 날로 맞춘다 (2026-11-09 · 80번 — 종결일이 시작일보다 앞이면 서버가 막음)
+  try {
+    const { data: _tp } = await sb.from('nl_therapies').select('started_on').eq('id', edRow.therapy_id).maybeSingle();
+    const _st = [(_tp && _tp.started_on) || '', edRow.from_date || ''].map(v => String(v).slice(0, 10)).filter(Boolean).sort().pop() || '';
+    if (_st && d < _st) {
+      if (!confirm('이 수업은 ' + _st + ' 에 시작하는 수업입니다.\n\n'
+        + '첫 수업 전에 그만두는 것이라 종결일을 ' + _st + ' 로 맞춥니다.\n(한 번도 수업하지 않고 끝남)\n\n이대로 할까요?')) return;
+      d = _st; if ($('ed_end')) $('ed_end').value = d;
+    }
+  } catch (e) {}
   const _last = dayAdd(d, -1);   // 끝난날(마지막 수업 날) — 다른 화면들이 이 뜻으로 쓴다
 
   // 지난 날짜면 한 번 더 묻는다 (시작일로 착각해 넣는 일이 있었다)
@@ -7643,6 +7718,56 @@ $('edEnd').onclick = async () => {
     edmsg('❌ 끝내지 못했습니다.\n' + e.message, false);
   } finally {
     $('edEnd').disabled = false;
+  }
+};
+
+// 수업 시작일 바꾸기 (2026-11-09 은정님 · 179번) — 셈 · 지우기 · 깔기는 서버 nl_change_start 한 곳
+$('edStartBtn').onclick = async () => {
+  if (!edRow || !CAN_EDIT) return;
+  const d = $('ed_start2').value;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { alert('시작일을 넣어 주세요.'); return; }
+  if (!confirm((edRow._name || '') + ' 수업 시작일을 ' + d + ' 로 바꿀까요?\n\n늦추면 그 앞의 예정 회기를 지우고, 당기면 그 날부터 회기를 깝니다.')) return;
+  $('edStartBtn').disabled = true;
+  try {
+    const { data, error } = await sb.rpc('nl_change_start', { p_therapy: Number(edRow.therapy_id), p_date: d });
+    if (error) { alert('❌ 바꾸지 못했습니다.\n\n' + error.message); return; }
+    const keep = edRow.id;
+    try { await reloadRowsAll(); } catch (e) {}
+    await loadMonth();
+    draw();
+    const nr = ROWS.find(x => x.id === keep) || ROWS_ALL.find(x => x.id === keep);
+    if (nr) edRow = nr;
+    $('edStartNow').textContent = '지금 ' + d;
+    alert('✅ ' + data);
+  } catch (e) {
+    alert('❌ 바꾸지 못했습니다.\n\n' + (e.message || e));
+  } finally { $('edStartBtn').disabled = false; }
+};
+
+// 수업 취소 (등록 취소) — 한 번도 하지 않은 수업을 처음부터 없던 것으로 (2026-11-09 은정님 · 80번)
+//   셈 · 지우기는 서버 nl_therapy_cancel 한 곳 — 걸리는 것이 있으면 아무것도 안 지움
+$('edCancel').onclick = async () => {
+  if (!edRow) return;
+  if (!CAN_EDIT) { alert('대표 · 행정 · 데스크만 수업을 취소할 수 있습니다.'); return; }
+  const _what = (edRow._name || '') + ' · ' + (TTYPE[edRow._tt] || '') + ' · '
+    + (STYPE[edRow.support_type_id] || '') + ' · ' + (edRow.weekday || '') + '요일 ' + String(edRow.start_time || '').slice(0, 5);
+  $('edCancel').disabled = true;
+  try {
+    const { data: chk, error: e0 } = await sb.rpc('nl_therapy_cancel', { p_therapy: Number(edRow.therapy_id), p_check: true });
+    if (e0) { edmsg('❌ 취소할 수 없습니다.\n' + e0.message, false); alert('❌ 취소할 수 없습니다.\n\n' + e0.message); return; }
+    if (!confirm('아래 수업을 「등록 취소」합니다. 처음부터 없던 수업이 됩니다.\n\n  ' + _what + '\n\n' + chk
+      + '\n\n종결 기록 · 통계에도 남지 않고 되돌릴 수 없습니다. 이대로 할까요?')) return;
+    const { data: res, error: e1 } = await sb.rpc('nl_therapy_cancel', { p_therapy: Number(edRow.therapy_id), p_check: false });
+    if (e1) { edmsg('❌ 취소하지 못했습니다.\n' + e1.message, false); alert('❌ 취소하지 못했습니다.\n\n' + e1.message); return; }
+    ROWS = ROWS.filter(x => String(x.therapy_id) !== String(edRow.therapy_id));
+    $('edBox').style.display = 'none'; edRow = null;
+    await loadMonth();
+    draw();
+    alert('✅ ' + res);
+  } catch (e) {
+    edmsg('❌ 취소하지 못했습니다.\n' + (e.message || e), false);
+  } finally {
+    $('edCancel').disabled = false;
   }
 };
 
@@ -9898,7 +10023,7 @@ async function mkSaveRun() {
   if (!skipBusy) {
     const newS = toMin(String((mkHm || slotHm(slot, th, wdOf(d))) || '').slice(0, 5));
     const q = await sb.from('nl_sessions')
-      .select('id, child_id, therapist_id, start_time, minutes, schedule_id, makeup_for, status')
+      .select('id, child_id, therapist_id, start_time, minutes, schedule_id, makeup_for, status, therapy_id')
       .eq('plan_date', d).in('status', ['예정', '완료', '보강']);
     if (q.error) { mkmsg('그 날 수업을 읽지 못했습니다. 다시 해 주세요.\n' + q.error.message, false); return; }
     const scIds = Array.from(new Set((q.data || []).filter(x => x.schedule_id && !x.minutes).map(x => x.schedule_id)));
@@ -9914,7 +10039,11 @@ async function mkSaveRun() {
       && Number(x.makeup_for) !== Number(mkSess.id)          // 이 결석에 이미 딸린 보강은 고치는 대상
       && toMin(String(x.start_time).slice(0, 5)) < newS + mkMin
       && newS < toMin(String(x.start_time).slice(0, 5)) + lenOf(x));
-    const other = hit.find(x => Number(x.therapist_id) === th && Number(x.child_id) !== Number(mkSess.child_id));
+    // 같은 그룹반 아동을 같은 선생님 · 같은 시각에 함께 보강하는 것은 겹침이 아님 (2026-11-13 은정님)
+    const myG = GTH[mkSess.therapy_id];
+    const sameGrp = x => myG && Number(GTH[x.therapy_id]) === Number(myG)
+      && String(x.start_time).slice(0, 5) === String((mkHm || slotHm(slot, th, wdOf(d))) || '').slice(0, 5);
+    const other = hit.find(x => Number(x.therapist_id) === th && Number(x.child_id) !== Number(mkSess.child_id) && !sameGrp(x));
     if (other) {
       mkmsg('❌ 그 시간에는 이미 선생님 다른 아동 수업이 있습니다.\n'
         + '  ' + dayNo(d) + '일 ' + h12(String(other.start_time).slice(0, 5)) + ' · ' + kidNameOf(other.child_id) + '\n'

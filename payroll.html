@@ -402,10 +402,11 @@
     <div style="color:#888;font-size:12px;">영역마다 1:1 칸은 꼭 적습니다 · 그룹 칸은 그룹 수업이 있을 때만 · 60분은 1:1 칸의 1.5배</div>
     <div class="evalrow" style="margin-top:10px;">
       <div>
-        <label for="rt_ev1">평가 1 · 2 · 3개 단가 <span style="color:#888;">(비우면 공통 단가)</span></label>
+        <label for="rt_ev1">평가 1 · 2 · 3 · 4개 단가 <span style="color:#888;">(비우면 공통 단가)</span></label>
         <span style="display:flex;gap:4px;"><input id="rt_ev1" data-won type="text" inputmode="numeric" placeholder="1개" style="width:80px;">
         <input id="rt_ev2" data-won type="text" inputmode="numeric" placeholder="2개" style="width:80px;">
-        <input id="rt_ev3" data-won type="text" inputmode="numeric" placeholder="3개" style="width:80px;"></span>
+        <input id="rt_ev3" data-won type="text" inputmode="numeric" placeholder="3개" style="width:80px;">
+        <input id="rt_ev4" data-won type="text" inputmode="numeric" placeholder="4개" style="width:80px;"></span>
       </div>
       <button id="rtSave" class="addb">저장</button>
     </div>
@@ -931,7 +932,7 @@ function calc(){
   let efee = 0;
   $('rows2').innerHTML = evs.length ? evs.map(e => {
     const cnt = Number(e.item_cnt) || 1;
-    const own = cnt === 1 ? r.eval1 : cnt === 2 ? r.eval2 : cnt === 3 ? r.eval3 : null;
+    const own = cnt === 1 ? r.eval1 : cnt === 2 ? r.eval2 : cnt === 3 ? r.eval3 : cnt === 4 ? r.eval4 : null;   // 4개 (2026-11-13)
     const f = (own != null && own !== '' ? Number(own) : (EVFEE[cnt] || 0)); efee += f;
     const nm = KIDS[e.child_id] || ('아동 ' + e.child_id + '번');
     return '<tr><td>' + esc(e.eval_date) + '</td><td>' + esc(nm) + '</td>'
@@ -1244,14 +1245,14 @@ function drawRateBox(){
     $('rt_fuel').value = r.daily_fuel  || '';
     $('rt_ins').value  = r.insured ? 'yes' : 'no';
     $('rt_dec').value  = r.declared_amt || '';
-    $('rt_ev1').value = r.eval1 || ''; $('rt_ev2').value = r.eval2 || ''; $('rt_ev3').value = r.eval3 || '';
+    $('rt_ev1').value = r.eval1 || ''; $('rt_ev2').value = r.eval2 || ''; $('rt_ev3').value = r.eval3 || ''; $('rt_ev4').value = r.eval4 || '';
     $('rt_fname').value = r.fuel_name || '주유비';
   } else {
     $('rtNow').innerHTML = '<b style="color:#c62828;">이 달에 적용되는 단가가 없습니다.</b>'
       + ' 아래에 넣어주세요.';
     $('rt_fee').value = ''; $('rt_grp').value = '';
     $('rt_fuel').value = ''; $('rt_dec').value = ''; $('rt_ins').value = 'no';
-    $('rt_ev1').value = ''; $('rt_ev2').value = ''; $('rt_ev3').value = ''; $('rt_fname').value = '주유비';
+    $('rt_ev1').value = ''; $('rt_ev2').value = ''; $('rt_ev3').value = ''; $('rt_ev4').value = ''; $('rt_fname').value = '주유비';
   }
   $('rt_from').value = mon;
   drawPfBox();
@@ -1367,6 +1368,7 @@ $('rtSave').onclick = async () => {
     insured:      ins,
     declared_amt: dec,
     eval1: numOf($('rt_ev1').value), eval2: numOf($('rt_ev2').value), eval3: numOf($('rt_ev3').value),
+    eval4: numOf($('rt_ev4').value),   // 언어평가 4개 (2026-11-13)
     fuel_name: $('rt_fname').value || '주유비'
   };
 
@@ -2102,7 +2104,7 @@ function initCard(){
   $('ct_memoClr').onclick = () => { if (!$('ct_memo').value || confirm('메모를 지울까요? (「저장」을 눌러야 지워집니다)')) $('ct_memo').value = ''; };
   $('ctSave').onclick = saveCard;
 }
-function rtSnap(){ return ['rt_fee','rt_grp','rt_fuel','rt_fname','rt_ins','rt_dec','rt_ev1','rt_ev2','rt_ev3'].map(i => $(i).value).join('|')
+function rtSnap(){ return ['rt_fee','rt_grp','rt_fuel','rt_fname','rt_ins','rt_dec','rt_ev1','rt_ev2','rt_ev3','rt_ev4'].map(i => $(i).value).join('|')
   + '|' + areaVals().map(a => a.therapy_type_id + ':' + a.fee + '/' + a.group_fee + '/' + a.share_pct).join(','); }
 // 퇴사 뒤 상태 글 — 다음 날부터 14일은 기록지만, 그 뒤는 막힘 (서버 nl_me 와 같은 셈)
 function leftNote(d){
@@ -2142,7 +2144,7 @@ function drawCard(){
   const rates = RATES_ALL.filter(x => x.therapist_id === thId).sort((p, q) => String(q.started_on).localeCompare(String(p.started_on)));
   const rl = r => String(r.started_on || '').slice(0, 7) + '~ · 회기 ' + won(r.session_fee) + ' · 60분 ' + won(Math.round((r.session_fee || 0) * 1.5))
     + areaTxt(r) + (r.group_fee ? ' · 그룹 1인당 ' + won(r.group_fee) : '')
-    + ((r.eval1 || r.eval2 || r.eval3) ? ' · 평가 ' + [r.eval1, r.eval2, r.eval3].map(v => v ? won(v) : '공통').join('/') : ' · 평가 공통 단가')
+    + ((r.eval1 || r.eval2 || r.eval3 || r.eval4) ? ' · 평가 ' + [r.eval1, r.eval2, r.eval3, r.eval4].map(v => v ? won(v) : '공통').join('/') : ' · 평가 공통 단가')
     + (r.daily_fuel ? ' · ' + (r.fuel_name || '주유비') + ' ' + won(r.daily_fuel) + '/일' : '')
     + ' · 4대보험 ' + (r.insured ? '가입 (기본급 ' + won(r.declared_amt) + ')' : '미가입');
   $('ctCard').innerHTML = '<div class="cthd">' + thId + '번 ' + esc(t.name || '') + ' 선생님 · 위탁계약'
