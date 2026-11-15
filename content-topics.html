@@ -70,7 +70,7 @@ const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&am
 
 // 콘텐츠 주제 (2026-11-15 은정님) — 신규 상담 「콘텐츠 주제」 칸에 적은 것
 //   namu-content 로 나가는 창구 nl_content_export() 를 그대로 읽음 — 아동 · 상담 번호 없음
-const AREAS = ['언어','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
+const AREAS = ['언어','발음','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
 let ROWS = [], AREA = '', MON = '';
 async function load() {
   const { data, error } = await sb.rpc('nl_content_export');

@@ -1337,7 +1337,7 @@ function detMarkDirty() {
 //   표 nl_content_topics (아동 한 명에 한 줄) · nl_content_topic_areas (영역 한 칸에 하나)
 //   밖으로는 nl_content_export() 가 { 질문, 영역, 센터, 등록 월 } 만 내보냄
 const CT_CENTER = '자라는나무';   // 센터 — 지금은 고정. 아이힐 상담도 여기 적게 되면 이 한 줄만 그 상담의 센터로 바꾸면 됨
-const CT_AREAS = ['언어','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
+const CT_AREAS = ['언어','발음','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
 let CT = { cid: null, id: null, q: '', areas: [], saving: false };
 function ctPick() { return [...document.querySelectorAll('#ctAreas .ctA.on')].map(b => b.dataset.a); }
 function ctDirty() {
