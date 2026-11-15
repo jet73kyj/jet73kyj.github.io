@@ -394,6 +394,22 @@
         <div id="ikAddBox" style="display:none;margin-top:8px;padding:10px 12px;border:1px solid #EFD5DF;
              border-left:3px solid #C7648E;border-radius:8px;background:#FBF0F4;font-size:13.5px;line-height:1.7;"></div>
       </div>
+      <!-- 콘텐츠 주제 (2026-11-15 은정님) — 새 문의 등록 창. 「등록하기」 때 함께 저장 · 비우면 저장 안 함 -->
+      <div style="grid-column:1 / -1; border-top:1px dashed #cfe0d0; margin-top:10px; padding-top:10px;">
+        <label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span>콘텐츠 주제</span>
+          <span style="font-weight:normal;color:#888;font-size:12.5px;">(선택 · 비워도 됨)</span>
+          <span style="flex:1 1 auto;"></span>
+          <span id="nctCenter" style="font-weight:normal;font-size:12.5px;color:#666;"></span>
+        </label>
+        <div style="font-size:12.5px;color:#666;margin-bottom:6px;">부모님이 걱정한 모습을 일반 질문으로 적어주세요. 이름·나이·기관명은 적지 않아요.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="nctQ" type="text" maxlength="60" placeholder="예: 말은 하는데 대화가 잘 안 이어져요" style="flex:1 1 auto;margin:0;">
+          <span id="nctLen" style="font-size:12px;color:#999;white-space:nowrap;">0 / 60</span>
+        </div>
+        <div id="nctAreas" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;"></div>
+        <div id="nctWarn" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:6px;padding:6px 10px;color:#633806;font-size:12.5px;margin-top:6px;"></div>
+      </div>
       <div style="grid-column:1 / -1; border-top:2px solid #cfe0d0;
                   margin-top:14px; padding-top:14px;">
         <label style="display:flex; align-items:center; gap:10px;">
@@ -1446,6 +1462,72 @@ async function ctDelete() {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 })();
 
+// 새 문의 등록 창의 콘텐츠 주제 (2026-11-15) — 열기 창 상자와 같은 규칙 · 「등록하기」 때 저장
+function nctPick() { return [...document.querySelectorAll('#nctAreas .ctA.on')].map(b => b.dataset.a); }
+function nctDraw() {
+  if (!$('nctAreas')) return;
+  $('nctCenter').textContent = '센터 ' + CT_CENTER;
+  $('nctQ').value = '';
+  $('nctAreas').innerHTML = CT_AREAS.map(a => '<button type="button" class="ctA" data-a="' + a + '" style="width:auto;margin:0;padding:4px 11px;'
+    + 'border-radius:14px;font-size:13px;cursor:pointer;background:#fff;color:#444;border:1px solid #ccc;">' + a + '</button>').join('');
+  nctWarn();
+}
+function nctWarn() {
+  const q = $('nctQ').value;
+  $('nctLen').textContent = q.length + ' / 60';
+  const hit = ctCheck(q), w = $('nctWarn');
+  if (!hit.length) { w.style.display = 'none'; return; }
+  w.style.display = 'block';
+  w.textContent = '⚠ ' + hit.map(x => '「' + x + '」').join(' ') + '이 들어 있어요. 일반 질문으로 바꾸면 좋아요. (그래도 등록은 됩니다)';
+}
+// cid 아동에 저장 — 돌려주는 글: '' 저장 안 함 / '저장' / '⚠ …' 실패
+async function nctSaveFor(cid) {
+  const q = ($('nctQ').value || '').trim(), areas = nctPick();
+  if (!q) return areas.length ? '⚠ 콘텐츠 주제는 질문이 비어 저장하지 않았습니다' : '';
+  try {
+    const { data: old, error: e0 } = await sb.from('nl_content_topics').select('id').eq('child_id', cid).maybeSingle();
+    if (e0) throw e0;
+    let id;
+    if (old) {
+      const { data, error } = await sb.from('nl_content_topics')
+        .update({ question: q, updated_at: new Date().toISOString() }).eq('id', old.id).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('저장할 권한이 없습니다.');
+      id = old.id;
+      const { error: e2 } = await sb.from('nl_content_topic_areas').delete().eq('topic_id', id);
+      if (e2) throw e2;
+    } else {
+      const { data, error } = await sb.from('nl_content_topics')
+        .insert({ child_id: cid, question: q, center: CT_CENTER }).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('저장할 권한이 없습니다.');
+      id = data[0].id;
+    }
+    if (areas.length) {
+      const { error } = await sb.from('nl_content_topic_areas').insert(areas.map(a => ({ topic_id: id, area: a })));
+      if (error) throw error;
+    }
+    return old ? '저장 (전에 적은 콘텐츠 주제를 바꿈)' : '저장';
+  } catch (e) {
+    return '⚠ 콘텐츠 주제는 저장하지 못했습니다: ' + (e.message || e) + ' — 「열기」 창에서 다시 적어 주세요';
+  }
+}
+(function nctBind() {
+  const go = () => {
+    if (!$('nctQ')) return;
+    nctDraw();
+    $('nctQ').addEventListener('input', nctWarn);
+    $('nctAreas').addEventListener('click', e => {
+      const b = e.target.closest('.ctA'); if (!b) return;
+      b.classList.toggle('on');
+      const on = b.classList.contains('on');
+      b.style.background = on ? '#E1F5EE' : '#fff'; b.style.color = on ? '#0F6E56' : '#444';
+      b.style.border = on ? '1px solid #5DCAA5' : '1px solid #ccc';
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+
 function detPending() {
   const out = [];
   if ($('detBox').style.display === 'none' || !openId) return out;
@@ -1494,6 +1576,7 @@ function addDraft() {
     .some(k => $(k) && String($(k).value || '').trim());
   if (any) return true;
   if (String($('k_memo').value || '').trim() !== MEMO_TMPL.trim()) return true;
+  if ($('nctQ') && ($('nctQ').value.trim() || nctPick().length)) return true;
   return Array.from(document.querySelectorAll('#nvRows .nv_date')).some(el => el.value);
 }
 
@@ -3831,6 +3914,7 @@ function resetAddBox() {
     .forEach(k => $(k).value = '');
   $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
   $('k_evalsum').value = '';
+  nctDraw();
   $('k_age').textContent = '';
   $('k_gender').value = '';
   $('k_status').value = '대기중';
@@ -4159,10 +4243,14 @@ $('saveNew').onclick = async () => {
       else { evN = (ev.data || []).length; EVALS = EVALS.concat(ev.data || []); }
     }
 
+    // (4) 콘텐츠 주제 (2026-11-15) — 비우면 저장 안 함 · 실패해도 등록은 그대로
+    const ctRes = await nctSaveFor(cid);
+
     draw();
     if (row.status === '치료시작') {
       await kidToActive(cid);
       if (confirm(kid.name + ' — 「치료시작」으로 등록했습니다.\n\n'
+        + (ctRes && ctRes.charAt(0) === '⚠' ? ctRes + '\n\n' : '')
         + '문의 목록에서는 감춰집니다.\n아동 목록으로 갈까요?')) {
         ADD_LEAVING = true;   // 등록을 마친 칸이라 묻지 않는다
         location.href = 'children-new.html'; return;
@@ -4171,13 +4259,15 @@ $('saveNew').onclick = async () => {
     showBox('msgA', '✅ 등록했습니다.\n아동 ' + esc(kid.name) + ' (' + cid + '번 · '
       + (kid.manager_no || '') + ')' + (useKid ? ' — 이미 등록된 아동' : '') + '\n문의 ' + data.id + '번'
       + (evN ? '\n평가 ' + evN + '건' : '')
-      + (evErr ? '\n⚠️ 평가는 넣지 못했습니다: ' + evErr : ''), true);
+      + (evErr ? '\n⚠️ 평가는 넣지 못했습니다: ' + evErr : '')
+      + (ctRes ? '\n' + (ctRes.charAt(0) === '⚠' ? ctRes : '콘텐츠 주제 ' + ctRes) : ''), true);
     $('nvRows').innerHTML = ''; nvEnsureOne();
     ['a_channel','a_area','a_day','a_time','a_action','a_memo',
      'k_name','k_birth','k_guardian','k_phone']
       .forEach(k => $(k).value = '');
     $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
     $('k_evalsum').value = '';
+    nctDraw();
     $('k_gender').value = '';
     $('k_status').value = '대기중';
     ADD_KID = null; addLock(false);
