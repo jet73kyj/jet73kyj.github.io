@@ -706,6 +706,28 @@
       <div id="ikList" style="font-size:13.5px;line-height:1.8;"></div>
     </div>
 
+    <!-- 콘텐츠 주제 (2026-11-15 은정님) — 부모님 걱정을 일반 질문으로 · 자라는나무 콘텐츠로 나감 (아동 · 상담 번호는 안 나감) -->
+    <div class="logbox" id="ctBox" style="margin-top:12px;">
+      <div class="logbox-t" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span>콘텐츠 주제</span>
+        <span style="font-weight:normal;color:#888;font-size:12.5px;">(선택 · 비워도 됨)</span>
+        <span style="flex:1 1 auto;"></span>
+        <span id="ctCenter" style="font-weight:normal;font-size:12.5px;color:#666;"></span>
+      </div>
+      <div style="font-size:12.5px;color:#666;margin-bottom:6px;">부모님이 걱정한 모습을 일반 질문으로 적어주세요. 이름·나이·기관명은 적지 않아요.</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="ctQ" type="text" maxlength="60" placeholder="예: 말은 하는데 대화가 잘 안 이어져요" style="flex:1 1 auto;margin:0;">
+        <span id="ctLen" style="font-size:12px;color:#999;white-space:nowrap;">0 / 60</span>
+      </div>
+      <div id="ctAreas" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;"></div>
+      <div id="ctWarn" style="display:none;background:#FAEEDA;border:1px solid #EF9F27;border-radius:6px;padding:6px 10px;color:#633806;font-size:12.5px;margin-bottom:8px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" id="ctDel" class="tab" style="width:auto;margin:0;">지우기</button>
+        <button type="button" id="ctSave" class="tab" style="width:auto;margin:0;font-weight:bold;">저장 전</button>
+      </div>
+      <div id="ctMsg" style="font-size:12.5px;"></div>
+    </div>
+
     <div id="addBar" style="margin-top:14px; padding:12px; background:#f5f7f4;
          border:1px solid #dde5da; border-radius:8px;">
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
@@ -832,46 +854,13 @@
   </div>
 </div>
 
-<!-- 초기 상담지 창 (2026-10-08) -->
-<div id="ikBg" style="display:none;position:fixed;inset:0;background:rgba(47,41,38,.35);z-index:900;overflow:auto;">
-  <div id="ikWin" style="background:#fff;max-width:760px;margin:30px auto;border-radius:12px;overflow:hidden;border:1px solid #ECE8E3;">
-    <div style="background:#F8F1E8;border-bottom:2px solid #C9A27E;padding:12px 16px;">
-      <div id="ikTitle" style="font-size:15px;font-weight:600;color:#2F2926;"></div>
-      <div id="ikSub" style="font-size:12.5px;color:#A39C95;margin-top:3px;"></div>
-    </div>
-    <div style="padding:14px 16px;" id="ikBody"></div>
-    <div style="padding:10px 16px 16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid #ECE8E3;">
-      <button type="button" id="ikDel" class="tab" style="color:#c62828;margin-right:auto;">지우기</button>
-      <button type="button" id="ikClose" class="tab">닫기</button>
-      <button type="button" id="ikSave" class="tab detsave" style="font-weight:bold;">💾 저장 전</button>
-    </div>
-    <div id="ikMsg" class="out" style="padding:0 16px 12px;"></div>
-  </div>
-</div>
-<style>
-  .ikq { padding:8px 0; border-bottom:1px solid #F1EEEA; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .ikq .t { flex:1 1 300px; font-size:13.5px; line-height:1.6; }
-  .ikq .b { display:flex; gap:4px; }
-  .ikq .b button { width:auto; margin:0; font-size:12.5px; padding:5px 11px; border-radius:7px;
-    border:1px solid #E4E0DA; background:#fff; color:#5F5E5A; cursor:pointer; }
-  .ikq .b button.on.c1 { background:#EAF3DE; border-color:#97C459; color:#27500A; font-weight:600; }
-  .ikq .b button.on.c2 { background:#FAEEDA; border-color:#E0B260; color:#854F0B; font-weight:600; }
-  .ikq .b button.on.c3 { background:#FBE4DE; border-color:#E59A86; color:#993C1D; font-weight:600; }
-  .iksec { font-size:13.5px; font-weight:600; color:#B07A4A; margin:14px 0 4px; padding-bottom:4px; border-bottom:1px solid #F0E4D6; }
-  .iklab { font-size:12.5px; color:#5F5E5A; margin:10px 0 4px; }
-  #ikBody textarea, #ikBody input, #ikBody select { font:inherit; font-size:14px; padding:8px 10px;
-    border:1px solid #ECE8E3; border-radius:8px; width:100%; box-sizing:border-box; background:#fff; }
-  #ikBody textarea { resize:vertical; line-height:1.6; min-height:60px; }
-  .ikrow { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid #F1EEEA; }
-  .ikrow button { width:auto; margin:0; font-size:12px; padding:3px 10px; }
-  .iktag { font-size:11.5px; padding:1px 8px; border-radius:9px; background:#F1EFEA; color:#5F5E5A; }
-  .iktag.p { background:#FBEAF0; color:#993556; } .iktag.g { background:#E6F1FB; color:#185FA5; }
-  @media (max-width:640px) { #ikWin { margin:0; border-radius:0; min-height:100%; } }
-</style>
+<!-- 초기 상담지 창은 nl-intake.js 가 넣음 (2026-11-09) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
 <script src="nl-evaldocs.js"></script>
 <script src="nl-trials.js"></script>
+<script src="nl-intake.js"></script>
+<script src="nl-sensechk.js?v=1112d"></script>
 <script>
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
@@ -1274,6 +1263,7 @@ async function openDetail(id) {
   drawNextEv(r.child_id);
   refreshDocs(r.child_id);
   ikLoad(r.child_id);
+  ctLoad(r.child_id);   // 콘텐츠 주제 (2026-11-15)
 
   logEditClear();
   LOGEDIT = LOGDRAFT = LOGORIG = null;
@@ -1326,6 +1316,136 @@ function detMarkDirty() {
   setDetBtn('before');
 }
 // 저장 안 한 것이 무엇인지 — 없으면 빈 목록
+
+// ── 콘텐츠 주제 (2026-11-15 은정님) ──────────────────────────────
+//   표 nl_content_topics (아동 한 명에 한 줄) · nl_content_topic_areas (영역 한 칸에 하나)
+//   밖으로는 nl_content_export() 가 { 질문, 영역, 센터, 등록 월 } 만 내보냄
+const CT_CENTER = '자라는나무';   // 센터 — 지금은 고정. 아이힐 상담도 여기 적게 되면 이 한 줄만 그 상담의 센터로 바꾸면 됨
+const CT_AREAS = ['언어','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
+let CT = { cid: null, id: null, q: '', areas: [], saving: false };
+function ctPick() { return [...document.querySelectorAll('#ctAreas .ctA.on')].map(b => b.dataset.a); }
+function ctDirty() {
+  if (!CT.cid || $('ctBox').style.display === 'none') return false;
+  const q = $('ctQ').value.trim(), a = ctPick().sort().join('|');
+  return q !== CT.q || a !== CT.areas.slice().sort().join('|');
+}
+function ctBtn() {
+  const b = $('ctSave');
+  if (CT.saving) { b.textContent = '저장 중…'; b.style.background = '#ddd'; b.style.color = '#555'; return; }
+  const d = ctDirty();
+  b.textContent = d ? '저장 전' : '✓ 저장됨';
+  b.style.background = d ? '#fff' : '#2e7d32'; b.style.color = d ? '#2e7d32' : '#fff';
+  b.style.border = '1px solid #2e7d32';
+  $('ctLen').textContent = $('ctQ').value.length + ' / 60';
+}
+// 이름·나이·기관명 점검 — 경고만 (저장은 됨)
+function ctCheck(q) {
+  const hit = [];
+  const m1 = q.match(/\d+\s*(살|개월|세)/); if (m1) hit.push(m1[0]);
+  const m2 = q.match(/(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*살/); if (m2) hit.push(m2[0]);
+  const m3 = q.match(/(두|세)\s*돌/); if (m3) hit.push(m3[0]);
+  const m4 = q.match(/어린이집|유치원|학교|병원/); if (m4) hit.push(m4[0]);
+  return hit;
+}
+function ctWarn() {
+  const hit = ctCheck($('ctQ').value);
+  const w = $('ctWarn');
+  if (!hit.length) { w.style.display = 'none'; return; }
+  w.style.display = 'block';
+  w.textContent = '⚠ ' + hit.map(x => '「' + x + '」').join(' ') + '이 들어 있어요. 일반 질문으로 바꾸면 좋아요. (그래도 저장은 됩니다)';
+}
+function ctDraw() {
+  $('ctCenter').textContent = '센터 ' + CT_CENTER;
+  $('ctQ').value = CT.q;
+  $('ctAreas').innerHTML = CT_AREAS.map(a => {
+    const on = CT.areas.indexOf(a) >= 0;
+    return '<button type="button" class="ctA' + (on ? ' on' : '') + '" data-a="' + a + '" style="width:auto;margin:0;padding:4px 11px;'
+      + 'border-radius:14px;font-size:13px;cursor:pointer;' + (on ? 'background:#E1F5EE;color:#0F6E56;border:1px solid #5DCAA5;' : 'background:#fff;color:#444;border:1px solid #ccc;')
+      + '">' + a + '</button>';
+  }).join('');
+  ctWarn(); ctBtn();
+}
+async function ctLoad(cid) {
+  CT = { cid: cid || null, id: null, q: '', areas: [], saving: false };
+  $('ctMsg').textContent = '';
+  if (!cid) { $('ctBox').style.display = 'none'; return; }
+  $('ctBox').style.display = '';
+  const { data, error } = await sb.from('nl_content_topics')
+    .select('id, question, nl_content_topic_areas(area)').eq('child_id', cid).maybeSingle();
+  if (CT.cid !== cid) return;   // 그 사이 다른 아동을 엶
+  if (error) { $('ctMsg').textContent = '콘텐츠 주제를 읽지 못했습니다: ' + error.message; }
+  else if (data) {
+    CT.id = data.id; CT.q = data.question || '';
+    CT.areas = (data.nl_content_topic_areas || []).map(x => x.area);
+  }
+  ctDraw();
+}
+async function ctSave() {
+  if (!CT.cid || CT.saving) return;
+  const q = $('ctQ').value.trim(), areas = ctPick();
+  if (!q && !CT.id) { if (areas.length) alert('질문을 먼저 적어 주세요.'); return; }
+  if (!q) return ctDelete();
+  if (!ctDirty()) return;
+  CT.saving = true; ctBtn(); $('ctMsg').textContent = '';
+  try {
+    let id = CT.id;
+    if (id) {
+      const { data, error } = await sb.from('nl_content_topics')
+        .update({ question: q, updated_at: new Date().toISOString() }).eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('저장할 권한이 없습니다.');
+    } else {
+      const { data, error } = await sb.from('nl_content_topics')
+        .insert({ child_id: CT.cid, question: q, center: CT_CENTER }).select('id');
+      if (error) throw error;
+      if (!data || !data.length) throw new Error('저장할 권한이 없습니다.');
+      id = data[0].id;
+    }
+    // 영역 — 빠진 것 지우고 새 것 넣기
+    const del = CT.areas.filter(a => areas.indexOf(a) < 0);
+    const add = areas.filter(a => CT.areas.indexOf(a) < 0);
+    if (del.length) {
+      const { error } = await sb.from('nl_content_topic_areas').delete().eq('topic_id', id).in('area', del);
+      if (error) throw error;
+    }
+    if (add.length) {
+      const { error } = await sb.from('nl_content_topic_areas').insert(add.map(a => ({ topic_id: id, area: a })));
+      if (error) throw error;
+    }
+    CT.id = id; CT.q = q; CT.areas = areas.slice();
+  } catch (e) {
+    $('ctMsg').textContent = '❌ 저장하지 못했습니다: ' + (e.message || e);
+  }
+  CT.saving = false; ctBtn();
+}
+async function ctDelete() {
+  if (!CT.id) { $('ctQ').value = ''; CT.q = ''; ctDraw(); return; }
+  if (!confirm('이 아동의 콘텐츠 주제를 지울까요?')) return;
+  CT.saving = true; ctBtn();
+  const { data, error } = await sb.from('nl_content_topics').delete().eq('id', CT.id).select('id');
+  CT.saving = false;
+  if (error || !data || !data.length) { $('ctMsg').textContent = '❌ 지우지 못했습니다' + (error ? ': ' + error.message : ''); ctBtn(); return; }
+  CT.id = null; CT.q = ''; CT.areas = [];
+  ctDraw();
+}
+(function ctBind() {
+  const go = () => {
+    if (!$('ctBox')) return;
+    $('ctQ').addEventListener('input', () => { ctWarn(); ctBtn(); });
+    $('ctAreas').addEventListener('click', e => {
+      const b = e.target.closest('.ctA'); if (!b) return;
+      b.classList.toggle('on');
+      const on = b.classList.contains('on');
+      b.style.background = on ? '#E1F5EE' : '#fff'; b.style.color = on ? '#0F6E56' : '#444';
+      b.style.border = on ? '1px solid #5DCAA5' : '1px solid #ccc';
+      ctBtn();
+    });
+    $('ctSave').addEventListener('click', ctSave);
+    $('ctDel').addEventListener('click', ctDelete);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+})();
+
 function detPending() {
   const out = [];
   if ($('detBox').style.display === 'none' || !openId) return out;
@@ -1335,6 +1455,7 @@ function detPending() {
   const lc = $('l_content');
   if (lc.value.trim() && lc.value.trim() !== (lc.dataset.orig || '')) out.push('상담 기록 (「기록 추가」)');
   if (logInlineDirty()) out.push('고치던 상담 기록 (그 줄 「저장」)');
+  if (ctDirty()) out.push('콘텐츠 주제 (「저장 전」)');
   const ds = $('dsumEdit');
   if (ds.value.trim() !== (ds.dataset.orig || '')) out.push('평가 요약 (「요약 저장」)');
   const tn = window.NLTrials ? NLTrials.pendingN() : 0;
@@ -1656,6 +1777,7 @@ function dkmShow(text, at) {
   $('dkmDate').textContent = at ? '· ' + String(at).slice(0, 10) + ' 적음' : '';
   $('d_kmemo').value = t;
   $('d_kmemo').dataset.orig = t;
+  if (window.NLChk) NLChk.refresh($('d_kmemo'));
   KMEDIT = false; kmGoHome();
   memoFit($('d_kmemo'));
   $('dkmMsg').textContent = '';
@@ -1963,6 +2085,7 @@ $('saveDet').onclick = async () => {
       const kk = KIDS.find(k => k.id === data.child_id);
       if (kk) kk.birth = kb[0].birth;
       $('d_birth').dataset.orig = bd;
+      if (window.NLChk) NLChk.refresh($('d_kmemo'));
       $('detTitle').textContent = '문의 ' + data.id + '번 — ' + kidName(data.child_id)
         + (kidBirth6(data.child_id) ? ' ' + kidBirth6(data.child_id) : '');
       ikLoad(data.child_id);
@@ -2172,16 +2295,19 @@ function setCntOpts(sel, tid, keep) {
   if (!sel) return;
   const psy  = isPsy(tid);
   const dev  = !psy && isDev(tid);
-  const mode = psy ? 'psy' : (dev ? 'dev' : 'cnt');
+  // 언어평가는 4개까지 (2026-11-13 은정님 · 240,000원)
+  const t4   = EVTYPES.find(x => x.id === Number(tid));
+  const lang = !psy && !dev && !!(t4 && String(t4.name).indexOf('언어') >= 0);
+  const mode = psy ? 'psy' : (dev ? 'dev' : (lang ? 'cnt4' : 'cnt'));
   const cur  = keep != null ? String(keep) : sel.value;
   if (sel.dataset.mode !== mode) {
-    const opts = psy ? PSY_OPTS : (dev ? DEV_OPTS : [['1', '1개'], ['2', '2개'], ['3', '3개']]);
+    const opts = psy ? PSY_OPTS : (dev ? DEV_OPTS : [['1', '1개'], ['2', '2개'], ['3', '3개']].concat(lang ? [['4', '4개']] : []));
     sel.innerHTML = opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('');
     sel.dataset.mode = mode;
     sel.style.width = (psy || dev) ? '120px' : '80px';
   }
   const ok = Array.prototype.some.call(sel.options, o => o.value === cur);
-  sel.value = ok ? cur : (psy ? '1' : String(Math.min(3, parseInt(cur, 10) || 1)));
+  sel.value = ok ? cur : (psy ? '1' : String(Math.min(lang ? 4 : 3, parseInt(cur, 10) || 1)));
   const lb = sel.id ? document.querySelector('label[for="' + sel.id + '"]')
                     : (sel.parentElement && sel.parentElement.querySelector('label'));
   if (lb) lb.textContent = (psy || dev) ? '구성' : (sel.id ? '평가 개수' : '개수');
@@ -2228,7 +2354,7 @@ function dvAddRow(e) {
   const stOpt = ['예정','완료','취소'].map(v =>
     '<option value="' + v + '"' + (e && e.status === v ? ' selected' : '') + '>'
     + v + '</option>').join('');
-  const cntOpt = [1,2,3].map(v =>
+  const cntOpt = [1,2,3,4].map(v =>
     '<option value="' + v + '"' + (e && Number(e.item_cnt) === v ? ' selected' : '') + '>'
     + v + '개</option>').join('');
   const html =
@@ -3703,7 +3829,7 @@ function resetAddBox() {
   ['a_channel','a_area','a_day','a_time','a_action','a_memo',
    'k_name','k_birth','k_guardian','k_phone']
     .forEach(k => $(k).value = '');
-  $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
+  $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
   $('k_evalsum').value = '';
   $('k_age').textContent = '';
   $('k_gender').value = '';
@@ -3799,6 +3925,7 @@ function ageText(b) {
 function drawAge() {
   const t = ageText($('k_birth').value);
   $('k_age').textContent = t ? '만 ' + t : '';
+  if (window.NLChk) NLChk.refresh($('k_memo'));   // 연령별 체크리스트 (2026-11-12)
 }
 // 열기 창 생년월일 나이 (2026-10-14)
 // 열기 창 연락처 (2026-10-30) — 아동 표 대표 번호 + 보호자 표 번호 · 같은 번호는 한 번만
@@ -3830,6 +3957,13 @@ function openIdChild() { const r = ALL.find(x => x.id === openId); return r ? r.
 function drawDAge() {
   const t = ageText($('d_birth').value);
   $('d_age').textContent = t ? '만 ' + t : '';
+  if (window.NLChk) NLChk.refresh($('d_kmemo'));
+}
+// 상담 내용 칸 위 연령별 체크리스트 (2026-11-12 은정님) — 셈 · 글 다루기는 nl-sensechk.js 한 곳
+//   새 문의 = 적은 생년월일 / 열기 창 아동 메모 = 저장된 생년월일 (없으면 적은 값) · 저장은 원래 저장 그대로
+if (window.NLChk) {
+  NLChk.attach($('k_memo'),  { birth: () => $('k_birth').value });
+  NLChk.attach($('d_kmemo'), { birth: () => $('d_birth').dataset.orig || $('d_birth').value });
 }
 $('d_birth').addEventListener('input',  drawDAge);
 $('d_birth').addEventListener('change', drawDAge);
@@ -4042,7 +4176,7 @@ $('saveNew').onclick = async () => {
     ['a_channel','a_area','a_day','a_time','a_action','a_memo',
      'k_name','k_birth','k_guardian','k_phone']
       .forEach(k => $(k).value = '');
-    $('k_memo').value = MEMO_TMPL; memoFit($('k_memo'));
+    $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
     $('k_evalsum').value = '';
     $('k_gender').value = '';
     $('k_status').value = '대기중';
@@ -4076,6 +4210,7 @@ async function afterLogin(user) {
     show('이 화면은 관리자와 행정만 볼 수 있습니다.', false); return;
   }
   ME = me;
+  NLIntake.init({ sb, me, kid: id => KIDS.find(k => k.id === id) });   // 초기 상담지 (nl-intake.js)
   NLDocs.init(sb, me.id);   // 평가보고서 창구 준비
   if (window.NLTrials) NLTrials.init(sb, me.id);   // 체험 수업 칸 준비
 
@@ -4194,356 +4329,7 @@ $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn').click
   }
 })();
 
-// ═══════════════ 초기 상담지 (2026-10-08 은정님) ═══════════════
-//   서식(nl_intake_forms) · 문항(nl_intake_items) · 상담 일지(nl_intake_notes) · 답(nl_intake_answers)
-//   학부모 링크(nl_intake_links) — 14일 · 한 번 제출하면 닫힘 · 학부모 화면 intake-form.html
-// 학부모가 적은 글이 칸 값(value="…")에 들어가므로 따옴표까지 바꾼다 (2026-10-08 점검)
-function ikEsc(v) {
-  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-let IK_FORMS = null, IK_ITEMS = {}, IK_CID = null, IK_NOTES = [], IK_LINKS = [];
-let IK_CUR = null, IK_DIRTY = false, IK_SAVING = false;
-const IK_CHOICE = ['가능', '부분', '어려움'];
-const IK_AREAS = ['사회정서', '언어', '인지', '운동'];
-const IK_DAYS = 14;
-function ikCanWrite() { return ME && [8, 19].indexOf(Number(ME.id)) >= 0; }
-function ikMonths(birth, at) {
-  if (!birth) return null;
-  const d = new Date(String(birth).slice(0, 10) + 'T00:00:00');
-  const n = at ? new Date(String(at).slice(0, 10) + 'T00:00:00') : new Date();
-  if (isNaN(d) || isNaN(n)) return null;
-  let m = (n.getFullYear() - d.getFullYear()) * 12 + (n.getMonth() - d.getMonth());
-  if (n.getDate() < d.getDate()) m--;
-  return m < 0 ? null : m;
-}
-function ikAgeTxt(m) { return m == null ? '' : '만 ' + Math.floor(m / 12) + '년 ' + (m % 12) + '개월 (' + m + '개월)'; }
-function ikFormFor(m) {
-  if (m == null || !IK_FORMS) return null;
-  return IK_FORMS.find(f => f.active && m >= f.min_month && m <= f.max_month) || null;
-}
-function ikShort(f) { return f ? String(f.name).replace(' 초기 상담지', '') : ''; }
-function ikDayKo(s) { const p = String(s || '').slice(0, 10).split('-'); return p.length === 3 ? Number(p[1]) + '월 ' + Number(p[2]) + '일' : ''; }
-function ikToday() { return today(); }
-function ikAddDays(n) {
-  const d = new Date(); d.setDate(d.getDate() + n);
-  const p = x => String(x).padStart(2, '0');
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-}
-
-async function ikReadForms() {
-  if (IK_FORMS) return true;
-  const [f, i] = await Promise.all([
-    sb.from('nl_intake_forms').select('*').order('sort_no'),
-    sb.from('nl_intake_items').select('*').order('sort_no')
-  ]);
-  if (f.error || i.error) return false;
-  IK_FORMS = f.data || [];
-  IK_ITEMS = {};
-  (i.data || []).forEach(x => { if (x.active !== false) (IK_ITEMS[x.form_id] = IK_ITEMS[x.form_id] || []).push(x); });
-  return true;
-}
-
-async function ikLoad(cid) {
-  IK_CID = cid;
-  const wr = ikCanWrite();
-  $('ikLinkBtn').style.display = wr ? '' : 'none';
-  $('ikNewBtn').style.display = wr ? '' : 'none';
-  $('ikList').innerHTML = '<span style="color:#A39C95;">불러오는 중…</span>';
-  const okF = await ikReadForms();
-  const [n, l] = await Promise.all([
-    sb.from('nl_intake_notes').select('*').eq('child_id', cid).order('consult_on', { ascending: false }),
-    wr ? sb.from('nl_intake_links').select('*').eq('child_id', cid).order('id', { ascending: false })
-       : Promise.resolve({ data: [] })
-  ]);
-  if (IK_CID !== cid) return;   // 그 사이 다른 아동을 열었으면 그리지 않음
-  if (!okF || n.error || l.error) {
-    $('ikList').innerHTML = '<span style="color:#993C1D;">초기 상담지를 읽지 못했습니다.</span>'; return;
-  }
-  IK_NOTES = n.data || [];
-  IK_LINKS = l.data || [];
-  let cnt = {};
-  if (IK_NOTES.length) {
-    const a = await sb.from('nl_intake_answers').select('note_id, choice').in('note_id', IK_NOTES.map(x => x.id));
-    (a.data || []).forEach(x => {
-      if (!x.choice) return;
-      const c = cnt[x.note_id] = cnt[x.note_id] || {};
-      c[x.choice] = (c[x.choice] || 0) + 1;
-    });
-  }
-  ikDrawList(cnt);
-}
-
-function ikDrawList(cnt) {
-  const td = ikToday();
-  let html = '';
-  IK_LINKS.filter(x => !x.used_at).forEach(x => {
-    const live = x.expires_on >= td;
-    const f = IK_FORMS.find(y => y.id === x.form_id);
-    html += '<div class="ikrow"><span class="iktag p">학부모 링크</span>'
-      + '<span>' + ikEsc(ikShort(f)) + ' · ' + (live ? ikEsc(ikDayKo(x.expires_on)) + '까지 · 아직 안 씀'
-                                                    : '<span style="color:#993C1D;">기한 지남</span>') + '</span>'
-      + '<span style="flex:1 1 auto;"></span>'
-      + '<button type="button" class="tab" data-ikdrop="' + x.id + '" style="color:#c62828;"'
-      + ' title="잘못 보낸 링크를 못 쓰게 막습니다">링크 막기</button></div>';
-  });
-  IK_NOTES.forEach(x => {
-    const f = IK_FORMS.find(y => y.id === x.form_id);
-    const c = cnt[x.id] || {};
-    const who = x.source === '학부모' ? '<span class="iktag p">학부모 작성</span>'
-              : x.source === '구글' ? '<span class="iktag g">구글</span>' : '<span class="iktag">센터 작성</span>';
-    const th = x.counselor_id ? (THRS.find(t => t.id === x.counselor_id) || {}).name : x.counselor_name;
-    html += '<div class="ikrow">' + who
-      + '<span>' + ikEsc(x.consult_on || '') + ' · ' + ikEsc(ikShort(f))
-      + (th ? ' · 상담 ' + ikEsc(th) : '')
-      + (c['어려움'] ? ' · 어려움 ' + c['어려움'] : '') + (c['부분'] ? ' · 부분 ' + c['부분'] : '') + '</span>'
-      + '<span style="flex:1 1 auto;"></span>'
-      + '<button type="button" class="tab" data-ikopen="' + x.id + '">열기</button></div>';
-  });
-  $('ikList').innerHTML = html || '<span style="color:#A39C95;">아직 초기 상담지가 없습니다.</span>';
-  $('ikList').querySelectorAll('[data-ikopen]').forEach(b => b.onclick = () => ikOpen(Number(b.dataset.ikopen)));
-  $('ikList').querySelectorAll('[data-ikdrop]').forEach(b => b.onclick = () => ikDropLink(Number(b.dataset.ikdrop)));
-}
-
-function ikKid() { return KIDS.find(k => k.id === IK_CID) || {}; }
-function ikLinkUrl(key) { return new URL('intake-form.html?k=' + key, location.href).href; }
-function ikLinkText(x, kidRow) {
-  const k = kidRow || ikKid();
-  return '안녕하세요^^\n자라는 나무 입니다\n\n'
-    + (k.name || '') + ' 아동 초기 상담 질문지입니다.\n'
-    + '아래 링크를 눌러 초기 상담지를 작성해 주세요.\n'
-    + '너무 오래되어 기억나지 않는 부분은 비워 두셔도 됩니다.\n'
-    + '마지막에 「제출」 버튼까지 꼭 눌러 주세요.\n'
-    + '(' + ikDayKo(x.expires_on) + '까지)\n'
-    + ikLinkUrl(x.link_key) + '\n\n'
-    + '궁금하신 점은 편하게 연락 주세요\n042-488-6011';
-}
-async function ikCopyText(t, btn) {
-  try { await navigator.clipboard.writeText(t); }
-  catch (e) {
-    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta);
-    ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-  }
-  if (btn) { const o = btn.textContent; btn.textContent = '복사됨'; setTimeout(() => btn.textContent = o, 1300); }
-}
-async function ikDropLink(id) {
-  if (!confirm('이 질문지 링크를 막을까요?\n잘못 보낸 링크일 때 씁니다. 막으면 그 링크로는 더 이상 열 수 없습니다.')) return;
-  const { data, error } = await sb.from('nl_intake_links').delete().eq('id', id).is('used_at', null).select('id');
-  if (error || !data || !data.length) { alert('링크를 막지 못했습니다.' + (error ? '\n' + error.message : '\n(이미 제출되었을 수 있습니다)')); }
-  ikLoad(IK_CID);
-}
-
-let IK_LINKING = false;
-$('ikLinkBtn').onclick = async () => {
-  if (!IK_CID || IK_LINKING) return;
-  if (!(await ikReadForms())) { alert('질문지 서식을 읽지 못했습니다.'); return; }
-  const k = ikKid();
-  if (!k.birth) { alert('생년월일이 없어 질문지를 고를 수 없습니다.\n아동 생년월일을 먼저 넣어 주세요.'); return; }
-  const m = ikMonths(k.birth);
-  const f = ikFormFor(m);
-  if (!f) { alert('해당 연령(' + m + '개월)의 질문지가 없습니다.'); return; }
-  const td = ikToday();
-  // 아직 안 쓴 링크가 있으면 새로 만들지 않고 그 링크로 문자 글을 복사한다 (2026-10-08 은정님)
-  const open = IK_LINKS.find(x => !x.used_at && x.expires_on >= td && x.form_id === f.id);   // 개월이 넘어 서식이 바뀌면 새 링크
-  if (open) {
-    await ikCopyText(ikLinkText(open));
-    alert('문자 글이 복사되었습니다 (' + ikDayKo(open.expires_on) + '까지 쓰는 링크).\n학부모께 문자로 붙여 보내 주세요.');
-    return;
-  }
-  IK_LINKING = true; $('ikLinkBtn').disabled = true;
-  try {
-    const { data, error } = await sb.from('nl_intake_links').insert({
-      child_id: IK_CID, form_id: f.id, expires_on: ikAddDays(IK_DAYS), created_by: ME ? ME.id : null
-    }).select().single();
-    if (error) throw error;
-    if (!data) throw new Error('만든 링크를 돌려받지 못했습니다.');
-    IK_LINKS.unshift(data);
-    await ikCopyText(ikLinkText(data));
-    alert(ikShort(f) + ' 질문지 링크를 만들고 문자 글을 복사했습니다.\n학부모께 문자로 붙여 보내 주세요.');
-    ikLoad(IK_CID);
-  } catch (e) {
-    alert('링크를 만들지 못했습니다.\n' + e.message);
-  } finally {
-    IK_LINKING = false; $('ikLinkBtn').disabled = false;
-  }
-};
-
-$('ikNewBtn').onclick = async () => {
-  if (!IK_CID) return;
-  if (!(await ikReadForms())) { alert('질문지 서식을 읽지 못했습니다.'); return; }
-  const k = ikKid();
-  const m = ikMonths(k.birth);
-  const f = ikFormFor(m);
-  if (!f) { alert('해당 연령' + (m == null ? '' : '(' + m + '개월)') + '의 상담지가 없습니다.'); return; }
-  ikShow({ id: null, child_id: IK_CID, form_id: f.id, consult_on: ikToday(),
-           counselor_id: ME ? ME.id : null, source: '나무링크' }, []);
-};
-
-async function ikOpen(id) {
-  const n = IK_NOTES.find(x => x.id === id); if (!n) return;
-  const { data, error } = await sb.from('nl_intake_answers').select('*').eq('note_id', id);
-  if (error) { alert('답을 읽지 못했습니다.\n' + error.message); return; }
-  ikShow(n, data || []);
-}
-
-function ikShow(note, answers) {
-  IK_CUR = { note: note, ans: {} };
-  answers.forEach(a => IK_CUR.ans[a.item_id] = { id: a.id, c: a.choice || '', t: a.text_val || '' });
-  const wr = ikCanWrite();
-  const k = ikKid();
-  const f = IK_FORMS.find(x => x.id === note.form_id);
-  const items = IK_ITEMS[note.form_id] || [];
-  $('ikTitle').textContent = '초기 상담지 — ' + IK_CID + '번 ' + (k.name || '') + ' · ' + ikAgeTxt(ikMonths(k.birth, note.consult_on));
-  $('ikSub').textContent = (f ? f.name : '') + ' · '
-    + (note.source === '학부모' ? '학부모가 적음' : note.source === '구글' ? '구글 자료' : '센터에서 적음')
-    + (note.created_at ? ' · ' + ikDayKo(note.created_at) : '');
-
-  const dis = wr ? '' : ' disabled';
-  const thList = THRS.slice();
-  if (note.counselor_id && !thList.some(t => t.id === note.counselor_id))
-    thList.push({ id: note.counselor_id, name: (note.counselor_id + '번 (그만둔 직원)') });   // 그만둔 직원도 지워지지 않게
-  const thOpt = '<option value="">— 상담자 —</option>' + thList.map(t =>
-    '<option value="' + t.id + '"' + (t.id === note.counselor_id ? ' selected' : '') + '>' + ikEsc(t.name) + '</option>').join('');
-  let h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">'
-    + '<div><div class="iklab">상담일</div><input type="date" id="ik_on" value="' + ikEsc(note.consult_on || '') + '"' + dis + '></div>'
-    + '<div><div class="iklab">상담자' + (note.counselor_name && !note.counselor_id ? ' (구글: ' + ikEsc(note.counselor_name) + ')' : '') + '</div>'
-    + '<select id="ik_th"' + dis + '>' + thOpt + '</select></div></div>'
-    + '<div class="iklab">유입경로</div><input type="text" id="ik_ch" maxlength="100" value="' + ikEsc(note.channel || '') + '"' + dis + '>'
-    + (note.log_text ? '<div class="iklab">구글 「상담 일지」 칸</div><div style="font-size:13px;color:#5F5E5A;">' + ikEsc(note.log_text) + '</div>' : '')
-    + '<div class="iklab">주 호소문제</div><textarea id="ik_chief" maxlength="2000"' + dis + '>' + ikEsc(note.chief || '') + '</textarea>';
-  IK_AREAS.forEach(a => {
-    const qs = items.filter(x => x.area === a && x.kind === '3단계');
-    if (!qs.length) return;
-    h += '<div class="iksec">' + ikEsc(a) + '</div>';
-    qs.forEach(x => {
-      h += '<div class="ikq"><div class="t">' + ikEsc(x.question) + '</div><div class="b" data-ikq="' + x.id + '">'
-        + IK_CHOICE.map((c, i) => '<button type="button" class="c' + (i + 1) + '" data-c="' + c + '"' + dis + '>' + c + '</button>').join('')
-        + '</div></div>';
-    });
-  });
-  const txt = items.filter(x => x.kind === '글');
-  if (txt.length) h += '<div class="iksec">특이사항 · 공통확인</div>';
-  txt.forEach(x => {
-    h += '<div class="iklab">' + ikEsc(x.question) + '</div><textarea data-ikt="' + x.id + '" maxlength="2000"' + dis + '>'
-      + ikEsc((IK_CUR.ans[x.id] || {}).t || '') + '</textarea>';
-  });
-  h += '<div class="iksec">종합 메모 및 추천 방향 (센터)</div><textarea id="ik_total" maxlength="4000"' + dis + '>'
-    + ikEsc(note.total_memo || '') + '</textarea>';
-  $('ikBody').innerHTML = h;
-  ikPaint();
-
-  $('ikBody').querySelectorAll('[data-ikq] button').forEach(b => {
-    b.onclick = () => {
-      const q = Number(b.parentNode.dataset.ikq), c = b.dataset.c;
-      const cur = IK_CUR.ans[q] || {};
-      IK_CUR.ans[q] = Object.assign({}, cur, { c: cur.c === c ? '' : c });   // 한 번 더 누르면 풀림
-      ikPaint(); ikDirty();
-    };
-  });
-  $('ikBody').querySelectorAll('input, textarea, select').forEach(el => {
-    el.addEventListener('input', ikDirty); el.addEventListener('change', ikDirty);
-  });
-  $('ikSave').style.display = wr ? '' : 'none';
-  $('ikDel').style.display = wr && note.id ? '' : 'none';
-  IK_DIRTY = !note.id;
-  ikBtn(note.id ? 'done' : 'before');
-  $('ikMsg').textContent = '';
-  $('ikBg').style.display = 'block';
-  $('ikBg').scrollTop = 0;
-}
-function ikPaint() {
-  $('ikBody').querySelectorAll('[data-ikq]').forEach(g => {
-    const c = (IK_CUR.ans[g.dataset.ikq] || {}).c;
-    g.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === c));
-  });
-}
-function ikDirty() { if (IK_SAVING) return; IK_DIRTY = true; ikBtn('before'); }
-function ikBtn(st) {
-  const b = $('ikSave');
-  b.classList.toggle('done', st === 'done');
-  b.disabled = st === 'saving';
-  b.textContent = st === 'saving' ? '저장 중…' : st === 'done' ? '✓ 저장됨' : '💾 저장 전';
-}
-function ikHide() { $('ikBg').style.display = 'none'; IK_CUR = null; IK_DIRTY = false; }
-$('ikClose').onclick = () => {
-  if (IK_DIRTY && ikCanWrite() && !confirm('저장하지 않은 내용이 있습니다.\n그래도 닫을까요?')) return;
-  ikHide();
-};
-
-$('ikSave').onclick = async () => {
-  if (!IK_CUR || IK_SAVING || !ikCanWrite()) return;
-  const n = IK_CUR.note;
-  const row = {
-    child_id: n.child_id, form_id: n.form_id,
-    consult_on: $('ik_on').value || null,
-    counselor_id: $('ik_th').value ? Number($('ik_th').value) : null,
-    channel: $('ik_ch').value.trim() || null,
-    chief: $('ik_chief').value.trim() || null,
-    total_memo: $('ik_total').value.trim() || null,
-    updated_at: new Date().toISOString()
-  };
-  $('ikBody').querySelectorAll('[data-ikt]').forEach(t => {
-    const q = Number(t.dataset.ikt);
-    IK_CUR.ans[q] = Object.assign({}, IK_CUR.ans[q], { t: t.value });
-  });
-  IK_SAVING = true; ikBtn('saving');
-  try {
-    let nid = n.id;
-    if (nid) {
-      const { data, error } = await sb.from('nl_intake_notes').update(row).eq('id', nid).select('id');
-      if (error) throw error;
-      if (!data || !data.length) throw new Error('고친 줄이 없습니다.');
-    } else {
-      row.source = '나무링크'; row.created_by = ME ? ME.id : null;
-      const { data, error } = await sb.from('nl_intake_notes').insert(row).select('*').single();
-      if (error) throw error;
-      if (!data) throw new Error('넣은 줄을 돌려받지 못했습니다.');
-      nid = data.id; IK_CUR.note = data;
-    }
-    // 답 — 있는 것은 덮어쓰고, 비운 것은 지운다
-    const put = [], drop = [];
-    Object.keys(IK_CUR.ans).forEach(q => {
-      const a = IK_CUR.ans[q];
-      const c = a.c || null, t = String(a.t || '').trim() || null;
-      if (c || t) put.push({ note_id: nid, item_id: Number(q), choice: c, text_val: t });
-      else if (a.id) drop.push(a.id);
-    });
-    if (put.length) {
-      const { data, error } = await sb.from('nl_intake_answers')
-        .upsert(put, { onConflict: 'note_id,item_id' }).select('id, item_id');
-      if (error) throw error;
-      if (!data || data.length !== put.length) throw new Error('답이 다 저장되지 않았습니다.');
-      data.forEach(d => { IK_CUR.ans[d.item_id] = Object.assign({}, IK_CUR.ans[d.item_id], { id: d.id }); });
-    }
-    if (drop.length) {
-      const { error } = await sb.from('nl_intake_answers').delete().in('id', drop);
-      if (error) throw error;
-      Object.keys(IK_CUR.ans).forEach(q => { if (drop.indexOf(IK_CUR.ans[q].id) >= 0) delete IK_CUR.ans[q].id; });
-    }
-    IK_DIRTY = false; ikBtn('done');
-    $('ikDel').style.display = '';
-    $('ikMsg').className = 'out ok'; $('ikMsg').textContent = '';
-    ikLoad(IK_CID);
-  } catch (e) {
-    ikBtn('before');
-    $('ikMsg').className = 'out err'; $('ikMsg').textContent = '❌ 저장하지 못했습니다.\n' + e.message;
-  } finally {
-    IK_SAVING = false;
-  }
-};
-
-$('ikDel').onclick = async () => {
-  if (!IK_CUR || !IK_CUR.note.id || !ikCanWrite()) return;
-  if (!confirm('이 초기 상담지를 지울까요?\n질문과 답이 함께 지워지고 되돌릴 수 없습니다.')) return;
-  const { data, error } = await sb.from('nl_intake_notes').delete().eq('id', IK_CUR.note.id).select('id');
-  if (error || !data || !data.length) { alert('지우지 못했습니다.' + (error ? '\n' + error.message : '')); return; }
-  ikHide(); ikLoad(IK_CID);
-};
-
-window.addEventListener('beforeunload', e => {
-  if (!IK_DIRTY || !IK_CUR || !ikCanWrite()) return;
-  e.preventDefault(); e.returnValue = '';
-});
+// 초기 상담지 — 함수 · 창은 nl-intake.js (아동 목록과 함께 씀 · 2026-11-09)
 
 // 새 문의 등록 뒤 — 질문지 링크를 만들고(안 쓴 링크가 있으면 그것) 문자 글 복사 단추를 보여 준다
 let IK_PRE_LINK = null;
