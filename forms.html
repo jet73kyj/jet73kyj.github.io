@@ -196,9 +196,18 @@
     body.print-doc .dsheet input { border:none; padding:0; background:transparent; }
     body.print-doc .dsheet table { font-size:10.5px; }
     body.print-doc .dsheet th, body.print-doc .dsheet td { padding:2.5px 5px; }
-    body.print-doc #dsHire { font-size:12px; } body.print-doc #dsHire h2 { font-size:20px; margin:4px 0 12px; }
-    body.print-doc #dsHire .box { padding:6px 8px; line-height:1.6; }
-    body.print-doc #dsHire table { font-size:12px; }
+    /* 입사 전 개인정보동의서 — A4 한 장을 위아래로 채움 (2026-11-16 은정님) · 쓸 수 있는 높이 277mm */
+    body.print-doc #dsHire { font-size:13.5px; min-height:274mm; display:flex !important; flex-direction:column; }
+    body.print-doc #dsHire h2 { font-size:23px; margin:6px 0 14px; }
+    body.print-doc #dsHire .dno { font-size:12px; }
+    body.print-doc #dsHire table { font-size:13.5px; }
+    body.print-doc #dsHire > table th { padding:7px 8px; }
+    body.print-doc #dsHire > table td { padding:15px 10px !important; line-height:1.6; }
+    body.print-doc #dsHire > table tr:last-child td { padding:30px 10px !important; }
+    body.print-doc #dsHire .box { flex:1; display:flex; flex-direction:column; padding:10px 8px 4px; line-height:1.75; }
+    body.print-doc #dsHire .box > div { margin-top:10px !important; }
+    body.print-doc #dsHire .hsp { flex:1; }
+    body.print-doc #dsHire table.sigt td { padding:5px 6px !important; font-size:13.5px; }
     body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
@@ -624,6 +633,7 @@ function docHire() {
     +   '<div style="margin-top:12px;">이용기관은 본인이 동의한 위 공동이용 행정정보를 확인하기 위해 「전자정부법 시행령」 제90조에 따라 주민등록번호, 여권번호, 운전면허의 면허번호 또는 외국인등록번호가 포함된 행정정보를 처리할 수 있습니다. 이용기관이 요청하는 경우 기재하여 주십시오.</div>'
     +   '<div style="margin-top:6px;">(필요시 기재) &nbsp;[ &nbsp;]주민등록번호(' + sp(28) + ') &nbsp;[ &nbsp;]여권번호(' + sp(28) + ')<br>'
     +   sp(24) + '[ &nbsp;]운전면허의 면허번호(' + sp(20) + ') &nbsp;[ &nbsp;]외국인등록번호(' + sp(20) + ')</div>'
+    +   '<div class="hsp"></div>'
     +   '<div style="text-align:right;margin-top:16px;">년' + sp(10) + '월' + sp(10) + '일</div>'
     +   sig('대상자(본인)', [['성' + sp(4) + '명', '(서명 또는 인)'], ['생년월일'], ['전화번호']])
     +   '<div style="font-size:11px;margin-top:12px;">※ 14세 미만 아동인 경우 법정대리인의 동의가 필요합니다.(법정대리인의 동의가 필요 없는 경우에는 생략이 가능합니다.)</div>'
