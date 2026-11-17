@@ -3647,7 +3647,11 @@ function drawFind(){
       }).join('');
       if (!xs.length) return anc.length ? '<span class="fb fbl"></span>' + ancTxt : '<span class="fb fbl"></span>';
       nOn++;
-      dup += xs.length - 1;
+      // 두 벌 = 같은 날 · 같은 사업의 원래 줄이 둘 이상 (2026-11-17)
+      //   발추를 발달 날 다른 시각에 잡은 것(같은 요일줄)은 두 벌이 아님 (83번 11월)
+      const _bySt = {};
+      xs.forEach(x => { if (isMk(x)) return; const k = Number(x.support_type_id) || 0; _bySt[k] = (_bySt[k] || 0) + 1; });
+      Object.keys(_bySt).forEach(k => { if (_bySt[k] > 1) dup += _bySt[k] - 1; });
       return xs.map(x => fBtn(x, mkOf, PARTS, HOSTADD)).join('') + ancTxt;
     }).join('');
     // 전월 보강 (지난달 몫 보강·조각을 이 달에 한 것) · 요일줄 밖 보강 — 점선 초록으로 앞에 덧붙임
