@@ -208,8 +208,14 @@
     body.print-doc #dsHire .box > div { margin-top:10px !important; }
     body.print-doc #dsHire .hsp { flex:1; }
     body.print-doc #dsHire table.sigt td { padding:5px 6px !important; font-size:13.5px; }
+    body.print-doc #dsChg input, body.print-doc #dsChg textarea { border:none !important; background:transparent !important; resize:none; overflow:hidden; }
+    body.print-doc #dsChg textarea { display:block !important; }
     body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
+  /* 등록사항 변경신청서 (2026-11-17) — 점선 칸은 고칠 수 있음 */
+  #dsChg input.chgi, #dsChg textarea.chgt { border:1px dashed #d8c7b3; background:#fffdf9; font-family:inherit; font-size:12px; padding:2px 4px; box-sizing:border-box; border-radius:3px; }
+  #dsChg textarea.chgt { width:100%; resize:vertical; min-height:34px; line-height:1.45; display:block; }
+  #dsChg td { vertical-align:top; }
 </style>
 </head>
 <body>
@@ -641,6 +647,73 @@ function docHire() {
     +   '<div style="font-size:15px;font-weight:700;margin-top:10px;">대전광역시 서구청장 <span style="font-size:12px;font-weight:normal;">귀하</span></div>'
     + '</div></div>';
 }
+// 사회서비스 제공자 등록사항 변경신청서 (2026-11-17 은정님) — 사회서비스이용권법 시행규칙 [별지 제4호서식]
+//   기관 칸은 미리 채움 · 점선 칸은 모두 고칠 수 있음 · 「변경신청 내용」 다섯 줄
+//   서버에 저장하지 않음 — 이 화면을 닫기 전까지만 CHG 에 남김 · 주민등록번호는 늘 빈칸(인쇄 뒤 손으로)
+let CHG = null;
+const CHG_DEF = { org: '자라는나무', biz: '314-82-75463', addr: '대전 서구 문정로22 10층', regno: '', tel: '488-6011', fax: '070-7543-0752', mail: '',
+                  boss: '김은정', corp: '자라는나무', btel: '', y: '', m: '', d: '', who: '', to: '시장ㆍ군수ㆍ구청장' };
+function docChange() {
+  const d = Object.assign({}, CHG_DEF, CHG || {});
+  const v = k => esc(d[k] == null ? '' : d[k]);
+  const i = (k, st) => '<input type="text" class="chgi" data-c="' + k + '" value="' + v(k) + '" style="' + (st || 'width:100%;') + '">';
+  const ta = k => '<textarea class="chgt" data-c="' + k + '" rows="2">' + v(k) + '</textarea>';
+  const lab = t => '<div style="font-size:10.5px;color:#333;">' + t + '</div>';
+  let rows = '';
+  for (let n = 0; n < 5; n++) rows += '<tr>'
+    + '<td>' + ta('r' + n + '_a') + '</td><td>' + ta('r' + n + '_b') + '</td><td>' + ta('r' + n + '_c') + '</td></tr>';
+  return '<div class="dsheet" id="dsChg"><div class="dno">■ 사회서비스 이용 및 이용권 관리에 관한 법률 시행규칙 [별지 제4호서식] &lt;개정 2020. 3. 10.&gt;</div>'
+    + '<h2>사회서비스 제공자 등록사항 변경신청서</h2>'
+    + '<table><colgroup><col style="width:15%"><col style="width:28%"><col style="width:27%"><col></colgroup>'
+    + '<tr><td style="background:#e6e6e6;">' + lab('접수번호') + '</td><td colspan="2" style="background:#e6e6e6;">' + lab('접수일') + '</td><td style="background:#e6e6e6;">' + lab('처리기간') + '<div style="text-align:right;">20일</div></td></tr>'
+    + '<tr><th rowspan="3">사회서비스<br>제공자</th><td colspan="2">' + lab('기관명') + i('org') + '</td><td>' + lab('사업자등록번호(고유번호)') + i('biz') + '</td></tr>'
+    + '<tr><td colspan="2">' + lab('소재지') + i('addr') + '</td><td>' + lab('등록번호') + i('regno') + '</td></tr>'
+    + '<tr><td>' + lab('전화번호') + i('tel') + '</td><td>' + lab('팩스번호') + i('fax') + '</td><td>' + lab('전자우편주소') + i('mail') + '</td></tr>'
+    + '<tr><th rowspan="2">신청인</th><td colspan="2">' + lab('성명(법인ㆍ단체는 대표자)') + i('boss') + '</td><td>' + lab('주민등록번호') + '<div style="height:20px;"></div></td></tr>'
+    + '<tr><td colspan="2">' + lab('법인ㆍ단체명') + i('corp') + '</td><td>' + lab('전화번호') + i('btel') + '</td></tr>'
+    + '</table>'
+    + '<table style="margin-top:-1px;"><colgroup><col style="width:15%"><col style="width:28%"><col style="width:28%"><col></colgroup>'
+    + '<tr><th rowspan="6">변경신청<br>내용</th><th>변경신청할 등록사항</th><th>변경 전</th><th>변경 후</th></tr>'
+    + rows
+    + '</table>'
+    + '<div class="box" style="border-left:none;border-right:none;">'
+    +   '<div style="text-indent:10px;">「사회서비스 이용 및 이용권 관리에 관한 법률」 제16조제1항 후단 및 같은 법 시행규칙 제8조제1항에 따라 위와 같이 사회서비스 제공자 등록사항의 변경을 신청합니다.</div>'
+    +   '<div style="text-align:right;margin-top:10px;">' + i('y', 'width:52px;text-align:right;') + ' 년 ' + i('m', 'width:34px;text-align:right;') + ' 월 ' + i('d', 'width:34px;text-align:right;') + ' 일</div>'
+    +   '<div style="text-align:right;margin-top:8px;">신청인 : ' + i('who', 'width:150px;') + ' <span style="color:#888;font-size:11px;">(서명 또는 인)</span></div>'
+    +   '<div style="font-size:16px;font-weight:700;margin-top:10px;">' + i('to', 'width:220px;font-size:16px;font-weight:700;') + ' <span style="font-size:12px;font-weight:normal;">귀하</span></div>'
+    + '</div>'
+    + '<table style="margin-top:10px;"><colgroup><col style="width:15%"><col><col style="width:13%"></colgroup>'
+    + '<tr><th>첨부서류</th><td style="font-size:11px;">1. 변경사항을 확인할 수 있는 서류(담당 공무원이 첨부서류에 대한 정보를 확인할 수 있는 경우에는 그 확인으로 첨부서류 제출을 갈음할 수 있습니다) 1부<br>2. 사회서비스 제공자 등록증</td><td style="text-align:center;font-size:11px;">수수료<br>없음</td></tr>'
+    + '</table>'
+    + '<div style="background:#d9d9d9;text-align:center;margin-top:10px;padding:3px;font-weight:700;">작성방법</div>'
+    + '<div style="border:1px solid #333;padding:6px 8px;font-size:10.5px;line-height:1.6;">* 변경신청할 등록사항은 「사회서비스 이용 및 이용권 관리에 관한 법률 시행규칙」 별지 제1호서식에 따른 등록사항입니다. '
+    +   '① 서비스 종류 ② 신청인(대표자): 성명(법인ㆍ단체는 대표자), 주민등록번호, 법인ㆍ단체명, 법인등록번호, 주소, 전화번호 ③ 기관명, 사업자등록번호(고유번호) '
+    +   '④ 소재지: 주소, 전화번호, 팩스번호, 전자우편주소 ⑤ 설립구분 ⑥ 시설기준: 시설면적, 설비ㆍ비품 ⑦ 인력기준: 기관장 및 관리책임자 수, 제공인력 수 '
+    +   '⑧ 기관장: 성명, 자격, 경력 ⑨ 관리책임자: 성명, 자격, 경력 ⑩ 지급계좌: 예금주, 은행명, 계좌번호</div>'
+    + '<div style="background:#d9d9d9;text-align:center;margin-top:10px;padding:3px;font-weight:700;">처리절차</div>'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:6px;font-size:10.5px;text-align:center;">'
+    +   ['신청서 작성|신청인', '접 수|처리기관(시ㆍ군ㆍ구)', '검 토|처리기관(시ㆍ군ㆍ구)', '결 재|처리기관(시ㆍ군ㆍ구)', '등록증 재발급|처리기관(시ㆍ군ㆍ구)', '등록증 수령|신청인']
+         .map(t => { const p = t.split('|'); return '<div style="flex:1;"><div style="border:1px solid #333;padding:6px 2px;">' + p[0] + '</div><div style="margin-top:3px;">' + p[1] + '</div></div>'; }).join('<div>➔</div>')
+    + '</div>'
+    + '<div style="text-align:right;font-size:10px;margin-top:6px;">210mm×297mm[백상지(80g/㎡) 또는 중질지(80g/㎡)]</div>'
+    + '</div>';
+}
+function chgKeep() {
+  const sh = $('dsChg'); if (!sh) return;
+  const d = {};
+  sh.querySelectorAll('[data-c]').forEach(el => { d[el.dataset.c] = el.value; });
+  CHG = d;
+}
+function chgDirty() {
+  if (!CHG) return false;
+  return Object.keys(CHG).some(k => String(CHG[k] || '') !== String(CHG_DEF[k] == null ? '' : CHG_DEF[k]));
+}
+function chgBind() {
+  const sh = $('dsChg'); if (!sh) return;
+  const fit = t => { t.style.height = 'auto'; t.style.height = Math.max(34, t.scrollHeight + 2) + 'px'; };
+  sh.querySelectorAll('textarea.chgt').forEach(fit);
+  sh.addEventListener('input', e => { if (e.target.matches('textarea.chgt')) fit(e.target); chgKeep(); });
+}
 const ORG_SVC = ['언어재활','청능재활','미술심리재활','음악재활','행동발달재활','놀이심리','재활심리','감각발달재활','운동발달재활','심리운동','기타'];
 function docOrg(d) {
   d = d || {};
@@ -937,12 +1010,13 @@ function gmKor(iso) { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2}
 //   선생님을 고르면 이름 · 직종 · 입사일이 본문에 들어감 · 칸은 모두 고칠 수 있음
 // ═════════════════════════════════════════════
 function hireTabs() {
-  return '<div class="gmtabs">' + [['consent', '입사 전 개인정보동의서'], ['staff', '치료지원 인력 등록'], ['devjoin', '발달재활 인력 등록'], ['leave', '발달재활 인력 퇴사']]
+  return '<div class="gmtabs">' + [['consent', '입사 전 개인정보동의서'], ['staff', '치료지원 인력 등록'], ['devjoin', '발달재활 인력 등록'], ['leave', '발달재활 인력 퇴사'], ['change', '등록사항 변경 신청서']]
     .map(([k, l]) => '<button type="button" data-htab="' + k + '"' + (HIRE_TAB === k ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div>';
 }
 function hireBind() {
   document.querySelectorAll('[data-htab]').forEach(b => b.onclick = async () => {
-    if (b.dataset.htab === HIRE_TAB && HIRE_TAB === 'consent') return;
+    if (b.dataset.htab === HIRE_TAB && (HIRE_TAB === 'consent' || HIRE_TAB === 'change')) return;
+    if (HIRE_TAB === 'change') chgKeep();
     if (HIRE_TAB !== 'consent' && GM_DIRTY && !confirm('저장하지 않은 공문이 있습니다. 넘어갈까요?')) return;
     GM_DIRTY = false; GM_EDIT = false;
     HIRE_TAB = b.dataset.htab;
@@ -951,6 +1025,11 @@ function hireBind() {
       $('dvTitle').textContent = '신규인력등록 — 입사 전 개인정보동의서 (행정정보 공동이용 사전동의서)';
       $('dvHint').textContent = '채용하는 선생님께 인쇄해 드리고 직접 적어 서명받습니다 · 주민등록번호 등 고유식별번호 칸은 늘 빈칸';
       $('dvBody').innerHTML = hireTabs() + docHire(); hireBind(); placeTools();
+    } else if (HIRE_TAB === 'change') {
+      DOC_KIND = 'hire'; GM_MODE = 'refer'; GM_DIRTY = false;
+      $('dvTitle').textContent = '신규인력등록 — 사회서비스 제공자 등록사항 변경신청서 [별지 제4호서식]';
+      $('dvHint').textContent = '점선 칸은 고칠 수 있습니다 · 서버에 저장하지 않습니다 (이 화면을 닫기 전까지만 남음) · 주민등록번호는 인쇄 뒤 손으로';
+      $('dvBody').innerHTML = hireTabs() + docChange(); hireBind(); chgBind(); placeTools();
     } else { await openStaffLetter(false, HIRE_TAB === 'staff' ? 'join' : HIRE_TAB); }
   });
 }
@@ -1682,7 +1761,7 @@ function printDoc() {
   window.print();
   setTimeout(off, 1500);
 }
-window.addEventListener('beforeunload', e => { if (((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY) || (GM_KINDS.includes(DOC_KIND) && GM_DIRTY)) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (HIRE_TAB === 'change' && DOC_KIND === 'hire') chgKeep(); if (chgDirty()) { e.preventDefault(); e.returnValue = ''; return; } if (((DOC_KIND === 'org' || DOC_KIND === 'info') && ORG_DIRTY) || (GM_KINDS.includes(DOC_KIND) && GM_DIRTY)) { e.preventDefault(); e.returnValue = ''; } });
 
 async function afterLogin(user) {
   const { data: me, error: e1 } = await sb
