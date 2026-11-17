@@ -12258,9 +12258,39 @@ async function skipNotice(cid){
       + '\n\n이 날 ' + kidLbl(cid) + ' 수업은 시간표에 없습니다.\n보강을 다른 자리로 옮기거나, ' + kidLbl(cid) + ' 수업을 다른 날로 잡아 주세요.');
   } catch (e) { /* 알림만 못 띄움 */ }
 }
+// 발달재활은 한 달 4회 — 수업을 넣거나 고친 뒤 이번 달부터 석 달을 센다 (2026-11-17)
+//   4회를 넘는 줄은 서버(trg_t_dev4)가 깔지 않고 8 · 19번께 알림을 보낸다
+//   4회가 안 되는 달은 여기서 알려 「회기가 모자란 수업」 상자에서 보강을 잡게 한다
+async function dev4Notice(cid){
+  try {
+    const today = todayKr();
+    const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
+    const mks = [0, 1, 2].map(k => { const d = new Date(y, m - 1 + k, 1);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); });
+    const { data, error } = await sb.from('nl_sessions')
+      .select('month_key, run_no, status, split_anchor')
+      .eq('child_id', cid).eq('support_type_id', 2).is('makeup_for', null)
+      .in('month_key', mks);
+    if (error || !data || !data.length) return;
+    const cnt = {};
+    data.forEach(r => {
+      if (!(Number(r.run_no) > 0) || r.split_anchor) return;
+      if (r.status === '취소' || r.status === '쉼') return;
+      cnt[r.month_key] = (cnt[r.month_key] || 0) + 1;
+    });
+    const has = {};
+    data.forEach(r => { has[r.month_key] = 1; });
+    const short = mks.filter(k => has[k] && (cnt[k] || 0) < 4);
+    if (!short.length) return;
+    alert('⚠️ ' + kidLbl(cid) + ' 발달재활이 한 달 4회가 안 되는 달이 있습니다.\n\n'
+      + short.map(k => '· ' + Number(k.slice(5, 7)) + '월 ' + (cnt[k] || 0) + '회').join('\n')
+      + '\n\n모자란 회는 「회기가 모자란 수업」 상자나 찾기 창 ＋ 로 보강을 잡아 주세요.');
+  } catch (e) { /* 알림만 못 띄움 */ }
+}
 async function ovlNotice(cid){
   if (!cid) return;
   await skipNotice(cid);   // 보강 자리라 정규 수업을 넣지 못한 날 — 꼭 알림 (2026-10-19)
+  await dev4Notice(cid);   // 발달재활 한 달 4회가 안 되는 달 — 알림 (2026-11-17)
   try {
     const today = todayKr();
     const y = Number(today.slice(0, 4)), m = Number(today.slice(5, 7));
