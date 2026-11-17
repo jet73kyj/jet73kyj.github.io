@@ -493,6 +493,7 @@
   <input id="np2" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password">
   <button id="npBtn">이 번호로 정하기</button>
   <div id="npMsg" class="out"></div>
+  <button id="npBack" type="button" style="background:#fff;color:var(--ink2,#555);border:1px solid #ddd;margin-top:10px;">처음 로그인 화면으로</button>
   <div style="margin-top:16px;font-size:12px;color:var(--ink3);line-height:1.8;">
     정하신 번호는 휴대폰에 적어 두시면 좋습니다.<br>
     잊으셨을 때는 센터(042-488-6011)로 연락 주세요.
@@ -745,8 +746,12 @@ $('npBtn').onclick = async () => {
       why = '이 번호는 쓸 수 없는 번호입니다.\n다른 4자리로 정해 주세요.';
     else if (code === 'reauthentication_needed' || /reauth/i.test(msg))
       why = '로그인한 지 오래되었습니다.\n나갔다가 임시 비밀번호로 다시 로그인해 주세요.';
-    else if (/session|jwt|not authenticated/i.test(msg))
-      why = '로그인이 끊겼습니다.\n임시 비밀번호로 다시 로그인해 주세요.';
+    else if (/session|jwt|not authenticated/i.test(msg)) {
+      // 남아 있던 옛 로그인이 끊긴 것 — 로그인 화면으로 돌려보낸다 (2026-11-17)
+      alert('로그인이 끊겼습니다.\n임시 비밀번호로 다시 로그인해 주세요.');
+      await npGoLogin();
+      return;
+    }
     else
       why = '바꾸지 못했습니다.\n(' + (code || msg || '알 수 없는 오류') + ')\n이 글을 센터에 알려 주세요.';
     show($('npMsg'), why, false);
@@ -755,6 +760,12 @@ $('npBtn').onclick = async () => {
   }
 };
 $('np2').addEventListener('keydown', e => { if (e.key === 'Enter') $('npBtn').click(); });
+// 비밀번호 정하기 화면에서 로그인 화면으로 — 옛 로그인을 이 기기에서 지운다 (2026-11-17)
+async function npGoLogin() {
+  try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+  location.replace('parent.html');
+}
+$('npBack').onclick = () => npGoLogin();
 
 $('out').onclick = async () => {
   $('out').disabled = true; $('out').textContent = '나가는 중...';
