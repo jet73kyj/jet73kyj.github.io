@@ -1570,8 +1570,9 @@ async function loadMonth() {
   } catch (e) {}
   // 「보강 없음」으로 뺀 날은 학부모 시간표에도 안 그린다 (2026-09-09)
   // 쪼개기 자리표(따로 하는 수업 없음)는 학부모께 안 보인다 — 조각(+10)만 보인다 (2026-09-30)
-  // 발달재활 시작 전 몫 결석 줄은 학부모께 안 보인다 — 잡힌 보강만 보인다 (2026-11-17)
-  if (data) data = data.filter(r => !r.no_makeup && !r.split_anchor && !r.pre_start);
+  // 발달재활 시작 전 몫도 결석 줄로 보인다 — 보강을 잡아야 하는 회 (2026-11-17 은정님)
+  //   결석 취소 단추만 안 붙인다 (absPart)
+  if (data) data = data.filter(r => !r.no_makeup && !r.split_anchor);
   // 체험 · 추가 수업 — 요일줄 없이 이 달만 하는 수업 (2026-09-30) · 금액 · 메모는 안 받음
   try {
     const { data: xs } = await sb.rpc('nl_parent_extras', { p_child: CURKID, p_mk: CURMK });
@@ -1972,7 +1973,7 @@ function absPart(r, d, rq, tname) {
   // 그룹 수업 결석 — 보강 없음 안내 (2026-10-04 은정님)
   if (GRPT[r.therapy_id] && !mks.length)
     h += '<span class="absnote grpnote">그룹 수업은 결석 보강이 없습니다 · 1:1 보강(차액 4,000원)은 센터로</span>';
-  if (!mks.some(v => v.status === '완료') && d >= todayYmd()) {
+  if (!r.pre_start && !mks.some(v => v.status === '완료') && d >= todayYmd()) {
     h += canAsk(d, r.start_time)
       ? '<button class="absbtn undo" data-undo2="' + r.id + '">결석 취소</button>'
       : '<span class="absnote">결석 취소는 센터로</span>';
