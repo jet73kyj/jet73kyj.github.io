@@ -1264,14 +1264,15 @@ async function loadRecords() {
     return;
   }
 
-  // 각 기록지의 회차 내용을 가져온다
+  // 각 기록지의 회차 내용 — 서버 창구 하나에서 받는다 (2026-11-17)
+  //   서식마다 어느 칸이 「수업 내용」인지는 창구(nl_parent_rec_items)가 정한다
+  //   화면은 받은 body 를 그리기만 한다 · 선생님 메모는 창구가 아예 안 내려준다
   const ids = mine.map(l => l.id);
-  const { data: items } = await sb
-    .from('nl_session_items')
-    .select('log_id, seq_no, service_date, start_time, end_time, therapist_id,'
-          + ' reaction, content, status, absent_reason, makeup_date, makeup_time')
-    .in('log_id', ids)
-    .order('seq_no');
+  const { data: items, error: itErr } = await sb.rpc('nl_parent_rec_items', { p_log_ids: ids });
+  if (itErr) {
+    $('reclist').innerHTML = '<div class="none">기록지를 가져오지 못했습니다.<br>센터로 연락해 주세요.</div>';
+    return;
+  }
 
   const bag = {};
   (items || []).forEach(r => { (bag[r.log_id] = bag[r.log_id] || []).push(r); });
@@ -1310,8 +1311,7 @@ async function loadRecords() {
         + '<td class="ctr">' + day + '</td>'
         + '<td class="ctr">' + esc(tm) + '</td>'
         + '<td class="ctr">' + esc(THRS[r.therapist_id] || THRS[lg.therapist_id] || '') + '</td>'
-        // 센터 기록지는 「활동 내용」이 content 칸에 들어 있다 (2026-09-08 세 칸 → 한 칸 · 2026-11-17 고침)
-        + '<td>' + esc(r.reaction || r.content || '') + '</td>'
+        + '<td>' + esc(r.body || '') + '</td>'
         + '</tr>';
     });
 
