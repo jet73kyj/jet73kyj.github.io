@@ -157,18 +157,22 @@
   /* ===== 꾸밈 B 끝 ===== */
 .apprWarn button { width:auto !important; margin:3px 4px 0 0 !important; padding:2px 8px !important; font-size:11px !important;
   background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px !important; cursor:pointer; }
-  /* 계획서 · 보고서 라벨 (2026-11-17) */
-  #docLabs { position:fixed; right:0; top:200px; display:flex; flex-direction:column; gap:6px; z-index:34; }
-  body.nl-has-tabs #docLabs { right:58px; }
-  #docLabs button.dl { writing-mode:vertical-rl; width:34px !important; margin:0 !important; padding:12px 4px !important;
-    border-radius:10px 0 0 10px !important; border:1px solid #CFC9C2 !important; border-right:none !important;
-    background:#fff !important; color:#4A433F !important; font-size:13px !important; font-weight:600 !important;
-    letter-spacing:1px; cursor:pointer; box-shadow:none !important; }
-  #docLabs button.dl.need { background:#D93A2B !important; border-color:#D93A2B !important; color:#fff !important; }
-  #docLabs button.dl.none { border-style:dashed !important; color:#A39C95 !important; font-weight:500 !important; }
-  @media (max-width:900px) { #docLabs { position:static; flex-direction:row; justify-content:flex-end; margin:6px 10px; }
-    body.nl-has-tabs #docLabs { right:auto; }
-    #docLabs button.dl { writing-mode:horizontal-tb; width:auto !important; padding:5px 10px !important; border-radius:8px !important; border-right:1px solid #CFC9C2 !important; } }
+  /* 계획서 · 보고서 라벨 — 서식 화면 책갈피와 같은 모양 (2026-11-18 은정님) */
+  #docLabs { position:fixed; top:200px; display:flex; flex-direction:column; gap:4px; z-index:34;
+             padding:6px 0; border-left:2px solid #B07A4A; }
+  #docLabs button.dl { writing-mode:vertical-rl; text-orientation:upright; letter-spacing:0; word-spacing:-0.45em; white-space:nowrap;
+    width:auto !important; margin:0 0 0 -2px !important; padding:14px 8px !important; line-height:1.2;
+    background:#F3ECE3 !important; color:#8a7a6a !important; font-weight:500 !important; font-size:13px !important;
+    border:1px solid #E2D4C2 !important; border-left:2px solid #B07A4A !important;
+    border-radius:0 10px 10px 0 !important; box-shadow:none !important; cursor:pointer; }
+  #docLabs button.dl:hover { background:#FBF5EE !important; color:#7E5530 !important; }
+  #docLabs button.dl.has { background:#fff !important; color:#7E5530 !important; font-weight:700 !important;
+    border-color:#B07A4A !important; border-left:2px solid #fff !important; border-right:5px solid #B07A4A !important; }
+  #docLabs button.dl.need { background:#D93A2B !important; color:#fff !important; font-weight:700 !important;
+    border-color:#D93A2B !important; border-left:2px solid #B07A4A !important; }
+  #docLabs button.dl.none { color:#B8ADA2 !important; }
+  @media (max-width:900px) { #docLabs { top:auto; bottom:10px; right:8px; left:auto !important; flex-direction:row; border-left:none; padding:0; }
+    #docLabs button.dl { writing-mode:horizontal-tb; margin:0 !important; padding:6px 10px !important; border-radius:8px !important; border-left:1px solid #E2D4C2 !important; border-right:1px solid #E2D4C2 !important; } }
   @media print { #docLabs { display:none !important; } }
 </style>
 <style>
@@ -2588,7 +2592,7 @@ function plDraw() {
     b.className = 'no-print info';
     b.innerHTML = '제공 계획서 — ' + ym(PL.key) + ' 작성 (보호자 서명 전) <button type="button" onclick="plOpen()">보기</button>';
   }
-  b.style.display = 'block';
+  b.style.display = 'none';            // 계획서 알림 상자는 쓰지 않음 — 오른쪽 라벨이 빨강으로 알림 (2026-11-18 은정님)
   const open = w.style.display === 'block';
   const v = f => esc(plVal(f) || '');
   const inp = (f, st) => '<input type="text" data-f="' + f + '" value="' + v(f) + '"' + (st ? ' style="' + st + '"' : '') + '>';
@@ -2726,8 +2730,7 @@ function dlDraw() {
   let box = document.getElementById('docLabs');
   if (!box) {
     box = document.createElement('div'); box.id = 'docLabs'; box.className = 'no-print';
-    const c0 = document.querySelector('.container');
-    if (c0 && c0.parentNode) c0.parentNode.insertBefore(box, c0); else document.body.appendChild(box);
+    document.body.appendChild(box);      // 숨겨진 칸 안에 넣으면 안 보임 — 늘 body 바로 아래 (2026-11-18)
     box.addEventListener('click', e => { const b = e.target.closest('button[data-dl]'); if (b) dlOpen(b.dataset.dl); });
   }
   if (!LOADED || !childId) { box.style.display = 'none'; return; }
@@ -2736,7 +2739,19 @@ function dlDraw() {
   box.innerHTML = L.map(([t, nm]) => { const st = dlState(t);
     return '<button type="button" class="dl ' + st + '" data-dl="' + t + '" title="' + nm + ' — ' + tip[st] + '">' + nm + '</button>'; }).join('');
   box.style.display = '';
+  dlPlace();
 }
+// 라벨은 기록지 용지 바로 오른쪽 끝에 붙인다 (넓은 화면에서 창 끝에 붙으면 안 보임 · 2026-11-18)
+function dlPlace() {
+  const box = document.getElementById('docLabs'); if (!box) return;
+  if (window.innerWidth <= 900) { box.style.left = ''; return; }
+  const c = document.getElementById('sheet1') || document.querySelector('.container');
+  if (!c) return;
+  const r = c.getBoundingClientRect();
+  const tabs = document.body.classList.contains('nl-has-tabs') ? 58 : 0;
+  box.style.left = Math.round(Math.min(r.right + 2, window.innerWidth - tabs - 40)) + 'px';
+}
+window.addEventListener('resize', dlPlace);
 async function dlOpen(t) {
   if (t === '계획서') {
     if (PL) { plOpen(); return; }
