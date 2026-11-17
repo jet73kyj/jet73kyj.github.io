@@ -297,7 +297,7 @@
 
 <div class="picker no-print">
   <select id="pChild" style="min-width:220px;"></select>
-  <input id="pMonth" type="month" onchange="buildChildList().then(drawChildSelect);">
+  <input id="pMonth" type="month" onchange="monthChanged()">
   <button id="pLoad">불러오기</button>
   <button type="button" id="pIntake" style="background:#e3f0fb;color:#0c447c;border:1px solid #85b7eb;border-radius:7px;font-weight:600;">상담 · 보고서</button>
   <span id="pCount" style="font-size:14px;color:#5F5E5A;white-space:nowrap;"></span>
@@ -824,6 +824,35 @@ async function addMySessKids(mv, seen) {
   } catch (e) {}
 }
 
+// 달을 바꾸면 보던 아동의 그 달 기록지를 바로 불러온다 (2026-11-17 은정님)
+//   전에는 아동 목록만 새로 그려, 그 달 목록에 없는 아동은 이름이 지워지고 기록지는 옛 달 그대로였음
+//   그 달에 발달재활 수업이 없는 아동이면 알려 주고 아동을 다시 고르게 함
+let MV_SHOWN = '';
+async function monthChanged() {
+  const mv = $('pMonth').value;
+  const before = MV_SHOWN || (LOADED ? mkNow() : '');
+  if (!mv) { if (before) $('pMonth').value = before; return; }
+  if (DIRTY && !confirm('저장하지 않은 내용이 있습니다.\n\n그래도 다른 달로 넘어갈까요?\n(적어 둔 내용은 사라집니다)')) { if (before) $('pMonth').value = before; return; }
+  if (typeof chgPendingN === 'function' && chgPendingN() && !confirm('변경 계약서에 저장하지 않은 글이 있습니다.\n\n그래도 다른 달로 넘어갈까요?')) { if (before) $('pMonth').value = before; return; }
+  DIRTY = false;
+  if (typeof CHG !== 'undefined') CHG.forEach(c => { c.dirty = false; });
+  const prev = $('pChild').value || (LOADED && childId ? String(childId) : '');
+  await buildChildList();
+  drawChildSelect();
+  MV_SHOWN = mv;
+  if (!prev) return;
+  const q = $('pChildQ');
+  if (CHILDREN.some(c => String(c.id) === String(prev))) {
+    $('pChild').value = String(prev);
+    const o = $('pChild').options[$('pChild').selectedIndex];
+    if (q && o) q.value = o.text;
+    await loadOne();
+  } else {
+    $('pChild').value = '';
+    if (q) q.value = '';
+    alert(Number(mv.slice(5, 7)) + '월 발달재활 목록에 ' + prev + '번이 없습니다.\n그 달에는 이 아동의 발달재활 수업이 없었습니다.\n\n아동을 다시 골라 주세요.');
+  }
+}
 function drawChildSelect() {
   const keep = $('pChild').value;
   $('pChild').innerHTML = '<option value="">— 아동을 고르세요 —</option>'
@@ -1130,6 +1159,7 @@ async function loadOne() {
     });
 
     LOADED = true;
+    MV_SHOWN = mv;
     // 다시 다니는 아동 — 옛 수업 기록지 (보기만 · 2026-11-09 은정님)
     if (window.NLRec) NLRec.pastLogs({ sb: sb, cid: childId, sups: [2], page: 'record-develop.html',
       name: t => THERAPISTS[t] || '', sup: () => '발달재활' });
