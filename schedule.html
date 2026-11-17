@@ -3596,10 +3596,35 @@ function drawFind(){
     });
     // 미술공개수업은 한 번뿐 — 빈 회색 단추를 안 그린다 (2026-11-06)
     if (Number(r._tt) === 9) days = days.filter(d => slot[d]);
+    // 발달재활 달 중간 시작 — 시작 전 몫도 단추 넷 (2026-11-17 은정님)
+    //   지난 날짜에 줄을 깔면 선생님 확인이 풀리므로 줄은 시작일부터만 깔고,
+    //   시작 전 주는 「발 11-1 · 시작 전 ＋」 → 그 달 안 · 오늘부터 빈 자리에 잡는다 (openPlan 'dev')
+    //   회차는 그 달 몫 발달 회기(취소 · 쉼 빼고)가 안 쓴 번호 1~4 중 앞에서부터
+    const devFill = [];
+    if (Number(r.support_type_id) === 2 && CAN_EDIT) {
+      const _st = (GRPOF[r.id] || [r]).map(fStartOf).sort()[0];
+      if (_st > mon + '-01' && String(_st).slice(0, 7) === String(mon)) {
+        const _used = {};
+        let _cnt = 0;
+        _rl.forEach(x => {
+          if (Number(x.support_type_id) !== 2 || x.status === '취소' || x.status === '쉼') return;
+          if (x.month_key && String(x.month_key) !== String(mon)) return;
+          _cnt++;
+          if (Number(x.run_no) > 0) _used[Number(x.run_no)] = 1;
+        });
+        for (let n = 1; n <= 4 && devFill.length < 4 - _cnt; n++) if (!_used[n]) devFill.push(n);
+      }
+    }
+    const devBtn = (n, d) => '<span class="fb s2 fdev" data-dev="' + r.id + '" data-run="' + n + '"'
+      + ' style="border-style:dashed;cursor:pointer;" title="시작 전 몫 — 이 달 안 빈 자리에 잡기">발 '
+      + monNo(mon) + '-' + n + ' · ' + (d ? dayNo(d) + '일 ' : '') + '시작 전 <b class="fplus">＋</b></span>';
+    let devI = 0;
+    const devStart = (GRPOF[r.id] || [r]).map(fStartOf).sort()[0];
     // 한 날에 원래 줄이 둘 이상이면 오류 (두 벌) — 줄 끝에 빨간 글
     let dup = 0, nOn = 0;
     const main = days.map(d => {
       const all = slot[d] || [];
+      if (!all.length && devI < devFill.length && d < devStart) return devBtn(devFill[devI++], d);
       // 발추 쪼개기 자리표는 단추로 그리지 않고 그 날 발달 단추 뒤에 조각만 「이 +10 +10 +10 +10」
       const anc = all.filter(isAnchor), xs = all.filter(x => !isAnchor(x));
       const ancTxt = anc.map(a => {
@@ -3647,6 +3672,7 @@ function drawFind(){
     //   발4+발추1   — 매달 1회
     //   발4+5주발추 — 그 요일이 5번 있는 달만 1회 (공휴일 빼고 셈)
     let ghost = '';
+    while (devI < devFill.length) ghost += devBtn(devFill[devI++], null);
     // 발추를 다른 수업 첫째 주 자리에서 할 때 (발추대체 · 2026-10-28 은정님)
     //   발달 줄 끝에 「이 방11-1 대체」만 · 날짜 단추는 그 수업 줄에 「이 11-5 6일」로 그려진다
     if (Number(r.support_type_id) === 2) {
@@ -3731,6 +3757,14 @@ function drawFind(){
         + '</div>';
     }).join('');
 
+  // 「발 11-1 · 시작 전 ＋」 — 발달재활 시작 전 몫 자리 잡기 (2026-11-17)
+  $('findRows').querySelectorAll('.fdev[data-dev]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      lastClick = { clientX: e.clientX, clientY: e.clientY };
+      openPlan(Number(el.dataset.dev), null, 'dev', Number(el.dataset.run));
+    };
+  });
   // 「이 미정 ＋」 — 발추 자리 잡는 창 (2026-09-11)
   $('findRows').querySelectorAll('.fx8[data-x8]').forEach(el => {
     el.style.cursor = 'pointer';
@@ -7965,7 +7999,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ===== 회기가 모자란 수업에 한 자리 더 잡기 =====
-async function openPlan(scId, mk){
+async function openPlan(scId, mk, how, runNo){
   const r = ROWS_ALL.find(x => x.id === scId);
   if (!r) return;
   const slot = nearest(toMin(r.start_time));
@@ -7973,11 +8007,19 @@ async function openPlan(scId, mk){
   // 발추는 다음 달 끝까지 잡을 수 있다 (원칙 3) — 몫인 달 1일 ~ 다음 달 말일 (2026-10-01)
   //   전에는 보고 있는 달 안만 골라져, 9월 찾기 창에서 10월 날짜를 못 골랐다 (48번)
   PLAN_MK = mk || mon;
-  if (Number(r.support_type_id) === 2) {
+  const isDev = (how === 'dev');
+  if (isDev) {
+    // 시작 전 몫 — 그 달 안 · 오늘부터 (지난 날짜에 넣으면 선생님 확인이 풀린다)
+    const td = todayKr(), m1 = mon + '-01';
+    $('mn_date').min = td > m1 ? td : m1;
+    $('mn_date').max = monEnd(mon);
+  } else if (Number(r.support_type_id) === 2) {
     $('mn_date').min = PLAN_MK + '-01';
     $('mn_date').max = monEnd(nextMon(PLAN_MK));
   }
-  $('mnTitle').textContent = (PLAN_MK !== mon ? monNo(PLAN_MK) + '월 몫 · ' : '')
+  $('mnTitle').textContent = isDev
+    ? monNo(mon) + '월 발달재활 ' + runNo + '회차 (시작 전 몫) — 이 달 안 빈 자리 잡기'
+    : (PLAN_MK !== mon ? monNo(PLAN_MK) + '월 몫 · ' : '')
     + monNo(mon) + '월 ' + r.weekday + '요일 '
     + slotHm12(slot, r.therapist_id)
     + ' — 회기가 모자라 한 자리 더 잡기';
@@ -7994,6 +8036,13 @@ async function openPlan(scId, mk){
   if (o2) $('mn_scd').value = String(scId);
   drawMnHow();
 
+  if (isDev) {
+    $('mn_sp').value  = '';            // 치료와 같게 = 발달재활(2)
+    $('mn_run').value = String(runNo);
+    mnmsg('시작 전 몫 발달재활 ' + runNo + '회차입니다. '
+        + monNo(mon) + '월 안 · 오늘부터의 빈 자리를 골라 저장하세요.', true);
+    return;
+  }
   // 발달재활에서 모자란 한 자리는 발추(8번) 5회차다
   if (Number(r.support_type_id) === 2) {
     $('mn_sp').value  = '8';
