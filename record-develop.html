@@ -157,6 +157,19 @@
   /* ===== 꾸밈 B 끝 ===== */
 .apprWarn button { width:auto !important; margin:3px 4px 0 0 !important; padding:2px 8px !important; font-size:11px !important;
   background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px !important; cursor:pointer; }
+  /* 계획서 · 보고서 라벨 (2026-11-17) */
+  #docLabs { position:fixed; right:0; top:200px; display:flex; flex-direction:column; gap:6px; z-index:34; }
+  body.nl-has-tabs #docLabs { right:58px; }
+  #docLabs button.dl { writing-mode:vertical-rl; width:34px !important; margin:0 !important; padding:12px 4px !important;
+    border-radius:10px 0 0 10px !important; border:1px solid #CFC9C2 !important; border-right:none !important;
+    background:#fff !important; color:#4A433F !important; font-size:13px !important; font-weight:600 !important;
+    letter-spacing:1px; cursor:pointer; box-shadow:none !important; }
+  #docLabs button.dl.need { background:#D93A2B !important; border-color:#D93A2B !important; color:#fff !important; }
+  #docLabs button.dl.none { border-style:dashed !important; color:#A39C95 !important; font-weight:500 !important; }
+  @media (max-width:900px) { #docLabs { position:static; flex-direction:row; justify-content:flex-end; margin:6px 10px; }
+    body.nl-has-tabs #docLabs { right:auto; }
+    #docLabs button.dl { writing-mode:horizontal-tb; width:auto !important; padding:5px 10px !important; border-radius:8px !important; border-right:1px solid #CFC9C2 !important; } }
+  @media print { #docLabs { display:none !important; } }
 </style>
 <style>
 /* ===== 변경 계약서 [서식 10호] (2026-10-09) ===== */
@@ -1178,6 +1191,7 @@ async function loadOne() {
     fcLoadDocs(cid, mk);
     rpLoad(cid, mk);
     plLoad(cid, mk);
+    dlLoad(cid);
     _rdRemember();
     _autoKeep(cid, mk);              // 화면과 서버가 같은 기록지를 보게 — 여는 순간 저장 (2026-11-05)
   } catch (e) {
@@ -1842,6 +1856,7 @@ function chgReset() {
   fcReset();
   rpReset();
   plReset();
+  dlReset();
 }
 function chgArea(tid) {      // 그 선생님이 맡은 발달재활 수업의 영역 (나중에 시작한 것)
   let best = null, bd = '';
@@ -2328,7 +2343,8 @@ async function rpLoad(cid, mk) {
   const y = year, m = month;
   // 이 달에 끝나는 발달재활 수업이 있으면 종결 보고서 (종결한 달에 작성 · 2026-10-22 은정님 다시 확인)
   //   계속 받는 아동은 12월 기록지에 종결 보고서 (7~12월)
-  const endHere = (TL || []).map(t => String(t.ended_on || '')).filter(d => d.slice(0, 7) === mk).sort().pop() || '';
+  // 종결 보고서는 12월에만 (2026-11-17 은정님 — 종결한 달에 따로 띄우지 않음 · 지난 보고서는 오른쪽 라벨로 엶)
+  const endHere = '';
   let type = null, key = '', from = '', to = '';
   if (endHere) { type = '종결보고'; key = mk; to = endHere; from = (m <= 6 ? y + '-01-01' : y + '-07-01'); }
   else if (m === 6)  { type = '중간보고'; key = String(y); from = y + '-01-01'; to = rpIsoLast(y, 6); }
@@ -2437,6 +2453,8 @@ function rpDraw() {
   });
   chgStamp();
   w.style.display = open ? 'block' : 'none';
+  if (RP.doc) DL_HAS[RP.type] = true;
+  dlDraw();
 }
 function rpOpen() {
   const w = $('rpWrap');
@@ -2501,12 +2519,13 @@ function plReset() {
   const b = $('plBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('plWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
 }
-async function plLoad(cid, mk) {
+async function plLoad(cid, mk, force) {
   const req = PL_REQ;
   const st0 = (TL || []).map(t => String(t.started_on || '')).concat(
                 [].concat(...(TL || []).map(t => (t.nl_therapy_schedules || []).map(sc => String(sc.from_date || '')))))
               .filter(d => /^\d{4}-\d{2}-\d{2}/.test(d)).sort()[0] || '';
-  const need = month === 1 || (st0 && st0.slice(0, 7) === mk);
+  // 발달재활을 시작한 첫 달에만 작성 (2026-11-17 은정님 — 해마다 1월은 아님)
+  const need = !!force || !!(st0 && st0.slice(0, 7) === mk);
   try {
     const q = need
       ? sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
@@ -2560,7 +2579,7 @@ function plDraw() {
   const ym = k => Number(k.slice(0, 4)) + '년 ' + Number(k.slice(5, 7)) + '월';
   if (PL.need && !done) {
     b.className = 'no-print need';
-    b.innerHTML = '<b>제공(이용) 계획서를 작성해 주세요</b> · ' + (month === 1 ? '해마다 1월' : '발달재활을 시작한 달')
+    b.innerHTML = '<b>제공(이용) 계획서를 작성해 주세요</b> · 발달재활을 시작한 달'
       + '<div style="margin-top:4px;"><button type="button" onclick="plOpen()">제공 계획서 열기</button></div>';
   } else if (done) {
     b.className = 'no-print ok';
@@ -2625,6 +2644,8 @@ function plDraw() {
     if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
   });
   w.style.display = open ? 'block' : 'none';
+  if (PL.doc) DL_HAS['계획서'] = true;
+  dlDraw();
 }
 function plOpen() {
   const w = $('plWrap');
@@ -2677,6 +2698,73 @@ function plPrint() {
   window.print();
   setTimeout(off, 1500);
 }
+// ═════════════════════════════════════════════
+// 계획서 · 보고서 라벨 (2026-11-17 은정님) — 기록지 오른쪽에 늘 붙어 있어 어느 달이든 열어 봄
+//   빨강 = 이 달에 써야 하는데 아직 (계획서는 보호자 서명 전 · 보고서는 작성 끝 전)
+//   흰색 = 저장된 것 있음 · 점선 = 아직 없음
+//   누르면 — 이 달 몫이면 그것, 아니면 가장 최근에 저장한 것 (계획서는 없으면 이 달로 새로)
+// ═════════════════════════════════════════════
+let DL_HAS = {}, DL_REQ = 0;
+function dlReset() { DL_HAS = {}; DL_REQ++; dlDraw(); }
+async function dlLoad(cid) {
+  const req = ++DL_REQ;
+  try {
+    const { data, error } = await sb.from('nl_dev_docs').select('doc_type')
+      .eq('child_id', Number(cid)).in('doc_type', ['계획서', '중간보고', '종결보고']).range(0, 999);
+    if (error || req !== DL_REQ) return;
+    (data || []).forEach(r => { DL_HAS[r.doc_type] = true; });
+  } catch (e) {}
+  dlDraw();
+}
+function dlState(t) {
+  if (t === '계획서') {
+    if (PL && PL.need && !(PL.doc && PL.doc.done)) return 'need';
+  } else if (RP && RP.type === t && !(RP.doc && RP.doc.done)) return 'need';
+  return DL_HAS[t] ? 'has' : 'none';
+}
+function dlDraw() {
+  let box = document.getElementById('docLabs');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'docLabs'; box.className = 'no-print';
+    const c0 = document.querySelector('.container');
+    if (c0 && c0.parentNode) c0.parentNode.insertBefore(box, c0); else document.body.appendChild(box);
+    box.addEventListener('click', e => { const b = e.target.closest('button[data-dl]'); if (b) dlOpen(b.dataset.dl); });
+  }
+  if (!LOADED || !childId) { box.style.display = 'none'; return; }
+  const L = [['계획서', '제공 계획서'], ['중간보고', '중간 보고서'], ['종결보고', '종결 보고서']];
+  const tip = { need: '이 달에 써야 합니다 (아직 안 끝남)', has: '저장된 문서가 있습니다', none: '아직 없습니다' };
+  box.innerHTML = L.map(([t, nm]) => { const st = dlState(t);
+    return '<button type="button" class="dl ' + st + '" data-dl="' + t + '" title="' + nm + ' — ' + tip[st] + '">' + nm + '</button>'; }).join('');
+  box.style.display = '';
+}
+async function dlOpen(t) {
+  if (t === '계획서') {
+    if (PL) { plOpen(); return; }
+    if (!confirm('이 아동의 제공 계획서가 아직 없습니다.\n\n이 달(' + mkNow() + ')로 새로 작성할까요?')) return;
+    await plLoad(childId, mkNow(), true);
+    if (PL) plOpen();
+    return;
+  }
+  if (RP && RP.type === t) { rpOpen(); return; }
+  const nm = t === '중간보고' ? '중간 보고서' : '종결 보고서';
+  try {
+    const { data, error } = await sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
+      .eq('child_id', Number(childId)).eq('doc_type', t).order('doc_key', { ascending: false }).limit(1);
+    if (error) throw error;
+    const doc = data && data[0];
+    if (!doc) {
+      alert('아직 저장한 ' + nm + '가 없습니다.\n\n' + (t === '중간보고' ? '중간 보고서는 6월 기록지에서 씁니다.' : '종결 보고서는 12월 기록지에서 씁니다.'));
+      return;
+    }
+    if (RP && RP.dirty && !confirm('지금 열린 보고서에 저장하지 않은 글이 있습니다.\n그래도 다른 보고서를 열까요?')) return;
+    const d = doc.data || {};
+    RP = { type: t, key: doc.doc_key, from: d.from || '', to: d.to || '', doc, dirty: false,
+           auto: { period: d.period || (rpDot(d.from || '') + ' ~ ' + rpDot(d.to || '')) } };
+    rpDraw();
+    rpOpen();
+  } catch (e) { alert(nm + '를 불러오지 못했습니다.\n' + (e.message || e)); }
+}
+
 // ── 이 아동 이 달 기록지 점검 결과 (2026-10-02) — 셈은 서버 nl_record_check 한 곳 ──
 const RC_ITEM = {
   1:'빠른 결제', 2:'중복결제', 3:'수업보다 결제가 많은 날', 4:'중복결제', 5:'승인번호 이상',
