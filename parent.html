@@ -1269,7 +1269,7 @@ async function loadRecords() {
   const { data: items } = await sb
     .from('nl_session_items')
     .select('log_id, seq_no, service_date, start_time, end_time, therapist_id,'
-          + ' reaction, status, absent_reason, makeup_date, makeup_time')
+          + ' reaction, content, status, absent_reason, makeup_date, makeup_time')
     .in('log_id', ids)
     .order('seq_no');
 
@@ -1310,7 +1310,8 @@ async function loadRecords() {
         + '<td class="ctr">' + day + '</td>'
         + '<td class="ctr">' + esc(tm) + '</td>'
         + '<td class="ctr">' + esc(THRS[r.therapist_id] || THRS[lg.therapist_id] || '') + '</td>'
-        + '<td>' + esc(r.reaction || '') + '</td>'
+        // 센터 기록지는 「활동 내용」이 content 칸에 들어 있다 (2026-09-08 세 칸 → 한 칸 · 2026-11-17 고침)
+        + '<td>' + esc(r.reaction || r.content || '') + '</td>'
         + '</tr>';
     });
 
