@@ -3013,11 +3013,20 @@ function rcDraw() {
     .concat(rcRuleLocal());
   let bad = 0;
   rows.forEach(r => { if (rcPlace(r)) bad++; });
+  // 결과 글 미작성 — 서버에 저장된 회차로 셈 (2026-11-18 · 97번 10월 — 글이 하나도 없는데 「고칠 곳 없음」이 떴음)
+  //   지난 날 · 결석 아님 · 포기 아님 · 결과 글이 빈 회차
+  const today0 = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const unw = (ITEMS || []).filter(it => it.service_date && String(it.service_date).slice(0, 10) <= today0
+      && String(it.status || '') !== '결석' && String(it.voucher_no || '') !== '포기'
+      && !String(it.reaction || '').trim() && !String(it.content || '').trim())
+    .map(it => Number(it.seq_no)).filter(Boolean).sort((a, b) => a - b);
+  if (unw.length) bad += unw.length;
   box.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;font-size:12.5px;line-height:1.6;'
     + (bad ? 'background:#FDECEA;border-left:3px solid #D8684A;color:#7A2E1E;'
            : 'background:#EAF4EC;border-left:3px solid #5E9A6E;color:#2E6B3E;');
   box.innerHTML = bad
     ? '<b>기록지 점검 — 고칠 곳 ' + bad + '군데</b> · 기록지 안 빨간 칸을 확인해 주세요 (고친 뒤 저장하면 다시 셉니다)'
+      + (unw.length ? '<br>· <b>결과 글 미작성</b> — ' + unw.map(n => n + '회째').join(' · ') + ' (서버에 저장된 글이 없습니다)' : '')
     : '기록지 점검 — 고칠 곳 없음';
   if (RC_EDITED.size) box.innerHTML += '<br>· 고친 ' + [...RC_EDITED].sort((a, b) => a - b).map(i => (i + 1) + '회째').join(' · ')
     + ' — 저장하면 다시 점검합니다';
@@ -3452,6 +3461,9 @@ async function saveRecord(opts) {
   SAVING = true;
   setSaveBtn('saving');
   try {
+    // 로그인이 끊겼으면 저장하지 않고 알린다 — 적은 글은 화면에 그대로 (2026-11-18)
+    const { data: ssn } = await sb.auth.getSession();
+    if (!ssn || !ssn.session) throw new Error('로그인이 끊겼습니다.\n\n이 탭은 닫지 마세요 (적은 글이 그대로 있습니다).\n새 탭에서 나무링크에 다시 로그인한 뒤, 이 탭으로 돌아와 「저장」을 한 번 더 눌러 주세요.');
     // 1) 기록지 한 장
     const logRow = {
       child_id: Number(childId), support_type_id: 2, month_key: mk,
@@ -3553,6 +3565,14 @@ async function saveRecord(opts) {
       throw new Error('저장하지 못해 전에 적은 내용으로 되돌렸습니다.\n' + ins.error.message);
     }
 
+    // 서버에서 다시 읽어 회차 수 · 결과 글이 다 들어갔는지 견줌 (2026-11-18)
+    {
+      const chk = await sb.from('nl_session_items').select('seq_no, reaction').eq('log_id', LOGID);
+      const sent = items.reduce((a, it) => a + String(it.reaction || '').length, 0);
+      const got = chk.error ? -1 : (chk.data || []).reduce((a, r) => a + String(r.reaction || '').length, 0);
+      if (chk.error || (chk.data || []).length !== items.length || got !== sent)
+        throw new Error('저장한 뒤 다시 읽어 보니 서버 내용이 화면과 다릅니다.\n(회차 ' + ((chk.data || []).length) + '/' + items.length + ' · 글자 ' + got + '/' + sent + ')\n\n이 탭은 닫지 말고, 새로고침(F5) 없이 「저장」을 한 번 더 눌러 주세요.');
+    }
     ITEMS = items;
     // 저장 알림 창은 뺐다 — 단추 모양이 알려 준다 (2026-09-16)
     $('pInfo').textContent = mk + ' · 바우처 ' + VOUCHER.length + '건 · 저장됨';
@@ -3564,8 +3584,13 @@ async function saveRecord(opts) {
     if (reordered) setTimeout(() => { DIRTY = false; try { loadOne(); } catch (e) {} }, 350);   // 날짜 차례로 다시 그림 (2026-11-05)
   } catch (e) {
     if (opts && opts.quiet === true) console.warn('기록지 자동 저장 실패', e);   // 여는 순간 저장 — 실패하면 「저장 전」으로 둠
-    else alert('❌ 저장하지 못했습니다.\n' + e.message);
+    else {
+      const msg = String((e && e.message) || e);
+      const auth = /row-level security|JWT|jwt|401|Unauthorized|refresh token/i.test(msg);
+      alert('❌ 저장하지 못했습니다.\n' + (auth ? '로그인이 끊긴 것 같습니다. 이 탭은 닫지 말고 새 탭에서 다시 로그인한 뒤, 이 탭에서 「저장」을 한 번 더 눌러 주세요.\n\n(' + msg + ')' : msg));
+    }
     setSaveBtn('before');
+    if (!(opts && opts.quiet === true)) DIRTY = true;   // 저장 안 된 글이 있다 — 나갈 때 묻는다 (2026-11-18)
   } finally {
     setTimeout(() => { SAVING = false; }, 300);
   }
