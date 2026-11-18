@@ -157,22 +157,23 @@
   /* ===== 꾸밈 B 끝 ===== */
 .apprWarn button { width:auto !important; margin:3px 4px 0 0 !important; padding:2px 8px !important; font-size:11px !important;
   background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px !important; cursor:pointer; }
-  /* 계획서 · 보고서 라벨 — 서식 화면 책갈피와 같은 모양 (2026-11-18 은정님) */
-  #docLabs { position:fixed; top:200px; display:flex; flex-direction:column; gap:4px; z-index:34;
-             padding:6px 0; border-left:2px solid #B07A4A; }
-  #docLabs button.dl { writing-mode:vertical-rl; text-orientation:upright; letter-spacing:0; word-spacing:-0.45em; white-space:nowrap;
-    width:auto !important; margin:0 0 0 -2px !important; padding:14px 8px !important; line-height:1.2;
-    background:#F3ECE3 !important; color:#8a7a6a !important; font-weight:500 !important; font-size:13px !important;
-    border:1px solid #E2D4C2 !important; border-left:2px solid #B07A4A !important;
-    border-radius:0 10px 10px 0 !important; box-shadow:none !important; cursor:pointer; }
-  #docLabs button.dl:hover { background:#FBF5EE !important; color:#7E5530 !important; }
-  #docLabs button.dl.has { background:#fff !important; color:#7E5530 !important; font-weight:700 !important;
-    border-color:#B07A4A !important; border-left:2px solid #fff !important; border-right:5px solid #B07A4A !important; }
-  #docLabs button.dl.need { background:#D93A2B !important; color:#fff !important; font-weight:700 !important;
-    border-color:#D93A2B !important; border-left:2px solid #B07A4A !important; }
-  #docLabs button.dl.none { color:#B8ADA2 !important; }
-  @media (max-width:900px) { #docLabs { top:auto; bottom:10px; right:8px; left:auto !important; flex-direction:row; border-left:none; padding:0; }
-    #docLabs button.dl { writing-mode:horizontal-tb; margin:0 !important; padding:6px 10px !important; border-radius:8px !important; border-left:1px solid #E2D4C2 !important; border-right:1px solid #E2D4C2 !important; } }
+  /* 계획서 · 보고서 라벨 — 세로 책갈피 · 흰 바탕 · 써야 하면 빨간 점 (2026-11-18 은정님 「가」) */
+  #docLabs { position:fixed; top:200px; display:flex; flex-direction:column; gap:5px; z-index:34; border-left:2px solid #B07A4A; }
+  #docLabs button.dl { position:relative; writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:1px; white-space:nowrap;
+    width:auto !important; margin:0 !important; padding:14px 8px !important; line-height:1.2;
+    background:#fff !important; color:#7E5530 !important; font-weight:500 !important; font-size:13px !important;
+    border:1px solid #E2D4C2 !important; border-left:none !important;
+    border-radius:0 8px 8px 0 !important; box-shadow:none !important; cursor:pointer; }
+  #docLabs button.dl:hover { background:#FBF5EE !important; }
+  #docLabs button.dl.need { padding-top:24px !important; font-weight:700 !important; }
+  #docLabs button.dl .dot { position:absolute; top:9px; left:50%; transform:translateX(-50%); width:8px; height:8px; border-radius:50%; background:#D93A2B; }
+  #docLabs button.dl.done { color:#3B6D11 !important; }
+  #docLabs button.dl.none { border-style:dashed dashed dashed none !important; color:#B8ADA2 !important; }
+  @media (max-width:900px) { #docLabs { top:auto; bottom:10px; right:8px; left:auto !important; flex-direction:row; border-left:none; }
+    #docLabs button.dl { writing-mode:horizontal-tb; padding:6px 10px !important; border-radius:8px !important; border-left:1px solid #E2D4C2 !important; }
+    #docLabs button.dl.need { padding-top:6px !important; padding-left:22px !important; }
+    #docLabs button.dl .dot { top:50%; left:9px; transform:translateY(-50%); }
+    #docLabs button.dl.none { border-style:dashed !important; } }
   @media print { #docLabs { display:none !important; } }
 </style>
 <style>
@@ -2523,36 +2524,96 @@ function plReset() {
   const b = $('plBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('plWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
 }
-async function plLoad(cid, mk, force) {
-  const req = PL_REQ;
-  const st0 = (TL || []).map(t => String(t.started_on || '')).concat(
-                [].concat(...(TL || []).map(t => (t.nl_therapy_schedules || []).map(sc => String(sc.from_date || '')))))
-              .filter(d => /^\d{4}-\d{2}-\d{2}/.test(d)).sort()[0] || '';
-  // 발달재활을 시작한 첫 달에만 작성 (2026-11-17 은정님 — 해마다 1월은 아님)
-  const need = !!force || !!(st0 && st0.slice(0, 7) === mk);
+// 영역별 계획서 (2026-11-18 은정님)
+//   치료 영역이 바뀌어 한 달 이상 이어지면 계획서를 새로 쓴다 (계획서 2 · 3 …)
+//   한 달이 안 되는 수업(1회성 영역 변경)은 계획서를 만들지 않는다
+//   계획서 줄의 doc_key = 그 영역 수업을 시작한 달 (같은 달에 둘이면 'YYYY-MM:영역번호')
+const PL_SHORT = { 1:'언어', 2:'작업', 3:'인지', 4:'감통', 5:'음악', 6:'자립', 7:'심리', 8:'미술', 9:'미술' };
+const PL_FULL  = { 1:'언어재활', 2:'작업재활', 3:'전산화인지재활', 4:'감각통합재활', 5:'음악재활', 6:'일상자립', 7:'심리재활', 8:'미술재활', 9:'미술재활' };
+let PL_DOCS = [];          // 이 아동 계획서 줄 전부 (라벨 · 짝 찾기)
+let PL_GL = null;          // 아동목록 보호자 {name, phone, gs:[{id,name,phone,pri}]}
+function plAddMonth(iso) {
+  const y = +iso.slice(0, 4), m = +iso.slice(5, 7), d = +iso.slice(8, 10);
+  const last = new Date(y, m + 1, 0).getDate();
+  const t = new Date(y, m, Math.min(d, last));
+  return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+}
+function planEps() {
+  const rows = (TL || []).map(t => {
+    const fr = (t.nl_therapy_schedules || []).map(sc => String(sc.from_date || '')).filter(x => /^\d{4}-\d{2}-\d{2}/.test(x)).sort()[0] || '';
+    const st = /^\d{4}-\d{2}-\d{2}/.test(String(t.started_on || '')) ? String(t.started_on).slice(0, 10) : fr;
+    return { type: Number(t.therapy_type_id) || 0, st, en: String(t.ended_on || '').slice(0, 10) };
+  }).filter(x => x.st).sort((a, b) => a.st < b.st ? -1 : a.st > b.st ? 1 : 0);
+  // 한 달이 안 된 수업은 뺌 (마지막 수업은 아직 진행 중일 수 있어 남김)
+  const keep = rows.filter((x, i) => !(x.en && x.en < plAddMonth(x.st) && i < rows.length - 1));
+  const eps = [];
+  keep.forEach(x => { const last = eps[eps.length - 1]; if (!last || last.type !== x.type) eps.push({ type: x.type, st: x.st, mk: x.st.slice(0, 7) }); });
+  eps.forEach((e, i) => { e.i = i; e.key = eps.some((o, j) => j < i && o.mk === e.mk) ? e.mk + ':' + e.type : e.mk; });
+  return eps;
+}
+function plDocOf(eps, i) {       // 그 영역 계획서 줄 — 정확한 열쇠, 없으면 그 영역 기간 안에 쓴 옛 계획서
+  const e = eps[i]; if (!e) return null;
+  const exact = PL_DOCS.find(d => d.doc_key === e.key); if (exact) return exact;
+  const from = i === 0 ? '' : e.mk, to = eps[i + 1] ? eps[i + 1].mk : '9999-99';
+  const inr = PL_DOCS.filter(d => !eps.some(o => o.key === d.doc_key) && d.doc_key.slice(0, 7) >= from && d.doc_key.slice(0, 7) < to)
+                     .sort((a, b) => a.doc_key < b.doc_key ? 1 : -1);
+  return inr[0] || null;
+}
+function plTelDigits(v) { return String(v || '').replace(/[^\d]/g, ''); }
+function plTelFmt(v) {
+  const d = plTelDigits(v);
+  if (/^02\d{8}$/.test(d)) return d.slice(0, 2) + '-' + d.slice(2, 6) + '-' + d.slice(6);
+  if (/^02\d{7}$/.test(d)) return d.slice(0, 2) + '-' + d.slice(2, 5) + '-' + d.slice(5);
+  if (d.length === 11) return d.slice(0, 3) + '-' + d.slice(3, 7) + '-' + d.slice(7);
+  if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+  if (d.length === 8 && /^1[5-9]/.test(d)) return d.slice(0, 4) + '-' + d.slice(4);
+  return String(v || '').trim();
+}
+async function plGuardLoad(cid) {       // 아동목록의 보호자 성함 · 연락처 (아동 번호로만 찾음 · 이름으로 찾지 않음)
+  const out = { name: '', phone: '', gs: [] };
   try {
-    const q = need
-      ? sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
-          .eq('child_id', Number(cid)).eq('doc_type', '계획서').eq('doc_key', mk).limit(1)
-      : sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
-          .eq('child_id', Number(cid)).eq('doc_type', '계획서').lte('doc_key', mk)
-          .order('doc_key', { ascending: false }).limit(1);
-    const { data, error } = await q;
-    if (error) throw error;
+    const { data } = await sb.from('nl_children').select('id, guardian, phone').eq('id', Number(cid)).maybeSingle();
+    if (data) { out.name = String(data.guardian || '').trim(); out.phone = String(data.phone || '').trim(); }
+  } catch (e) {}
+  try {         // 보호자 표는 관리자만 읽힘 — 선생님 계정은 빈 목록
+    const { data } = await sb.from('nl_guardians').select('id, name, phone, is_primary').eq('child_id', Number(cid)).order('id');
+    out.gs = (data || []).map(g => ({ id: g.id, name: String(g.name || '').trim(), phone: String(g.phone || '').trim(), pri: !!g.is_primary }));
+  } catch (e) {}
+  if (!out.phone) { const g = out.gs.find(x => x.pri && x.phone) || out.gs.find(x => x.phone); if (g) { out.phone = g.phone; if (!out.name) out.name = g.name; } }
+  if (!out.name) { const g = out.gs.find(x => x.pri && x.name) || out.gs.find(x => x.name); if (g) out.name = g.name; }
+  return out;
+}
+async function plLoad(cid, mk, force, epIdx) {
+  const req = PL_REQ;
+  const eps = planEps();
+  try {
+    const [dq, gl] = await Promise.all([
+      sb.from('nl_dev_docs').select('id, doc_key, data, done, done_on, updated_at')
+        .eq('child_id', Number(cid)).eq('doc_type', '계획서').range(0, 999),
+      plGuardLoad(cid)
+    ]);
+    if (dq.error) throw dq.error;
     if (req !== PL_REQ) return;
-    const doc = (data && data[0]) || null;
-    if (!need && !doc) return;                 // 작성할 달도 아니고 계획서도 없음
+    PL_DOCS = dq.data || [];
+    PL_GL = gl;
+    let ep = epIdx != null ? eps[epIdx] : null;
+    if (!ep) { const past = eps.filter(e => e.mk <= mk); ep = past[past.length - 1] || null; }
+    if (!ep && force) ep = { i: 0, type: (TL && TL[0] && Number(TL[0].therapy_type_id)) || 0, st: mk + '-01', mk, key: mk };
+    // 발달재활을 시작한 첫 달 · 영역이 바뀐 달에만 작성 (2026-11-17 · 11-18 은정님)
+    const need = !!(ep && ep.mk === mk);
+    const doc = ep ? plDocOf(eps, ep.i) : null;
+    if (!ep || (!need && !doc && !force)) { PL = null; dlDraw(); return; }
     const area = ($('s1_area') && $('s1_area').value) || '';
     const self = String(($('s1_costSelf') || {}).value || '').replace(/[^\d]/g, '');
     const selfN = self ? Number(self) : 0;
     const tot = UNIT * SESSIONS;
     const won = n => Number(n || 0).toLocaleString();
     const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '.');
-    PL = { need, key: doc ? doc.doc_key : mk, doc, dirty: false,
+    PL = { need, key: doc ? doc.doc_key : ep.key, ep, doc, dirty: false,
       auto: {
         name: child ? child.name || '' : '', birth: child && child.birth ? String(child.birth).slice(0, 10).replace(/-/g, '.') : '',
         mgmt: child ? child.manager_no || '' : '', dis_type: '', dis_level: '',
-        area, g_name: '', g_tel: '',
+        area: (ep.mk === mk ? area : '') || PL_FULL[ep.type] || area, g_name: '', g_tel: '',
         fee_month: won(tot), fee_self: selfN ? won(selfN) : '', issued_on: today,
         p1_need: '', p1_now: '', p1_short: '', p1_long: '',
         p2_need: '', p2_now: '', p2_short: '', p2_long: '',
@@ -2572,8 +2633,19 @@ async function plLoad(cid, mk, force) {
     b.textContent = '제공 계획서를 불러오지 못했습니다. (' + (e.message || e) + ')';
   }
 }
+function plFillTag(f) {
+  return plGFill(f) ? ' <span class="no-print pl-fill" data-fill="' + f + '" style="font-size:10.5px;color:#B07A4A;white-space:nowrap;">아동목록에서 불러옴</span>' : '';
+}
+function plGFill(f) {           // 계획서 칸이 비었을 때 아동목록에서 불러올 값 (덮어쓰지 않음 · 2026-11-18)
+  if (!PL || !PL_GL || (f !== 'g_name' && f !== 'g_tel')) return '';
+  const d = PL.doc && PL.doc.data;
+  if (d && String(d[f] || '').trim()) return '';
+  return f === 'g_name' ? PL_GL.name : (PL_GL.phone ? plTelFmt(PL_GL.phone) : '');
+}
 function plVal(f) {
   const d = PL && PL.doc && PL.doc.data;
+  const fill = plGFill(f);
+  if (fill) return fill;
   return d && d[f] != null ? d[f] : (PL ? PL.auto[f] : '');
 }
 function plDraw() {
@@ -2608,7 +2680,7 @@ function plDraw() {
     + '<table class="pl-tbl"><colgroup><col style="width:22%"><col style="width:28%"><col style="width:18%"><col style="width:32%"></colgroup>'
     + '<tr><th>성 명</th><td>' + inp('name') + '</td><th>생년월일</th><td>' + inp('birth') + '</td></tr>'
     + '<tr><th>사회복지서비스<br>관리번호</th><td>' + inp('mgmt') + '</td><th>장애아동 정보</th><td>등록(예견) 유형: ' + inp('dis_type', 'width:55%;display:inline-block') + '<br>장애정도: ' + inp('dis_level', 'width:55%;display:inline-block') + '</td></tr>'
-    + '<tr><th>발달재활서비스<br>제공영역</th><td>' + inp('area') + '</td><th>보호자<br>성명 및 연락처</th><td>성함: ' + inp('g_name', 'width:50%;display:inline-block') + ' (인)<br>연락처: ' + inp('g_tel', 'width:60%;display:inline-block') + '</td></tr>'
+    + '<tr><th>발달재활서비스<br>제공영역</th><td>' + inp('area') + '</td><th>보호자<br>성명 및 연락처</th><td>성함: ' + inp('g_name', 'width:50%;display:inline-block') + ' (인)' + plFillTag('g_name') + '<br>연락처: ' + inp('g_tel', 'width:60%;display:inline-block') + plFillTag('g_tel') + '</td></tr>'
     + '<tr><th>월 이용액<br>(본인부담금)</th><td>' + inp('fee_month', 'width:45%;display:inline-block') + ' 원/월<br>( ' + inp('fee_self', 'width:40%;display:inline-block') + ' 원)</td><th>발급일</th><td>' + inp('issued_on') + '</td></tr>'
     + '</table>'
     + '<table class="pl-tbl"><colgroup><col style="width:8%"><col style="width:26%"><col style="width:24%"><col style="width:21%"><col style="width:21%"></colgroup>'
@@ -2643,12 +2715,12 @@ function plDraw() {
     const f = e.target && e.target.dataset && e.target.dataset.f;
     const pr = f ? sh.querySelector('.pl-pr[data-p="' + f + '"]') : null;
     if (pr) pr.textContent = e.target.value;
+    if (f === 'g_name' || f === 'g_tel') { const tg = sh.querySelector('.pl-fill[data-fill="' + f + '"]'); if (tg) tg.remove(); }
     PL.dirty = true;
     const bt = sh.querySelector('.chg-save');
     if (bt) { bt.classList.remove('done'); bt.textContent = '저장 전'; bt.disabled = false; }
   });
   w.style.display = open ? 'block' : 'none';
-  if (PL.doc) DL_HAS['계획서'] = true;
   dlDraw();
 }
 function plOpen() {
@@ -2666,6 +2738,9 @@ async function plSave(doneVal) {
   const lines = k => [1, 2, 3].map(n => String(d['p' + n + '_' + k] || '').trim()).filter(Boolean)
                       .map((t, i, a) => a.length > 1 ? (i + 1) + '. ' + t : t).join('\n');
   d.goal_short = lines('short'); d.goal_long = lines('long');
+  d.g_name = String(d.g_name || '').trim();
+  d.g_tel = d.g_tel ? plTelFmt(d.g_tel) : '';          // 저장은 010-0000-0000 모양 (2026-11-18)
+  if (PL.ep) { d.plan_type = PL.ep.type; d.plan_no = PL.ep.i + 1; }
   const done = doneVal !== undefined ? !!doneVal : !!(PL.doc && PL.doc.done);
   if (done && !d.goal_short && !d.goal_long) {
     alert('서비스 계획 수립의 단기 · 장기 목표를 적어 주세요.\n목표가 비어 있으면 「보호자 서명 받음」을 할 수 없습니다.');
@@ -2674,7 +2749,8 @@ async function plSave(doneVal) {
   }
   if (bt) { bt.disabled = true; bt.textContent = '저장 중…'; }
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  const row = { child_id: Number(childId), doc_type: '계획서', doc_key: PL.key, data: d,
+  // 기존 저장 값에 칸만 덮어 합침 — 화면에 없는 칸이 지워지지 않게 (2026-11-18)
+  const row = { child_id: Number(childId), doc_type: '계획서', doc_key: PL.key, data: Object.assign({}, (PL.doc && PL.doc.data) || {}, d),
                 done, done_on: done ? ((PL.doc && PL.doc.done && PL.doc.done_on) || today) : null,
                 updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
   try {
@@ -2684,6 +2760,8 @@ async function plSave(doneVal) {
     if (error) throw error;
     if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다');
     PL.doc = data[0]; PL.dirty = false;
+    PL_DOCS = PL_DOCS.filter(x => x.doc_key !== data[0].doc_key).concat([data[0]]);
+    await plGuardSync(d.g_name, d.g_tel);
     const open = $('plWrap').style.display === 'block';
     plDraw();
     if (open) $('plWrap').style.display = 'block';
@@ -2691,6 +2769,59 @@ async function plSave(doneVal) {
     alert('제공 계획서를 저장하지 못했습니다.\n' + (e.message || e));
     if (bt) { bt.disabled = false; bt.textContent = '저장 전'; }
     if (cb && doneVal !== undefined) cb.checked = !doneVal;
+  }
+}
+// 계획서 → 아동목록 (2026-11-18 은정님) — 아동 번호로만 · 비었으면 채움 · 다르면 묻기 · 숫자만 견줌
+function plAsk(msg) {
+  return new Promise(res => {
+    const bg = document.createElement('div');
+    bg.className = 'no-print';
+    bg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    bg.innerHTML = '<div style="background:#fff;border-radius:12px;padding:20px 22px;max-width:440px;width:92%;font-size:14px;line-height:1.7;">'
+      + '<div style="white-space:pre-line;">' + esc(msg) + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+      + '<button type="button" data-a="0" style="width:auto;margin:0;padding:8px 14px;background:#fff;color:#4A433F;border:1px solid #CFC9C2;border-radius:8px;">계획서만 저장</button>'
+      + '<button type="button" data-a="1" style="width:auto;margin:0;padding:8px 14px;background:#B07A4A;color:#fff;border:1px solid #B07A4A;border-radius:8px;">바꾸기</button>'
+      + '</div></div>';
+    bg.addEventListener('click', e => { const b = e.target.closest('button[data-a]'); if (!b) return; bg.remove(); res(b.dataset.a === '1'); });
+    document.body.appendChild(bg);
+  });
+}
+function plSyncPlan(gl, pName, pTel) {    // 무엇을 할지만 셈 (시험하기 쉽게 따로)
+  const tD = plTelDigits(pTel);
+  const known = [gl.phone].concat(gl.gs.map(g => g.phone)).map(plTelDigits).filter(Boolean);
+  const names = [gl.name].concat(gl.gs.map(g => g.name)).filter(Boolean);
+  const up = {}, diff = [];
+  if (pName) { if (!gl.name) up.guardian = pName; else if (!names.includes(pName)) diff.push(['guardian', pName, '보호자 성함(' + gl.name + ')']); }
+  if (tD)    { if (!plTelDigits(gl.phone)) up.phone = plTelFmt(pTel); else if (!known.includes(tD)) diff.push(['phone', plTelFmt(pTel), '연락처(' + plTelFmt(gl.phone) + ')']); }
+  return { up, diff };
+}
+async function plGuardSync(pName, pTel) {
+  const cid = Number(childId);
+  if (!cid || (!pName && !pTel)) return;
+  const gl = await plGuardLoad(cid);
+  const { up, diff } = plSyncPlan(gl, pName, pTel);
+  let swap = false;
+  if (diff.length) {
+    swap = await plAsk('아동목록에 등록된 ' + diff.map(x => x[2]).join(' · ') + (diff[diff.length - 1][0] === 'phone' ? '와' : '과') + ' 다릅니다.\n아동목록도 새 ' + diff.map(x => x[0] === 'phone' ? '연락처' : '성함').join(' · ') + '로 바꿀까요?');
+    if (swap) diff.forEach(x => { up[x[0]] = x[1]; });
+  }
+  if (!Object.keys(up).length) { PL_GL = gl; return; }
+  try {
+    const { data, error } = await sb.from('nl_children').update(up).eq('id', cid).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('아동목록을 고칠 수 있는 계정이 아닙니다');
+    // 바꾸기 — 옛 번호가 적힌 보호자 줄만 새 번호로 (다른 보호자 줄은 그대로)
+    if (swap && up.phone && gl.phone) {
+      const old = plTelDigits(gl.phone);
+      for (const g of gl.gs.filter(x => plTelDigits(x.phone) === old)) {
+        const patch = { phone: up.phone }; if (up.guardian) patch.name = up.guardian;
+        await sb.from('nl_guardians').update(patch).eq('id', g.id).select('id');
+      }
+    }
+    PL_GL = await plGuardLoad(cid);
+  } catch (e) {
+    alert('계획서는 저장했습니다.\n아동목록 보호자 칸에는 반영하지 못했습니다.\n(' + (e.message || e) + ')');
   }
 }
 function plPrint() {
@@ -2721,23 +2852,34 @@ async function dlLoad(cid) {
   dlDraw();
 }
 function dlState(t) {
-  if (t === '계획서') {
-    if (PL && PL.need && !(PL.doc && PL.doc.done)) return 'need';
-  } else if (RP && RP.type === t && !(RP.doc && RP.doc.done)) return 'need';
+  if (RP && RP.type === t && !(RP.doc && RP.doc.done)) return 'need';
+  if (RP && RP.type === t && RP.doc && RP.doc.done) return 'done';
   return DL_HAS[t] ? 'has' : 'none';
+}
+function dlPlanState(eps, i) {
+  const e = eps[i], doc = plDocOf(eps, i);
+  if (e.mk === mkNow() && !(doc && doc.done)) return 'need';
+  if (doc && doc.done) return 'done';
+  return doc ? 'has' : 'none';
 }
 function dlDraw() {
   let box = document.getElementById('docLabs');
   if (!box) {
     box = document.createElement('div'); box.id = 'docLabs'; box.className = 'no-print';
     document.body.appendChild(box);      // 숨겨진 칸 안에 넣으면 안 보임 — 늘 body 바로 아래 (2026-11-18)
-    box.addEventListener('click', e => { const b = e.target.closest('button[data-dl]'); if (b) dlOpen(b.dataset.dl); });
+    box.addEventListener('click', e => { const b = e.target.closest('button[data-dl]'); if (b) dlOpen(b.dataset.dl, b.dataset.ep); });
   }
   if (!LOADED || !childId) { box.style.display = 'none'; return; }
-  const L = [['계획서', '제공 계획서'], ['중간보고', '중간 보고서'], ['종결보고', '종결 보고서']];
-  const tip = { need: '이 달에 써야 합니다 (아직 안 끝남)', has: '저장된 문서가 있습니다', none: '아직 없습니다' };
-  box.innerHTML = L.map(([t, nm]) => { const st = dlState(t);
-    return '<button type="button" class="dl ' + st + '" data-dl="' + t + '" title="' + nm + ' — ' + tip[st] + '">' + nm + '</button>'; }).join('');
+  const tip = { need: '이 달에 써야 합니다', done: '작성 끝', has: '저장된 문서가 있습니다 (작성 중)', none: '아직 없습니다' };
+  const eps = planEps().filter(e => e.mk <= mkNow());
+  const lab = (st, nm, attr) => '<button type="button" class="dl ' + st + '" ' + attr + ' title="' + nm + ' — ' + tip[st] + '">'
+                               + (st === 'need' ? '<i class="dot"></i>' : '') + nm + '</button>';
+  let h = '';
+  if (!eps.length) h += lab(DL_HAS['계획서'] ? 'has' : 'none', '계획서', 'data-dl="계획서"');
+  eps.forEach((e, i) => { h += lab(dlPlanState(eps, i), '계획서' + (i ? (i + 1) : '') + ' · ' + (PL_SHORT[e.type] || '기타'), 'data-dl="계획서" data-ep="' + i + '"'); });
+  h += lab(dlState('중간보고'), '중간 보고서', 'data-dl="중간보고"');
+  h += lab(dlState('종결보고'), '종결 보고서', 'data-dl="종결보고"');
+  box.innerHTML = h;
   box.style.display = '';
   dlPlace();
 }
@@ -2752,11 +2894,17 @@ function dlPlace() {
   box.style.left = Math.round(Math.min(r.right + 2, window.innerWidth - tabs - 40)) + 'px';
 }
 window.addEventListener('resize', dlPlace);
-async function dlOpen(t) {
+async function dlOpen(t, epS) {
   if (t === '계획서') {
-    if (PL) { plOpen(); return; }
-    if (!confirm('이 아동의 제공 계획서가 아직 없습니다.\n\n이 달(' + mkNow() + ')로 새로 작성할까요?')) return;
-    await plLoad(childId, mkNow(), true);
+    const ei = epS != null && epS !== '' ? Number(epS) : null;
+    if (PL && (ei == null || (PL.ep && PL.ep.i === ei))) { plOpen(); return; }
+    if (PL && PL.dirty && !confirm('지금 열린 계획서에 저장하지 않은 글이 있습니다.\n그래도 다른 계획서를 열까요?')) return;
+    const eps = planEps();
+    if (ei != null && eps[ei] && !plDocOf(eps, ei) && eps[ei].mk !== mkNow()
+        && !confirm('이 영역(' + (PL_SHORT[eps[ei].type] || '기타') + ') 계획서가 아직 없습니다.\n\n새로 작성할까요?')) return;
+    if (ei == null && !confirm('이 아동의 제공 계획서가 아직 없습니다.\n\n이 달(' + mkNow() + ')로 새로 작성할까요?')) return;
+    PL_REQ++;
+    await plLoad(childId, mkNow(), true, ei);
     if (PL) plOpen();
     return;
   }
