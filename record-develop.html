@@ -3014,11 +3014,11 @@ function rcDraw() {
   let bad = 0;
   rows.forEach(r => { if (rcPlace(r)) bad++; });
   // 결과 글 미작성 — 서버에 저장된 회차로 셈 (2026-11-18 · 97번 10월 — 글이 하나도 없는데 「고칠 곳 없음」이 떴음)
-  //   지난 날 · 결석 아님 · 포기 아님 · 결과 글이 빈 회차
+  //   지난 날 · 결석 아님 · 포기 아님 · 결과 글이 5글자 미만인 회차
   const today0 = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const unw = (ITEMS || []).filter(it => it.service_date && String(it.service_date).slice(0, 10) <= today0
       && String(it.status || '') !== '결석' && String(it.voucher_no || '') !== '포기'
-      && !String(it.reaction || '').trim() && !String(it.content || '').trim())
+      && String(it.reaction || '').trim().length < 5 && String(it.content || '').trim().length < 5)   // 5글자 미만 = 미작성 (2026-11-18 은정님)
     .map(it => Number(it.seq_no)).filter(Boolean).sort((a, b) => a - b);
   if (unw.length) bad += unw.length;
   box.style.cssText = 'margin:0 0 12px;padding:8px 14px;border-radius:8px;font-size:12.5px;line-height:1.6;'
