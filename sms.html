@@ -61,7 +61,7 @@
   .k-휴무 { background:#F1EFEA; color:#5F5E5A; }
   .k-휴무전날 { background:#FBE4DE; color:#993C1D; }
   .k-발달안내 { background:#EAF3DE; color:#27500A; }
-  .k-상담후 { background:#F8F1E8; color:#7E5530; }
+  .k-상담후, .k-상담후2, .k-상담후3, .k-상담후4 { background:#F8F1E8; color:#7E5530; }
   .tpl-ed { background:#fff; border:1px solid #C9A27E; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
   .tpl-ed label { display:block; font-size:12.5px; color:var(--ink2); margin:8px 0 4px; }
   .tpl-ed textarea { width:100%; font:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line);
@@ -212,7 +212,8 @@ function kindLabel(it) {
   if (it.kind === '클린센터') return '클린센터 안내 (1월)';
   if (it.kind === '5주쉼') return '5주차 쉼 안내';
   if (it.kind === '휴무전날') return '선생님 휴무 · 전날 안내';
-  if (it.kind === '상담후') return '상담 뒤 안부';
+  if (it.kind === '상담후') return '상담 뒤 안부 1/4';
+  if (/^상담후[234]$/.test(it.kind)) return '교육 자료 안부 ' + it.kind.slice(3) + '/4';
   if (isPiece(it)) return '보강 +' + it.mins;
   if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
   if (it.kind === '보강' && it.plus) return '보강 +' + it.plus;
@@ -310,6 +311,15 @@ function smsText(it) {
       + reelPart(it)
       + '\n\n더 궁금하신 점이 있으시거나 평가 · 수업 일정이 궁금하시면 편하게 연락 주세요.\n'
       + '아이 속도에 맞춰 함께 고민하겠습니다. ❤️\n' + CENTER_TEL;
+  }
+  // 2~4회 — 앞 문자를 보낸 날부터 30일마다 (광고 표시 · 그만 답장 안내 · 2026-11-20 은정님)
+  if (/^상담후[234]$/.test(it.kind)) {
+    return '(광고) 안녕하세요^^\n자라는나무입니다.\n\n'
+      + it.name + ' 아동, 잘 지내고 있나요?\n'
+      + '이번 달에도 아이와 함께 보시면 좋을 이야기를 나눠 드려요.'
+      + reelPart(it)
+      + '\n\n궁금하신 점은 언제든 편하게 연락 주세요. ❤️\n' + CENTER_TEL
+      + '\n문자를 원치 않으시면 「그만」이라고 답장 주세요.';
   }
   if (it.kind === '공휴수업') {
     return '안녕하세요\n자라는나무입니다. ^^\n\n'
@@ -733,19 +743,28 @@ async function loadAll() {
     });
   }
 
-  // ⑮ 상담 뒤 안부 (2026-11-20 은정님) — 서버 nl_consult_only() 셈 그대로
-  //   아동 메모(초기 상담) 있음 · 문의 7일 넘음 · 같은 집 형제가 센터와 이어져 있으면 뺌
-  //   같은 집(학부모 계정 · 대표 번호 FAM) 아이들은 한 장 · 그 집 누구라도 이미 보냈으면 안 만듦
+  // ⑮ 상담 뒤 안부 · 교육 자료 (2026-11-20 은정님) — 대상은 서버 nl_consult_only() 셈 그대로
+  //   아동 메모(초기 상담) 있음 · 같은 집 형제가 센터와 이어져 있으면 뺌 · 같은 집은 한 장
+  //   1회 = 문의 7일 뒤 (상담후) · 2~4회 = 앞 문자 「보냄」 30일 뒤 (상담후2 · 3 · 4)
+  //   「그만 받음」(안부그만)이 적힌 집은 더 안 만듦
   {
+    const STEPS = ['상담후', '상담후2', '상담후3', '상담후4'];
     const co = await sb.rpc('nl_consult_only');
     if (co.error) throw co.error;
     const tg = (co.data || []).filter(o => o.has_memo && o.days >= 7 && !o.sib_active && KID[o.child_id]);
     const cids = tg.map(o => Number(o.child_id));
-    const done = {};
+    const hist = {};   // 아동 → { n: 보낸 횟수, last: 마지막 보낸 날, stop }
     if (cids.length) {
-      const fs = await sb.from('nl_sms_sent').select('child_id').eq('kind', '상담후').in('child_id', cids);
+      const fs = await sb.from('nl_sms_sent').select('kind, child_id, sent_at')
+        .in('kind', STEPS.concat(['안부그만'])).in('child_id', cids);
       if (fs.error) throw fs.error;
-      (fs.data || []).forEach(x => { done[x.child_id] = true; });
+      (fs.data || []).forEach(x => {
+        const h = hist[x.child_id] = hist[x.child_id] || { n: 0, last: '', stop: false };
+        if (x.kind === '안부그만') { h.stop = true; return; }
+        h.n = Math.max(h.n, STEPS.indexOf(x.kind) + 1);
+        const d = ymd(new Date(x.sent_at));
+        if (d > h.last) h.last = d;
+      });
     }
     // 아동 고민 영역 — 신규 상담 「콘텐츠 주제」
     const ar = {};
@@ -759,15 +778,20 @@ async function loadAll() {
     tg.forEach(o => { const fk = FAM[o.child_id] || ('c' + o.child_id); (fam[fk] = fam[fk] || []).push(o); });
     Object.keys(fam).forEach(fk => {
       const os = fam[fk].sort((a, b) => a.child_id - b.child_id);
-      if (os.some(o => done[o.child_id])) return;
+      const hs = os.map(o => hist[o.child_id] || { n: 0, last: '', stop: false });
+      if (hs.some(h => h.stop)) return;
+      const n = Math.max(...hs.map(h => h.n));
+      if (n >= STEPS.length) return;
+      const last = hs.map(h => h.last).sort().pop() || '';
+      if (n > 0 && (!last || ymd(addDays(new Date(last + 'T00:00:00'), 30)) > from)) return;
       const k = KID[os[0].child_id];
       const first = os.map(o => o.inquiry_date).sort()[0];
       const areas = [...new Set([].concat(...os.map(o => ar[o.child_id] || [])))];
       out.push({
-        kind: '상담후', cid: Number(os[0].child_id),
+        kind: STEPS[n], cid: Number(os[0].child_id),
         name: os.map(o => KID[o.child_id].name || ('아동 ' + o.child_id)).join(' · '),
         on_date: first, on_time: '', ther: '', phone: k.phone || '', gds: GD[os[0].child_id] || [],
-        extra: '', mins: 0, meet: '', parking: false, areas: areas
+        extra: n > 0 ? '앞 문자 보낸 날 ' + last : '', mins: 0, meet: '', parking: false, areas: areas
       });
     });
   }
@@ -944,6 +968,7 @@ function draw() {
       +   '<button class="cp" data-cp="' + i + '">복사</button>'
       +   (done ? '<button data-un="' + i + '">보냄 취소</button>'
                 : '<button class="sd" data-sd="' + i + '">보냄</button>')
+      +   (/^상담후/.test(it.kind) && !done ? '<button data-stop="' + i + '">그만 받음</button>' : '')
       + '</div>'
       + '</div>';
   });
@@ -975,6 +1000,21 @@ function draw() {
   });
   $('list').querySelectorAll('[data-un]').forEach(el => {
     el.onclick = () => markSent(rows[Number(el.dataset.un)], false);
+  });
+  // 「그만」 답장이 온 집 — 안부 · 교육 자료 문자를 더 만들지 않는다 (2026-11-20)
+  $('list').querySelectorAll('[data-stop]').forEach(el => {
+    el.onclick = async () => {
+      const it = rows[Number(el.dataset.stop)];
+      if (!confirm(it.name + ' — 앞으로 안부 · 교육 자료 문자를 만들지 않을까요?')) return;
+      const { error } = await sb.from('nl_sms_sent').insert({
+        kind: '안부그만', child_id: it.cid, on_date: ymd(new Date()), on_time: null, sent_by: ME ? ME.id : null
+      });
+      if (error && !String(error.message).includes('duplicate')) {
+        show($('sum'), '❌ 적지 못했습니다.\n' + error.message, false); return;
+      }
+      ITEMS = ITEMS.filter(x => x !== it);
+      draw();
+    };
   });
 }
 
