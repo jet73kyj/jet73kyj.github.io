@@ -86,6 +86,8 @@ let ME = null, LOG = [], WK = [], ALR = [], EDIT = null, MSG = '';
 function kst(d) { const t = new Date((d || new Date()).getTime() + 9 * 3600e3); return t.toISOString().slice(0, 10); }
 function addDays(s, n) { const t = new Date(s + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
 function won(n) { return n == null ? '—' : Number(n).toLocaleString() + '원'; }
+// 환율 — 가장 최근 줄에 적은 값 (없으면 1400)
+function lastRate() { const r = LOG.find(l => l.usd_rate); return r ? r.usd_rate : 1400; }
 function md(s) { return s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10)) : ''; }
 
 async function load() {
@@ -129,7 +131,8 @@ function formHtml() {
     + '<label>종류<select id="fk">' + KINDS.map(k => '<option' + ((e ? e.kind : KINDS[0]) === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label>'
     + '<label>시작일<input id="fs" type="date" value="' + v('start_on', kst()) + '"></label>'
     + '<label>끝일 (진행 중이면 비움)<input id="fe" type="date" value="' + v('end_on', '') + '"></label>'
-    + '<label id="fbw">하루 예산 (원)<input id="fb" type="number" min="0" step="1000" style="width:120px" value="' + v('daily_budget', '') + '"></label>'
+    + '<label id="fbw">하루 예산 (달러)<input id="fb" type="number" min="0" step="0.01" style="width:100px" value="' + v('budget_usd', '') + '"></label>'
+    + '<label id="frw">1달러 = 원<input id="fr" type="number" min="500" max="3000" step="1" style="width:90px" value="' + esc(e && e.usd_rate ? e.usd_rate : lastRate()) + '"></label>'
     + '<label style="flex:1;min-width:220px;">무엇을 바꿨는지 (한 줄)<input id="fm" type="text" maxlength="300" value="' + v('memo', '') + '" placeholder="예: 말 늦은 아이 영상 광고로 바꿈"></label>'
     + '<button id="fsave" class="pri">저장</button>' + (e ? '<button id="fcancel">그만</button>' : '')
     + (MSG ? '<span class="ok">' + esc(MSG) + '</span>' : '') + '</div></div>';
@@ -140,7 +143,8 @@ function listHtml() {
     + '<th>종류</th><th>기간</th><th style="text-align:right;">하루 예산</th><th>바꾼 것</th><th></th></tr></thead><tbody>'
     + (LOG.length ? LOG.map(l => '<tr><td style="white-space:nowrap;">' + esc(l.kind) + '</td>'
         + '<td style="white-space:nowrap;">' + esc(l.start_on) + ' ~ ' + (l.end_on ? esc(l.end_on) : '<b style="color:var(--sage)">진행 중</b>') + '</td>'
-        + '<td style="text-align:right;">' + (l.daily_budget != null ? won(l.daily_budget) : '—') + '</td>'
+        + '<td style="text-align:right;white-space:nowrap;">' + (l.budget_usd != null ? '$' + Number(l.budget_usd) + ' (약 ' + won(l.daily_budget) + ')'
+            : (l.daily_budget != null ? won(l.daily_budget) : '—')) + '</td>'
         + '<td>' + esc(l.memo || '') + '</td><td style="white-space:nowrap;">'
         + (!l.end_on ? '<button class="fend" data-id="' + l.id + '">오늘로 끝내기</button> ' : '')
         + '<button class="fed" data-id="' + l.id + '">고치기</button> <button class="fdel" data-id="' + l.id + '">✕</button></td></tr>').join('')
@@ -157,7 +161,7 @@ function draw() {
     : '<div class="load" style="padding:12px;">아직 받은 신호 · 보고서가 없습니다. 매주 월요일(신호가 있을 때) · 매달 1일 오전 10시에 옵니다.</div>';
   $('body').innerHTML = '<div class="card"><div class="ttl">받은 신호 · 보고서</div>' + sig + '</div>'
     + formHtml() + wkHtml() + listHtml();
-  const tb = () => { $('fbw').style.display = AD($('fk').value) ? '' : 'none'; };
+  const tb = () => { const on = AD($('fk').value); $('fbw').style.display = on ? '' : 'none'; $('frw').style.display = on ? '' : 'none'; };
   $('fk').onchange = tb; tb();
   $('fsave').onclick = save;
   if ($('fcancel')) $('fcancel').onclick = () => { EDIT = null; MSG = ''; draw(); };
@@ -168,12 +172,15 @@ function draw() {
 
 async function save() {
   const kind = $('fk').value, s = $('fs').value, e = $('fe').value || null;
-  const bud = AD(kind) && $('fb').value !== '' ? Number($('fb').value) : null;
+  const usd = AD(kind) && $('fb').value !== '' ? Number($('fb').value) : null;
+  const rate = AD(kind) && $('fr').value !== '' ? Math.round(Number($('fr').value)) : null;
   const memo = $('fm').value.trim() || null;
   if (!s) { alert('시작일을 넣어 주세요.'); return; }
   if (e && e < s) { alert('끝일이 시작일보다 앞입니다.'); return; }
-  if (AD(kind) && bud == null) { alert('광고는 하루 예산을 넣어 주세요. (주별 광고비 셈에 씁니다)'); return; }
-  const row = { kind, start_on: s, end_on: e, daily_budget: bud, memo, updated_at: new Date().toISOString() };
+  if (AD(kind) && usd == null) { alert('광고는 하루 예산(달러)을 넣어 주세요. (주별 광고비 셈에 씁니다)'); return; }
+  if (AD(kind) && !(rate >= 500 && rate <= 3000)) { alert('1달러가 몇 원인지 넣어 주세요. (예: 1400)'); return; }
+  const row = { kind, start_on: s, end_on: e, budget_usd: usd, usd_rate: rate,
+                daily_budget: usd != null ? Math.round(usd * rate) : null, memo, updated_at: new Date().toISOString() };
   $('fsave').disabled = true; $('fsave').textContent = '저장 중…';
   try {
     let r;
