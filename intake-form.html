@@ -40,6 +40,7 @@
   .rad label.on { border-color:var(--acc); background:var(--acc-bg); }
   .rad input { accent-color:var(--acc); margin:0; }
   #etc { margin-top:8px; display:none; }
+  #kw { margin-top:8px; display:none; }
   .send { width:100%; font:inherit; font-size:16px; font-weight:600; padding:14px; border-radius:10px;
     border:none; background:var(--acc); color:#fff; cursor:pointer; margin-top:4px; }
   .send:disabled { background:#C9C3BC; cursor:default; }
@@ -69,9 +70,12 @@ const AREAS = ['사회정서', '언어', '인지', '운동'];
 const AREA_NAME = { '사회정서':'사회 · 정서', '언어':'언어 · 의사소통', '인지':'인지', '운동':'운동' };
 // 유입경로 — 저장은 갈래 이름(v), 학부모께는 문장(t) · 서버 nl_channel_group 과 같은 갈래
 const CHANNELS = [
+  { v: '네이버 검색',          t: '네이버에서 검색하고' },
   { v: '네이버 블로그',        t: '네이버에서 글을 읽고' },
   { v: '네이버 지도·플레이스', t: '네이버 지도에서 찾고' },
   { v: '인스타 광고',          t: '인스타그램 광고를 보고' },
+  { v: '인스타',               t: '인스타그램 글을 보고' },
+  { v: '당근',                 t: '당근에서 보고' },
   { v: '기관 소개',            t: '어린이집·유치원·병원에서 소개받고' },
   { v: '지인 소개',            t: '아는 분 소개로' },
   { v: '기타',                 t: '기타 (직접 적기)' }
@@ -91,7 +95,7 @@ let F = null, ANS = {}, SENDING = false, SENT = false;
 function saveDraft() {
   try {
     localStorage.setItem(DRAFT, JSON.stringify({
-      a: ANS, ch: chVal(), etc: $('etc') ? $('etc').value : '', chief: $('chief') ? $('chief').value : ''
+      a: ANS, ch: chVal(), etc: $('etc') ? $('etc').value : '', kw: $('kw') ? $('kw').value : '', chief: $('chief') ? $('chief').value : ''
     }));
   } catch (e) {}
 }
@@ -118,7 +122,8 @@ function draw() {
   // 1. 유입경로
   html += '<div class="box"><div class="sec">1. 자라는나무를 어떻게 알게 되셨나요?</div><div class="rad">'
     + CHANNELS.map(c => '<label><input type="radio" name="ch" value="' + esc(c.v) + '"> ' + esc(c.t) + '</label>').join('')
-    + '</div><input type="text" id="etc" maxlength="80" placeholder="어떻게 알게 되셨는지 적어 주세요"></div>';
+    + '</div><input type="text" id="etc" maxlength="80" placeholder="어떻게 알게 되셨는지 적어 주세요">'
+    + '<input type="text" id="kw" maxlength="60" placeholder="검색하신 말이 생각나면 적어 주세요 (예: 대전 언어치료)"></div>';
 
   // 2. 주 호소문제
   html += '<div class="box"><div class="sec">2. 아이에 대해 가장 걱정되시는 점</div>'
@@ -162,7 +167,7 @@ function draw() {
   if (d) {
     ANS = d.a || {};
     if (d.ch) { const r = document.querySelector('input[name=ch][value="' + CSS.escape(d.ch) + '"]'); if (r) r.checked = true; }
-    $('etc').value = d.etc || ''; $('chief').value = d.chief || '';
+    $('etc').value = d.etc || ''; $('kw').value = d.kw || ''; $('chief').value = d.chief || '';
   }
   paint();
 
@@ -179,7 +184,7 @@ function draw() {
     t.oninput = () => { ANS[t.dataset.t] = Object.assign({}, ANS[t.dataset.t], { t: t.value }); saveDraft(); };
   });
   document.querySelectorAll('input[name=ch]').forEach(r => r.onchange = () => { paint(); saveDraft(); });
-  $('etc').oninput = saveDraft; $('chief').oninput = saveDraft;
+  $('etc').oninput = saveDraft; $('kw').oninput = saveDraft; $('chief').oninput = saveDraft;
   $('send').onclick = send;
 }
 
@@ -190,6 +195,7 @@ function paint() {
   });
   document.querySelectorAll('.rad label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
   $('etc').style.display = chVal() === '기타' ? 'block' : 'none';
+  $('kw').style.display = /^네이버/.test(chVal()) ? 'block' : 'none';
 }
 
 async function send() {
@@ -212,7 +218,7 @@ async function send() {
   SENDING = true; $('send').disabled = true; $('send').textContent = '제출하는 중…';
   try {
     const { data, error } = await sb.rpc('nl_intake_submit', {
-      p_key: KEY, p_data: { channel: channel, chief: $('chief').value.trim(), answers: answers }
+      p_key: KEY, p_data: { channel: channel, kw: /^네이버/.test(ch) ? $('kw').value.trim() : '', chief: $('chief').value.trim(), answers: answers }
     });
     if (error) throw error;
     if (!data || !data.ok) throw new Error((data && data.msg) || '제출하지 못했습니다.');
