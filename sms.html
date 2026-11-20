@@ -61,6 +61,7 @@
   .k-휴무 { background:#F1EFEA; color:#5F5E5A; }
   .k-휴무전날 { background:#FBE4DE; color:#993C1D; }
   .k-발달안내 { background:#EAF3DE; color:#27500A; }
+  .k-상담후 { background:#F8F1E8; color:#7E5530; }
   .tpl-ed { background:#fff; border:1px solid #C9A27E; border-radius:12px; padding:14px 16px; margin-bottom:12px; }
   .tpl-ed label { display:block; font-size:12.5px; color:var(--ink2); margin:8px 0 4px; }
   .tpl-ed textarea { width:100%; font:inherit; font-size:14px; padding:9px 11px; border:1px solid var(--line);
@@ -156,6 +157,7 @@ const sb = window.supabase.createClient(URL_, KEY_, {
 const $ = id => document.getElementById(id);
 
 let ME = null, ITEMS = [], SENT = {}, fFilter = '안보냄';
+let NEWSAREA = {};   // 글 번호 → 영역들 (nl_news_areas)
 let SMS_BD = {};   // 아동번호 → 생년월일 여섯 자리 · 카드 이름 옆에만 (문자 글에는 안 넣음 · 2026-11-12)
 // 릴스 (2026-10-08 은정님) — 모든 문자에 붙인다
 //   REELS  쓸 수 있는 릴스 (조회수 많은 것 → 조회수 빈 것은 최신 순)
@@ -210,6 +212,7 @@ function kindLabel(it) {
   if (it.kind === '클린센터') return '클린센터 안내 (1월)';
   if (it.kind === '5주쉼') return '5주차 쉼 안내';
   if (it.kind === '휴무전날') return '선생님 휴무 · 전날 안내';
+  if (it.kind === '상담후') return '상담 뒤 안부';
   if (isPiece(it)) return '보강 +' + it.mins;
   if (it.kind === '보강' && it.subs && it.subs.length) return '보강 ' + (it.subs.length + 1) + '회';
   if (it.kind === '보강' && it.plus) return '보강 +' + it.plus;
@@ -298,6 +301,16 @@ function smsText(it) {
       + it.lines.map(l => '· ' + l.text).join('\n')
       + THANKS;
   }
+  // 상담 뒤 안부 (2026-11-20 은정님) — 상담만 하고 7일 동안 다음 단계가 없는 집 · 한 집에 한 번
+  //   대상은 서버 nl_consult_only() 가 고른다 · 교육 자료는 아동 고민(콘텐츠 주제 영역)에 맞는 것 먼저
+  if (it.kind === '상담후') {
+    return '안녕하세요^^\n자라는나무입니다.\n\n'
+      + it.name + ' 아동, 상담 뒤로 잘 지내고 있나요?\n'
+      + '아이 키우시면서 도움이 될 만한 이야기를 나눠 드리고 싶어 연락드려요.'
+      + reelPart(it)
+      + '\n\n더 궁금하신 점이 있으시거나 평가 · 수업 일정이 궁금하시면 편하게 연락 주세요.\n'
+      + '아이 속도에 맞춰 함께 고민하겠습니다. ❤️\n' + CENTER_TEL;
+  }
   if (it.kind === '공휴수업') {
     return '안녕하세요\n자라는나무입니다. ^^\n\n'
       + it.name + ' 아동 ' + dayKo(it.on_date) + ' ' + it.hol + eunNeun(it.hol) + ' 공휴일이지만\n'
@@ -352,6 +365,14 @@ async function loadAll() {
         || (b.id - a.id);
     });
   REEL = {}; REELS.forEach(r => REEL[r.id] = r);
+  // 글 영역 이름표 (2026-11-20) — 서버가 제목으로 붙임 · 못 읽으면 영역 맞추기 없이 조회수 차례
+  NEWSAREA = {};
+  for (let f = 0; ; f += 1000) {
+    const na = await sb.from('nl_news_areas').select('news_id, area').order('id').range(f, f + 999);
+    if (na.error) break;
+    (na.data || []).forEach(x => { (NEWSAREA[x.news_id] = NEWSAREA[x.news_id] || []).push(x.area); });
+    if (!na.data || na.data.length < 1000) break;
+  }
 
   // 보낸 릴스 기록 — 기간 없이 모두 (1,000줄씩)
   HIST = []; SENTNEWS = {};
@@ -712,6 +733,45 @@ async function loadAll() {
     });
   }
 
+  // ⑮ 상담 뒤 안부 (2026-11-20 은정님) — 서버 nl_consult_only() 셈 그대로
+  //   아동 메모(초기 상담) 있음 · 문의 7일 넘음 · 같은 집 형제가 센터와 이어져 있으면 뺌
+  //   같은 집(학부모 계정 · 대표 번호 FAM) 아이들은 한 장 · 그 집 누구라도 이미 보냈으면 안 만듦
+  {
+    const co = await sb.rpc('nl_consult_only');
+    if (co.error) throw co.error;
+    const tg = (co.data || []).filter(o => o.has_memo && o.days >= 7 && !o.sib_active && KID[o.child_id]);
+    const cids = tg.map(o => Number(o.child_id));
+    const done = {};
+    if (cids.length) {
+      const fs = await sb.from('nl_sms_sent').select('child_id').eq('kind', '상담후').in('child_id', cids);
+      if (fs.error) throw fs.error;
+      (fs.data || []).forEach(x => { done[x.child_id] = true; });
+    }
+    // 아동 고민 영역 — 신규 상담 「콘텐츠 주제」
+    const ar = {};
+    if (cids.length) {
+      const ct = await sb.from('nl_content_topics').select('child_id, nl_content_topic_areas(area)').in('child_id', cids);
+      if (!ct.error) (ct.data || []).forEach(r => {
+        ar[r.child_id] = (r.nl_content_topic_areas || []).map(x => x.area);
+      });
+    }
+    const fam = {};
+    tg.forEach(o => { const fk = FAM[o.child_id] || ('c' + o.child_id); (fam[fk] = fam[fk] || []).push(o); });
+    Object.keys(fam).forEach(fk => {
+      const os = fam[fk].sort((a, b) => a.child_id - b.child_id);
+      if (os.some(o => done[o.child_id])) return;
+      const k = KID[os[0].child_id];
+      const first = os.map(o => o.inquiry_date).sort()[0];
+      const areas = [...new Set([].concat(...os.map(o => ar[o.child_id] || [])))];
+      out.push({
+        kind: '상담후', cid: Number(os[0].child_id),
+        name: os.map(o => KID[o.child_id].name || ('아동 ' + o.child_id)).join(' · '),
+        on_date: first, on_time: '', ther: '', phone: k.phone || '', gds: GD[os[0].child_id] || [],
+        extra: '', mins: 0, meet: '', parking: false, areas: areas
+      });
+    });
+  }
+
   // ⑨ 주차 안내 — 센터에 처음 오는 아동 (2026-10-08 은정님)
   //   첫수업 · 체험 · 평가 · 평가상담(대면) 가운데
   //   그 날 앞에 완료된 수업 · 평가 · 체험 · 대면 상담이 하나도 없는 아동의
@@ -799,7 +859,13 @@ function assignReels() {
       it.news = ks.map(k => SENTNEWS[k]).find(Boolean) || null; return;
     }
     const u = used[famOf(it.cid)] || {};
-    const c = REELS.filter(r => !u[r.id]);
+    let c = REELS.filter(r => !u[r.id]);
+    // 아동 고민 영역이 있으면 같은 영역 이름표 글 먼저 (없으면 조회수 차례 그대로)
+    it.match = '';
+    if (it.areas && it.areas.length) {
+      const m = c.filter(r => (NEWSAREA[r.id] || []).some(a => it.areas.indexOf(a) >= 0));
+      if (m.length) { c = m; it.match = it.areas.filter(a => m.some(r => (NEWSAREA[r.id] || []).indexOf(a) >= 0)).join(' · '); }
+    }
     it.cands = c.length;
     it.news = c.length ? c[it.rot % c.length].id : null;
     if (it.news) add(it.cid, it.news);
@@ -829,6 +895,7 @@ function reelLine(it, i, done) {
   if (!r) return '<div class="reel">' + (done ? '교육 자료 없이 보냄' : '보낼 교육 자료 없음 (이 집은 릴스 · 블로그를 모두 받았습니다)') + '</div>';
   return '<div class="reel">' + reelName(r) + ': <b>「' + esc(r.title || '') + '」</b>'
     + (r.views != null ? ' · 조회수 ' + Number(r.views).toLocaleString() : '')
+    + (it.match ? ' · <span style="color:#3B6D11;">맞춤: ' + esc(it.match) + '</span>' : '')
     + (!done && it.cands > 1 ? ' <button data-rr="' + i + '">다른 자료</button>' : '')
     + '</div>';
 }
