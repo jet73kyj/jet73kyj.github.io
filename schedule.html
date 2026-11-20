@@ -6279,6 +6279,7 @@ function openEd(scId){
   $('ed_end').value   = r.to_date ? dayAdd(r.to_date, 1) : '';
   if ($('ed_endwhy')) $('ed_endwhy').value = '';
   if ($('ed_endcat')) $('ed_endcat').value = '';
+  edEndWhyLoad(r.therapy_id);
   egSetup(r);
   edLockSave();
   showSplitBox();
@@ -6290,6 +6291,55 @@ function openEd(scId){
   $('edBox').style.display = 'block';
   floatOn('edBox', lastClick);
 }
+// 종결 사유 · 세부 — 이미 끝난 수업은 칸을 고치면 바로 저장 (2026-11-20 은정님 — 저장 단추 없이)
+//   아직 안 끝난 수업은 「이 수업 종결」을 누를 때 함께 저장 (지금처럼)
+let ED_END = { tid: null, ended: false, cat: '', why: '' };
+function edEndNote(t, ok) {
+  let n = $('ed_endsaved');
+  if (!n) {
+    const w = $('ed_endwhy'); if (!w || !w.parentNode) return;
+    n = document.createElement('span'); n.id = 'ed_endsaved';
+    n.style.cssText = 'font-size:12px;margin-left:8px;white-space:nowrap;';
+    w.parentNode.appendChild(n);
+  }
+  n.textContent = t || ''; n.style.color = ok === false ? '#C0392B' : '#3C7A4A';
+}
+async function edEndWhyLoad(tid) {
+  ED_END = { tid: tid || null, ended: false, cat: '', why: '' };
+  edEndNote('');
+  if (!tid) return;
+  try {
+    const { data, error } = await sb.from('nl_therapies').select('ended_on, end_cat, end_reason').eq('id', tid).limit(1);
+    if (error || !data || !data[0] || ED_END.tid !== tid) return;
+    const t = data[0];
+    if (!t.ended_on) return;
+    ED_END.ended = true; ED_END.cat = t.end_cat || ''; ED_END.why = t.end_reason || '';
+    if ($('ed_endcat')) $('ed_endcat').value = ED_END.cat;
+    if ($('ed_endwhy')) $('ed_endwhy').value = (ED_END.why && ED_END.why !== ED_END.cat) ? ED_END.why : '';
+    edEndNote('끝난 수업 — 고치면 바로 저장됩니다');
+  } catch (e) {}
+}
+async function edEndWhySave() {
+  if (!ED_END.ended || !ED_END.tid) return;
+  const cat = String(($('ed_endcat') || {}).value || '').trim();
+  let why = String(($('ed_endwhy') || {}).value || '').trim();
+  if (!cat) { edEndNote('종결 사유를 골라 주세요', false); return; }
+  if (!why) why = cat;
+  if (cat === ED_END.cat && why === ED_END.why) return;
+  const tid = ED_END.tid;
+  edEndNote('저장 중…');
+  try {
+    const { data, error } = await sb.from('nl_therapies').update({ end_cat: cat, end_reason: why }).eq('id', tid).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('권한이 없거나 수업을 찾지 못했습니다');
+    if (ED_END.tid !== tid) return;
+    ED_END.cat = cat; ED_END.why = why;
+    edEndNote('✓ 저장됨');
+  } catch (e) { edEndNote('저장 못 함 — ' + (e.message || e), false); }
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'ed_endcat') edEndWhySave(); });
+document.addEventListener('focusout', e => { if (e.target && e.target.id === 'ed_endwhy') edEndWhySave(); });
+document.addEventListener('keydown', e => { if (e.target && e.target.id === 'ed_endwhy' && e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
 // 「발추 1회를 나눠서 진행」은 발달재활(2번) 수업에서만 쓴다.
 // 센터비용·치료지원 수업에서 켜지면 발추 회기가 잘못 만들어진다.
 function showSplitBox() {
@@ -7606,6 +7656,8 @@ $('xlsBtn').onclick = () => {
   }
 };
 
+// 「이 수업 종결」이 멈추면 창 아래 글만으로는 안 보여 알림 창도 띄움 (2026-11-20 은정님 — 눌렀는데 아무 일 없는 줄 앎)
+function edFail(t) { edmsg(t, false); alert(t); }
 $('edEnd').onclick = async () => {
   if (!edRow) return;
 
@@ -7636,8 +7688,8 @@ $('edEnd').onclick = async () => {
       + (_def ? '마지막 완료 수업의 다음 날을 넣어 두었습니다.\n' : '')
       + '날짜를 2026-09-30 모양으로 적으세요.', _def || '') || '';
   }
-  if (!d) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { edmsg('날짜 모양이 다릅니다.', false); return; }
+  if (!d) { edFail('종결일을 넣지 않아 끝내지 않았습니다.'); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) { edFail('날짜 모양이 다릅니다.'); return; }
   // 첫 수업 전에 그만두면 종결일은 첫 수업 날로 맞춘다 (2026-11-09 · 80번 — 종결일이 시작일보다 앞이면 서버가 막음)
   try {
     const { data: _tp } = await sb.from('nl_therapies').select('started_on').eq('id', edRow.therapy_id).maybeSingle();
@@ -7674,7 +7726,7 @@ $('edEnd').onclick = async () => {
       _mode = await askEndScope(edRow, live);
       if (!_mode) return;
     }
-  } catch (e) { edmsg('❌ 같은 수업의 다른 요일을 불러오지 못했습니다.\n' + e.message, false); return; }
+  } catch (e) { edFail('❌ 같은 수업의 다른 요일을 불러오지 못했습니다.\n' + e.message); return; }
 
   // ── 종결일부터의 줄을 가린다 ──
   //   보강을 10분이라도 한 줄 → 완료로 바꾸고 남김
@@ -7712,7 +7764,7 @@ $('edEnd').onclick = async () => {
     });
     // 종결일부터 잡혀 있는데 아직 안 한 보강·조각은 지운다
     _delMk = mks.filter(m => String(m.plan_date) >= d && m.status !== '완료');
-  } catch (e) { edmsg('❌ 회기를 불러오지 못했습니다.\n' + e.message, false); return; }
+  } catch (e) { edFail('❌ 회기를 불러오지 못했습니다.\n' + e.message); return; }
 
   const _ln = x => '  · ' + dtWithMon(x.plan_date) + ' ' + String(x.start_time || '').slice(0,5)
                  + ' ' + (x.status || '') + (Number(x.minutes || 40) !== 40 ? ' +' + x.minutes + '분' : '');
@@ -7751,7 +7803,7 @@ $('edEnd').onclick = async () => {
   const _cat = String(($('ed_endcat') || {}).value || '').trim();
   if (_mode === 'line' && !_why) _why = '요일 정리 (이 요일만 끝냄)';
   if (_mode !== 'line') {
-    if (!_cat) { edmsg('종결 사유를 골라 주세요.', false); try { $('ed_endcat').focus(); } catch (e) {} return; }
+    if (!_cat) { edFail('종결 사유를 골라 주세요.'); try { $('ed_endcat').focus(); } catch (e) {} return; }
     if (!_why) _why = _cat;
   }
 
@@ -7821,7 +7873,7 @@ $('edEnd').onclick = async () => {
       }
     }
   } catch (e) {
-    edmsg('❌ 끝내지 못했습니다.\n' + e.message, false);
+    edFail('❌ 끝내지 못했습니다.\n' + e.message);
   } finally {
     $('edEnd').disabled = false;
   }
