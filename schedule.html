@@ -3589,7 +3589,15 @@ function drawFind(){
       const t2 = THS_ALL.find(t => t.id === x.therapist_id);
       return t2 ? t2.id + '번 ' + (t2.name || '') : '';
     })).join('→');
-    const _durTxt = _uniq(_gr.map(x => String(x.duration || ''))).join('→');
+    const _durBase = _uniq(_gr.map(x => String(x.duration || ''))).join('→');
+    // 납부 계산에서 바꾼 분(dur_min)이 있으면 그 분으로 (2026-11-20 · 34번 — 요일줄 40 · 실제 60)
+    //   이 달 원래 줄이 모두 같은 분으로 바뀌었으면 그 분만, 일부만이면 「40 (바꾼 날 60)」
+    const _scIds = _gr.map(x => x.id);
+    const _orig = SESS.filter(x => _scIds.indexOf(x.schedule_id) >= 0 && !x.makeup_for && String(x.month_key || mon) === String(mon));
+    const _dm = _uniq(_orig.filter(x => x.dur_min).map(x => String(x.dur_min)));
+    const _durTxt = !_dm.length ? _durBase
+      : (_orig.every(x => x.dur_min) && _dm.length === 1) ? _dm[0]
+      : _durBase + ' (바꾼 날 ' + _dm.join('·') + ')';
     let days = fDaysOf(r);
     const slot = {}, other = [], bunsan = [];
     // 발달재활 달 중간 시작 (2026-11-17) — 시작 전 몫으로 잡은 직접 줄은 그 날 칸이 아니라 시작 전 칸에 그린다
