@@ -371,6 +371,8 @@
         <select id="a_channel_s" class="chSel"></select>
         <input id="a_channel_e" class="chEtc" type="text" maxlength="40" placeholder="어디서 보고 알았는지 적기">
         <input id="a_channel" type="hidden">
+        <input id="a_kw" type="text" maxlength="60" placeholder="검색어 (들은 그대로 · 예: 대전 감통치료)" style="margin-top:6px">
+        <select id="a_contact" style="margin-top:6px"></select>
         <div class="chNote">전화 · 카톡 · 톡톡은 문의 방법이에요. 어디서 보고 알았는지 여쭤 주세요.</div>
       </div>
       <div>
@@ -690,6 +692,8 @@
         <select id="d_channel_s" class="chSel"></select>
         <input id="d_channel_e" class="chEtc" type="text" maxlength="40" placeholder="어디서 보고 알았는지 적기">
         <input id="d_channel" type="hidden">
+        <input id="d_kw" type="text" maxlength="60" placeholder="검색어 (들은 그대로 · 예: 대전 감통치료)" style="margin-top:6px">
+        <select id="d_contact" style="margin-top:6px"></select>
       </div>
       <!-- 생년월일 (2026-10-14 은정님) — 등록 때 빠뜨린 것을 여기서 고친다 · 「저장」 때 아동 표에 -->
       <div>
@@ -1255,6 +1259,8 @@ async function openDetail(id) {
   $('d_action').value    = r.next_action || '';
   $('d_date').value      = r.inquiry_date || '';
   $('d_channel').value   = r.channel || '';
+  $('d_kw').value        = r.src_kw || '';
+  $('d_contact').value   = r.contact_way || '';
   $('d_area').value      = r.wish_area || '';
   $('d_day').value       = r.wish_day || '';
   $('d_time').value      = r.wish_time || '';
@@ -1581,8 +1587,16 @@ window.addEventListener('beforeunload', e => {
 //   어디서 보고 알았는지만 고름 (전화 · 카톡 · 톡톡은 문의 방법이라 갈래가 아님)
 //   저장 글자: 갈래 이름 · 기타는 「기타 · 적은 글」 · 서버 nl_channel_group 이 같은 갈래로 셈
 //   숨은 칸 a_channel · d_channel 의 value 를 고르기 칸과 이어 두어 다른 코드는 그대로 씀
-const CH_LIST = ['네이버 블로그','네이버 지도·플레이스','인스타 광고','지인 소개','기관 소개','기타'];
-const CH_TEXT = { '기관 소개':'기관 소개 (어린이집·유치원·병원)', '기타':'기타 (직접 적기)' };
+const CH_LIST = ['네이버 검색','네이버 블로그','네이버 지도·플레이스','인스타 광고','인스타','당근',
+                 '지인 소개','기관 소개','모름','기타'];
+const CH_TEXT = { '인스타':'인스타 (광고 아님)', '기관 소개':'기관 소개 (어린이집·유치원·병원)',
+                  '모름':'모름 (여쭸는데 기억 안 남)', '기타':'기타 (직접 적기)' };
+// 검색어 · 연락 방법 (2026-11-20 은정님 · 홍보 통계) — 문의 표 src_kw · contact_way
+const CW_LIST = ['전화','네이버 톡톡','방문','그 밖'];
+function cwOpts(sel) {
+  sel.innerHTML = '<option value="">— 연락 방법 —</option>'
+    + CW_LIST.map(c => '<option value="' + esc(c) + '">' + esc(c) + '</option>').join('');
+}
 function chBind(base) {
   const hid = $(base), sel = $(base + '_s'), etc = $(base + '_e');
   if (!hid || !sel || !etc) return;
@@ -1619,12 +1633,12 @@ function chBind(base) {
   });
   hid.value = '';
 }
-chBind('a_channel'); chBind('d_channel');
+chBind('a_channel'); chBind('d_channel'); cwOpts($('a_contact')); cwOpts($('d_contact'));
 
 let ADD_LEAVING = false;
 function addDraft() {
   if (!$('k_name')) return false;
-  const any = ['k_name','k_birth','k_guardian','k_phone','a_channel','a_action','k_evalsum']
+  const any = ['k_name','k_birth','k_guardian','k_phone','a_channel','a_kw','a_action','k_evalsum']
     .some(k => $(k) && String($(k).value || '').trim());
   if (any) return true;
   if (String($('k_memo').value || '').trim() !== MEMO_TMPL.trim()) return true;
@@ -2175,6 +2189,8 @@ $('saveDet').onclick = async () => {
     next_action:     $('d_action').value.trim() || null,
     inquiry_date:    $('d_date').value || null,
     channel:         $('d_channel').value.trim() || null,
+    src_kw:          $('d_kw').value.trim() || null,
+    contact_way:     $('d_contact').value || null,
     wish_area:       $('d_area').value.trim() || null,
     wish_day:        $('d_day').value.trim() || null,
     wish_time:       $('d_time').value.trim() || null,
@@ -3961,7 +3977,7 @@ function resetAddBox() {
   $('a_status').value = '연락대기';
   $('nvRows').innerHTML = '';
   nvEnsureOne();
-  ['a_channel','a_area','a_day','a_time','a_action','a_memo',
+  ['a_channel','a_kw','a_contact','a_area','a_day','a_time','a_action','a_memo',
    'k_name','k_birth','k_guardian','k_phone']
     .forEach(k => $(k).value = '');
   $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
@@ -4248,6 +4264,8 @@ $('saveNew').onclick = async () => {
     child_id:        cid,
     inquiry_date:    $('a_date').value,
     channel:         $('a_channel').value.trim() || null,
+    src_kw:          $('a_kw').value.trim() || null,
+    contact_way:     $('a_contact').value || null,
     wish_area:       $('a_area').value.trim() || null,
     wish_day:        $('a_day').value.trim() || null,
     wish_time:       $('a_time').value.trim() || null,
@@ -4314,7 +4332,7 @@ $('saveNew').onclick = async () => {
       + (evErr ? '\n⚠️ 평가는 넣지 못했습니다: ' + evErr : '')
       + (ctRes ? '\n' + (ctRes.charAt(0) === '⚠' ? ctRes : '콘텐츠 주제 ' + ctRes) : ''), true);
     $('nvRows').innerHTML = ''; nvEnsureOne();
-    ['a_channel','a_area','a_day','a_time','a_action','a_memo',
+    ['a_channel','a_kw','a_contact','a_area','a_day','a_time','a_action','a_memo',
      'k_name','k_birth','k_guardian','k_phone']
       .forEach(k => $(k).value = '');
     $('k_memo').value = MEMO_TMPL; memoFit($('k_memo')); if (window.NLChk) NLChk.refresh($('k_memo'));
