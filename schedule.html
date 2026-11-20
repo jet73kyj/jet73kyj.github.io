@@ -7113,6 +7113,35 @@ $('edSave').onclick = async () => {
     return;
   }
 
+  // 분만 바뀌면 — 변경 시작일 앞의 회기 줄에 옛 분을 「바꾼 분」으로 적어 고정한 뒤 요일줄을 바꾼다 (2026-11-20 · 34번)
+  //   전에는 요일줄 분이 통째로 바뀌어 지난 달까지 새 분으로 셈될 수 있었다
+  //   「바꾼 분」(dur_min)은 납부 계산 · 정산 · 쪼개기가 요일줄 분보다 먼저 본다 · 선생님 확인은 안 풀림
+  const oldDu = Number(edRow.duration) || 40;
+  if (Number(du) !== oldDu) {
+    const fromD = edFromDay(applyD);
+    if (!confirm('수업 시간이 바뀝니다.\n\n· ' + oldDu + '분  →  ' + du + '분\n\n'
+      + fromD + ' 부터 ' + du + '분입니다.\n그 앞의 수업은 ' + oldDu + '분 그대로 남습니다 (납부 · 정산 포함).\n\n계속할까요?')) return;
+    try {
+      const fz = await sb.from('nl_sessions').update({ dur_min: oldDu })
+        .eq('schedule_id', edRow.id).is('makeup_for', null).is('dur_min', null)
+        .lt('plan_date', fromD).select('id');
+      if (fz.error) throw fz.error;
+      // 변경 시작일부터는 요일줄 새 분을 따르도록 — 그날부터 옛 분으로 적힌 줄은 비움 (납부 계산에서 손으로 바꾼 다른 분은 그대로)
+      const ul = await sb.from('nl_sessions').update({ dur_min: null })
+        .eq('schedule_id', edRow.id).is('makeup_for', null).eq('dur_min', du)
+        .gte('plan_date', fromD).select('id');
+      if (ul.error) throw ul.error;
+      (SESS.concat(PREV)).forEach(v => {
+        if (v.schedule_id !== edRow.id || v.makeup_for) return;
+        if (String(v.plan_date) < fromD && !v.dur_min) v.dur_min = oldDu;
+        else if (String(v.plan_date) >= fromD && Number(v.dur_min) === Number(du)) v.dur_min = null;
+      });
+    } catch (e) {
+      alert('❌ 지난 수업의 분을 고정하지 못해 저장하지 않았습니다.\n\n' + (e.message || e));
+      return;
+    }
+  }
+
   $('edSave').disabled = true; $('edSave').textContent = '옮기는 중...';
   try {
     const { data, error } = await sb.from('nl_therapy_schedules')
