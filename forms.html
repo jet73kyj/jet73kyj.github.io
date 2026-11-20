@@ -117,6 +117,8 @@
   .gmno { font-weight:700; color:#7E5530; }
   .gml { font-family:'Batang','바탕','Malgun Gothic',serif; font-size:13px; line-height:1.75; }
   .gml .lg { text-align:center; margin:4px 0 14px; } .gml .lg img { height:62px; }
+  /* 공문 로고는 맨 아래 (2026-11-20 은정님) */
+  .gml .lgb { margin:14px 0 0; } .gml .lgb img { height:46px; }
   .gml input, .gml textarea { border:1px dashed #d8c7b3; background:#fffdf9; font-family:inherit; font-size:13px; padding:1px 4px; }
   .gml textarea { width:100%; box-sizing:border-box; resize:vertical; }
   .gml .hr { border-top:1.5px solid #333; margin:6px 0 10px; width:72%; }
@@ -210,6 +212,19 @@
     body.print-doc #dsHire table.sigt td { padding:5px 6px !important; font-size:13.5px; }
     body.print-doc #dsChg input, body.print-doc #dsChg textarea { border:none !important; background:transparent !important; resize:none; overflow:hidden; }
     body.print-doc #dsChg textarea { display:block !important; }
+    /* 발달의뢰서 모음 — 한 장씩 A4 를 채움 (2026-11-20 은정님) · 쓸 수 있는 높이 277mm
+       표는 남은 높이를 채우고(줄이 고르게 늘어남) · 공문은 직인 줄 앞 빈 곳이 늘어나 로고가 맨 아래로
+       display 에 !important 를 붙이지 않음 — 인쇄 안 할 서식(.gskip)이 이겨야 함 */
+    body.print-doc .gfm.gsheet { height:268mm; display:flex; flex-direction:column; box-sizing:border-box; font-size:12.5px; }
+    body.print-doc .gfm.gsheet > table:last-of-type { flex:1; height:1px; }
+    body.print-doc .gfm.gsheet table { font-size:12.5px; }
+    body.print-doc .gfm.gsheet th, body.print-doc .gfm.gsheet td { padding:4px 7px; }
+    body.print-doc .gfm.gsheet input[data-g], body.print-doc .gfm.gsheet input[data-x] { font-size:12.5px; }
+    body.print-doc .gfm.gsheet h2 { font-size:22px; margin:0 0 16px; }
+    body.print-doc #gmLetter { min-height:268mm; display:flex; flex-direction:column; font-size:14px; line-height:1.9; }
+    body.print-doc #gmLetter input { font-size:14px; }
+    body.print-doc #gmLetter .ft, body.print-doc #gmLetter .ft input { font-size:13px; }
+    body.print-doc #gmLetter .gsp { flex:1; }
     body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
   /* 등록사항 변경신청서 (2026-11-17) — 점선 칸은 고칠 수 있음 */
@@ -1070,7 +1085,6 @@ function gmStaffLetter(d) {
   const date = d.date || '';
   const noTxt = gmNoText() || '대가 ' + (date ? date.slice(0, 4) : '') + ' - ___호';
   return '<div class="dsheet gsheet gml" id="gmLetter" data-sheet="letter">'
-    + '<div class="lg"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div>'
     + '<div>수 신 자 : ' + i('to', '60%') + '</div>'
     + '<div>(경 유) ' + i('via', '50%') + '</div>'
     + '<div>제 &nbsp;&nbsp; 목 : ' + i('title', '70%') + '</div>'
@@ -1079,6 +1093,7 @@ function gmStaffLetter(d) {
     + '<div style="padding-left:20px;display:flex;gap:4px;"><span>2.</span><textarea data-g="p2" rows="2">' + v('p2') + '</textarea><div class="gpr" data-p="p2" style="flex:1;">' + v('p2') + '</div></div>'
     + '<br><br><div style="text-align:center;">- 아래 -</div>'
     + '<div style="text-align:center;margin-top:6px;">가. 사업명 : ' + i('biz', '45%') + '<br>나. 치료사명 : ' + i('name2', '35%') + '</div>'
+    + '<div class="gsp"></div>'
     + '<br><br><br><div class="sign" style="letter-spacing:4px;font-size:22px;"><input type="text" data-g="sign" value="' + v('sign') + '" style="width:260px;text-align:center;font-size:22px;letter-spacing:4px;"><img class="gmstamp" alt="" style="left:58%;"></div><br><br>'
     + '<div class="hr2"></div>'
     + '<div class="ft">'
@@ -1086,7 +1101,8 @@ function gmStaffLetter(d) {
     +   '<div>시 행 &nbsp;&nbsp; <span class="gmno">' + esc(noTxt) + '</span>(' + esc(gmDot(date)) + ')</div><div>접 수 &nbsp;&nbsp; (' + esc(gmDot(date)) + ')</div>'
     +   '<div class="w">우) ' + i('addr', '80%') + '</div>'
     +   '<div class="w">전화 ' + i('tel', '24%') + ' &nbsp; 전송 ' + i('fax', '24%') + ' &nbsp; / E-mail: ' + i('mail', '30%') + '</div>'
-    + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
+    + '</div><div class="hr2" style="margin-top:14px;"></div>'
+    + '<div class="lg lgb"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div></div>';
 }
 function gmStaffCtl(d) {
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -1156,7 +1172,6 @@ function gmClaimLetter(d) {
       + c('c' + n + '_point') + c('c' + n + '_mon') + c('c' + n + '_why') + '</tr>';
   }
   return '<div class="dsheet gsheet gml" id="gmLetter" data-sheet="letter">'
-    + '<div class="lg"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div>'
     + '<div>수 신 &nbsp; ' + i('to', '50%') + '</div>'
     + '<div>(경유) ' + i('via', '50%') + '</div>'
     + '<div>제 목 &nbsp; ' + i('title', '80%') + '</div>'
@@ -1169,6 +1184,7 @@ function gmClaimLetter(d) {
     + '<tr><th>성 명</th><th>주민번호</th><th>제공<br>기관명</th><th>사업자<br>번호</th><th>사업<br>구분</th><th>사업유형<br>(서비스코드)</th><th>등급</th><th>인정시간<br>(포인트)</th><th>청구<br>월</th><th>청구사유</th></tr>'
     + rows + '</table><br>'
     + '<div style="display:flex;gap:10px;"><span>붙임</span><textarea data-g="att" rows="3" style="width:60%;">' + v('att') + '</textarea><div class="gpr" data-p="att">' + v('att') + '</div></div>'
+    + '<div class="gsp"></div>'
     + '<div class="sign">자 라 는 나 무<img class="gmstamp" alt=""></div>'
     + '<div class="hr2"></div>'
     + '<div class="ft">'
@@ -1176,7 +1192,8 @@ function gmClaimLetter(d) {
     +   '<div>시 행 &nbsp;&nbsp; <span class="gmno">' + esc(noTxt) + '</span>(' + esc(gmDot(date)) + ')</div><div>접 수 &nbsp;&nbsp; (' + esc(gmDot(date)) + ')</div>'
     +   '<div class="w">우) ' + i('addr', '80%') + '</div>'
     +   '<div class="w">전화) ' + i('tel', '24%') + ' &nbsp; 전송) ' + i('fax', '24%') + ' &nbsp; E-mail) ' + i('mail', '30%') + '</div>'
-    + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
+    + '</div><div class="hr2" style="margin-top:14px;"></div>'
+    + '<div class="lg lgb"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div></div>';
 }
 function gmClaimCtl(d) {
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
@@ -1259,7 +1276,6 @@ function gmLetter(d) {
   const date = d.date || '';
   const noTxt = gmNoText() || '대가 ' + (date ? date.slice(0, 4) : '') + ' - ___호';
   return '<div class="dsheet gsheet gml" id="gmLetter" data-sheet="letter">'
-    + '<div class="lg"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div>'
     + '<div>수 신 &nbsp; ' + i('to', '50%') + '</div>'
     + '<div>(경유) ' + i('via', '50%') + '</div>'
     + '<div>제 목 &nbsp; ' + i('title', '80%') + '</div>'
@@ -1269,6 +1285,7 @@ function gmLetter(d) {
     + '<div style="padding-left:34px;">가. 일시 : ' + i('when', '40%') + '<br>나. 장소 : ' + i('place', '40%')
     +   '<br>다. 평가자 : ' + i('who', '40%') + '<br>라. 평가결과 : ' + i('res', '40%') + '</div><br><br>'
     + '<div style="display:flex;gap:10px;"><span>붙임</span><textarea data-g="att" rows="4" style="width:60%;">' + v('att') + '</textarea><div class="gpr" data-p="att">' + v('att') + '</div></div>'
+    + '<div class="gsp"></div>'
     + '<div class="sign">자 라 는 나 무<img class="gmstamp" alt=""></div>'
     + '<div class="hr2"></div>'
     + '<div class="ft">'
@@ -1276,7 +1293,8 @@ function gmLetter(d) {
     +   '<div>시 행 &nbsp;&nbsp; <span class="gmno">' + esc(noTxt) + '</span>(' + esc(gmDot(date)) + ')</div><div>접 수 &nbsp;&nbsp; (' + esc(gmDot(date)) + ')</div>'
     +   '<div class="w">우) ' + i('addr', '80%') + '</div>'
     +   '<div class="w">전화) ' + i('tel', '24%') + ' &nbsp; 전송) ' + i('fax', '24%') + ' &nbsp; E-mail) ' + i('mail', '30%') + '</div>'
-    + '</div><div class="hr2" style="margin-top:14px;"></div></div>';
+    + '</div><div class="hr2" style="margin-top:14px;"></div>'
+    + '<div class="lg lgb"><img src="img/nl-logo.png" alt="자라는나무" onerror="this.style.display=\'none\'"></div></div>';
 }
 // 의뢰서 · 검사결과서 · 진단서 — 칸에 적고 공문과 함께 저장 (2026-11-03 은정님)
 //   적은 글은 공문 줄(nl_gongmun.data)에 함께 담김 · 칸 이름 r_ 의뢰서 / t_ 검사결과서 / x_ 진단서
