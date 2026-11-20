@@ -73,7 +73,7 @@ const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&am
 const AREAS = ['언어','발음','화용','감각','주의집중','사회성','정서','대근육·소근육','인지','기타'];
 let ROWS = [], AREA = '', MON = '';
 // 유입 경로 (2026-11-15) — nl_inquiry_export(상담 한 건 한 줄 · 갈래 이름) · nl_channel_diff(직원 ≠ 학부모)
-const CH_ORD = ['네이버 블로그','네이버 지도·플레이스','인스타 광고','지인 소개','기관 소개','기타(검색)','기타','안 적음'];
+const CH_ORD = ['네이버 검색','네이버 블로그','네이버 지도·플레이스','인스타 광고','인스타','당근','지인 소개','기관 소개','모름','기타','안 적음'];
 let INQ = [], DIFF = [], CHERR = '';
 async function load() {
   const [a, b, c] = await Promise.all([sb.rpc('nl_content_export'), sb.rpc('nl_inquiry_export'), sb.rpc('nl_channel_diff')]);

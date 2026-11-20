@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>홍보 기록 - 나무링크</title>
+<style>
+  :root{ --bg:#F5F4F2; --sf:#FFFFFF; --line:#ECE8E3; --tx:#2F2926; --dim:#A39C95;
+         --cam:#B07A4A; --camL:#F8F1E8; --camB:#C9A27E; --sage:#4F7A5C; --coral:#C2553A; }
+  body { font-family:-apple-system,"Malgun Gothic",sans-serif; background:var(--bg); margin:0; color:var(--tx); }
+  .hd { background:var(--sf); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; }
+  .hd img.lg { height:22px; display:block; }
+  .hd .bar { width:1px; height:16px; background:var(--line); }
+  .hd h1 { font-size:15px; font-weight:600; margin:0; }
+  .hd .who { font-size:12px; color:var(--dim); }
+  .hd .sp { flex:1 1 auto; }
+  .wrap { max-width:1000px; margin:0 auto; padding:16px; }
+  button { font:inherit; border-radius:8px; padding:6px 13px; font-size:13px; background:var(--sf); color:var(--tx); border:1px solid #E4E0DA; cursor:pointer; }
+  button:hover { background:var(--camL); }
+  button.grey { border-color:#D9C3A7; color:#7E5530; }
+  .card { background:var(--sf); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .tools { display:flex; gap:14px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:8px; margin-bottom:10px; }
+  .tab { border:none; border-bottom:2px solid transparent; border-radius:0; padding:4px 2px; color:var(--dim); background:none; }
+  .tab.on { color:#7E5530; border-bottom-color:var(--cam); }
+  .tab:hover { background:none; color:#7E5530; }
+  input.q { font:inherit; font-size:13px; padding:6px 10px; border:1px solid #E4E0DA; border-radius:8px; min-width:200px; }
+  .tw { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { background:var(--camL); color:#7E5530; text-align:left; font-weight:500; padding:7px 9px; border-bottom:1px solid var(--camB); white-space:nowrap; }
+  td { padding:7px 9px; border-bottom:1px solid #F0EEEA; vertical-align:top; }
+  .a-동의 { color:var(--sage); font-weight:600; } .a-거절 { color:var(--dim); font-weight:600; } .a-철회 { color:var(--coral); font-weight:600; }
+  .lnk { color:#7E5530; text-decoration:underline; cursor:pointer; white-space:nowrap; }
+  .note { font-size:12px; color:var(--dim); margin-top:10px; line-height:1.7; }
+  .err { background:var(--sf); border-left:3px solid var(--coral); padding:14px 16px; color:var(--coral); white-space:pre-wrap; }
+  .load { text-align:center; padding:30px; color:var(--dim); }
+  .sum { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  @media (max-width:700px){ .sum { grid-template-columns:1fr; } }
+  .bar2 { display:flex; align-items:center; gap:8px; font-size:13px; margin:5px 0; }
+  .bar2 .nm { width:92px; flex:0 0 auto; }
+  .bar2 .bg { flex:1; background:#F3F1EE; border-radius:4px; height:12px; overflow:hidden; }
+  .bar2 .fg { height:12px; background:#C9A27E; }
+  .bar2 .n { width:34px; text-align:right; color:#7E5530; }
+  .chip { display:inline-block; padding:1px 8px; border-radius:10px; background:#E1F5EE; color:#0F6E56; font-size:12px; margin:0 3px 3px 0; }
+  .ttl { font-size:13px; font-weight:600; color:#7E5530; margin-bottom:6px; }
+  .frm { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+  .frm label { display:flex; flex-direction:column; font-size:12px; color:#7E5530; gap:3px; }
+  .frm input, .frm select { font:inherit; font-size:13px; padding:6px 8px; border:1px solid #E4E0DA; border-radius:8px; }
+  button.pri { background:var(--cam); color:#fff; border-color:var(--cam); }
+  .sig { background:#FBEDE6; border-left:3px solid var(--coral); padding:10px 14px; white-space:pre-wrap; font-size:13px; margin-bottom:8px; }
+  .rep { background:#F8F1E8; border-left:3px solid var(--camB); padding:10px 14px; white-space:pre-wrap; font-size:13px; margin-bottom:8px; }
+  .wkbar { display:inline-block; height:10px; background:#C9A27E; border-radius:3px; vertical-align:middle; margin-right:6px; }
+  .mk { font-size:11.5px; color:var(--coral); }
+  .ok { color:var(--sage); font-size:13px; margin-left:6px; }
+</style>
+</head>
+<body>
+<div class="hd">
+  <img src="img/nl-logo.png" alt="" class="lg" onerror="this.style.display='none'">
+  <span class="bar"></span>
+  <h1>홍보 기록</h1>
+  <span class="who" id="who"></span>
+  <span class="sp"></span>
+  <button id="home" class="grey">처음으로</button>
+</div>
+<div class="wrap">
+  <div id="body"><div class="load">불러오는 중…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="nl-login.js"></script>
+<script>
+const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
+const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
+const sb = window.supabase.createClient(URL_, KEY_, {
+  auth: { storage: nlStore, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// 홍보 기록 (2026-11-20 은정님) — 8번 · 10번(홍보)
+//   홍보 일지 nl_promo_log · 주별 셈 nl_promo_weekly(시작, 끝) · 알림 nl_alerts kind '홍보신호'
+//   빠른 신호(매주 월요일) · 보고서(매달 1일)는 서버 예약 작업 nl_promo_signal 이 만든다
+const KINDS = ['인스타 광고','당근 광고','블로그 방법 변경','릴스 방법 변경','그 밖'];
+const AD = k => k === '인스타 광고' || k === '당근 광고';
+let ME = null, LOG = [], WK = [], ALR = [], EDIT = null, MSG = '';
+function kst(d) { const t = new Date((d || new Date()).getTime() + 9 * 3600e3); return t.toISOString().slice(0, 10); }
+function addDays(s, n) { const t = new Date(s + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function won(n) { return n == null ? '—' : Number(n).toLocaleString() + '원'; }
+function md(s) { return s ? Number(s.slice(5, 7)) + '/' + Number(s.slice(8, 10)) : ''; }
+
+async function load() {
+  const td = kst();
+  const from = addDays(td, -7 * 12);
+  const [a, b, c] = await Promise.all([
+    sb.from('nl_promo_log').select('*').order('start_on', { ascending: false }).range(0, 999),
+    sb.rpc('nl_promo_weekly', { p_from: from, p_to: td }),
+    sb.from('nl_alerts').select('body, created_at').eq('kind', '홍보신호').eq('to_therapist_id', ME)
+      .order('created_at', { ascending: false }).range(0, 5)
+  ]);
+  if (a.error) throw a.error;
+  if (b.error) throw b.error;
+  LOG = a.data || []; WK = b.data || []; ALR = c.error ? [] : (c.data || []);
+  draw();
+}
+
+function wkHtml() {
+  const mx = Math.max(1, ...WK.map(w => w.inquiries));
+  const starts = w => LOG.filter(l => l.start_on >= w.week_start && l.start_on <= addDays(w.week_start, 6))
+    .map(l => '▲ ' + l.kind + (l.memo ? ' · ' + l.memo : '')).join('<br>');
+  return '<div class="card" style="margin-top:12px;"><div class="ttl">주별 문의 · 광고비 (최근 12주)</div><div class="tw"><table><thead><tr>'
+    + '<th>주 (월요일)</th><th>문의</th><th style="text-align:right;">인스타 광고</th><th style="text-align:right;">등록</th>'
+    + '<th style="text-align:right;">광고비</th><th style="text-align:right;">문의 1건당</th><th>바꾼 것</th></tr></thead><tbody>'
+    + WK.slice().reverse().map(w => '<tr><td style="white-space:nowrap;">' + md(w.week_start) + ' ~ ' + md(addDays(w.week_start, 6)) + '</td>'
+      + '<td style="white-space:nowrap;"><span class="wkbar" style="width:' + Math.round(w.inquiries / mx * 80) + 'px"></span>' + w.inquiries + '</td>'
+      + '<td style="text-align:right;">' + w.insta_inq + '</td><td style="text-align:right;">' + w.registered + '</td>'
+      + '<td style="text-align:right;">' + (w.ad_cost ? won(w.ad_cost) : '—') + '</td>'
+      + '<td style="text-align:right;">' + (w.cost_per_inq ? won(w.cost_per_inq) : '—') + '</td>'
+      + '<td class="mk">' + starts(w) + '</td></tr>').join('')
+    + '</tbody></table></div>'
+    + '<div class="note">광고비는 홍보 일지의 「하루 예산 × 켜진 날」로 셉니다. 등록 = 그 주 문의 중 뒤에 수업을 시작한 아동.<br>'
+    + '효과는 2~4주 늦게 옵니다 — 바꾼 주보다 그 뒤 몇 주를 보세요. 문의가 적은 주는 한두 건 차이도 크게 보입니다.</div></div>';
+}
+
+function formHtml() {
+  const e = EDIT ? LOG.find(l => l.id === EDIT) : null;
+  const v = (k, d) => esc(e ? (e[k] == null ? '' : e[k]) : d);
+  return '<div class="card" style="margin-top:12px;"><div class="ttl">' + (e ? '홍보 일지 고치기' : '홍보 일지 적기') + '</div>'
+    + '<div class="frm">'
+    + '<label>종류<select id="fk">' + KINDS.map(k => '<option' + ((e ? e.kind : KINDS[0]) === k ? ' selected' : '') + '>' + k + '</option>').join('') + '</select></label>'
+    + '<label>시작일<input id="fs" type="date" value="' + v('start_on', kst()) + '"></label>'
+    + '<label>끝일 (진행 중이면 비움)<input id="fe" type="date" value="' + v('end_on', '') + '"></label>'
+    + '<label id="fbw">하루 예산 (원)<input id="fb" type="number" min="0" step="1000" style="width:120px" value="' + v('daily_budget', '') + '"></label>'
+    + '<label style="flex:1;min-width:220px;">무엇을 바꿨는지 (한 줄)<input id="fm" type="text" maxlength="300" value="' + v('memo', '') + '" placeholder="예: 말 늦은 아이 영상 광고로 바꿈"></label>'
+    + '<button id="fsave" class="pri">저장</button>' + (e ? '<button id="fcancel">그만</button>' : '')
+    + (MSG ? '<span class="ok">' + esc(MSG) + '</span>' : '') + '</div></div>';
+}
+
+function listHtml() {
+  return '<div class="card" style="margin-top:12px;"><div class="ttl">홍보 일지 ' + LOG.length + '줄</div><div class="tw"><table><thead><tr>'
+    + '<th>종류</th><th>기간</th><th style="text-align:right;">하루 예산</th><th>바꾼 것</th><th></th></tr></thead><tbody>'
+    + (LOG.length ? LOG.map(l => '<tr><td style="white-space:nowrap;">' + esc(l.kind) + '</td>'
+        + '<td style="white-space:nowrap;">' + esc(l.start_on) + ' ~ ' + (l.end_on ? esc(l.end_on) : '<b style="color:var(--sage)">진행 중</b>') + '</td>'
+        + '<td style="text-align:right;">' + (l.daily_budget != null ? won(l.daily_budget) : '—') + '</td>'
+        + '<td>' + esc(l.memo || '') + '</td><td style="white-space:nowrap;">'
+        + (!l.end_on ? '<button class="fend" data-id="' + l.id + '">오늘로 끝내기</button> ' : '')
+        + '<button class="fed" data-id="' + l.id + '">고치기</button> <button class="fdel" data-id="' + l.id + '">✕</button></td></tr>').join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#A39C95;padding:24px;">아직 없습니다. 지금 켜져 있는 광고부터 적어 주세요.</td></tr>')
+    + '</tbody></table></div>'
+    + '<div class="note">광고를 켜거나 끌 때 · 하루 예산을 바꿀 때 · 블로그 쓰는 방법을 바꿀 때 한 줄씩 적습니다.<br>'
+    + '예산을 바꿀 때는 지금 줄을 「오늘로 끝내기」 하고 새 줄을 적어야 주별 광고비가 맞습니다.</div></div>';
+}
+
+function draw() {
+  const sig = ALR.length
+    ? ALR.map(a => '<div class="' + (String(a.body).indexOf('[홍보 빠른 신호]') === 0 ? 'sig' : 'rep') + '">'
+        + '<span style="color:var(--dim);font-size:12px;">' + esc(kst(new Date(a.created_at))) + '</span>\n' + esc(a.body) + '</div>').join('')
+    : '<div class="load" style="padding:12px;">아직 받은 신호 · 보고서가 없습니다. 매주 월요일(신호가 있을 때) · 매달 1일 오전 10시에 옵니다.</div>';
+  $('body').innerHTML = '<div class="card"><div class="ttl">받은 신호 · 보고서</div>' + sig + '</div>'
+    + formHtml() + wkHtml() + listHtml();
+  const tb = () => { $('fbw').style.display = AD($('fk').value) ? '' : 'none'; };
+  $('fk').onchange = tb; tb();
+  $('fsave').onclick = save;
+  if ($('fcancel')) $('fcancel').onclick = () => { EDIT = null; MSG = ''; draw(); };
+  document.querySelectorAll('.fed').forEach(b => b.onclick = () => { EDIT = Number(b.dataset.id); MSG = ''; draw(); window.scrollTo(0, 0); });
+  document.querySelectorAll('.fend').forEach(b => b.onclick = () => endRow(Number(b.dataset.id)));
+  document.querySelectorAll('.fdel').forEach(b => b.onclick = () => delRow(Number(b.dataset.id)));
+}
+
+async function save() {
+  const kind = $('fk').value, s = $('fs').value, e = $('fe').value || null;
+  const bud = AD(kind) && $('fb').value !== '' ? Number($('fb').value) : null;
+  const memo = $('fm').value.trim() || null;
+  if (!s) { alert('시작일을 넣어 주세요.'); return; }
+  if (e && e < s) { alert('끝일이 시작일보다 앞입니다.'); return; }
+  if (AD(kind) && bud == null) { alert('광고는 하루 예산을 넣어 주세요. (주별 광고비 셈에 씁니다)'); return; }
+  const row = { kind, start_on: s, end_on: e, daily_budget: bud, memo, updated_at: new Date().toISOString() };
+  $('fsave').disabled = true; $('fsave').textContent = '저장 중…';
+  try {
+    let r;
+    if (EDIT) r = await sb.from('nl_promo_log').update(row).eq('id', EDIT).select('id');
+    else { row.created_by = ME; r = await sb.from('nl_promo_log').insert(row).select('id'); }
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.length) throw new Error('저장된 줄이 없습니다 (권한 확인)');
+    EDIT = null; MSG = '✓ 저장했습니다';
+    await load();
+  } catch (x) {
+    alert('저장하지 못했습니다.\n' + (x.message || x));
+    $('fsave').disabled = false; $('fsave').textContent = '저장';
+  }
+}
+async function endRow(id) {
+  const td = kst();
+  const l = LOG.find(x => x.id === id);
+  if (!l || !confirm(l.kind + ' — 오늘(' + td + ')로 끝낼까요?')) return;
+  const { data, error } = await sb.from('nl_promo_log').update({ end_on: td < l.start_on ? l.start_on : td, updated_at: new Date().toISOString() })
+    .eq('id', id).select('id');
+  if (error || !data || !data.length) { alert('끝내지 못했습니다.\n' + (error ? error.message : '권한 확인')); return; }
+  MSG = '✓ 끝냈습니다'; await load();
+}
+async function delRow(id) {
+  const l = LOG.find(x => x.id === id);
+  if (!l || !confirm(l.kind + ' ' + l.start_on + ' 줄을 지울까요?\n(잘못 적은 줄만 지우세요. 끝난 광고는 「오늘로 끝내기」)')) return;
+  const { data, error } = await sb.from('nl_promo_log').delete().eq('id', id).select('id');
+  if (error || !data || !data.length) { alert('지우지 못했습니다.\n' + (error ? error.message : '권한 확인')); return; }
+  MSG = '✓ 지웠습니다'; await load();
+}
+
+$('home').onclick = () => { location.href = 'index.html'; };
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) { location.replace('index.html'); return; }
+  const { data: me, error } = await sb.from('nl_therapists').select('id, name, role')
+    .eq('login_email', data.session.user.email.toLowerCase()).maybeSingle();
+  if (error || !me) { $('body').innerHTML = '<div class="err">직원 표에 이 이메일이 없습니다.</div>'; return; }
+  nlKeep(me.id);
+  if ([8, 10].indexOf(Number(me.id)) < 0) { $('body').innerHTML = '<div class="err">원장님 · 홍보만 볼 수 있는 화면입니다.</div>'; return; }
+  ME = Number(me.id);
+  $('who').textContent = me.name + ' 님으로 로그인됨';
+  try { await load(); } catch (e) { $('body').innerHTML = '<div class="err">불러오지 못했습니다.\n' + esc(e.message || e) + '</div>'; }
+})();
+</script>
+</body>
+</html>
