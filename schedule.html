@@ -1502,7 +1502,7 @@
       <input id="mk_side" type="hidden" value="after">
     </div>
     <div id="mkSplitWrap" style="margin-top:12px;">
-      <label>쪼개기 <span class="sub2">(같은 선생님·같은 사업 수업 날에 앞·뒤로 · 40분을 한 번에)</span></label>
+      <label>쪼개기 <span class="sub2">(같은 선생님·같은 사업 수업 날에 앞·뒤로 · 한 회 분을 한 번에)</span></label>
       <div id="mkSplit"></div>
       <div id="mkSplitSum" class="spsum"></div>
     </div>
@@ -2223,12 +2223,19 @@ function mkPut(map, x){
   const k = x.makeup_for, cur = map[k];
   if (!cur || !pCount(cur) || pCount(x)) map[k] = x;
 }
-function filledMin(id, pool){
-  return (pool || SESS.concat(PREV)).reduce(function(t, v){
-    return (Number(v.makeup_for) === Number(id) && pCount(v)) ? t + Number(v.minutes || 40) : t; }, 0);
+// 한 회 길이 — 납부 계산에서 바꾼 분(dur_min) → 요일줄 분 → 40 (2026-11-20 · 34번 60분 쪼개기 · 서버 nl_sess_full 과 같음)
+function fullOf(id){
+  const o = SESS.concat(PREV).find(v => Number(v.id) === Number(id))
+         || ((typeof allSessU === 'function') ? allSessU().find(v => Number(v.id) === Number(id)) : null);
+  return Number(o && o.dur_min) || (o ? hostDur(o) : 0) || 40;
 }
-// 아직 40분을 못 채웠는가 — 상자에 남길지 정한다
-function needMore(id, pool){ return filledMin(id, pool) < 40; }
+function filledMin(id, pool){
+  const F = fullOf(id);
+  return (pool || SESS.concat(PREV)).reduce(function(t, v){
+    return (Number(v.makeup_for) === Number(id) && pCount(v)) ? t + Number(v.minutes || F) : t; }, 0);
+}
+// 아직 한 회를 못 채웠는가 — 상자에 남길지 정한다
+function needMore(id, pool){ return filledMin(id, pool) < fullOf(id); }
 // 같은 원래 줄의 40분 보강이 두 번 결석하면 그 회는 끝(소멸) — 더 보강하지 않는다 (2026-09-21 은정님)
 //   청구는 그대로. 서버 셈(nl_need_rows)도 같은 규칙
 function mkAbsN(id, pool){
@@ -2243,8 +2250,9 @@ function fillNote(id, pool){
     .filter(function(v){ return Number(v.makeup_for) === Number(id); })
     .sort(function(a,b){ return String(a.plan_date).localeCompare(String(b.plan_date)); });
   if (!parts.length) return '';
-  const sum = parts.reduce(function(t,v){ return pCount(v) ? t + Number(v.minutes || 40) : t; }, 0);
-  const left = 40 - sum;
+  const F = fullOf(id);
+  const sum = parts.reduce(function(t,v){ return pCount(v) ? t + Number(v.minutes || F) : t; }, 0);
+  const left = F - sum;
   if (left <= 0) return '';
   return ' <b class="pwhy">'
     + parts.map(function(v){ return '+' + Number(v.minutes || 40) + (pCount(v) ? '' : '(결석)'); }).join(' ')
@@ -2279,7 +2287,7 @@ function fillTag(x){
     .sort((a,b) => String(a.plan_date + a.start_time).localeCompare(String(b.plan_date + b.start_time)));
   if (!parts.length) return '';
   const sum = parts.reduce((t, v) => pCount(v) ? t + Number(v.minutes || 0) : t, 0);
-  const left = 40 - sum;
+  const left = fullOf(x.id) - sum;
   return '<span class="filltag">'
     + parts.map(v => '+' + Number(v.minutes) + (pCount(v) ? '' : '(결석)')).join(' ')
     + ((left > 0 && x.status !== '완료') ? ' <i>(' + left + '분 더 필요)</i>' : ' <b>완료</b>')
@@ -3272,7 +3280,7 @@ function fBtn(x, mkOf, PARTS, HOSTADD){
     const same = ps.every(function(v){ return Number(v.minutes) === m0; });
     info = (same ? '+' + m0 + ' ' + ps.map(function(v){ return mkDay(v).replace('일', ''); }).join('·')
                  : ps.map(function(v){ return '+' + Number(v.minutes) + ' ' + mkDay(v); }).join(' '))
-         + ((psum < 40 && x.status !== '완료') ? ' · ' + (40 - psum) + '분 남음' : '');
+         + ((psum < fullOf(x.id) && x.status !== '완료') ? ' · ' + (fullOf(x.id) - psum) + '분 남음' : '');
   } else if (mk && (x.status === '결석' || x.status === '휴무')) {
     // 보강 날짜 뒤에 그 보강의 상태도 적는다 — 아직 안 했으면 예정, 했으면 완료 (2026-09-11)
     info = '→' + mkDay(mk) + ' ' + (mk.status === '완료' ? '완료' : mk.status === '결석' ? '결석(안 함)' : '예정');
@@ -3287,12 +3295,12 @@ function fBtn(x, mkOf, PARTS, HOSTADD){
   //   청구하는 날(납부 계산에서 켜진 단추)만. 회색(청구 안 함)이면 ＋ 없음 (2026-09-11 납부와 잇기)
   //   쉬는 날에 보강하려면 납부 계산에서 그 날 단추를 먼저 켠다 (월 4회 아동)
   //   40분 보강이 없고 조각도 40분이 안 됐을 때
-  const done40 = (mk && Number(mk.minutes || 40) === 40 && pCount(mk)) || psum >= 40;
+  const done40 = (mk && Number(mk.minutes || 40) === 40 && pCount(mk)) || psum >= fullOf(x.id);
   const plus = CAN_EDIT && on && !done40 && !mkDead(x.id)
     && (x.status === '결석' || x.status === '휴무');
   // 결석 · 휴무였어도 보강을 마쳐 40분을 채웠으면 완료처럼 흰 바탕 (2026-10-03 은정님)
   const mkDone = (mk && mk.status === '완료' && Number(mk.minutes || 40) === 40)
-    || ps.reduce(function(t, v){ return v.status === '완료' ? t + Number(v.minutes || 0) : t; }, 0) >= 40;
+    || ps.reduce(function(t, v){ return v.status === '완료' ? t + Number(v.minutes || 0) : t; }, 0) >= fullOf(x.id);
   const filled = on && (x.status === '결석' || x.status === '휴무') && mkDone;
   const grey = !filled && (!on || x.status === '결석');
   const ovl = ovlTag(x.id) || ((mk && (x.status === '결석' || x.status === '휴무')) ? ovlTag(mk.id) : '');
@@ -3369,7 +3377,7 @@ function fPartGroup(list, origId){
   const allDone = list.every(x => x.status === '완료');
   const got = list.filter(x => x.status === '완료' || x.status === '보강')
                   .reduce((t, x) => t + Number(x.minutes || 0), 0);
-  const need = got < 40;
+  const need = got < fullOf(origId);
   const parts = list.map(x => {
     const cut = (x.status === '결석');
     return '<span class="fpart" data-psid="' + x.id + '" style="cursor:pointer;'
@@ -3518,7 +3526,7 @@ function drawFind(){
       ? '+' + m0 + ' ' + ps.map(mkDay).join('·')
       : ps.map(function(v){ return '+' + Number(v.minutes) + ' ' + mkDay(v); }).join(' · ');
     return '<b class="mintag" style="margin-left:0;">' + txt + '</b>'
-      + ((sum >= 40 || st === '완료') ? ' 완료' : ' <i style="color:#a1662f;font-style:normal;">(' + (40 - sum) + '분 더)</i>');
+      + ((sum >= fullOf(id) || st === '완료') ? ' 완료' : ' <i style="color:#a1662f;font-style:normal;">(' + (fullOf(id) - sum) + '분 더)</i>');
   }
 
   function extraOf(r){
@@ -6620,7 +6628,7 @@ function drawSp2(r){
       items.push({ id: x.id, txt: (anc ? '발추 ' + Number(String(mon).slice(5)) + '월분 · 쪼개기 진행 중'
         : nm + ' ' + (x.run_no ? Number(String(x.month_key || mon).slice(5)) + '-' + x.run_no + ' · ' : '')
           + dLbl(x.plan_date) + ' ' + h12(x.start_time) + ' · ' + x.status)
-        + (partsSum(x.id) ? ' (' + partsSum(x.id) + '/40)' : '') });
+        + (partsSum(x.id) ? ' (' + partsSum(x.id) + '/' + fullOf(x.id) + ')' : '') });
     });
   if (!items.length) { box.style.display = 'none'; return; }
   items.forEach(it => {
@@ -9457,11 +9465,11 @@ function drawSplit(){
   }).join('');
   const had = partsSum(s.id);
   const add = Object.keys(MKSPLIT).reduce((t, k) => t + Number((MKSPLIT[k] && MKSPLIT[k].min) || 0), 0);
-  const tot = had + add;
-  sum.className = 'spsum' + (tot === 40 && add ? ' ok' : '');
+  const tot = had + add, F = fullOf(s.id);
+  sum.className = 'spsum' + (tot === F && add ? ' ok' : '');
   sum.textContent = (add || had)
-    ? '채운 분 ' + tot + ' / 40' + (had ? ' (이미 ' + had + '분)' : '')
-      + (tot === 40 ? (add ? ' — 저장할 수 있습니다' : '') : tot > 40 ? ' — 40분을 넘었습니다' : ' — ' + (40 - tot) + '분 더 골라야 저장됩니다')
+    ? '채운 분 ' + tot + ' / ' + F + (had ? ' (이미 ' + had + '분)' : '')
+      + (tot === F ? (add ? ' — 저장할 수 있습니다' : '') : tot > F ? ' — ' + F + '분을 넘었습니다' : ' — ' + (F - tot) + '분 더 골라야 저장됩니다')
     : '';
 }
 document.addEventListener('click', ev => {
@@ -9487,9 +9495,10 @@ async function saveSplit(picks){
   const s = mkSess;
   const had = partsSum(s.id);
   const add = picks.reduce((t, k) => t + Number(MKSPLIT[k].min), 0);
-  if (had + add !== 40) {
-    const m = (had + add < 40) ? (40 - had - add) + '분 더 골라야 저장됩니다.'
-                               : (had + add - 40) + '분 넘었습니다. 40분에 맞춰 주세요.';
+  const F = fullOf(s.id);   // 한 회 길이 (60분 수업이면 60 · 2026-11-20)
+  if (had + add !== F) {
+    const m = (had + add < F) ? (F - had - add) + '분 더 골라야 저장됩니다.'
+                              : (had + add - F) + '분 넘었습니다. ' + F + '분에 맞춰 주세요.';
     mkmsg('❌ ' + m, false); alert(m); return;
   }
   const hosts = splitHosts(s);
@@ -9542,7 +9551,7 @@ function haveHtml(s){
   return '<b>잡힌 보강</b><br>' + ms.map(x => dLbl(x.plan_date) + ' ' + h12(x.start_time)
       + ' · ' + Number(x.minutes || 40) + '분 · ' + esc(x.status || '') + (x.status === '결석' ? '(안 셈)' : '')
       + (Number(x.therapist_id) !== Number(s.therapist_id) ? ' · ' + x.therapist_id + '번' : '')).join('<br>')
-    + (ps.length ? '<br>채운 분 ' + sum + ' / 40' : '');
+    + (ps.length ? '<br>채운 분 ' + sum + ' / ' + fullOf(s.id) : '');
 }
 // 상태를 바꿀 수 있나 — 8·9·11번은 모두, 치료사는 자기 수업만 (원칙 10)
 function canStat(s){
@@ -9618,7 +9627,7 @@ function openDay2(sid){
     : (FABBR[sp] || STYPE[sp] || '') + ' ' + (Number(s.run_no) > 0 ? monNo(s.month_key || mon) + '-' + s.run_no : '');
   $('mkTitle').textContent = (s.child_id ? '[' + s.child_id + '] ' : '') + (s._name || '') + ' · ' + lbl
     + ' · ' + dLbl(s.plan_date) + ' ' + h12(s.start_time)
-    + ' · ' + (s.therapist_id ? s.therapist_id + '번' : '') + ' · ' + hostDur(s) + '분';
+    + ' · ' + (s.therapist_id ? s.therapist_id + '번' : '') + ' · ' + fullOf(s.id) + '분';
   // 상태 단추 줄은 쓰지 않는다 — 상태는 찾기 창 단추를 눌러 돌린다 (2026-09-11 은정님)
   $('mkStat').style.display = 'none';
   const hv = haveHtml(s);
@@ -10166,9 +10175,9 @@ async function mkSaveRun() {
     }
     // 이미 채운 분과 더해 40분을 넘기지 않는다
     const done = madeBy.reduce((n, v) => n + Number(v.minutes || 0), 0);
-    if (done + mkMin > 40) {
+    if (done + mkMin > fullOf(mkSess.id)) {
       mkmsg('이미 ' + done + '분을 채웠습니다.\n'
-        + '남은 것은 ' + (40 - done) + '분입니다.', false);
+        + '남은 것은 ' + (fullOf(mkSess.id) - done) + '분입니다.', false);
       return;
     }
   }
