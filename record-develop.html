@@ -907,7 +907,21 @@ async function kbMonth(k) {
   let rows = (data || []).map(r => Object.assign({}, r, { item_no: Number(r.item_no) }))
     .filter(r => r.kind === '발달재활' && r.item_no < 31 && r.item_no !== 25
               && r.state !== '참고' && r.state !== '작성 중' && r.state !== '끝');
-  if (!_isAllView(ME.role)) rows = rows.filter(r => Number(r.therapist_id) === Number(ME.id));
+  if (!_isAllView(ME.role)) {
+    rows = rows.filter(r => Number(r.therapist_id) === Number(ME.id));
+    // 시간 겹침(10)은 발달 기록지와 치료지원 기록지를 맞대 봄 — 고칠 아동이 치료지원 쪽이면 여기 라벨에 넣지 않음 (2026-11-20 · 2번 선생님 62 · 100번)
+    //   그 달 내가 맡은 발달재활 회기가 있는 아동만 남김 · 그 밖은 치료지원 기록지 라벨에 뜸
+    if (rows.some(r => r.item_no === 10)) {
+      const dev = {};
+      try {
+        const q = await sb.from('nl_sessions').select('child_id').eq('therapist_id', ME.id).eq('support_type_id', 2)
+          .eq('month_key', k).neq('status', '취소').range(0, 999);
+        if (q.error) throw q.error;
+        (q.data || []).forEach(x => { dev[x.child_id] = 1; });
+        rows = rows.filter(r => r.item_no !== 10 || dev[r.child_id]);
+      } catch (e) {}
+    }
+  }
   const out = {};
   rows.forEach(r => {
     const o = out[r.child_id] || (out[r.child_id] = { fix: 0, doc: 0, wait: 0, th: {} });

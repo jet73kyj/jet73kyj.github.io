@@ -703,12 +703,21 @@ async function kbMonth(k) {
   // 끝났는지는 서버 nl_rc_open 한 곳이 정함 (2026-10-23) — 기록지 점검 화면과 같은 상태
   const { data, error } = await sb.rpc('nl_rc_my', { p_month: k });
   if (error) throw error;
+  // 시간 겹침(10)은 발달재활 줄로 오지만 고칠 아동이 치료지원 쪽일 수 있음 — 그 달 내가 맡은 치료지원 아동이면 여기 라벨에도 (2026-11-20 · 2번 선생님 62 · 100번)
+  const sup = {};
+  if ((data || []).some(r => r.kind === '발달재활' && Number(r.item_no) === 10 && Number(r.therapist_id) === Number(ME.id))) {
+    try {
+      const q = await sb.from('nl_sessions').select('child_id').eq('therapist_id', ME.id).in('support_type_id', [3, 4, 6, 7])
+        .eq('month_key', k).neq('status', '취소').range(0, 999);
+      if (!q.error) (q.data || []).forEach(x => { sup[x.child_id] = 1; });
+    } catch (e) {}
+  }
   const out = {};
   (data || []).forEach(r => {
-    if (r.kind !== '치료지원') return;
+    if (r.kind !== '치료지원' && !(r.kind === '발달재활' && Number(r.item_no) === 10 && sup[r.child_id])) return;
     if (r.state === '참고' || r.state === '작성 중' || r.state === '끝') return;   // 기한 전 미작성 · 원장 확인 등
     if (Number(r.therapist_id) !== Number(ME.id)) return;
-    const key = r.child_id + '|' + (r.support_type_id || '');
+    const key = r.child_id + '|' + (r.kind === '치료지원' ? (r.support_type_id || '') : '');   // 겹침 줄은 그 아동 치료지원 모두에
     out[key] = (out[key] || 0) + 1;
   });
   return out;
