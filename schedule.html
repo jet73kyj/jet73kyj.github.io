@@ -2711,9 +2711,9 @@ async function changeSessTher(sid){
     alert('그런 번호가 없습니다.'); return;
   }
   if (nid === Number(s.therapist_id)) return;
-  const { error } = await sb.from('nl_sessions')
+  const { error } = await rowsOk(sb.from('nl_sessions')
     .update({ therapist_id: nid, updated_at: new Date().toISOString() })
-    .eq('id', s.id);
+    .eq('id', s.id).select('id'));
   if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
   s.therapist_id = nid;
   // 상자 셋 · 찾기 창도 다시 센다 (2026-10-01 전체 점검)
@@ -3881,8 +3881,8 @@ function drawFind(){
       if (s.status === '휴무') { openMk(s.id); return; }
       const nx = cycNext(s);
       if (!(await askDropMakeup(s, nx))) return;
-      const { error } = await sb.from('nl_sessions')
-        .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', id);
+      const { error } = await rowsOk(sb.from('nl_sessions')
+        .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', id).select('id'));
       if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
       s.status = nx;
       await reloadAfterMk();
@@ -5789,7 +5789,7 @@ $('gbody').addEventListener('click', async e => {
     e.stopPropagation();
     const id = Number(mnd.dataset.mndel);
     if (!confirm('직접 넣은 이 보강을 지울까요?')) return;
-    const { error } = await sb.from('nl_sessions').delete().eq('id', id);
+    const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', id).select('id'));
     if (error) { alert('지우지 못했습니다.\n' + error.message); return; }
     SESS = SESS.filter(x => x.id !== id);
     // 상자 셋 · 찾기 창도 다시 센다 (2026-10-01 전체 점검)
@@ -6791,8 +6791,8 @@ async function undoRest(){
 
   $('edRest').disabled = true; $('edRest').textContent = '되돌리는 중...';
   try {
-    const { error: e1 } = await sb.from('nl_therapy_schedules')
-      .update({ from_month: null }).eq('id', edRow.id);
+    const { error: e1 } = await rowsOk(sb.from('nl_therapy_schedules')
+      .update({ from_month: null }).eq('id', edRow.id).select('id'));
     if (e1) throw e1;
     // 화면이 들고 있는 값도 함께 바꾼다 (안 그러면 「쉬는 중」 표시가 남는다)
     edRow.from_month = null;
@@ -6828,8 +6828,8 @@ $('edRest').onclick = async () => {
   $('edRest').disabled = true; $('edRest').textContent = '쉼 처리 중...';
   try {
     // (1) 요일줄을 다음 달부터 쓰도록
-    const { error: e1 } = await sb.from('nl_therapy_schedules')
-      .update({ from_month: nextM }).eq('id', edRow.id);
+    const { error: e1 } = await rowsOk(sb.from('nl_therapy_schedules')
+      .update({ from_month: nextM }).eq('id', edRow.id).select('id'));
     if (e1) throw e1;
     // 화면이 들고 있는 값도 함께 바꾼다
     edRow.from_month = nextM;
@@ -7163,8 +7163,8 @@ $('edSave').onclick = async () => {
                   count_mode: nmode,
                   monthly_count: wkCnt + ((nmode !== '4회만') ? 1 : 0),
                   duration_min: du };
-    const { error: e2 } = await sb.from('nl_therapies')
-      .update(up2).eq('id', edRow.therapy_id);
+    const { error: e2 } = await rowsOk(sb.from('nl_therapies')
+      .update(up2).eq('id', edRow.therapy_id).select('id'));
     if (e2) throw e2;
     edRow._tt = ntt; edRow.support_type_id = nst;
     edRow._mode = nmode; edRow._cnt = up2.monthly_count;
@@ -7293,8 +7293,8 @@ async function changeTherapistFrom(th, du, applyD){
       //   끝난달은 「바꾸는 날의 달」이 아니라 「끝난날의 달」로 적는다 (2026-09-19)
       //   10월 1일부터 바꾸면 옛 줄은 9월까지다. 끝난달을 10월로 적으면
       //   납부 계산은 10월에 남기고 nl_live_rows 는 빼서 화면마다 달라진다 (109번)
-      const { error: e1 } = await sb.from('nl_therapy_schedules')
-        .update({ to_month: before.slice(0, 7), to_date: before }).eq('id', old.id);
+      const { error: e1 } = await rowsOk(sb.from('nl_therapy_schedules')
+        .update({ to_month: before.slice(0, 7), to_date: before }).eq('id', old.id).select('id'));
       if (e1) {
         if (ns.id !== old.id) await sb.from('nl_therapy_schedules').delete().eq('id', ns.id);
         throw e1;
@@ -7327,10 +7327,10 @@ async function changeTherapistFrom(th, du, applyD){
     // ⑤ 치료 종류 · 지원유형 · 회기 방식도 함께
     const ntt = Number($('ed_tt').value), nmode = $('ed_cnt').value, nst = Number($('ed_st2').value);
     const wkCnt = edWk.filter(Boolean).length || 4;
-    await sb.from('nl_therapies').update({
+    { const _r = await rowsOk(sb.from('nl_therapies').update({
       therapy_type_id: ntt, support_type_id: nst, count_mode: nmode,
       monthly_count: wkCnt + ((nmode !== '4회만') ? 1 : 0), duration_min: du
-    }).eq('id', old.therapy_id);
+    }).eq('id', old.therapy_id).select('id')); if (_r.error) throw _r.error; }
     try { await sb.rpc('nl_renum_month', { p_month: mon, p_therapy: old.therapy_id }); } catch (e) {}
     // 화면이 들고 있는 요일줄 목록도 맞춘다 (loadMonth 는 요일줄을 다시 읽지 않는다)
     const extra = { _tt: ntt, support_type_id: nst, _mode: nmode,
@@ -7418,8 +7418,8 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     }
 
     // ① 옛 줄을 여기까지로 끝낸다
-    const { error: e1 } = await sb.from('nl_therapy_schedules')
-      .update(oldUpd).eq('id', edRow.id);
+    const { error: e1 } = await rowsOk(sb.from('nl_therapy_schedules')
+      .update(oldUpd).eq('id', edRow.id).select('id'));
     if (e1) throw e1;
 
     // ② 새 요일 줄을 만든다
@@ -7471,11 +7471,11 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     const nst  = Number($('ed_st2').value);
     const wkCnt = edWk.filter(Boolean).length || 4;
     // 주차는 수업요일 줄에 있으므로 치료에는 쓰지 않는다
-    const { error: e3 } = await sb.from('nl_therapies').update({
+    const { error: e3 } = await rowsOk(sb.from('nl_therapies').update({
       therapy_type_id: ntt, support_type_id: nst, count_mode: nmode,
       monthly_count: wkCnt + ((nmode !== '4회만') ? 1 : 0),
       duration_min: du
-    }).eq('id', edRow.therapy_id);
+    }).eq('id', edRow.therapy_id).select('id'));
     if (e3) throw e3;
 
     // ④ 옛 줄의 이번 달 이후 예정·쉼·휴무 회기를 지운다
@@ -7523,7 +7523,7 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
             + (mkN ? ' (보강 딸림)' : ' (학부모 요청)'));
           continue;
         }
-        const { error: eD } = await sb.from('nl_sessions').delete().eq('id', a.id);
+        const { error: eD } = await rowsOk(sb.from('nl_sessions').delete().eq('id', a.id).select('id'));
         if (eD) _keptAbs.push(String(a.plan_date).slice(5).replace('-', '/')
           + ' (지우지 못함)');
       }
@@ -7864,15 +7864,15 @@ $('edEnd').onclick = async () => {
   $('edEnd').disabled = true;
   try {
     if (_mode === 'all') {
-      const { error: e1 } = await sb.from('nl_therapies')
-        .update({ ended_on: _last, end_reason: _why, end_cat: _cat }).eq('id', edRow.therapy_id);
+      const { error: e1 } = await rowsOk(sb.from('nl_therapies')
+        .update({ ended_on: _last, end_reason: _why, end_cat: _cat }).eq('id', edRow.therapy_id).select('id'));
       if (e1) throw e1;
     }
     // ⚠️ 요일줄을 지우지 않는다. 지우면 그 달 납부 계산 화면에서
     //    수업이 사라져 납부 내역이 안 보인다. 끝난달만 넣어 다음 달부터 안 나오게 한다
     //    끝나는 날짜(to_date)도 적어, 시간표가 그 달 남은 날을 다시 깔지 않게 한다
-    const { error: e2 } = await sb.from('nl_therapy_schedules')
-      .update({ to_month: String(_last).slice(0, 7), to_date: _last }).eq('id', edRow.id);
+    const { error: e2 } = await rowsOk(sb.from('nl_therapy_schedules')
+      .update({ to_month: String(_last).slice(0, 7), to_date: _last }).eq('id', edRow.id).select('id'));
     if (e2) throw e2;
     if (_toDone.length) {
       const { error: e4 } = await sb.from('nl_sessions')
@@ -7911,8 +7911,8 @@ $('edEnd').onclick = async () => {
         + '아동 상태를 「종결」로 바꿀까요?\n\n'
         + '확인 = 종결로 바꿈\n'
         + '취소 = 그대로 둠 (곧 다른 수업을 시작하실 때)')) {
-        const { error: e3 } = await sb.from('nl_children')
-          .update({ status: '종결' }).eq('id', _kid);
+        const { error: e3 } = await rowsOk(sb.from('nl_children')
+          .update({ status: '종결' }).eq('id', _kid).select('id'));
         alert(e3 ? '❌ 아동 상태를 바꾸지 못했습니다.\n' + e3.message
                  : '✅ 아동을 「종결」로 바꿨습니다.');
       }
@@ -8492,7 +8492,7 @@ $('mnFind').onclick = async () => {
 $('mnDel').onclick = async () => {
   if (!mnEditId) { mnmsg('취소할 보강이 없습니다.', false); return; }
   if (!confirm('이 보강을 취소할까요?\n\n지운 뒤에는 되돌릴 수 없습니다.')) return;
-  const { error } = await sb.from('nl_sessions').delete().eq('id', mnEditId);
+  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', mnEditId).select('id'));
   if (error) { mnmsg('❌ 취소하지 못했습니다.\n' + error.message, false); return; }
   SESS = SESS.filter(v => v.id !== mnEditId);
   PREV = PREV.filter(v => v.id !== mnEditId);
@@ -9077,7 +9077,7 @@ async function drawOffList(){
   $('offList').querySelectorAll('.del').forEach(el => {
     el.onclick = async () => {
       if (!confirm('이 휴무를 지울까요?')) return;
-      const { error } = await sb.from('nl_offdays').delete().eq('id', Number(el.dataset.off));
+      const { error } = await rowsOk(sb.from('nl_offdays').delete().eq('id', Number(el.dataset.off)).select('id'));
       if (error) { offmsg('❌ 지우지 못했습니다.\n' + error.message, false); return; }
       offmsg('✅ 지웠습니다. 휴무였던 수업은 예정으로 돌리려면 회기를 눌러 주세요.', true);
       await loadMonth(); drawOffList(); draw();
@@ -9338,7 +9338,7 @@ async function delMakeup(sid){
     + ' · ' + (x._name || '') + '\n\n'
     + '원래 결석·휴무 줄은 그대로 남습니다.\n'
     + '지운 뒤에는 되돌릴 수 없습니다.')) return;
-  const { error } = await sb.from('nl_sessions').delete().eq('id', sid);
+  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', sid).select('id'));
   if (error) { alert('지우지 못했습니다.\n' + error.message); return; }
   SESS = SESS.filter(v => v.id !== sid);
   PREV = PREV.filter(v => v.id !== sid);
@@ -9634,8 +9634,8 @@ async function findTap(sid, isPlus){
   const _py = window.scrollY, _px = window.scrollX;
   const nx = cycNext(s);
   if (!(await askDropMakeup(s, nx))) return;
-  const { error } = await sb.from('nl_sessions')
-    .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', sid);
+  const { error } = await rowsOk(sb.from('nl_sessions')
+    .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', sid).select('id'));
   if (error) { alert('바꾸지 못했습니다.\n' + error.message); return; }
   s.status = nx;
   await reloadAfterMk();
@@ -9686,8 +9686,8 @@ document.addEventListener('click', async ev => {
   const s = mkSess, nx = b.dataset.st;
   if (s.status === nx || !canStat(s)) return;
   if (!(await askDropMakeup(s, nx))) return;
-  const { error } = await sb.from('nl_sessions')
-    .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', s.id);
+  const { error } = await rowsOk(sb.from('nl_sessions')
+    .update({ status: nx, updated_at: new Date().toISOString() }).eq('id', s.id).select('id'));
   if (error) { mkmsg('❌ 바꾸지 못했습니다.\n' + error.message, false); return; }
   s.status = nx;
   await loadNeed();
@@ -10437,9 +10437,9 @@ $('mkGiveup').onclick = async () => {
     + '사유 — ' + why + '\n\n'
     + '시간표에서는 빈 자리가 되고,\n'
     + '회기 수·급여·교육비에서 빠집니다.\n\n계속할까요?')) return;
-  const { error } = await sb.from('nl_sessions')
+  const { error } = await rowsOk(sb.from('nl_sessions')
     .update({ no_makeup: true, no_makeup_why: why })
-    .eq('id', mkSess.id);
+    .eq('id', mkSess.id).select('id'));
   if (error) { mkmsg('❌ 저장하지 못했습니다.\n' + error.message, false); return; }
   const put = function(a){ a.forEach(function(x){
     if (x.id === mkSess.id) { x.no_makeup = true; x.no_makeup_why = why; } }); };
@@ -10457,7 +10457,7 @@ $('mkDel').onclick = async () => {
            || PREV.find(x => isMk(x) && x.makeup_for === mkSess.id && pCount(x));
   if (!old) { mkmsg('취소할 보강이 없습니다.', false); return; }
   if (!confirm('이 보강을 취소할까요?')) return;
-  const { error } = await sb.from('nl_sessions').delete().eq('id', old.id);
+  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', old.id).select('id'));
   if (error) { mkmsg('❌ 취소하지 못했습니다.\n' + error.message, false); return; }
   SESS = SESS.filter(x => x.id !== old.id);
   PREV = PREV.filter(x => x.id !== old.id);
@@ -10947,6 +10947,13 @@ async function loadMonth(){
 //   세 상자 · 찾기 창 ＋ · 하루 보기 멘트가 이것만 따른다
 //   2026-09-19 — 따로 떼어냈다. 보강을 잡거나 취소하거나 상태를 바꾸면 다시 받는다
 //   전에는 달을 불러올 때 한 번만 받아, 보강을 잡아도 상자에 그대로 남아 있었다
+// 저장 결과 확인 (2026-11-21) — 표 잠금에 걸리면 오류 없이 0줄이 바뀌므로 돌려받은 줄 수를 본다
+async function rowsOk(q) {
+  const r = await q;
+  if (!r.error && !(r.data && r.data.length))
+    r.error = { message: '서버에서 바뀐 줄이 없습니다. 다른 곳에서 이미 바뀌었거나 로그인이 끊겼을 수 있습니다. 새로고침(F5) 뒤 다시 확인해 주세요.' };
+  return r;
+}
 async function loadNeed(){
   NEEDSRV = null; NEEDRAW = [];
   await loadOvl();   // 회기 겹침 (2026-10-06)
