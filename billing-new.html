@@ -3531,6 +3531,18 @@ $('kids').addEventListener('change', e => {
   const box = t.closest('.kid');
   if (!box) return;
 
+  // 적용단가에 원래 수업료와 같은 값을 적으면 알림 (2026-11-21 · 33번)
+  //   같은 값이 남아 있으면 선생님 수업료가 올라도 이 아동만 옛 금액에 묶인다
+  if (t.classList.contains('apu')) {
+    const tr = t.closest('.line');
+    const base = tr ? Number((tr.querySelector('.lineamt') || {}).dataset ? tr.querySelector('.lineamt').dataset.unit : '') : 0;
+    const ap = numOf(t.value);
+    if (ap > 0 && base > 0 && ap === base)
+      alert('적용단가 ' + ap.toLocaleString() + '원이 원래 수업료와 같습니다.\n\n'
+        + '할인이 아니면 칸을 비워 주세요.\n'
+        + '같은 값이 남아 있으면 나중에 선생님 수업료가 올라도 이 아동만 옛 금액으로 청구됩니다.');
+  }
+
   // 평가 종류를 고르면 금액이 자동으로 채워진다
   if (t.classList.contains('evsel')) {
     const amtEl = box.querySelector('.evamt');
