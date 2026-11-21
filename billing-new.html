@@ -2239,7 +2239,11 @@ function drawKid(c) {
       // 적용단가 — 이번 달 저장분이 없으면 지난달 것을 이어받는다
       //   요일줄 번호로 짝지은 표시 [요일줄단가11:54000] 가 있으면 그것을 쓴다 (2026-10-21 · 49번)
       //   옛 표시 [적용단가a,b,c] 는 줄 차례라, 수업을 고쳐 차례가 바뀌면 단가가 다른 줄로 옮겨 갔다
-      const apSrc  = [sv[g.support_type_id], lastM[g.support_type_id]].find(p => unitMapOf(p) || unitsOf(p));
+      //   이번 달을 이미 저장했으면 이번 달 것만 본다 — 칸을 비우고 저장한 것이 「할인 끝」이므로 (2026-11-21 · 33번)
+      //   이번 달을 아직 저장하지 않았을 때만 지난달 것을 이어받는다
+      const apSrc  = sv[g.support_type_id]
+        ? ((unitMapOf(sv[g.support_type_id]) || unitsOf(sv[g.support_type_id])) ? sv[g.support_type_id] : null)
+        : ((unitMapOf(lastM[g.support_type_id]) || unitsOf(lastM[g.support_type_id])) ? lastM[g.support_type_id] : null);
       const apMap  = unitMapOf(apSrc);
       const apList = apMap ? null : unitsOf(apSrc);
       g.items.forEach((it, i) => {
