@@ -195,6 +195,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="nl-login.js"></script>
 <script>
+// 저장 결과 확인 (2026-11-21) — 표 잠금에 걸리면 오류 없이 0줄이 바뀌므로 돌려받은 줄 수를 본다
+async function rowsOk(q) {
+  const r = await q;
+  if (!r.error && !(r.data && r.data.length))
+    r.error = { message: '서버에서 바뀐 줄이 없습니다. 다른 곳에서 이미 바뀌었거나 로그인이 끊겼을 수 있습니다. 새로고침(F5) 뒤 다시 확인해 주세요.' };
+  return r;
+}
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
 const sb = window.supabase.createClient(URL_, KEY_, {
@@ -366,7 +373,7 @@ async function delOne(id) {
   const r = ROWS.find(x => x.id === id);
   if (!r) return;
   if (!confirm('「' + r.title + '」 소식을 지웁니다.\n지운 뒤에는 되돌릴 수 없습니다.\n\n계속할까요?')) return;
-  const { error } = await sb.from('nl_news').delete().eq('id', id);
+  const { error } = await rowsOk(sb.from('nl_news').delete().eq('id', id).select('id'));
   if (error) { show($('msg2'), '❌ 지우지 못했습니다.\n' + error.message, false); return; }
   ROWS = ROWS.filter(x => x.id !== id);
   draw();
