@@ -3986,7 +3986,7 @@ function resetAddBox() {
   $('k_age').textContent = '';
   $('k_gender').value = '';
   $('k_status').value = '대기중';
-  ADD_KID = null; addLock(false);
+  ADD_KID = null; DUP_NEW = ''; addLock(false);
   $('dupWarn').style.display = 'none';
   $('pastQ').value = '';
   $('pastBox').style.display = 'none';
@@ -4057,10 +4057,34 @@ $('pastQ').addEventListener('input', () => {
 
 
 // ===== 이름 타이핑 중 같은 이름 알림 =====
+// 같은 아동 찾기 (2026-11-21) — 이름은 띄어쓰기를 무시하고 견준다
+function normName(s) { return String(s || '').replace(/\s/g, ''); }
 function sameNamed(nm) {
-  const t = (nm || '').trim();
+  const t = normName(nm);
   if (!t) return [];
-  return KIDS.filter(k => (k.name || '').trim() === t);
+  return KIDS.filter(k => normName(k.name) === t);
+}
+// 이름이 달라도 생년월일 · 연락처가 둘 다 같은 아동 (이름을 잘못 친 경우)
+function sameBirthTel(nm, bd, ph) {
+  const t = normName(nm), d = telDigits(ph || '');
+  if (!bd || d.length < 9) return [];
+  return KIDS.filter(k => normName(k.name) !== t
+    && String(k.birth || '').slice(0, 10) === bd && telDigits(k.phone || '') === d);
+}
+function dupCands(nm, bd, ph) { return sameNamed(nm).concat(sameBirthTel(nm, bd, ph)); }
+// 아동 목록 — 1,000명씩 나눠 서버에서 다시 읽는다
+async function loadKids() {
+  const out = [];
+  for (let f = 0; ; f += 1000) {
+    const { data, error } = await sb.from('nl_children')
+      .select('id, name, birth, status, manager_no, phone, memo, memo_at, eval_summary, gender, guardian')
+      .order('id').range(f, f + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  out.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+  KIDS = out;
 }
 
 // 생년월일 → 몇 년 몇 개월 (등록 창)
@@ -4125,13 +4149,21 @@ $('k_birth').addEventListener('change', drawAge);
 // ===== 이미 등록된 아동이면 정보를 넣고 문의만 붙인다 (2026-10-07) =====
 //   ADD_KID — 고른 기존 아동 번호. 있으면 「등록하기」가 아동을 새로 만들지 않는다
 let ADD_KID = null;
-const ADD_LOCK = ['k_birth', 'k_gender', 'k_guardian', 'k_phone', 'k_status'];
+let DUP_NEW = '';   // 「동명이인 — 새 아동으로」를 누른 이름 (그 이름이면 다시 묻지 않음)
+const ADD_LOCK = ['k_name', 'k_birth', 'k_gender', 'k_guardian', 'k_phone', 'k_status'];
 function addLock(on) {
-  ADD_LOCK.forEach(id => { const el = $(id); if (el) { el.disabled = on; el.style.background = on ? '#F7F6F4' : ''; } });
+  ADD_LOCK.forEach(id => {
+    const el = $(id); if (!el) return;
+    // 「먼저 저장」한 아동은 이름 · 생년월일을 계속 잠가 둔다
+    let pre = null; try { pre = PRE_KID; } catch (e) {}
+    if (!on && pre && (id === 'k_name' || id === 'k_birth')) return;
+    el.disabled = on; el.style.background = on ? '#F7F6F4' : '';
+  });
 }
 function addUseKid(cid) {
   const k = KIDS.find(x => x.id === cid); if (!k) return;
-  ADD_KID = cid;
+  ADD_KID = cid; DUP_NEW = '';
+  $('k_name').value     = k.name || '';
   $('k_birth').value    = k.birth ? String(k.birth).slice(0, 10) : '';
   $('k_gender').value   = k.gender || '';
   $('k_guardian').value = k.guardian || '';
@@ -4139,38 +4171,59 @@ function addUseKid(cid) {
   if (STATUS && $('k_status').querySelector('option[value="' + k.status + '"]')) $('k_status').value = k.status;
   drawAge(); addLock(true); drawDupWarn();
 }
-function addNewKid() {
+// 고른 아동 풀기 — asNew 면 「동명이인 새 아동」으로 진행
+function addNewKid(asNew) {
   ADD_KID = null;
+  DUP_NEW = asNew === true ? normName($('k_name').value) : '';
   ['k_birth', 'k_guardian', 'k_phone'].forEach(id => $(id).value = '');
   $('k_gender').value = ''; $('k_status').value = '대기중';
   drawAge(); addLock(false); drawDupWarn();
+  if (asNew !== true) $('k_name').focus();
 }
 function drawDupWarn() {
   const box = $('dupWarn');
   const nm  = $('k_name').value;
   if (ADD_KID) {
     const k = KIDS.find(x => x.id === ADD_KID);
-    if (!k || (k.name || '').trim() !== nm.trim()) { addNewKid(); return; }   // 이름을 바꾸면 풀림
+    if (!k) { addNewKid(); return; }   // 서버에서 사라진 아동만 풂 (이름 칸은 잠겨 있어 바뀌지 않음)
     box.innerHTML = '✓ <b>' + k.id + '번 ' + esc(k.name) + ' · ' + wlBirth(k) + ' · ' + esc(k.status) + '</b>'
       + ' — 이미 등록된 아동의 정보를 넣었습니다.<br>'
       + '「등록하기」를 누르면 <b>아동을 새로 만들지 않고 이 아동에게 문의만</b> 붙습니다.'
       + ' (아동 정보 · 초기 상담은 바뀌지 않고, 이 창에 적은 상담 내용 · 평가 요약은 문의 메모로 남습니다)'
-      + '<br><button type="button" class="tab" id="addNewBtn" style="margin-top:6px;padding:4px 10px;font-size:12.5px;">동명이인 — 새 아동으로 등록</button>';
+      + '<br><button type="button" class="tab" id="addOtherBtn" style="margin-top:6px;padding:4px 10px;font-size:12.5px;">다른 아동으로 바꾸기</button>'
+      + ' <button type="button" class="tab" id="addNewBtn" style="margin-top:6px;padding:4px 10px;font-size:12.5px;">동명이인 — 새 아동으로 등록</button>';
     box.style.display = 'block';
-    $('addNewBtn').onclick = addNewKid;
+    $('addOtherBtn').onclick = () => addNewKid(false);
+    $('addNewBtn').onclick   = () => addNewKid(true);
     return;
   }
-  const hit = sameNamed(nm);
-  if (!hit.length) { box.style.display = 'none'; return; }
-  box.innerHTML = '⚠️ <b>이미 등록된 아동입니다.</b> 같은 아동이면 「이 아동 정보 넣기」를 누르세요.<br>'
-    + hit.map(k => '　· ' + k.id + '번 ' + esc(k.name) + ' · ' + wlBirth(k) + ' · ' + esc(k.status)
+  let pre = null; try { pre = PRE_KID; } catch (e) {}
+  if (pre) { box.style.display = 'none'; return; }
+  const named = sameNamed(nm);
+  const other = sameBirthTel(nm, $('k_birth').value, $('k_phone').value);
+  if (!named.length && !other.length) { box.style.display = 'none'; return; }
+  const row = k => '　· ' + k.id + '번 ' + esc(k.name) + ' · ' + wlBirth(k) + ' · ' + esc(k.status)
         + ' <button type="button" class="tab" data-adduse="' + k.id + '"'
-        + ' style="padding:3px 10px;font-size:12.5px;margin:3px 0 0 6px;">이 아동 정보 넣기</button>').join('<br>')
-    + '<br>동명이인 새 아동이면 그대로 적어 진행하세요.';
+        + ' style="padding:3px 10px;font-size:12.5px;margin:3px 0 0 6px;">이 아동 정보 넣기</button>';
+  let h = '';
+  if (named.length) {
+    h += (DUP_NEW && DUP_NEW === normName(nm)
+          ? '✓ <b>동명이인 새 아동으로 등록합니다.</b> 아래 아동과 다른 아동인지 한 번 더 확인하세요.<br>'
+          : '⚠️ <b>같은 이름의 아동이 이미 있습니다.</b> 같은 아동이면 「이 아동 정보 넣기」를 누르세요.<br>')
+      + named.map(row).join('<br>');
+  }
+  if (other.length) {
+    h += (h ? '<br>' : '') + '⚠️ <b>이름은 다르지만 생년월일 · 연락처가 같은 아동이 있습니다.</b> 이름을 잘못 적지 않았는지 확인하세요.<br>'
+      + other.map(row).join('<br>');
+  }
+  if (!(DUP_NEW && DUP_NEW === normName(nm))) h += '<br>다른 아동이 맞으면 그대로 적어 진행하세요.';
+  box.innerHTML = h;
   box.style.display = 'block';
   box.querySelectorAll('[data-adduse]').forEach(b => b.onclick = () => addUseKid(Number(b.dataset.adduse)));
 }
 $('k_name').addEventListener('input', drawDupWarn);
+$('k_birth').addEventListener('change', drawDupWarn);
+$('k_phone').addEventListener('input', drawDupWarn);
 
 // ===== 관리번호 자동 =====
 function nextManagerNo() {
@@ -4192,14 +4245,21 @@ $('saveNew').onclick = async () => {
   if (!nm) { showBox('msgA', '아동 이름을 넣으세요.', false); return; }
   if (!$('a_date').value) { showBox('msgA', '문의일을 넣으세요.', false); return; }
 
+  // 다른 컴퓨터에서 방금 등록한 아동까지 보도록 서버에서 다시 읽는다 (2026-11-21)
+  if (!PRE_KID) {
+    try { await loadKids(); }
+    catch (e) { showBox('msgA', '❌ 아동 목록을 다시 읽지 못했습니다. 새로고침(F5) 뒤 다시 눌러 주세요.\n' + e.message, false); return; }
+  }
+  if (ADD_KID && !KIDS.find(x => x.id === ADD_KID)) {
+    alert('고른 아동을 서버에서 찾지 못했습니다. 다시 골라 주세요.'); addNewKid(false); return;
+  }
   const useKid = ADD_KID ? KIDS.find(x => x.id === ADD_KID) : null;
-  const hit = (useKid || PRE_KID) ? [] : sameNamed(nm);   // 먼저 저장한 아동은 자기 자신이라 묻지 않음
+  const hit = (useKid || PRE_KID) ? [] : dupCands(nm, $('k_birth').value, $('k_phone').value);   // 먼저 저장한 아동은 자기 자신이라 묻지 않음
   if (hit.length) {
-    const list = hit.map(k => '  · ' + k.name + ' (' + k.id + '번 · ' + k.status + ')').join('\n');
-    if (!confirm('⚠️ 같은 이름이 이미 있습니다.\n\n' + list
-      + '\n\n같은 아동이면 「취소」를 누르고\n'
-      + '아동 관리 화면에서 확인하세요.\n\n'
-      + '동명이인이라 새로 만들어야 하면 「확인」을 누르세요.')) return;
+    const list = hit.map(k => '  · ' + k.id + '번 ' + k.name + ' · ' + wlBirth(k) + ' · ' + k.status).join('\n');
+    if (!confirm('⚠️ 같은 아동일 수 있는 아동이 이미 있습니다.\n\n' + list
+      + '\n\n같은 아동이면 「취소」를 누르고 「이 아동 정보 넣기」를 누르세요.\n\n'
+      + '다른 아동(동명이인)이라 새로 만들어야 하면 「확인」을 누르세요.')) { drawDupWarn(); return; }
   }
 
   // 연락처 — 숫자 자리 수 확인 (2026-10-08)
@@ -4340,9 +4400,9 @@ $('saveNew').onclick = async () => {
     nctDraw();
     $('k_gender').value = '';
     $('k_status').value = '대기중';
-    ADD_KID = null; addLock(false);
+    ADD_KID = null; DUP_NEW = '';
+    ikPreClear(); addLock(false);
     $('dupWarn').style.display = 'none';
-    ikPreClear();
   } catch (e) {
     showBox('msgA', useKid
       ? '❌ ' + esc(kid.name) + ' (' + cid + '번) 아동에게 문의를 붙이지 못했습니다.\n' + e.message
@@ -4374,13 +4434,9 @@ async function afterLogin(user) {
   NLDocs.init(sb, me.id);   // 평가보고서 창구 준비
   if (window.NLTrials) NLTrials.init(sb, me.id);   // 체험 수업 칸 준비
 
-  // 아동 이름표
-  const { data: kids, error: e2 } = await sb
-    .from('nl_children')
-    .select('id, name, birth, status, manager_no, phone, memo, memo_at, eval_summary, gender, guardian')
-    .order('name');
-  if (e2) { show('❌ 아동 목록 조회 실패\n' + e2.message, false); return; }
-  KIDS = kids || [];
+  // 아동 이름표 (1,000명씩 나눠 읽기 · 2026-11-21)
+  try { await loadKids(); }
+  catch (e2) { show('❌ 아동 목록 조회 실패\n' + e2.message, false); return; }
 
 
   // 문의 목록
@@ -4543,10 +4599,12 @@ $('ikPreBtn').onclick = async () => {
   if (!nm || !bd) { alert('아동 이름과 생년월일을 먼저 적어 주세요.'); return; }
   // 이미 등록된 아동을 골랐으면 새로 만들지 않고 질문지만
   if (ADD_KID) { const k = KIDS.find(x => x.id === ADD_KID); ikAfterAdd(ADD_KID, k); return; }
-  const hit = sameNamed(nm);
-  if (hit.length && !confirm('⚠️ 같은 이름이 이미 있습니다.\n\n'
-      + hit.map(k => '  · ' + k.name + ' (' + k.id + '번 · ' + k.status + ')').join('\n')
-      + '\n\n같은 아동이면 「취소」를 누르고 「이 아동 정보 넣기」를 누르세요.\n동명이인 새 아동이면 「확인」')) return;
+  try { await loadKids(); }
+  catch (e) { alert('아동 목록을 다시 읽지 못했습니다. 새로고침(F5) 뒤 다시 눌러 주세요.\n' + e.message); return; }
+  const hit = dupCands(nm, bd, $('k_phone').value);
+  if (hit.length && !confirm('⚠️ 같은 아동일 수 있는 아동이 이미 있습니다.\n\n'
+      + hit.map(k => '  · ' + k.id + '번 ' + k.name + ' · ' + wlBirth(k) + ' · ' + k.status).join('\n')
+      + '\n\n같은 아동이면 「취소」를 누르고 「이 아동 정보 넣기」를 누르세요.\n다른 아동(동명이인)이면 「확인」')) { drawDupWarn(); return; }
   PRE_SAVING = true; $('ikPreBtn').disabled = true;
   try {
     const { data, error } = await sb.from('nl_children').insert({

@@ -811,15 +811,21 @@ async function afterLogin(user) {
     NLIntake.init({ sb, me, kid: id => ALL.find(k => k.id === id) });
   }
 
-  // 2) 아동 불러오기
-  const { data, error } = await sb
-    .from('nl_children')
-    .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
-    .order('id');
+  // 2) 아동 불러오기 (1,000명씩 나눠 읽기 · 2026-11-21)
+  const data = [];
+  let error = null;
+  for (let f = 0; ; f += 1000) {
+    const r = await sb.from('nl_children')
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .order('id').range(f, f + 999);
+    if (r.error) { error = r.error; break; }
+    data.push(...(r.data || []));
+    if (!r.data || r.data.length < 1000) break;
+  }
 
   if (error) { show('❌ 아동 목록 조회 실패\n' + error.message, false); return; }
 
-  ALL = data || [];
+  ALL = data;
 
   // 2-1) 보호자 연락처 — 한 아동에 여럿일 수 있다 (1,000줄씩 나눠 가져온다)
   GUARD = {};
@@ -1143,8 +1149,10 @@ $('saveNew').onclick = async () => {
   if ($('f_phone').value.trim() && !telOk($('f_phone').value)) {
     show3('연락처 숫자 자리 수가 맞지 않습니다. (휴대폰 11자리 · 일반 전화 9~11자리)', false); return; }
 
-  // 같은 이름 + 같은 생년월일이 이미 있으면 막는다
-  const dup = ALL.find(c => (c.name || '') === name && (c.birth || '') === birth);
+  // 같은 이름 + 같은 생년월일이 이미 있으면 막는다 (띄어쓰기 무시 · 서버에서 다시 찾음 · 2026-11-21)
+  let dup = null;
+  try { dup = await sameKidOnServer(name, birth, null); }
+  catch (e) { show3('❌ 같은 아동이 있는지 확인하지 못했습니다. 새로고침(F5) 뒤 다시 눌러 주세요.\n' + e.message, false); return; }
   if (dup) {
     show3('⚠️ 같은 이름 · 같은 생년월일 아동이 이미 있습니다.\n번호 ' + dup.id +
           ' (' + (dup.manager_no || '관리번호 없음') + ')\n중복 등록이 아닌지 확인하세요.', false);
@@ -2692,10 +2700,30 @@ $('e_backList').onclick = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+// 서버에서 같은 이름(띄어쓰기 무시) · 같은 생년월일 아동 찾기 — 자기 자신(exceptId)은 뺌
+async function sameKidOnServer(name, birth, exceptId) {
+  if (!birth) return null;
+  const { data, error } = await sb.from('nl_children')
+    .select('id, manager_no, name, birth').eq('birth', birth);
+  if (error) throw error;
+  const t = String(name || '').replace(/\s/g, '');
+  return (data || []).find(c => c.id !== exceptId && String(c.name || '').replace(/\s/g, '') === t) || null;
+}
+
 $('saveEdit').onclick = async () => {
   if (!edId) return;
   const name = $('e_name').value.trim();
   if (!name) { show4('이름을 입력하세요.', false); return; }
+  // 이름 · 생년월일을 바꿔 다른 아동과 같아지면 묻는다 (2026-11-21)
+  const bef0 = ALL.find(x => x.id === edId);
+  const eb = $('e_birth').value || '';
+  if (bef0 && eb && (bef0.name !== name || String(bef0.birth || '') !== eb)) {
+    let d2 = null;
+    try { d2 = await sameKidOnServer(name, eb, edId); }
+    catch (e) { show4('❌ 같은 아동이 있는지 확인하지 못했습니다.\n' + e.message, false); return; }
+    if (d2 && !confirm('⚠️ 같은 이름 · 같은 생년월일 아동이 이미 있습니다.\n번호 ' + d2.id
+        + '\n\n같은 아동이면 「취소」를 누르세요.\n다른 아동(동명이인)이 맞으면 「확인」')) return;
+  }
   const badTel = GROWS.findIndex(g => String(g.phone || '').trim() && !telOk(g.phone));
   if (badTel >= 0) { show4((badTel + 1) + '번째 연락처 숫자 자리 수가 맞지 않습니다. (휴대폰 11자리 · 일반 전화 9~11자리)', false); return; }
 
