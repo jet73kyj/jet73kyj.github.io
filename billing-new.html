@@ -1905,6 +1905,8 @@ function drawAll() {
   const q = $('q').value.trim().toLowerCase();
   let list = CHILDREN.filter(c => {
     if (!q) return true;
+    // 숫자만 넣으면 아동 번호로만 찾는다 (2026-08-25 의도) — 메모 속 금액 · 승인번호 숫자에 걸리지 않게 (2026-11-21)
+    if (/^\d+$/.test(q)) return String(c.id) === q;
     if (String(c.id) === q) return true;               // 아동 번호로 찾기
     if ((c.name || '').toLowerCase().includes(q)) return true;
     if (payerOf(c.id).toLowerCase().includes(q)) return true;   // 입금자명으로도 찾기
