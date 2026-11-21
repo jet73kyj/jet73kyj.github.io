@@ -607,6 +607,13 @@
 <script src="nl-trials.js"></script>
 <script src="nl-intake.js"></script>
 <script>
+// 저장 결과 확인 (2026-11-21) — 표 잠금에 걸리면 오류 없이 0줄이 바뀌므로 돌려받은 줄 수를 본다
+async function rowsOk(q) {
+  const r = await q;
+  if (!r.error && !(r.data && r.data.length))
+    r.error = { message: '서버에서 바뀐 줄이 없습니다. 다른 곳에서 이미 바뀌었거나 로그인이 끊겼을 수 있습니다. 새로고침(F5) 뒤 다시 확인해 주세요.' };
+  return r;
+}
 
 // ===== 연락처 칸 (2026-10-08) — 숫자만 · 자리 수만큼 · 줄표 저절로 =====
 //   data-tel 이 붙은 칸 모두 (나중에 그려지는 칸도) · 신규 아동 관리와 같은 규칙
@@ -1473,9 +1480,9 @@ $('esSave').onclick = async () => {
   const v = $('esEdit').value.trim();
   $('esSave').disabled = true; $('esSave').textContent = '저장 중...';
   try {
-    const { error } = await sb.from('nl_children')
+    const { error } = await rowsOk(sb.from('nl_children')
       .update({ eval_summary: v || null, updated_at: new Date().toISOString() })
-      .eq('id', edId);
+      .eq('id', edId).select('id'));
     if (error) throw error;
     const c = ALL.find(x => x.id === edId);
     if (c) c.eval_summary = v || null;
@@ -1797,9 +1804,9 @@ function emRedraw() {
   if (t && $('emView').style.display !== 'none') $('emView').innerHTML = emLinesHtml(t);
 }
 async function emSaveText(v) {
-  const { error } = await sb.from('nl_children')
+  const { error } = await rowsOk(sb.from('nl_children')
     .update({ memo: v || null, memo_at: tdy(), updated_at: new Date().toISOString() })
-    .eq('id', edId);
+    .eq('id', edId).select('id'));
   if (error) throw error;
   const c = ALL.find(x => x.id === edId);
   if (c) { c.memo = v || null; c.memo_at = tdy(); }
@@ -1813,9 +1820,9 @@ $('emSave').onclick = async () => {
   $('emSave').disabled = true;
   $('emSave').textContent = '저장 중...';
   try {
-    const { error } = await sb.from('nl_children')
+    const { error } = await rowsOk(sb.from('nl_children')
       .update({ memo: v || null, memo_at: tdy(), updated_at: new Date().toISOString() })
-      .eq('id', edId);
+      .eq('id', edId).select('id'));
     if (error) throw error;
     const c = ALL.find(x => x.id === edId);
     if (c) { c.memo = v || null; c.memo_at = tdy(); }
@@ -1956,7 +1963,7 @@ $('cnRows').addEventListener('click', async ev => {
   }
   if (b.classList.contains('cnDel')) {
     if (!confirm('이 상담 메모를 지울까요?')) return;
-    const { error } = await sb.from('nl_child_notes').delete().eq('id', id);
+    const { error } = await rowsOk(sb.from('nl_child_notes').delete().eq('id', id).select('id'));
     if (error) { cnSay('❌ 지우지 못했습니다: ' + error.message, false); return; }
     await loadNotes(edId); loadProgress();
     cnSay('✅ 지웠습니다.', true);

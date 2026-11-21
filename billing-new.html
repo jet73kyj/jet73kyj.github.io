@@ -542,6 +542,13 @@
 <script src="nl-login.js"></script>
 <script src="nl-live-alert.js"></script>
 <script>
+// 저장 결과 확인 (2026-11-21) — 표 잠금에 걸리면 오류 없이 0줄이 바뀌므로 돌려받은 줄 수를 본다
+async function rowsOk(q) {
+  const r = await q;
+  if (!r.error && !(r.data && r.data.length))
+    r.error = { message: '서버에서 바뀐 줄이 없습니다. 다른 곳에서 이미 바뀌었거나 로그인이 끊겼을 수 있습니다. 새로고침(F5) 뒤 다시 확인해 주세요.' };
+  return r;
+}
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
 
@@ -3060,9 +3067,9 @@ async function saveWeeks(box) {
     const before = (WKWAS[sid] || [true, true, true, true]);
     if (on.every((v, i) => v === before[i])) continue;   // 안 바뀌었으면 건너뛴다
 
-    const { error } = await sb.from('nl_therapy_schedules')
+    const { error } = await rowsOk(sb.from('nl_therapy_schedules')
       .update({ week1: on[0], week2: on[1], week3: on[2], week4: on[3] })
-      .eq('id', sid);
+      .eq('id', sid).select('id'));
     if (error) throw error;
     WKWAS[sid] = on.slice();
     chg++;
@@ -3473,7 +3480,7 @@ async function markTrialPaid(childId, rows, st, kind){
       if (tr.paid_on && !v.paid_on) upd.paid_on = tr.paid_on;
       if (v.status !== '완료' && String(v.lesson_date) <= td) { upd.status = '완료'; nDone++; }
       if (!Object.keys(upd).length) continue;
-      const { error: e2 } = await sb.from('nl_trial_lessons').update(upd).eq('id', v.id);
+      const { error: e2 } = await rowsOk(sb.from('nl_trial_lessons').update(upd).eq('id', v.id).select('id'));
       if (e2) return '\n⚠️ ' + lbl + ' 상태는 바꾸지 못했습니다. ' + e2.message;
     }
     return nDone ? '\n' + lbl + ' ' + nDone + '건을 「완료」로 바꿨습니다.' : '';
@@ -3719,8 +3726,8 @@ async function markNoMakeup(btn) {
 
   // 예정 줄을 골랐으면 결석으로도 바꾼다 (사유를 다 받은 뒤에)
   if (pick.s === '예정' || pick.s === '완료') {
-    const up = await sb.from('nl_sessions')
-      .update({ status: '결석' }).eq('id', pick.id);
+    const up = await rowsOk(sb.from('nl_sessions')
+      .update({ status: '결석' }).eq('id', pick.id).select('id'));
     if (up.error) { alert('바꾸지 못했습니다.\n' + up.error.message); return; }
   }
 
@@ -4062,7 +4069,7 @@ async function saveDurOne(kid, cid, x, nv, dur0, th, sched, bst, fixed) {
         if (!cr || !cr.length) throw new Error('이월이 저장되지 않았습니다.');
         CARRYOUT[x.id] = Object.assign({}, old || {}, cr[0], { session_id: x.id });
       } else if (old) {
-        const { error: eD } = await sb.from('nl_carry').delete().eq('id', old.id);
+        const { error: eD } = await rowsOk(sb.from('nl_carry').delete().eq('id', old.id).select('id'));
         if (eD) throw eD;
         delete CARRYOUT[x.id];
       }

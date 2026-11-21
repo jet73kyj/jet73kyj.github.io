@@ -890,6 +890,13 @@
 <script src="nl-intake.js"></script>
 <script src="nl-sensechk.js?v=1112d"></script>
 <script>
+// 저장 결과 확인 (2026-11-21) — 표 잠금에 걸리면 오류 없이 0줄이 바뀌므로 돌려받은 줄 수를 본다
+async function rowsOk(q) {
+  const r = await q;
+  if (!r.error && !(r.data && r.data.length))
+    r.error = { message: '서버에서 바뀐 줄이 없습니다. 다른 곳에서 이미 바뀌었거나 로그인이 끊겼을 수 있습니다. 새로고침(F5) 뒤 다시 확인해 주세요.' };
+  return r;
+}
 const URL_ = 'https://mrezaqgfyvgdtukzkidb.supabase.co';
 const KEY_ = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yZXphcWdmeXZnZHR1a3praWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjMxNjEsImV4cCI6MjA5NzI5OTE2MX0.xNWlRG9XajOg4cE6SgeVne8kFiO8ZiQCatJHRymT6nc';
 
@@ -1073,9 +1080,9 @@ async function kidToActive(cid) {
   if (k.status === '치료중') return;          // 이미 치료중이면 묻지 않는다
   if (!confirm(k.name + ' 아동은 아직 「' + (k.status || '미지정') + '」 입니다.\n\n'
     + '아동 상태도 「치료중」으로 바꿀까요?')) return;
-  const { error } = await sb.from('nl_children')
+  const { error } = await rowsOk(sb.from('nl_children')
     .update({ status: '치료중', updated_at: new Date().toISOString() })
-    .eq('id', cid);
+    .eq('id', cid).select('id'));
   if (error) { alert('⚠️ 아동 상태를 바꾸지 못했습니다.\n' + error.message); return; }
   k.status = '치료중';
 }
@@ -1316,8 +1323,8 @@ async function openDetail(id) {
   const g  = gs[gs.length - 1];
   if (r.eval_date && g && g.items.every(e => e.status === '완료')
       && (new Date() - new Date(g.last + 'T00:00:00')) / 86400000 > 31) {
-    const { error: ec } = await sb.from('nl_inquiries')
-      .update({ eval_date: null }).eq('id', id);
+    const { error: ec } = await rowsOk(sb.from('nl_inquiries')
+      .update({ eval_date: null }).eq('id', id).select('id'));
     if (!ec) { r.eval_date = null; $('d_evaldate').value = ''; }
   }
 
@@ -2162,9 +2169,9 @@ $('dsumSave').onclick = async () => {
   $('dsumSave').disabled = true;
   $('dsumSave').textContent = '저장 중...';
   try {
-    const { error } = await sb.from('nl_children')
+    const { error } = await rowsOk(sb.from('nl_children')
       .update({ eval_summary: v || null, updated_at: new Date().toISOString() })
-      .eq('id', r.child_id);
+      .eq('id', r.child_id).select('id'));
     if (error) throw error;
     const kk = KIDS.find(k => k.id === r.child_id);
     if (kk) kk.eval_summary = v || null;
@@ -2214,9 +2221,9 @@ $('saveDet').onclick = async () => {
     // 아동 메모가 바뀌었으면 아동 표에도 저장한다
     const km = $('d_kmemo').value.trim();
     if (km !== ($('d_kmemo').dataset.orig || '')) {
-      const { error: ek } = await sb.from('nl_children')
+      const { error: ek } = await rowsOk(sb.from('nl_children')
         .update({ memo: km || null, updated_at: new Date().toISOString() })
-        .eq('id', data.child_id);
+        .eq('id', data.child_id).select('id'));
       if (ek) throw new Error('아동 메모 저장 실패: ' + ek.message);
       const kk = KIDS.find(k => k.id === data.child_id);
       if (kk) kk.memo = km || null;
@@ -2320,7 +2327,7 @@ $('addLog').onclick = async () => {
     };
     let error;
     if (editId) {
-      ({ error } = await sb.from('nl_inquiry_logs').update(row).eq('id', editId));
+      ({ error } = await rowsOk(sb.from('nl_inquiry_logs').update(row).eq('id', editId).select('id')));
     } else {
       row.inquiry_id = openId;
       row.staff_id   = ME ? ME.id : null;
@@ -3082,8 +3089,8 @@ async function wlMarkDone(id, btn) {
       + '줄은 지우지 않고 「배정됨」 갈래에 남습니다.')) return;
   btn.disabled = true; btn.textContent = '바꾸는 중…';
   const td = today();
-  const { error } = await sb.from('nl_waitlist')
-    .update({ status: '배정됨', last_contact: td }).eq('id', id);
+  const { error } = await rowsOk(sb.from('nl_waitlist')
+    .update({ status: '배정됨', last_contact: td }).eq('id', id).select('id'));
   if (error) {
     alert('바꾸지 못했습니다.\n' + error.message);
     btn.disabled = false; btn.textContent = '✓ 배정';
@@ -3262,7 +3269,7 @@ $('w_del').onclick = async () => {
   const w = WL.find(x => x.id === wlEditId);
   const k = w ? KIDS.find(x => x.id === w.child_id) : null;
   if (!confirm((k ? k.name + ' 아동' : '이 아동') + ' 을 대기 명단에서 뺍니다.\n계속할까요?')) return;
-  const { error } = await sb.from('nl_waitlist').delete().eq('id', wlEditId);
+  const { error } = await rowsOk(sb.from('nl_waitlist').delete().eq('id', wlEditId).select('id'));
   if (error) { wlmsg('❌ 빼지 못했습니다.\n' + error.message, false); return; }
   await loadWl(); drawWl(); clearWlForm();
   wlmsg('✅ 대기 명단에서 뺐습니다.', true);
@@ -3924,7 +3931,7 @@ $('evSave').onclick = async () => {
   $('evSave').disabled = true;
   try {
     let res;
-    if (evEditId) res = await sb.from('nl_evaluations').update(row).eq('id', evEditId);
+    if (evEditId) res = await rowsOk(sb.from('nl_evaluations').update(row).eq('id', evEditId).select('id'));
     else          res = await sb.from('nl_evaluations').insert(row);
     if (res.error) throw res.error;
 
