@@ -287,7 +287,10 @@
           <div style="display:flex;gap:5px;">
             <input type="text" id="f_school" placeholder="○○초등학교" style="flex:2;">
             <input type="text" id="f_grade" placeholder="3학년" style="flex:1;">
+            <input type="text" id="f_class" placeholder="반" style="flex:0.7;">
+            <input type="text" id="f_no" placeholder="번호" style="flex:0.7;">
           </div>
+          <div id="schNote" class="no-print" style="display:none;margin-top:4px;padding:4px 8px;background:#fff6d6;border:1px solid #f0d77a;border-radius:6px;font-size:12px;color:#7a5b00;line-height:1.5;"></div>
         </td>
       </tr>
       <tr>
@@ -502,7 +505,7 @@ async function afterLogin(user) {
     sb.from('nl_therapists').select('id, name, gender'),
     sb.from('nl_support_types').select('id, name'),
     sb.from('nl_therapies')
-      .select('id, child_id, therapy_type_id, support_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status, disability, school, grade_year, gender), nl_therapy_schedules(therapist_id, to_month)')
+      .select('id, child_id, therapy_type_id, support_type_id, ended_on, nl_children!inner(id, name, birth, manager_no, status, disability, school, grade_year, school_class, school_no, edu_year, gender), nl_therapy_schedules(therapist_id, to_month)')
       .in('support_type_id', SUPPORTS)
   ]);
   (th.data || []).forEach(t => { THERAPISTS[t.id] = t.name; THGENDER[t.id] = t.gender || ''; });
@@ -956,6 +959,47 @@ function _timeText() {
   return s + '-' + h + ':' + String(m).padStart(2,'0');
 }
 
+// ── 학교·학년·반·번호 (2026-11-22) ──
+function eduYearOf(y, m) { return m >= 3 ? y : y - 1; }
+function eduYearOfMk(mk) {
+  const y = parseInt(String(mk || '').slice(0, 4), 10), m = parseInt(String(mk || '').slice(5, 7), 10);
+  return (y && m) ? eduYearOf(y, m) : null;
+}
+function fillSchool(saved, c, year, month) {
+  const ey = eduYearOf(Number(year), Number(month));
+  let v = null;
+  if (saved) {
+    v = { s: saved.school_text, g: saved.grade_text, c: saved.class_text, n: saved.no_text };
+  } else if (c && Number(c.edu_year) === ey) {
+    v = { s: c.school, g: c.grade_year, c: c.school_class, n: c.school_no };
+  } else if (PREV && eduYearOfMk(PREV.month_key) === ey) {
+    v = { s: PREV.school_text, g: PREV.grade_text, c: PREV.class_text, n: PREV.no_text };
+  }
+  v = v || {};
+  $('f_school').value = v.s || '';
+  $('f_grade').value  = v.g || '';
+  $('f_class').value  = v.c || '';
+  $('f_no').value     = v.n || '';
+  const note = $('schNote');
+  if (!v.s && !v.g) {
+    note.textContent = ey + '학년도 학교 정보가 아직 없습니다. 학부모 입력을 기다리거나 직접 적어 주세요.';
+    note.style.display = '';
+  } else {
+    note.style.display = 'none';
+  }
+}
+['f_school', 'f_grade', 'f_class', 'f_no'].forEach(id => $(id).addEventListener('input', () => {
+  if ($('f_school').value.trim() || $('f_grade').value.trim()) $('schNote').style.display = 'none';
+  if (typeof drawTT === 'function' && cur) drawTT();
+}));
+function schoolLine() {
+  const t = id => $(id).value.trim();
+  const cls = t('f_class'), no = t('f_no');
+  return [t('f_school'), t('f_grade'),
+          cls ? (/^\d+$/.test(cls) ? cls + '반' : cls) : '',
+          no  ? (/^\d+$/.test(no)  ? no  + '번' : no)  : ''].filter(Boolean).join(' ');
+}
+
 function drawAll(saved) {
   const c = cur.child;
   const areaName = TTYPE[cur.therapy_type_id] || '';
@@ -969,8 +1013,9 @@ function drawAll(saved) {
   const pick = k => (saved && saved[k]) || (PREV && PREV[k]) || '';
   $('f_disab').value  = pick('disability_text');
   $('f_opinion').value = pick('month_summary') || '';
-  $('f_school').value = pick('school_text') || c.school || '';
-  $('f_grade').value  = pick('grade_text')  || c.grade_year || '';
+  // 학교·학년·반·번호 — 이 기록지의 학년도(3월~다음 해 2월) 것만 (2026-11-22)
+  //   이번 달 저장분 → 아동 정보(같은 학년도) → 같은 학년도 지난 기록 → 빈칸
+  fillSchool(saved, c, year, month);
   $('f_fine').value   = pick('level_fine');
   $('f_cog').value    = pick('level_cog');
   $('f_goalL').value  = pick('goal_long');
@@ -1047,7 +1092,7 @@ function drawTT() {
     }
     cells += '</tr>';
   }
-  const school = [$('f_school').value.trim(), $('f_grade').value.trim()].filter(Boolean).join(' ');
+  const school = schoolLine();
   const area = (SUPNAME[cur.support_type_id] || '');
   box.innerHTML =
       '<h2 class="title">특수교육대상자 치료지원 시간표 ( ' + month + ' 월)</h2>'
@@ -1154,7 +1199,7 @@ function drawPc() {
     + (PCERR ? '<div class="no-print" style="color:#c62828;font-size:12px;margin-bottom:6px;">결제 변경 줄을 읽지 못했습니다.</div>' : '')
     + '<table class="rec-tbl"><colgroup><col style="width:16%"><col style="width:34%"><col style="width:16%"><col style="width:34%"></colgroup>'
     + '<tr><td class="lbl">학생명</td><td>' + esc(c.name || '') + '</td><td class="lbl">치료영역</td><td class="pc-area" style="text-align:center;">' + area + '</td></tr>'
-    + '<tr><td class="lbl">학교명</td><td>' + esc($('f_school').value.trim() || c.school || '') + '</td><td class="lbl">치료사명</td><td>' + esc(schedThNames(id => THERAPISTS[id] || '')) + '</td></tr>'
+    + '<tr><td class="lbl">학교명</td><td>' + esc($('f_school').value.trim()) + '</td><td class="lbl">치료사명</td><td>' + esc(schedThNames(id => THERAPISTS[id] || '')) + '</td></tr>'
     + '<tr><td class="lbl">수강 요일</td><td>' + esc(days) + '</td><td class="lbl">수강 시간</td><td>' + esc(times) + '</td></tr></table>'
     + '<table class="rec-tbl pc-tbl" style="margin-top:-1px;"><colgroup><col style="width:7%"><col style="width:17%"><col style="width:56%"><col style="width:20%"></colgroup>'
     + '<tr><th>연번</th><th>변경 사항</th><th>변경 내용</th><th>보호자 서명</th></tr>' + rows + '</table>'
@@ -1413,6 +1458,8 @@ async function saveRecord() {
       level_cog:  $('f_cog').value   || null,
       school_text: $('f_school').value || null,
       grade_text:  $('f_grade').value  || null,
+      class_text:  $('f_class').value.trim() || null,
+      no_text:     $('f_no').value.trim()    || null,
       disability_text: $('f_disab').value || null,
       continue_yn: CONT || null,
       month_summary: $('f_opinion').value || null,
@@ -1467,14 +1514,7 @@ async function saveRecord() {
       throw new Error('저장하지 못해 전에 적은 내용으로 되돌렸습니다.\n' + ins.error.message);
     }
 
-    // 학교·학년을 아동 표에도 남긴다 (다음부터 자동으로 채워짐)
-    const sc = $('f_school').value.trim(), gy = $('f_grade').value.trim();
-    if (sc || gy) {
-      await sb.from('nl_children')
-        .update({ school: sc || null, grade_year: gy || null })
-        .eq('id', cur.child.id);
-      cur.child.school = sc; cur.child.grade_year = gy;
-    }
+    // 학교·학년은 아동 표에 되쓰지 않는다 — 학부모 · 아동 목록에서만 고친다 (2026-11-22)
 
     ITEMS = items;
     // 저장 알림 창은 뺐다 — 단추 모양이 알려 준다 (2026-09-16)
