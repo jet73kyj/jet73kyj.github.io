@@ -142,6 +142,15 @@
             background:#4a7c59; color:#fff; font-size:14px; font-weight:700;
             cursor:pointer; width:100%; }
   .fixbtn.gray { background:#fff; border:1px solid #cfd8cc; color:#7d8479; }
+  /* 새 학년 학교 정보 창 (2026-11-22) */
+  .schkid { border:1px solid #ECE8E3; border-radius:10px; padding:12px; margin-top:12px; }
+  .schname { font-weight:700; color:#2e3d2c; margin-bottom:6px; }
+  .schkid label { display:block; font-size:12.5px; color:#7d8479; margin:8px 0 4px; }
+  .schkid input, .schkid select { width:100%; box-sizing:border-box; padding:10px; font-size:15px;
+            border:1px solid #cfd8cc; border-radius:8px; background:#fff; }
+  .schrow { display:flex; gap:8px; }
+  .schrow > div { flex:1; }
+  .schmsg { color:#c62828; font-size:13px; margin-top:10px; min-height:1em; }
 
   /* 수업 안내 창 */
   .plbody { max-height:52vh; overflow:auto; }
@@ -862,6 +871,94 @@ async function afterLogin() {
   } catch (e) {}
 
   try { await showPlan(); } catch (e) {}
+  try { await showSchool(); } catch (e) {}
+}
+
+// ── 새 학년 학교 정보 창 (2026-11-22) ─────────────────────
+// 2월 15일 ~ 말일, 치료지원 수업 아이 중 올해 아직 안 적은 아이만 (서버가 고름)
+// 다른 창(중요 공지 · 수업 안내 · 알림 동의)이 모두 닫힌 뒤에 뜬다
+// 시험: 주소 끝에 ?schooltest=2027-02-20 (띄울지만 정함 · 저장은 그대로)
+let SCH_SHOWN = false;
+function otherPopOpen() {
+  return !!document.querySelector('.popwrap, .imgwrap, body > div[style*="z-index:100000"]');
+}
+function waitPopClear() {
+  return new Promise(res => {
+    let n = 0;
+    const tick = () => {
+      if (!otherPopOpen() || n > 600) return res();
+      n++; setTimeout(tick, 500);
+    };
+    setTimeout(tick, 2000);   // 알림 동의 창이 뜰 틈을 준다
+  });
+}
+async function showSchool() {
+  if (SCH_SHOWN) return;
+  SCH_SHOWN = true;
+  const tdate = new URLSearchParams(location.search).get('schooltest');
+  const arg = /^\d{4}-\d{2}-\d{2}$/.test(tdate || '') ? { p_date: tdate } : {};
+  const { data: list, error } = await sb.rpc('nl_parent_school_need', arg);
+  if (error || !list || !list.length) return;
+  await waitPopClear();
+
+  const GR = ['유치원', '1학년', '2학년', '3학년', '4학년', '5학년', '6학년'];
+  let body = '';
+  list.forEach(k => {
+    body += '<div class="schkid" data-cid="' + Number(k.child_id) + '">'
+      + '<div class="schname">' + esc(k.name) + '</div>'
+      + '<label>학교(유치원)</label>'
+      + '<input type="text" class="schs" maxlength="40" placeholder="○○초등학교" value="' + esc(k.school || '').replace(/"/g, '&quot;') + '">'
+      + '<div class="schrow"><div><label>학년</label>'
+      + '<select class="schg"><option value="">— 고르세요 —</option>'
+      + GR.map(g => '<option value="' + g + '">' + g + '</option>').join('')
+      + '</select></div>'
+      + '<div><label>반</label>'
+      + '<input type="text" class="schc" maxlength="10" placeholder="예: 2반"></div>'
+      + '<div><label>번호</label>'
+      + '<input type="text" class="schn" maxlength="10" placeholder="예: 5번"></div></div>'
+      + '</div>';
+  });
+  const w = document.createElement('div');
+  w.className = 'popwrap';
+  w.innerHTML =
+      '<div class="popbox">'
+    + '<div class="poptag">새 학년 안내</div>'
+    + '<div class="popbody">교육청 치료지원 서류에 들어가는 내용입니다.\n3월부터\n학교(유치원), 학년, 반, 번호 기재 부탁드려요</div>'
+    + body
+    + '<div class="schmsg" id="schMsg"></div>'
+    + '<button class="fixbtn" id="schOk">저장</button>'
+    + '<button class="fixbtn gray" id="schLater">나중에</button>'
+    + '</div>';
+  document.body.appendChild(w);
+
+  $('schLater').onclick = () => w.remove();
+  $('schOk').onclick = async () => {
+    const b = $('schOk'), msg = $('schMsg');
+    msg.textContent = '';
+    const rows = [...w.querySelectorAll('.schkid')].map(d => ({
+      id: Number(d.dataset.cid),
+      nm: d.querySelector('.schname').textContent,
+      s: d.querySelector('.schs').value.trim(),
+      g: d.querySelector('.schg').value,
+      c: d.querySelector('.schc').value.trim(),
+      n: d.querySelector('.schn').value.trim()
+    }));
+    const bad = rows.find(r => !r.s || !r.g);
+    if (bad) { msg.textContent = bad.nm + ' — 학교와 학년을 적어 주세요'; return; }
+    b.disabled = true; b.textContent = '저장하는 중...';
+    for (const r of rows) {
+      const { error: e2 } = await sb.rpc('nl_parent_school_save',
+        { p_child: r.id, p_school: r.s, p_grade: r.g, p_class: r.c, p_no: r.n });
+      if (e2) {
+        msg.textContent = r.nm + ' — 저장하지 못했습니다. ' + (e2.message || '');
+        b.disabled = false; b.textContent = '저장';
+        return;
+      }
+      w.querySelector('.schkid[data-cid="' + r.id + '"]').remove();
+    }
+    w.remove();
+    alert('저장했습니다. 고맙습니다.');
+  };
 }
 
 // ── 다음 달 수업 안내 창 ───────────────────────────────
