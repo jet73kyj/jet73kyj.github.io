@@ -330,6 +330,10 @@
         <label for="f_grade">학년</label>
         <input id="f_grade" type="text">
       </div>
+      <div>
+        <label for="f_cls">반 · 번호</label>
+        <div style="display:flex;gap:6px;"><input id="f_cls" type="text" placeholder="반"><input id="f_sno" type="text" placeholder="번호"></div>
+      </div>
       <div style="grid-column:1 / -1;">
         <label for="f_memo">메모</label>
         <textarea id="f_memo" rows="6" style="font:inherit;font-size:14px;padding:9px 11px;width:100%;box-sizing:border-box;resize:vertical;line-height:1.6;"></textarea>
@@ -450,6 +454,10 @@
           <div>
             <label for="e_grade">학년</label>
             <input id="e_grade" type="text">
+          </div>
+          <div>
+            <label for="e_cls">반 · 번호</label>
+            <div style="display:flex;gap:6px;"><input id="e_cls" type="text" placeholder="반"><input id="e_sno" type="text" placeholder="번호"></div>
           </div>
           <input id="e_phone" type="hidden">
           <input id="e_guardian" type="hidden">
@@ -823,7 +831,7 @@ async function afterLogin(user) {
   let error = null;
   for (let f = 0; ; f += 1000) {
     const r = await sb.from('nl_children')
-      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year, school_class, school_no, edu_year')
       .order('id').range(f, f + 999);
     if (r.error) { error = r.error; break; }
     data.push(...(r.data || []));
@@ -1113,9 +1121,26 @@ document.addEventListener('click', function (e) {
   }
 });
 
+// ── 학교 정보의 학년도 (3월~다음 해 2월) · 2월이면 묻는다 (2026-11-22) ──
+function staffEduYear() {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric' })
+    .formatToParts(new Date());
+  const y = Number(p.find(x => x.type === 'year').value), m = Number(p.find(x => x.type === 'month').value);
+  if (m >= 3) return y;
+  if (m === 1) return y - 1;
+  return confirm('지금 적은 학교·학년이 3월부터 쓸 새 학년인가요?\n\n확인 = 3월부터 새 학년 (' + y + '학년도)\n취소 = 지금 다니는 학년 (' + (y - 1) + '학년도)')
+    ? y : y - 1;
+}
+function schLine(c) {
+  const cl = String(c.school_class || '').trim(), no = String(c.school_no || '').trim();
+  return [c.school, c.grade_year,
+          cl ? (/^\d+$/.test(cl) ? cl + '반' : cl) : '',
+          no ? (/^\d+$/.test(no) ? no + '번' : no) : ''].filter(Boolean).join(' ');
+}
+
 function clearForm() {
   ['f_name','f_birth','f_phone','f_guardian','f_diagnosis','f_disability',
-   'f_school','f_grade','f_memo']
+   'f_school','f_grade','f_cls','f_sno','f_memo']
     .forEach(k => $(k).value = '');
   $('f_gender').value = '';
   $('f_status').value = '대기중';
@@ -1176,10 +1201,14 @@ $('saveNew').onclick = async () => {
     guardian:   $('f_guardian').value.trim() || null,
     diagnosis:  $('f_diagnosis').value.trim() || null,
     disability: $('f_disability').value.trim() || null,
-    school:     $('f_school').value.trim() || null,
-    grade_year: $('f_grade').value.trim() || null,
+    school:       $('f_school').value.trim() || null,
+    grade_year:   $('f_grade').value.trim() || null,
+    school_class: $('f_cls').value.trim() || null,
+    school_no:    $('f_sno').value.trim() || null,
     memo:       $('f_memo').value.trim() || null
   };
+  // 학교 정보가 있으면 어느 학년도 것인지 함께 (2026-11-22)
+  if (row.school || row.grade_year || row.school_class || row.school_no) row.edu_year = staffEduYear();
 
   // ── 수업 줄 모으기 ──
   const lsns = [];
@@ -1217,7 +1246,7 @@ $('saveNew').onclick = async () => {
   try {
     const { data, error } = await sb.from('nl_children')
       .insert(row)
-      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year, school_class, school_no, edu_year')
       .single();
     if (error) throw error;
     made = data;
@@ -1375,6 +1404,8 @@ function openEdit(id) {
   $('e_disability').value = c.disability || '';
   $('e_school').value     = c.school || '';
   $('e_grade').value      = c.grade_year || '';
+  $('e_cls').value        = c.school_class || '';
+  $('e_sno').value        = c.school_no || '';
   emShow(c.memo || '', c.memo_at || null);
   if (window.NLIntake && $('ikList')) NLIntake.load(c.id);   // 초기 상담지
 
@@ -1420,7 +1451,7 @@ function drawBasic(c) {
     + (ageOf(c.birth) ? ' <span style="color:#2e7d32;font-weight:700;">' + ageOf(c.birth) + '</span>' : '')
     + ' · ' + esc(c.gender || '성별 없음') + ' · ' + esc(c.status || '')
     + (c.diagnosis ? ' · ' + esc(c.diagnosis) : '')
-    + (c.school ? ' · ' + esc(c.school) + (c.grade_year ? ' ' + esc(c.grade_year) : '') : '')
+    + (c.school ? ' · ' + esc(schLine(c)) : '')
     + '<br><span style="color:#5a6156;">' + tel + '</span>'
     + '<div id="e_mob" style="color:#5a6156; margin-top:4px;">📱 학부모 계정 — 보는 중...</div>'
     + (cmodeTxt(c.id) ? '<div style="margin-top:2px;">회기방식 ' + cmodeTxt(c.id) + '</div>' : '');
@@ -2750,18 +2781,27 @@ $('saveEdit').onclick = async () => {
     guardian:   ((GROWS.find(g => String(g.phone || '').trim()) || {}).name || '').trim() || null,
     diagnosis:  $('e_diagnosis').value.trim() || null,
     disability: $('e_disability').value.trim() || null,
-    school:     $('e_school').value.trim() || null,
-    grade_year: $('e_grade').value.trim() || null,
     memo:       $('e_memo').value.trim() || null,
     updated_at: new Date().toISOString()
   };
+  // 학교·학년·반·번호는 바뀌었을 때만 보낸다 — 옛 화면 값으로 학부모가 적은 새 학년을 덮지 않게 (2026-11-22)
+  const sch = {
+    school:       $('e_school').value.trim() || null,
+    grade_year:   $('e_grade').value.trim() || null,
+    school_class: $('e_cls').value.trim() || null,
+    school_no:    $('e_sno').value.trim() || null
+  };
+  if (before && Object.keys(sch).some(k => (sch[k] || '') !== String(before[k] || '').trim())) {
+    Object.assign(up, sch);
+    up.edu_year = (sch.school || sch.grade_year || sch.school_class || sch.school_no) ? staffEduYear() : null;
+  }
 
   $('saveEdit').disabled = true;
   $('saveEdit').textContent = '저장 중...';
   try {
     const { data, error } = await sb.from('nl_children')
       .update(up).eq('id', edId)
-      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year')
+      .select('id, manager_no, name, birth, gender, status, memo, memo_at, eval_summary, phone, guardian, diagnosis, disability, school, grade_year, school_class, school_no, edu_year')
       .single();
     if (error) throw error;
 
