@@ -3584,7 +3584,7 @@ function drawFind(){
     const _wds = _uniq(_gr.map(x => x.weekday));
     const _whenTxt = (_wds.length > 1)
       ? _uniq(_gr.map(x => x.weekday + ' ' + h12(String(x.start_time || '').slice(0, 5)))).join(' → ')
-      : (_hms.length > 1) ? _hms.map(h12).join('→') : h12(sl.hm);
+      : (_hms.length > 1) ? _hms.map(h12).join('→') : h12(String(r.start_time || sl.hm).slice(0, 5));   // 교시가 아닌 실제 시각 (2026-11-23 · 143번 4:50→5:00)
     const _thTxt = _uniq(_gr.map(x => {
       const t2 = THS_ALL.find(t => t.id === x.therapist_id);
       return t2 ? t2.id + '번 ' + (t2.name || '') : '';
@@ -7639,8 +7639,19 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
           + '\n보강을 새 요일로 옮기거나 지운 뒤 정리해 주세요.'
         : ''), true);
 
+    // 옛 줄이 변경 시작일부터 시작했으면 (아직 한 번도 안 쓴 줄) 끝날이 시작일보다 앞이 된다 — 딸린 회기가 없으면 지운다 (2026-11-23 · 143번)
+    let _oldGone = false;
+    if (newFrom && edRow.from_date && String(edRow.from_date) >= String(newFrom)) {
+      const { count: _oc } = await sb.from('nl_sessions')
+        .select('id', { count: 'exact', head: true }).eq('schedule_id', edRow.id);
+      if (!_oc) {
+        const { error: _de } = await sb.from('nl_therapy_schedules').delete().eq('id', edRow.id);
+        if (!_de) _oldGone = true;
+      }
+    }
     const old = ROWS_ALL.find(x => x.id === edRow.id);
     if (old) Object.assign(old, oldUpd);
+    if (_oldGone) for (let i = ROWS_ALL.length - 1; i >= 0; i--) if (ROWS_ALL[i].id === edRow.id) ROWS_ALL.splice(i, 1);
     // 되살려 쓴 줄이면 이미 목록에 있으므로 먼저 빼고 다시 넣는다
     for (let i = ROWS_ALL.length - 1; i >= 0; i--) {
       if (ROWS_ALL[i].id === ns.id) ROWS_ALL.splice(i, 1);
