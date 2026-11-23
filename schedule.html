@@ -7081,6 +7081,16 @@ $('edSave').onclick = async () => {
         return;
       }
     }
+    {
+      const _ov = await edOvlPre(nw, newHm, du, th, edFromDay(applyD));
+      if (_ov) {
+        alert('❌ 바꿀 수 없습니다 — 그 시간에 다른 수업이 있습니다.\n\n'
+          + _ov + '\n\n'
+          + nw + '요일 ' + h12(newHm) + ' 으로 옮기려면 겹치는 수업을 먼저 정리하거나 다른 시각을 골라 주세요.\n'
+          + '(저장하지 않았습니다 · 시간표는 그대로입니다)');
+        return;
+      }
+    }
     if (!confirm('요일·시간이 바뀝니다.\n\n'
       + '· ' + oldWd + '요일 ' + h12(oldHm) + '  →  ' + nw + '요일 ' + h12(newHm) + '\n\n'
       + (applyD
@@ -7103,6 +7113,14 @@ $('edSave').onclick = async () => {
   //   지난 기록은 옛 선생님 줄에 남고, 그날부터의 수업·옛 선생님 보강은 새 선생님이 맡는다
   //   묻지 않는다
   if (Number(th) !== Number(edRow.therapist_id)) {
+    {
+      const _ov = await edOvlPre(nw, newHm, du, th, edFromDay(applyD));
+      if (_ov) {
+        alert('❌ 담당을 바꿀 수 없습니다 — 새 선생님 그 시간에 다른 수업이 있습니다.\n\n'
+          + _ov + '\n\n(저장하지 않았습니다 · 시간표는 그대로입니다)');
+        return;
+      }
+    }
     const scId1 = edRow.id;
     const ok = await changeTherapistFrom(th, du, applyD);
     if (ok === true) await applySplit(scId1, wantSp);
@@ -7214,11 +7232,57 @@ $('edSave').onclick = async () => {
     edmsg('❌ 옮기지 못했습니다.\n' + e.message, false);
     // 창 아래 빨간 글은 눈에 잘 안 띄어 알림 창으로도 띄운다 (2026-11-23 · 186번)
     alert('❌ 옮기지 못했습니다.\n\n' + e.message + '\n\n(F5 로 새로고침한 뒤 시간표를 다시 확인해 주세요)');
-    alert('❌ 저장하지 못했습니다.\n\n' + e.message);
   } finally {
     $('edSave').disabled = false; $('edSave').textContent = '저장';
   }
 };
+
+// ===== 바꾸기 전 겹침 미리 보기 (2026-11-23 · 186번) =====
+//   서버(trg_g_sched_ovl)가 막을 겹침을 저장 전에 찾아, 언제부터 · 어느 아동 수업과 겹치는지 알려 준다
+//   같은 선생님 또는 같은 아동 · 같은 요일 · 시간 걸침 · 변경 시작일 뒤에도 살아 있는 줄 · 주차 하나라도 같음
+//   같은 수업 · 같은 그룹반은 뺀다. 읽지 못하면 그냥 넘어간다 (서버가 한 번 더 막음)
+async function edOvlPre(nw, hm, du, th, fromD){
+  try {
+    const { data: sc, error } = await sb.from('nl_therapy_schedules')
+      .select('id, therapy_id, weekday, start_time, duration, therapist_id, from_date, to_date, week1, week2, week3, week4')
+      .eq('weekday', nw).neq('id', edRow.id)
+      .or('to_date.is.null,to_date.gte.' + fromD);
+    if (error || !sc || !sc.length) return '';
+    const tids = [...new Set(sc.map(x => x.therapy_id))];
+    const { data: tp, error: e2 } = await sb.from('nl_therapies')
+      .select('id, child_id, group_id, ended_on').in('id', tids);
+    if (e2) return '';
+    const T = {}; (tp || []).forEach(x => T[x.id] = x);
+    const { data: myTp } = await sb.from('nl_therapies').select('group_id').eq('id', edRow.therapy_id).limit(1);
+    const myG = (myTp && myTp[0]) ? myTp[0].group_id : null;
+    const s0 = toMin(hm), e0 = s0 + (Number(du) || 40);
+    const wk = [edWk[0], edWk[1], edWk[2], edWk[3]].map(v => v !== false);
+    const hits = sc.filter(x => {
+      const t = T[x.therapy_id]; if (!t) return false;
+      if (x.therapy_id === edRow.therapy_id) return false;
+      if (myG && t.group_id && Number(t.group_id) === Number(myG)) return false;
+      if (t.ended_on && String(t.ended_on) < fromD) return false;
+      const sameTh = Number(x.therapist_id) === Number(th);
+      const sameKid = Number(t.child_id) === Number(edRow._cid);
+      if (!sameTh && !sameKid) return false;
+      const s1 = toMin(x.start_time), e1 = s1 + (Number(x.duration) || 40);
+      if (!(s1 < e0 && s0 < e1)) return false;
+      const w2 = [x.week1, x.week2, x.week3, x.week4].map(v => v !== false);
+      return wk.some((v, i) => v && w2[i]);
+    });
+    if (!hits.length) return '';
+    const md = d => { const p = String(d).split('-'); return Number(p[1]) + '월 ' + Number(p[2]) + '일'; };
+    return hits.map(x => {
+      const t = T[x.therapy_id];
+      const when = (x.from_date && String(x.from_date) > fromD) ? md(x.from_date) + '부터 ' : '';
+      const th2 = THS_ALL.find(z => z.id === x.therapist_id);
+      const who = Number(t.child_id) === Number(edRow._cid)
+        ? '이 아동의 다른 수업'
+        : (th2 ? th2.id + '번 선생님 · ' : '') + t.child_id + '번 아동 수업';
+      return '· ' + when + nw + '요일 ' + h12(String(x.start_time).slice(0,5)) + ' — ' + who;
+    }).join('\n');
+  } catch (e) { return ''; }
+}
 
 // ===== 담당 바꾸기 (2026-09-17) =====
 // 변경 시작일 — 적었으면 그 날, 비었으면 오늘과 이 달 1일 중 늦은 날
