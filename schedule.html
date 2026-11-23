@@ -7212,6 +7212,8 @@ $('edSave').onclick = async () => {
     ovlNotice(edRow && edRow._cid);   // 겹침 알림 (2026-10-06)
   } catch (e) {
     edmsg('❌ 옮기지 못했습니다.\n' + e.message, false);
+    // 창 아래 빨간 글은 눈에 잘 안 띄어 알림 창으로도 띄운다 (2026-11-23 · 186번)
+    alert('❌ 옮기지 못했습니다.\n\n' + e.message + '\n\n(F5 로 새로고침한 뒤 시간표를 다시 확인해 주세요)');
     alert('❌ 저장하지 못했습니다.\n\n' + e.message);
   } finally {
     $('edSave').disabled = false; $('edSave').textContent = '저장';
@@ -7353,6 +7355,8 @@ async function changeTherapistFrom(th, du, applyD){
     return true;
   } catch (e) {
     edmsg('❌ 담당을 바꾸지 못했습니다.\n' + (e.message || e), false);
+    // 창 아래 빨간 글은 눈에 잘 안 띄어 알림 창으로도 띄운다 (2026-11-23 · 186번)
+    alert('❌ 담당을 바꾸지 못했습니다.\n\n' + (e.message || e) + '\n\n(F5 로 새로고침한 뒤 시간표를 다시 확인해 주세요)');
     return false;
   } finally {
     $('edSave').disabled = false; $('edSave').textContent = '저장';
@@ -7588,6 +7592,8 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     draw();
   } catch (e) {
     edmsg('❌ 바꾸지 못했습니다.\n' + e.message, false);
+    // 창 아래 빨간 글은 눈에 잘 안 띄어 알림 창으로도 띄운다 (2026-11-23 · 186번)
+    alert('❌ 바꾸지 못했습니다.\n\n' + e.message + '\n\n(F5 로 새로고침한 뒤 시간표를 다시 확인해 주세요)');
   } finally {
     $('edSave').disabled = false; $('edSave').textContent = '저장';
     $('edFrom').disabled = false; $('edFrom').textContent = '이번 달부터 바꾸기';
