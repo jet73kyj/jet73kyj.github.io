@@ -210,8 +210,8 @@ const sb = window.supabase.createClient(URL_, KEY_, {
 const $  = id => document.getElementById(id);
 
 // 묶음마다 카드 왼쪽 줄 색 (2026-09-17) — 없는 묶음은 카멜
-const GCOLOR = { '일정':'#C9A27E', '아동':'#8FB39A', '납부':'#8AA6C1', '학부모':'#D6A3B2',
-                 '소식':'#D4B266', '정산':'#C98B73', '치료 기록지':'#A99BC9' };
+const GCOLOR = { '일정':'#C9A27E', '업무관리':'#B9A58F', '아동':'#8FB39A', '홍보':'#D4B266', '납부':'#8AA6C1', '학부모':'#D6A3B2',
+                 '소식':'#D4B266', '치료 기록지':'#A99BC9', '직원 관리':'#C98B73', '정산':'#C98B73', '관리':'#B9A58F' };
 
 // 화면 목록 — roles 에 적힌 역할만 볼 수 있다
 // 메뉴 목록은 nl-menu.js 한 곳에 (2026-10-05 · 모든 화면 「☰ 메뉴」와 함께 씀)
@@ -310,7 +310,7 @@ async function afterLogin(user) {
   const isBoss = (Number(me.id) === 8);
   MENU.forEach(g => {
     if (g.boss && !isBoss) return;      // 대표만 보는 묶음
-    const list = g.items.filter(it => it.roles.includes(role)
+    const list = g.items.filter(it => it.roles.includes(role) && (!it.boss || isBoss)
       && (!LEFT || /^record-/.test(it.f) || it.f === 'my-salary.html'));   // 퇴사 뒤에는 기록지 · 내 급여명세서만 (2026-10-08)
     if (!list.length) return;
     html += '<div class="grp" style="--gc:' + (GCOLOR[g.grp] || '#C9A27E') + '"><h2>' + esc(g.grp) + '</h2>'

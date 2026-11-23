@@ -320,14 +320,15 @@
     var out = [];
     (w.NL_MENU || []).forEach(function (g) {
       if (g.boss && ME.id !== 8) return;
-      var its = (g.items || []).filter(function (it) { return (it.roles || []).indexOf(ME.role) >= 0; });
+      var its = (g.items || []).filter(function (it) { return (it.roles || []).indexOf(ME.role) >= 0 && (!it.boss || ME.id === 8); });
       if (its.length) out.push({ grp: g.grp, items: its });
     });
     return out;
   }
   // 묶음 색 — 홈 카드와 같게 (index.html GCOLOR)
   var GC = { '일정': ['#C9A27E', '#7E5530'], '아동': ['#8FB39A', '#4F7A5C'], '납부': ['#8AA6C1', '#4F6F8F'], '학부모': ['#D6A3B2', '#8E4F62'],
-             '소식': ['#D4B266', '#85692A'], '정산': ['#C98B73', '#9A5A44'], '치료 기록지': ['#A99BC9', '#62558A'] };
+             '소식': ['#D4B266', '#85692A'], '정산': ['#C98B73', '#9A5A44'], '치료 기록지': ['#A99BC9', '#62558A'],
+             '업무관리': ['#B9A58F', '#7A6650'], '홍보': ['#D4B266', '#85692A'], '직원 관리': ['#C98B73', '#9A5A44'], '관리': ['#B9A58F', '#7A6650'] };
   function plain(h) { return String(h || '').split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, '').trim(); }
   function closePanel() { var p = document.getElementById('nlMenuPanel'); if (p) p.remove(); }
   // ‹ 뒤로 가기로 돌아온 화면에 판이 열린 채 남지 않게 (크롬이 떠난 화면을 붙들어 둠 · 2026-10-07)
