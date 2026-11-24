@@ -452,6 +452,8 @@ async function loadAll() {
   (ss || []).forEach(s => {
     if (s.status === '휴무' || s.status === '쉼' || s.status === '결석'
         || s.status === '취소') return;
+    // 쪼개기 보강(40분 미만)은 문자로 안내하지 않음 (2026-11-24 은정님)
+    if (s.makeup_for && Number(s.minutes) > 0 && Number(s.minutes) < 40) return;
     if (s.makeup_for) { push('보강', s.child_id, s.plan_date, s.start_time, s.therapist_id, '', s.minutes); return; }
     // ⑧ 발추(이) 수업 — 달마다 날짜가 달라지므로 따로 알린다 (2026-09-19)
     //   보강 줄은 위에서 「보강」으로 이미 담았고,
