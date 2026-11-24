@@ -2613,9 +2613,9 @@ function gsubHtml(x){
     + splitTag(x) + minTag(x) + fillTag(x) + '</span>'
     + '<span class="gs">' + stWord(x) + '</span></div>';
 }
-function waitHtml(wd, no, thId){
+function waitHtml(wd, no, thId, day){
   const list = (WAITL[wd + '#' + no] || []).filter(v => waitOkFor(v, wd, thId));
-  const fut = futList(wd, no, thId);
+  const fut = futList(wd, no, thId, day);
   if (!list.length && !fut.length) return '';
   return '<template class="wtmp">' + list.map(v => '<div class="wtin" title="자리 대기 명단 (신규 아동 관리)">대기 '
     + esc(v.name) + (v.b6 ? '<span class="wb">' + v.b6 + '</span>' : '') + '</div>').join('')
@@ -2637,7 +2637,7 @@ function futNo(r, wd, thId){
   on.forEach(s => { const d = Math.abs(toMin(slotHm(s, thId, wd)) - toMin(hm)); if (d < g) { g = d; best = s; } });
   return best ? best.no : null;
 }
-function futList(wd, no, thId){
+function futList(wd, no, thId, day){
   if (!CAN_EDIT || !ROWS_ALL.length) return [];
   const y = Number(mon.slice(0, 4)), m = Number(mon.slice(5, 7));
   const last = mon + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0');
@@ -2645,10 +2645,15 @@ function futList(wd, no, thId){
   return ROWS_ALL.filter(r => {
     if (r.weekday !== wd || Number(r.therapist_id) !== Number(thId)) return false;
     const st = futStart(r);
-    if (!st || st <= last) return false;
+    // 주간 · 하루 보기는 그 칸 날짜보다 뒤에 시작하는 것만 (날짜 칸이 다음 달이어도 겹치지 않게)
+    if (!st || st <= (day ? String(day).slice(0, 10) : last)) return false;
     if (r.to_date && String(r.to_date).slice(0, 10) < st) return false;
     if (r._kst === '종결' || r._kst === '타기관이용') return false;
     if (futNo(r, wd, thId) !== no) return false;
+    // 같은 아동이 이 달에 이미 같은 요일 · 교시 · 선생님으로 다니면 뺀다
+    //   (사업 · 담당 바꾸기로 다음 달부터 새 줄이 생긴 것 — 지금 수업과 같은 자리라 알릴 것 없음)
+    if (ROWS.some(o => o !== r && Number(o._cid) === Number(r._cid) && o.weekday === wd
+        && Number(o.therapist_id) === Number(thId) && futNo(o, wd, thId) === no)) return false;
     if (seen[r._cid]) return false;
     seen[r._cid] = 1;
     return true;
@@ -2665,10 +2670,17 @@ function placeWait(){
       const x = SESS.find(v => String(v.id) === String(e.dataset.sid || ''));
       return !!(x && x.therapy_id && GTH[x.therapy_id]);
     });
-    if (isGrp) { m.remove(); return; }
+    // 「예약」 글자(뒤 달 시작 수업)는 그룹 칸에도 남긴다 (2026-11-25)
+    let html = m.innerHTML;
+    if (isGrp) {
+      const box = document.createElement('div'); box.innerHTML = html;
+      box.querySelectorAll('.wtin:not(.fut)').forEach(e => e.remove());
+      html = box.innerHTML;
+      if (!html.trim()) { m.remove(); return; }
+    }
     const host = lns[lns.length - 1];
-    if (host) host.insertAdjacentHTML('beforeend', m.innerHTML);
-    else m.insertAdjacentHTML('beforebegin', m.innerHTML);
+    if (host) host.insertAdjacentHTML('beforeend', html);
+    else m.insertAdjacentHTML('beforebegin', html);
     m.remove();
   });
 }
@@ -4233,7 +4245,7 @@ function drawWeek(){
               + (lunch ? '<span class="lunchtxt">점심</span>'
                        : '<div class="opentm">' + dayNo(ds2) + '일 '
                          + h12(slotHm(s, th3.id, d)) + '</div>')
-              + plus + waitHtml(d, s.no, th3.id) + '</td>';
+              + plus + waitHtml(d, s.no, th3.id, ds2) + '</td>';
           }
           // 수업이 있는 칸에는 ＋(수업 넣기)를 안 붙인다
           //   결석 줄이 있을 때만 ＋보강을 붙인다
@@ -4278,7 +4290,7 @@ function drawWeek(){
             + ((list.some(absLike) && !list.some(x => !absLike(x) && x.status !== '휴무' && x.status !== '쉼'))
                 ? '<div class="ln ln-open"><span class="d">' + dayNo(ds2) + '일</span>'
                   + '<span class="n">빈 자리</span></div>' : '')
-            + waitHtml(d, s.no, th3.id) + '</td>';
+            + waitHtml(d, s.no, th3.id, ds2) + '</td>';
           }).join('');
         }).join('')
       + '</tr>';
@@ -4823,7 +4835,7 @@ function drawOne(){
               + (lunch ? '<span class="lunchtxt">점심</span>'
                        : '<div class="opentm">' + dayNo(oneDate) + '일 '
                          + h12(slotHm(s, th3.id, wd)) + '</div>')
-              + plus + waitHtml(wd, s.no, th3.id) + '</td>';
+              + plus + waitHtml(wd, s.no, th3.id, oneDate) + '</td>';
           }
           // 수업이 있는 칸에는 ＋(수업 넣기)를 안 붙인다
           //   결석 줄이 있을 때만 ＋보강을 붙인다
@@ -4870,7 +4882,7 @@ function drawOne(){
             + ((list.some(absLike) && !list.some(x => !absLike(x) && x.status !== '휴무' && x.status !== '쉼'))
                 ? '<div class="ln ln-open"><span class="d">' + dayNo(oneDate) + '일</span>'
                   + '<span class="n">빈 자리</span></div>' : '')
-            + waitHtml(wd, s.no, th3.id) + '</td>';
+            + waitHtml(wd, s.no, th3.id, oneDate) + '</td>';
         }).join('')
       + '</tr>';
   }).join('');
