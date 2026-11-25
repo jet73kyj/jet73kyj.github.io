@@ -4546,8 +4546,9 @@ document.querySelectorAll('.ptab').forEach(b => {
     document.querySelectorAll('.ptab').forEach(x => x.classList.remove('on'));
     b.classList.add('on');
     PAYFILTER = b.dataset.pay;
-    if (LOADED_MK) drawAll();
-    else show($('msg2'), '먼저 [불러오기] 를 눌러주세요.', false);
+    // 아직 안 불러왔으면(처음 · 달을 바꾼 뒤) 단추를 누르는 것만으로 불러온다 (2026-11-26 은정님)
+    if (LOADED_MK && LOADED_MK === $('mk').value) drawAll();
+    else if (!$('load').disabled) load();
   };
 });
 $('mk').addEventListener('change', () => {
