@@ -2512,11 +2512,7 @@ function memoOf(p, isBank) {
     if (m === '계좌입금') return '';
     if (m.indexOf('계좌입금 ') === 0) return m.slice(5);
   } else {
-    // 옮겨 온 줄은 글을 비우되 현금영수증 표시([계좌확인] · [카드확인])는 남긴다 — 다시 저장해도 안 사라지게 (2026-11-25)
-    if (m.indexOf('2026-08-11 자동이관') === 0) {
-      const tg = m.match(/\[(계좌확인|카드확인)\d*\]/g);
-      return tg ? tg.join(' ') : '';
-    }
+    if (m.indexOf('2026-08-11 자동이관') === 0) return '';
   }
   m = m.replace(/\s*\[회기[0-9,]+\]/g, '')
        .replace(/\s*\[적용단가[0-9,]+\]/g, '')
@@ -2527,7 +2523,9 @@ function memoOf(p, isBank) {
        .replace(/\s*\[본인이월\d+\]/g, '')
        .replace(/\s*\[환불 [^\]]*\]/g, '')
        .replace(/\s*\[평가유형\d+\]/g, '')
-       .replace(/\s*\[따로\]/g, '').trim();
+       .replace(/\s*\[따로\]/g, '')
+       // 현금영수증 표시는 줄마다 따로 — 승인번호 칸에 안 보이고, 저장할 때 그 줄 것을 그대로 붙인다 (2026-11-25)
+       .replace(/\s*\[(계좌확인|카드확인)\d*\]/g, '').trim();
   if (m === '카드결제' || m === '자동계산' || m === '화면입력' || m === '계좌입금') return '';
   return m;
 }
@@ -3215,8 +3213,14 @@ async function saveKid(childId, btn, only) {
     // 승인번호 칸에 이미 붙어 있는 표시는 지우고 새로 붙인다
     // (안 그러면 저장할 때마다 [리뷰4]가 계속 쌓인다)
     let memo2 = String(memo)
-      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로)[^\]]*\]/g, '')
+      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로|계좌확인|카드확인)[^\]]*\]/g, '')
       .trim();
+    // 현금영수증 표시([계좌확인] · [카드확인] · [계좌확인금액])는 그 줄에 저장돼 있던 것을 그대로 (2026-11-25)
+    {
+      const old = (SAVED[childId] || {})[p.st];
+      const tg = old && old.memo ? String(old.memo).match(/\[(계좌확인|카드확인)\d*\]/g) : null;
+      if (tg) memo2 += ' ' + tg.join(' ');
+    }
     if (lr) memo2 += ' [따로]';
     {
       const rv0 = box.querySelector('.rv');
