@@ -10659,7 +10659,8 @@ function drawConfirm(){
   if (CONF_MON !== mon) { loadConf().then(function(){ if (CONF_MON === mon) drawConfirm(); }); box.style.display = 'none'; return; }
   const td = todayKr();
   const mine = SESS.filter(function(x){
-    return Number(x.therapist_id) === Number(MY_TH) && x.plan_date === oneDate && x.status !== '취소';
+    // 평가 · 체험 · 추가 수업은 서버 확인 대상(회기)이 아니라 뺀다 — 이것뿐인 날은 단추를 안 그림 (2026-11-26)
+    return Number(x.therapist_id) === Number(MY_TH) && x.plan_date === oneDate && x.status !== '취소' && !x._isEval;
   });
   if (oneDate > td || !mine.length) { box.style.display = 'none'; return; }
   box.style.display = '';
@@ -10685,9 +10686,9 @@ async function doConfirm(){
   const b = $('dcGo'); if (b) { b.disabled = true; b.textContent = '확인 중…'; }
   try {
     const { data, error } = await sb.rpc('nl_day_confirm', { p_day: oneDate });
-    if (error) { alert('⚠️ 확인하지 못했습니다 — ' + (error.message || '')); return; }
-    if (typeof data !== 'string' || !data) { alert('⚠️ 확인하지 못했습니다 (서버가 답을 돌려주지 않음)'); return; }
-  } catch (e) { alert('⚠️ 서버에 닿지 못했습니다. 다시 해 주세요'); return; }
+    if (error) { alert('⚠️ 확인하지 못했습니다 — ' + (error.message || '')); drawConfirm(); return; }
+    if (typeof data !== 'string' || !data) { alert('⚠️ 확인하지 못했습니다 (서버가 답을 돌려주지 않음)'); drawConfirm(); return; }
+  } catch (e) { alert('⚠️ 서버에 닿지 못했습니다. 다시 해 주세요'); drawConfirm(); return; }
   finally { CONF_BUSY = false; }
   CONF_MON = '';
   await loadConf();
