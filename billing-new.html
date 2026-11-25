@@ -2654,7 +2654,7 @@ function memoOf(p, isBank) {
        .replace(/\s*\[평가유형\d+\]/g, '')
        .replace(/\s*\[따로\]/g, '')
        // 현금영수증 표시는 줄마다 따로 — 승인번호 칸에 안 보이고, 저장할 때 그 줄 것을 그대로 붙인다 (2026-11-25)
-       .replace(/\s*\[(계좌확인|카드확인)\d*\]/g, '').trim();
+       .replace(/\s*\[(계좌확인|카드확인)\d*\]/g, '').replace(/\s*\[카드로바꿈\]/g, '').trim();
   if (m === '카드결제' || m === '자동계산' || m === '화면입력' || m === '계좌입금') return '';
   return m;
 }
@@ -3347,14 +3347,14 @@ async function saveKid(childId, btn, only) {
     // 승인번호 칸에 이미 붙어 있는 표시는 지우고 새로 붙인다
     // (안 그러면 저장할 때마다 [리뷰4]가 계속 쌓인다)
     let memo2 = String(memo)
-      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로|계좌확인|카드확인)[^\]]*\]/g, '')
+      .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로|계좌확인|카드확인|카드로바꿈)[^\]]*\]/g, '')
       .trim();
     // 현금영수증 표시([계좌확인] · [카드확인] · [계좌확인금액])는 그 줄에 저장돼 있던 것을 그대로 (2026-11-25)
     if (PL.multi && !isBank && !lr) {
       if (PL.marks[p.st]) memo2 += ' ' + PL.marks[p.st];
     } else {
       const old = (SAVED[childId] || {})[p.st];
-      const tg = old && old.memo ? String(old.memo).match(/\[(계좌확인|카드확인)\d*\]/g) : null;
+      const tg = old && old.memo ? String(old.memo).match(/\[(계좌확인\d*|카드확인|카드로바꿈)\]/g) : null;
       if (tg) memo2 += ' ' + tg.join(' ');
     }
     if (lr) memo2 += ' [따로]';

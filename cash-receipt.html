@@ -346,7 +346,7 @@ function render() {
   const by = {};
   PAYS.forEach(p => {
     const k = kindOf(p);
-    const g = by[p.child_id] = by[p.child_id] || { bank:0, card:0, done:0, ask:[], bankRows:[] };
+    const g = by[p.child_id] = by[p.child_id] || { bank:0, card:0, done:0, ask:[], bankRows:[], cardMk:[] };
     if (k === 'ask') g.ask.push(p);
     else if (k === 'split') {
       const sp = splitOf(p);
@@ -356,6 +356,9 @@ function render() {
     else {
       g[k] += (p.amount || 0);
       if (k === 'bank') g.bankRows.push(p);
+      // 「카드로 바꾸기」로 카드가 된 줄 — 되돌릴 수 있게 따로 보인다 (2026-11-25)
+      if (k === 'card' && String(p.memo || '').indexOf('[카드확인]') >= 0
+          && String(p.memo || '').indexOf('[카드로바꿈]') >= 0) g.cardMk.push(p);
     }
   });
 
@@ -422,6 +425,20 @@ function render() {
         + '<td>' + esc(tName(p.support_type_id)) + '</td>'
         + '<td style="text-align:right;">' + won(bankAmt(p)) + '</td>'
         + '<td class="mm">' + esc(cleanMemo(p.memo)) + '</td>'
+        // 본인부담금은 늘 계좌 · 나눠 낸 줄은 납부 계산에서 고친다 — 그 밖의 줄만 카드로 바꿀 수 있다 (2026-11-25)
+        + '<td class="zc">' + (Number(p.support_type_id) !== 2 && !splitOf(p)
+            ? '<button type="button" class="tocard" data-pid="' + p.id + '">카드로 바꾸기</button>' : '') + '</td>'
+        + '</tr>').join('');
+    const cardMkRows = g.cardMk.slice()
+      .sort((a,b) => String(a.paid_on).localeCompare(String(b.paid_on)))
+      .map(p =>
+        '<tr>'
+        + '<td>' + esc(p.paid_on || '') + '</td>'
+        + '<td>' + esc(p.month_key || '') + '</td>'
+        + '<td>' + esc(tName(p.support_type_id)) + '</td>'
+        + '<td style="text-align:right;">' + won(p.amount) + '</td>'
+        + '<td class="mm">' + esc(cleanMemo(String(p.memo || '').replace(/\s*\[카드로바꿈\]/g, ''))) + '</td>'
+        + '<td class="zc"><button type="button" class="tobank" data-pid="' + p.id + '">계좌로 되돌리기</button></td>'
         + '</tr>').join('');
 
     return '<div class="kid' + (issued ? ' done' : '') + '" data-child="' + id + '">'
@@ -440,12 +457,18 @@ function render() {
       + '</div>'
       + (bankRows
           ? '<table class="mix bank"><thead><tr><th>낸 날</th><th>달</th><th>항목</th>'
-            + '<th style="text-align:right;">금액</th><th>메모</th>'
+            + '<th style="text-align:right;">금액</th><th>메모</th><th></th>'
             + '</tr></thead><tbody>' + bankRows
             + '<tr class="sumrow"><td colspan="3">계좌 합계</td>'
-            + '<td style="text-align:right;">' + won(g.bank) + '</td><td></td></tr>'
+            + '<td style="text-align:right;">' + won(g.bank) + '</td><td></td><td></td></tr>'
             + '</tbody></table>'
           : '<div class="kbody" style="color:var(--ink3);">계좌로 받은 것이 없습니다.</div>')
+      + (cardMkRows
+          ? '<div class="asktitle">카드로 바꾼 줄</div>'
+            + '<table class="mix"><thead><tr><th>낸 날</th><th>달</th><th>항목</th>'
+            + '<th style="text-align:right;">금액</th><th>메모</th><th></th>'
+            + '</tr></thead><tbody>' + cardMkRows + '</tbody></table>'
+          : '')
       + (askRows
           ? '<div class="asktitle">어느 쪽인지 알 수 없는 것 — 골라 주세요</div>'
             + '<table class="mix"><thead><tr><th>낸 날</th><th>항목</th>'
@@ -468,6 +491,8 @@ function render() {
     box.querySelector('.savebtn').onclick = () => saveKid(box);
     const mk = box.querySelector('[data-act="mark"]');
     if (mk) mk.onclick = () => markKind(box);
+    box.querySelectorAll('.tocard').forEach(b => b.onclick = () => openToCard(b));
+    box.querySelectorAll('.tobank').forEach(b => b.onclick = () => toBank(b));
     // 두 네모칸은 하나만 켜지게
     box.querySelectorAll('.fbank').forEach(i => i.addEventListener('change', () => {
       if (i.checked) i.closest('tr').querySelector('.fcard').checked = false;
@@ -503,6 +528,55 @@ async function markKind(box) {
   } catch (e) {
     show($('msg2'), '❌ 표시 실패\n' + e.message, false);
   }
+}
+
+// ── 계좌 줄을 카드로 바꾸기 · 되돌리기 (2026-11-25 은정님) ──────────────────
+//   시스템 쓰기 전(7월) 장부에서 옮긴 줄처럼 납부 계산으로 고칠 수 없는 줄을, 카드 영수증을 보고 바꾼다
+//   메모 끝에 승인번호 · 메모 · [카드확인] [카드로바꿈] 을 붙인다. 금액 · 낸 날은 안 바꾼다
+function openToCard(btn) {
+  const tr = btn.closest('tr');
+  const nx = tr.nextElementSibling;
+  if (nx && nx.classList.contains('tcrow')) { nx.remove(); return; }
+  const pid = Number(btn.dataset.pid);
+  const row = document.createElement('tr');
+  row.className = 'tcrow';
+  row.innerHTML = '<td colspan="6" style="background:#FBF5EE;">'
+    + '<span style="font-size:13px;margin-right:6px;">카드로 바꾸기</span>'
+    + '<input class="tcappr" type="text" maxlength="20" placeholder="승인번호" style="width:130px;margin-right:6px;">'
+    + '<input class="tcmemo" type="text" maxlength="60" placeholder="메모 (예: 시스템 사용 전)" style="width:220px;margin-right:6px;">'
+    + '<button type="button" class="tcno" style="width:auto;margin:0 6px 0 0;padding:5px 12px;">그만</button>'
+    + '<button type="button" class="tcgo" style="width:auto;margin:0;padding:5px 12px;">저장</button></td>';
+  tr.after(row);
+  row.querySelector('.tcno').onclick = () => row.remove();
+  row.querySelector('.tcgo').onclick = () => saveToCard(pid, row);
+  row.querySelector('.tcappr').focus();
+}
+async function saveToCard(pid, row) {
+  const p = PAYS.find(x => x.id === pid); if (!p) return;
+  const ap = row.querySelector('.tcappr').value.trim();
+  const mm = row.querySelector('.tcmemo').value.replace(/[\[\]]/g, '').trim();
+  if (ap && !/^[0-9]{4,12}$/.test(ap)) { alert('승인번호는 숫자만 적어 주세요.'); return; }
+  if (!confirm(tName(p.support_type_id) + ' ' + won(p.amount) + ' (' + (p.paid_on || '') + ')\n이 줄을 카드로 바꿀까요?\n\n현금영수증 계좌 금액에서 빠집니다.')) return;
+  const base = String(p.memo || '').replace(/\s*\[(계좌확인|카드확인)\d*\]/g, '').replace(/\s*\[카드로바꿈\]/g, '').trim();
+  const memo = [base, ap, mm, '[카드확인] [카드로바꿈]'].filter(Boolean).join(' ');
+  const go = row.querySelector('.tcgo'); go.disabled = true; go.textContent = '저장 중…';
+  const { error } = await rowsOk(sb.from('nl_payments').update({ memo }).eq('id', pid).select('id'));
+  if (error) { alert('저장하지 못했습니다.\n' + error.message); go.disabled = false; go.textContent = '저장'; return; }
+  p.memo = memo;
+  show($('msg2'), '✅ 카드로 바꿨습니다.', true);
+  render();
+}
+async function toBank(btn) {
+  const pid = Number(btn.dataset.pid);
+  const p = PAYS.find(x => x.id === pid); if (!p) return;
+  if (!confirm(tName(p.support_type_id) + ' ' + won(p.amount) + ' (' + (p.paid_on || '') + ')\n이 줄을 계좌로 되돌릴까요?')) return;
+  const memo = (String(p.memo || '').replace(/\s*\[(카드확인|카드로바꿈)\]/g, '').trim() + ' [계좌확인]').trim();
+  btn.disabled = true;
+  const { error } = await rowsOk(sb.from('nl_payments').update({ memo }).eq('id', pid).select('id'));
+  if (error) { alert('되돌리지 못했습니다.\n' + error.message); btn.disabled = false; return; }
+  p.memo = memo;
+  show($('msg2'), '✅ 계좌로 되돌렸습니다.', true);
+  render();
 }
 
 async function saveKid(box) {
