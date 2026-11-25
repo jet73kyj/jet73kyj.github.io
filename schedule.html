@@ -1122,6 +1122,7 @@
   #gbody .ln .gsub .gs { font-size:11px; color:#6E6660; white-space:nowrap; }
   .wtin .wb { color:#B8935A; font-weight:400; margin-left:3px; }
   .wtin.fut { color:#A39C95; font-weight:400; }
+  .bkwhy { font-weight:400; color:#8C847D; }
 
 /* 하루 확인 (2026-10-01) — 치료사 계정 하루 보기 맨 아래 */
 .dayconf{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:12px 4px 4px;font-size:14px}
@@ -1353,6 +1354,10 @@
           <label for="bk_th">치료사</label>
           <select id="bk_th"></select>
         </div>
+      </div>
+      <div style="margin:6px 0;">
+        <label for="bk_reason">사유 <span style="font-weight:400;color:#A39C95;font-size:12px;">(선택 · 시간표 칸에 함께 보임 · 예: 27년 9월부터 가능)</span></label>
+        <input id="bk_reason" type="text" maxlength="40" placeholder="예: 27년 9월부터 가능">
       </div>
       <div class="blkhint">하루씩 막고 풉니다. 흰 교시를 누르면 「막을 칸」, ■막힘 교시를 누르면 「풀 칸」이 됩니다. 다시 누르면 원래대로입니다.</div>
       <div id="bk_slots" class="blkslots"></div>
@@ -2485,6 +2490,12 @@ function isBlocked(dd, thId, hm) {
   return BLOCK.has(String(dd) + '#' + thId + '#' + String(hm).slice(0,5));
 }
 let BLOCK  = new Set(); // 날짜#치료사#시각 -> 그 한 자리만 막음
+let BLKTXT = {};        // 날짜#치료사#시각 -> 시간 막음 사유 (2026-11-25)
+// 시간 막음 칸 글 — 사유가 있으면 「시간 막음 · 27년 9월부터 가능」
+function blkText(dd, thId, hm){
+  const r = BLKTXT[String(dd) + '#' + thId + '#' + String(hm || '').slice(0,5)];
+  return '시간 막음' + (r ? '<span class="bkwhy"> · ' + esc(r) + '</span>' : '');
+}
 let CONS   = {};        // 날짜#치료사#시각 -> 평가 상담 (아동 이름)
 // 그 날·그 치료사·그 시각에 평가 상담이 있는지
 let KIDNM = {};         // 아동번호 -> 이름
@@ -4383,7 +4394,7 @@ function drawWeekOld(){
                   + (cns !== null ? ' ln-cons' : (blk ? ' ln-block' : (isOffFor(dd, th) ? ' ln-holi' : ''))) + '">'
                   + '<span class="d">' + dayNo(dd) + '일</span>'
                   + (cns !== null ? '<span class="n">' + esc(kidLabel(cns)) + '</span>'
-                                  : (blk ? '<span class="n">시간 막음</span>' : ''))
+                                  : (blk ? '<span class="n">' + blkText(dd, th, slotHm(s, th, d)) + '</span>' : ''))
                   + ((canOpenAdd() && !blk && cns === null) ? '<button class="lnadd" data-mn="'
                      + s.no + '_' + th + '_' + d + '_' + dd + '" title="보강 넣기">＋</button>' : '')
                   + '</div>';
@@ -4477,7 +4488,7 @@ function drawWeekOld(){
                   + (cns !== null ? ' ln-cons' : (blk ? ' ln-block' : (isOffFor(dd, th) ? ' ln-holi' : ''))) + '">'
                   + '<span class="d">' + dayNo(dd) + '일</span>'
                   + (cns !== null ? '<span class="n">' + esc(kidLabel(cns)) + '</span>'
-                                  : (blk ? '<span class="n">시간 막음</span>' : ''))
+                                  : (blk ? '<span class="n">' + blkText(dd, th, slotHm(s, th, d)) + '</span>' : ''))
                   + ((canOpenAdd() && !blk && cns === null) ? '<button class="lnadd" data-mn="'
                      + s.no + '_' + th + '_' + d + '_' + dd + '" title="보강 넣기">＋</button>' : '')
                   + '</div>';
@@ -4827,7 +4838,7 @@ function drawOne(){
                 + '<span class="n">' + esc(kidLabel(cns)) + '</span></div></td>';
             if (blk)
               return '<td class="cell"><div class="ln ln-block">'
-                + '<span class="n">시간 막음</span></div></td>';
+                + '<span class="n">' + blkText(oneDate, th3.id, slotHm(s, th3.id, wd)) + '</span></div></td>';
             if (isOffFor(oneDate, th3.id))
               return '<td class="cell"><div class="ln ln-holi">'
                 + '<span class="n">' + (OFFTXT[oneDate] || '휴무') + '</span></div></td>';
@@ -5478,7 +5489,7 @@ function drawDay(){
                 return '<div class="ln ln-open'
                   + (cns !== null ? ' ln-cons' : (blk ? ' ln-block' : (isOffFor(dd, t.id) ? ' ln-holi' : ''))) + '">'
                   + '<span class="d">' + dayNo(dd) + '일</span>'
-                  + '<span class="n">' + (cns !== null ? esc(kidLabel(cns)) : (blk ? '시간 막음' : '빈 자리')) + '</span>'
+                  + '<span class="n">' + (cns !== null ? esc(kidLabel(cns)) : (blk ? blkText(dd, t.id, slotHm(s, t.id, wd)) : '빈 자리')) + '</span>'
                   + ((canOpenAdd() && !blk) ? '<button class="lnadd" data-mn="'
                      + s.no + '_' + t.id + '_' + wd + '_' + dd + '">＋</button>' : '')
                   + '</div>';
@@ -5670,7 +5681,7 @@ function drawDay(){
                 + (cns2 !== null ? ' ln-cons' : (blk2 ? ' ln-block' : (isOffFor(L2.d, t.id) ? ' ln-holi' : ''))) + '">'
                 + '<span class="d">' + day + '</span>'
                 + '<span class="hm">' + h12(slotHm(s, t.id, wd)) + '</span>'
-                + '<span class="n">' + (cns2 !== null ? esc(kidLabel(cns2)) : (blk2 ? '시간 막음' : '빈 자리')) + '</span>'
+                + '<span class="n">' + (cns2 !== null ? esc(kidLabel(cns2)) : (blk2 ? blkText(L2.d, t.id, slotHm(s, t.id, wd)) : '빈 자리')) + '</span>'
                 + ((CAN_EDIT && canOpenAdd() && !blk2 && cns2 === null) ? '<button class="lnadd" data-mn="'
                     + s.no + '_' + t.id + '_' + wd + '_' + L2.d + '" title="보강 넣기">＋</button>' : '')
                 + '</div>';
@@ -8925,7 +8936,8 @@ $('blkSave').onclick = async () => {
         .eq('off_date', d).eq('kind', '시간막음').eq('therapist_id', th);
       const hadSet = new Set((had || []).map(x => String(x.start_time || '').slice(0, 5)));
       const rows = add.filter(hm => !hadSet.has(hm))
-        .map(hm => ({ off_date: d, kind: '시간막음', therapist_id: th, start_time: hm + ':00' }));
+        .map(hm => ({ off_date: d, kind: '시간막음', therapist_id: th, start_time: hm + ':00',
+                       reason: ($('bk_reason').value || '').trim() || null }));
       if (rows.length) {
         const { data, error } = await sb.from('nl_offdays').insert(rows).select('id');
         if (error) throw error;
@@ -10824,7 +10836,7 @@ async function loadMonth(){
   await autoDone();
   await applyMonthFilter();
   BAL = new Set();
-  OFF = new Set(); OFFTXT = {}; BLOCK = new Set(); CONS = {}; WORKX = {};
+  OFF = new Set(); OFFTXT = {}; BLOCK = new Set(); BLKTXT = {}; CONS = {}; WORKX = {};
   const { data: off } = await sb.from('nl_offdays')
     .select('off_date, kind, therapist_id, reason, start_time, end_time, child_id, meet_type')
     .gte('off_date', mon + '-01').lte('off_date', monEnd(mon));
@@ -10840,6 +10852,8 @@ async function loadMonth(){
     if (o.kind === '시간막음') {
       BLOCK.add(o.off_date + '#' + o.therapist_id + '#'
                 + String(o.start_time || '').slice(0,5));
+      if (o.reason) BLKTXT[o.off_date + '#' + o.therapist_id + '#'
+                + String(o.start_time || '').slice(0,5)] = o.reason;
       return;
     }
     // 「평가 상담」도 그 한 자리만 쓴다. 회기는 안 만든다
