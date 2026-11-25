@@ -1746,8 +1746,12 @@ function payerOf(childId) {
 //   · 아직 저장 전이면 수업이 있는지로 본다
 //     - 발달재활만 있는 아동은 등급 본인부담금이 0원이면(다형) 낼 것이 없다
 //     - 대기중처럼 수업이 아예 없으면 낼 것이 없다
+// 시스템 쓰기 전 달(2026-07 까지) — 금액 · 미납은 저장된 줄(장부에서 옮긴 것)만 본다 (2026-11-25 은정님)
+//   시간표 회기가 없거나 일부만 있어 화면 셈이 장부와 다르고, 그 셈이 미납으로 보이던 일
+function isPre() { return !!LOADED_MK && String(LOADED_MK) < '2026-08'; }
 function hasBill(childId) {
   const sv = SAVED[childId] || {};
+  if (isPre()) return Object.keys(sv).some(k => Number(sv[k].amount) > 0);
   if (Object.keys(sv).some(k => Number(sv[k].amount) > 0)) return true;
   // 평가비를 아직 저장하지 않았는데 그 달 평가 금액이 있으면 낼 것이 있다 (2026-09-16)
   if (!sv[9] && evalSumOf(childId) > 0) return true;
@@ -1951,6 +1955,8 @@ function sideMissing(childId) {
 
 function isUnpaid(childId) {
   if (!hasBill(childId)) return false;            // 낼 것이 없으면 미납이 아니다
+  if (isPre()) { const s0 = SAVED[childId] || {};
+    return Object.keys(s0).some(k => Number(s0[k].amount) > 0 && !s0[k].paid_on); }
   if (sideMissing(childId)) return true;          // 카드·계좌 중 한쪽이라도 저장 안 됨
   const sv = SAVED[childId] || {};
   // 금액이 0원인 줄은 받을 돈이 없으므로 미납으로 세지 않는다
@@ -3063,8 +3069,33 @@ function calcKid(childId) {
     // 카드 쪽 금액 줄의 지원유형 — 저장 줄이 없는 줄이 하나라도 있으면 미납 · 「카드 저장 전」 (2026-11-06)
     cardSts: parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0).map(p => Number(p.st))
   };
-  fillLater(box, childId, parts);
-  try { syncPayLines(box, parts); } catch (e) { console.warn('납부 줄', e); }
+  if (isPre()) {
+    // 저장된 금액으로 바꿔 보인다 — 아래 수업 줄 셈은 참고만
+    const s0 = SAVED[childId] || {};
+    const rs = Object.keys(s0).map(k => s0[k]).filter(r => Number(r.amount) > 0);
+    const sc = rs.filter(r => Number(r.support_type_id) !== 2).reduce((a, r) => a + Number(r.amount), 0);
+    const sbk = rs.filter(r => Number(r.support_type_id) === 2).reduce((a, r) => a + Number(r.amount), 0);
+    CALC[childId] = { card: sc, bank: sbk, cardSts: rs.filter(r => Number(r.support_type_id) !== 2).map(r => Number(r.support_type_id)) };
+    box.dataset.total = sc + sbk;
+    box.querySelector('.ktotal').textContent = won(sc + sbk);
+    if (box.querySelector('.cardtotal')) box.querySelector('.cardtotal').textContent = won(sc);
+    if (!box.querySelector('.prenote')) {
+      const nt = document.createElement('div');
+      nt.className = 'prenote';
+      nt.style.cssText = 'margin:6px 0 8px;padding:8px 10px;background:#FBF5EE;border-left:3px solid #D29A3C;font-size:12.5px;color:#6b5a48;';
+      nt.textContent = LOADED_MK + '은 시스템 쓰기 전 달입니다. 금액 · 미납은 장부에서 옮긴 저장 금액('
+        + won(sc + sbk) + ')으로 봅니다. 아래 수업 줄 금액은 시간표 셈이라 참고만 하세요. 「카드 저장」은 금액을 바꾸지 않고 낸 날 · 승인번호 · 메모만 고칩니다.';
+      const hd = box.querySelector('.kidhead') || box.firstElementChild;
+      if (hd && hd.nextSibling) box.insertBefore(nt, hd.nextSibling); else box.prepend(nt);
+    }
+  }
+  const partsP = isPre()
+    ? Object.keys(SAVED[childId] || {}).map(k => SAVED[childId][k])
+        .filter(r => Number(r.amount) > 0 && Number(r.support_type_id) !== 2)
+        .map(r => ({ st: Number(r.support_type_id), amt: Number(r.amount) }))
+    : parts;
+  fillLater(box, childId, partsP);
+  try { syncPayLines(box, partsP); } catch (e) { console.warn('납부 줄', e); }
   try { pvBuild(childId, box, parts); } catch (e) { console.warn('예정 미리보기', e); }
   // 저장 줄이 없는 카드 금액 줄이 있으면 「카드 저장 전」으로 (2026-11-06)
   if (cardUnsaved(childId)) {
