@@ -215,6 +215,19 @@
   /* 카드 줄 한 줄 — 날짜 / 승인번호(좁게) / 특이사항(남은 폭) / 카드 저장 (2026-10-03) */
   .pay input.kmemo { flex:0 0 130px; width:130px; min-width:0; }
   .pay input.knote { flex:1; min-width:160px; }
+  .cardbody .pay { flex-direction:column; align-items:stretch; }
+  .pay .pl, .pay .pfoot { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pay .pl .pmk { flex:0 0 64px; font-size:13px; color:#4A433F; text-align:center; }
+  .pay .pl select.pmeth { flex:0 0 64px; width:64px; padding:6px 4px; margin:0; }
+  .pay .pl input.pref { flex:0 0 130px; width:130px; min-width:0; }
+  .pay .pl input.pamt { flex:0 0 120px; width:120px; min-width:0; text-align:right; }
+  .pay .pl input.pmemo { flex:1; min-width:120px; }
+  .pay .pl .pdel { width:auto; margin:0; padding:4px 10px; background:#fff; color:#C2553A; border:1px solid #F2D3C8; border-radius:6px; cursor:pointer; }
+  .pay .pfoot .padd { width:auto; margin:0; padding:6px 12px; background:#fff; color:#B07A4A; border:1px solid #E4E0DA; border-radius:6px; cursor:pointer; }
+  .pay .punp { font-size:13px; font-weight:700; min-width:90px; }
+  .pay .punp.red { color:#D8684A; }
+  .pay .punp.over { color:#D29A3C; }
+  .pay .punp.ok { color:#2e7d32; font-weight:400; }
   .kidfoot { display:flex; gap:8px; margin-top:20px; }
   .kidfoot .ksave { margin-left:auto; }
   /* 신규 상담 평가 줄 (2026-09-16) */
@@ -1501,6 +1514,21 @@ async function load() {
     } catch (e) {
       console.error('특이사항 읽기 실패', e);
     }
+    // 카드 상자 여러 줄 받기 (2026-11-25)
+    LINES = {};
+    try {
+      for (let from = 0; ; from += 1000) {
+        const { data: pl, error: eP } = await sb.from('nl_pay_lines')
+          .select('child_id, seq, method, paid_on, ref, amount, memo').eq('month_key', mk)
+          .order('seq').range(from, from + 999);
+        if (eP) throw eP;
+        (pl || []).forEach(x => { (LINES[x.child_id] = LINES[x.child_id] || []).push(x); });
+        if (!pl || pl.length < 1000) break;
+      }
+    } catch (e) {
+      console.error('납부 줄 읽기 실패', e);
+      show($('msg2'), '❌ 나눠 받은 납부 줄을 읽지 못했습니다. 새로고침(F5) 해 주세요.\n' + (e.message || e), false);
+    }
     // 분 변경 차액 이월 (2026-10-03)
     CARRYOUT = {}; CARRYIN = {};
     try {
@@ -1808,6 +1836,107 @@ function fillLater(box, childId, parts) {
   });
   el.style.display = want.some(w => w.st !== 9 || el9 === el) ? '' : 'none';
   if (el9 !== el) el9.style.display = want.some(w => w.st === 9) ? '' : 'none';
+}
+
+// ── 카드 상자 여러 줄 받기 (2026-11-25 은정님) ─────────────────────────────
+//   첫 줄은 카드 · 납부일자 · 승인번호 · 납부 금액(처음엔 카드 합계) · 메모
+//   ＋ 추가 줄은 카드/계좌를 고르고 납부일자 · 승인번호(계좌면 입금자명) · 금액 · 메모
+//   받은 금액 합이 카드 합계보다 적으면 빨간 「미납 ○원」 · 그 달 카드 쪽은 미납으로 저장
+//   계좌 줄 금액은 수업료 줄 메모에 [계좌확인] · [계좌확인금액] 으로 붙어 현금영수증이 계좌로 셈
+//   여러 줄일 때만 nl_pay_lines 에 담는다 (한 줄로 다 받으면 지금과 같음)
+let LINES = {};   // 아동번호 -> [{seq, method, paid_on, ref, amount, memo}]
+function plRow(l, first) {
+  const m = first ? '카드' : (l && l.method === '계좌' ? '계좌' : '카드');
+  const ph = m === '계좌' ? '입금자명' : '승인번호';
+  return '<div class="pl' + (first ? ' p1' : ' px') + '">'
+    + (first ? '<span class="pmk">카드</span>'
+             : '<select class="pmeth"><option' + (m === '카드' ? ' selected' : '') + '>카드</option>'
+               + '<option' + (m === '계좌' ? ' selected' : '') + '>계좌</option></select>')
+    + '<input class="dt ' + (first ? 'pday' : 'pdt') + '" type="date" value="' + esc(l && l.paid_on ? l.paid_on : '') + '">'
+    + '<input class="tx ' + (first ? 'kmemo' : 'pref') + '" type="text" placeholder="' + ph + '" value="' + esc(l && l.ref ? l.ref : '') + '">'
+    + '<input class="tx pamt" data-won type="text" inputmode="numeric" placeholder="납부 금액"'
+    + (first && !(l && l.amount != null) ? ' data-auto="1"' : '')
+    + ' value="' + (l && l.amount != null ? Number(l.amount).toLocaleString() : '') + '">'
+    + '<input class="tx pmemo" type="text" maxlength="100" placeholder="메모" value="' + esc(l && l.memo ? l.memo : '') + '">'
+    + (first ? '' : '<button type="button" class="pdel" title="이 줄 빼기">✕</button>')
+    + '</div>';
+}
+function payLinesHtml(childId, cp, cm) {
+  const ls = (LINES[childId] || []).slice().sort((a, b) => a.seq - b.seq);
+  if (ls.length) return ls.map((l, i) => plRow(l, i === 0)).join('');
+  return plRow({ paid_on: cp ? cp.paid_on : '', ref: cm ? memoOf(cm, false) : '', amount: null, memo: '' }, true);
+}
+// 카드 상자에서 받아야 할 돈 — 「따로 받을 수업」 줄은 뺀다
+function cardDueOf(box, parts) {
+  const lsts = Array.from(box.querySelectorAll('.later-r')).map(r => Number(r.dataset.lst));
+  return parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0 && lsts.indexOf(Number(p.st)) < 0)
+    .reduce((a, p) => a + Number(p.amt), 0);
+}
+function readLines(box) {
+  return Array.from(box.querySelectorAll('.pay .pl')).map((el, i) => {
+    const mt = el.querySelector('.pmeth');
+    const dt = el.querySelector('.pday, .pdt');
+    const rf = el.querySelector('.kmemo, .pref');
+    const am = el.querySelector('.pamt');
+    const mm = el.querySelector('.pmemo');
+    return { seq: i + 1, method: i === 0 ? '카드' : (mt ? mt.value : '카드'),
+             paid_on: dt ? dt.value : '', ref: rf ? rf.value.trim() : '',
+             amount: am ? numOf(am.value) : 0, amtTyped: !!(am && String(am.value).trim() !== ''),
+             auto: !!(am && am.dataset.auto === '1'), memo: mm ? mm.value.trim() : '' };
+  });
+}
+// 첫 줄 금액(저절로) · 미납 표기를 다시 그린다 — calcKid 끝에서 부른다
+function syncPayLines(box, parts) {
+  const due = cardDueOf(box, parts);
+  const a1 = box.querySelector('.pay .p1 .pamt');
+  if (a1 && a1.dataset.auto === '1') {
+    const v = due > 0 ? due.toLocaleString() : '';
+    if (a1.value !== String(due || '')) a1.value = v;
+  }
+  const ls = readLines(box);
+  const paid = ls.filter(l => l.paid_on).reduce((a, l) => a + l.amount, 0);
+  const u = box.querySelector('.punp');
+  if (!u) return;
+  // 다 받았거나 받을 돈이 없으면 ＋ 추가 단추를 감춘다 (2026-11-25 은정님)
+  const ad = box.querySelector('.pay .padd');
+  if (ad) ad.style.display = (due > 0 && due - paid > 0) ? '' : 'none';
+  if (due <= 0) { u.textContent = ''; u.className = 'punp'; return; }
+  const left = due - paid;
+  if (left > 0) { u.textContent = '미납 ' + left.toLocaleString() + '원'; u.className = 'punp red'; }
+  else if (left < 0) { u.textContent = (-left).toLocaleString() + '원 더 받음'; u.className = 'punp over'; }
+  else { u.textContent = '다 받음'; u.className = 'punp ok'; }
+}
+// 저장할 때 — 여러 줄이면 그 달 카드 쪽 낸 날 · 승인번호 · 현금영수증 표시를 정한다
+function planLines(box, parts) {
+  const ls = readLines(box);
+  const due = cardDueOf(box, parts);
+  const l1 = ls[0] || { amount: 0, auto: true };
+  const multi = ls.length > 1 || (!l1.auto && l1.amtTyped && l1.amount !== due);
+  if (!multi) return { multi: false };
+  const use = ls.filter((l, i) => i === 0 || l.amount > 0 || l.paid_on || l.ref || l.memo);
+  for (const l of use) {
+    if (l.amount > 0 && !l.paid_on) return { err: l.seq + '번째 줄에 납부일자를 적어 주세요.' };
+    if (l.paid_on && !(l.amount > 0)) return { err: l.seq + '번째 줄에 납부 금액을 적어 주세요.' };
+  }
+  const paidL = use.filter(l => l.paid_on && l.amount > 0);
+  const paid = paidL.reduce((a, l) => a + l.amount, 0);
+  const full = due > 0 && paid >= due;
+  const day = full ? paidL.map(l => l.paid_on).sort().slice(-1)[0] : '';
+  const refs = paidL.filter(l => l.method === '카드' && l.ref).map(l => l.ref);
+  let bankLeft = paidL.filter(l => l.method === '계좌').reduce((a, l) => a + l.amount, 0);
+  const marks = {};
+  const lsts = Array.from(box.querySelectorAll('.later-r')).map(r => Number(r.dataset.lst));
+  parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0 && lsts.indexOf(Number(p.st)) < 0)
+    .slice().sort((a, b) => Number(b.amt) - Number(a.amt))
+    .forEach(p => {
+      if (bankLeft <= 0) return;
+      const take = Math.min(bankLeft, Number(p.amt));
+      marks[p.st] = take >= Number(p.amt) ? '[계좌확인]' : '[계좌확인' + take + ']';
+      bankLeft -= take;
+    });
+  return { multi: true, day, memo: refs.length ? refs.join(' / ') : (paidL.some(l => l.method === '카드') ? '카드결제' : '계좌입금'),
+           marks, lines: use.map((l, i) => ({ seq: i + 1, method: l.method, paid_on: l.paid_on || null,
+             ref: l.ref || null, amount: l.amount || 0, memo: l.memo || null })) };
 }
 
 function sideMissing(childId) {
@@ -2432,13 +2561,13 @@ function drawKid(c) {
   const cardDone = sideSaved(c.id, 'card') && !(CHANGED[c.id] && CHANGED[c.id].card);
   // 승인번호는 이번 달 저장분에서만 가져온다. 지난달 것을 끌어오지 않는다.
   b += '<div class="pay">'
-    + '<input class="dt pday" type="date" value="' + (cp ? cp.paid_on : '') + '">'
-    + '<input class="tx kmemo" type="text" placeholder="승인번호" value="'
-    + esc(cm ? memoOf(cm, false) : '') + '">'
+    + payLinesHtml(c.id, cp, cm)
+    + '<div class="pfoot"><button type="button" class="padd">＋ 추가</button>'
+    + '<span class="punp"></span>'
     + '<input class="tx knote" type="text" maxlength="500" placeholder="특이사항 (지울 때까지 달마다 그대로)" value="'
     + esc(PAYNOTE[String(c.id)] || '') + '">'
     + '<button class="ksave2' + (cardDone ? ' done' : '') + '" type="button" data-only="card"'
-    + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div>'
+    + ' data-ttl="카드 저장 전">' + (cardDone ? '\u2713 저장됨' : '카드 저장 전') + '</button></div></div>'
     + '<div class="later"></div>'   // 납부완료 뒤 신청한 수업 — 그 줄만 날짜 · 승인번호 (calcKid 가 채움 · 2026-11-06)
     + (evSep ? '<div class="evsep">' + evHtml + '</div>' + totHtml : '')
     + '</div>';   // .cardbody 닫기
@@ -2935,6 +3064,7 @@ function calcKid(childId) {
     cardSts: parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0).map(p => Number(p.st))
   };
   fillLater(box, childId, parts);
+  try { syncPayLines(box, parts); } catch (e) { console.warn('납부 줄', e); }
   try { pvBuild(childId, box, parts); } catch (e) { console.warn('예정 미리보기', e); }
   // 저장 줄이 없는 카드 금액 줄이 있으면 「카드 저장 전」으로 (2026-11-06)
   if (cardUnsaved(childId)) {
@@ -3181,8 +3311,12 @@ async function saveKid(childId, btn, only) {
   const parts = JSON.parse(box.dataset.parts || '[]');
   const cEl = box.querySelector('.pday'),  cMemo = box.querySelector('.kmemo');
   const bEl = box.querySelector('.bday'),  bMemo = box.querySelector('.bmemo');
-  const cardDay  = cEl ? cEl.value : '';
-  const cardMemo = cMemo ? cMemo.value.trim() : '';
+  let cardDay  = cEl ? cEl.value : '';
+  let cardMemo = cMemo ? cMemo.value.trim() : '';
+  // 카드 상자 여러 줄 (2026-11-25)
+  const PL = only === 'bank' ? { multi: false } : planLines(box, parts);
+  if (PL.err) { alert(PL.err); return; }
+  if (PL.multi) { cardDay = PL.day; cardMemo = PL.memo; }
   const bankDay  = bEl ? bEl.value : '';
   const bankMemo = bMemo ? bMemo.value.trim() : '';
 
@@ -3216,7 +3350,9 @@ async function saveKid(childId, btn, only) {
       .replace(/\s*\[(리뷰|회기|적용단가|요일줄단가|발추치료사|발추방식|평가유형|본인부담|본인이월|환불|따로|계좌확인|카드확인)[^\]]*\]/g, '')
       .trim();
     // 현금영수증 표시([계좌확인] · [카드확인] · [계좌확인금액])는 그 줄에 저장돼 있던 것을 그대로 (2026-11-25)
-    {
+    if (PL.multi && !isBank && !lr) {
+      if (PL.marks[p.st]) memo2 += ' ' + PL.marks[p.st];
+    } else {
       const old = (SAVED[childId] || {})[p.st];
       const tg = old && old.memo ? String(old.memo).match(/\[(계좌확인|카드확인)\d*\]/g) : null;
       if (tg) memo2 += ' ' + tg.join(' ');
@@ -3337,6 +3473,23 @@ async function saveKid(childId, btn, only) {
           + miss.map(r => TYPES[r.support_type_id] || ('유형' + r.support_type_id)).join(' · ')
           + ' 줄이 저장한 값과 다릅니다. 새로고침(F5) 뒤 다시 저장해 주세요.');
       }
+    }
+    // 여러 줄 받기 — 여러 줄이면 담고, 한 줄로 돌아왔으면 지운다 (실패하면 옛 줄로 되돌림)
+    if (only !== 'bank' && (PL.multi || (LINES[childId] || []).length)) {
+      const oldL = LINES[childId] || [];
+      const { error: eL0 } = await sb.from('nl_pay_lines').delete()
+        .eq('child_id', childId).eq('month_key', LOADED_MK);
+      if (eL0) throw eL0;
+      if (PL.multi) {
+        const ins = PL.lines.map(l => Object.assign({ child_id: childId, month_key: LOADED_MK }, l));
+        const { data: lb, error: eL } = await sb.from('nl_pay_lines').insert(ins).select('seq');
+        if (eL || !(lb && lb.length === ins.length)) {
+          if (oldL.length) await sb.from('nl_pay_lines').insert(oldL.map(l => ({ child_id: childId, month_key: LOADED_MK,
+            seq: l.seq, method: l.method, paid_on: l.paid_on, ref: l.ref, amount: l.amount, memo: l.memo })));
+          throw (eL || new Error('납부 줄이 저장되지 않았습니다.'));
+        }
+        LINES[childId] = PL.lines;
+      } else delete LINES[childId];
     }
     if (deadSt.length) {
       const { error: eD } = await sb.from('nl_payments').delete()
@@ -3534,6 +3687,12 @@ $('kids').addEventListener('input', e => {
 // 숫자 고치면 바로 다시 계산
 $('kids').addEventListener('input', e => {
   const t = e.target;
+  if (t.classList.contains('pamt') || t.classList.contains('pday') || t.classList.contains('pdt')) {
+    if (t.classList.contains('pamt')) delete t.dataset.auto;   // 손으로 고친 첫 줄 금액은 그대로 둔다
+    const bx = t.closest('.kid');
+    if (bx) syncPayLines(bx, JSON.parse(bx.dataset.parts || '[]'));
+    return;
+  }
   if (t.classList.contains('brf')) {
     calcKid(Number(t.closest('.kid').dataset.child));
     sumAll();
@@ -3565,6 +3724,11 @@ $('kids').addEventListener('change', e => {
   const t = e.target;
   const box = t.closest('.kid');
   if (!box) return;
+  // 추가 줄 카드/계좌 — 계좌면 「입금자명」 (2026-11-25)
+  if (t.classList.contains('pmeth')) {
+    const rf = t.closest('.pl').querySelector('.pref');
+    if (rf) rf.placeholder = t.value === '계좌' ? '입금자명' : '승인번호';
+  }
 
   // 평가 종류를 고르면 금액이 자동으로 채워진다
   if (t.classList.contains('evsel')) {
@@ -3936,6 +4100,21 @@ $('kids').addEventListener('click', e => {
     return;
   }
 
+  // 카드 상자 ＋ 추가 · ✕ (2026-11-25)
+  if (e.target.classList.contains('padd')) {
+    const pay = e.target.closest('.pay');
+    const w = document.createElement('div'); w.innerHTML = plRow(null, false);
+    pay.insertBefore(w.firstChild, pay.querySelector('.pfoot'));
+    const kid = e.target.closest('.kid'); unDone(e.target);
+    syncPayLines(kid, JSON.parse(kid.dataset.parts || '[]'));
+    return;
+  }
+  if (e.target.classList.contains('pdel')) {
+    const kid = e.target.closest('.kid');
+    e.target.closest('.pl').remove(); unDone(kid.querySelector('.kmemo') || kid);
+    syncPayLines(kid, JSON.parse(kid.dataset.parts || '[]'));
+    return;
+  }
   // 카드 저장 · 계좌 저장 — 그 쪽만 저장한다
   if (e.target.classList.contains('ksave2')) {
     saveKid(Number(e.target.closest('.kid').dataset.child),
