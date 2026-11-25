@@ -10834,6 +10834,11 @@ async function reloadAfterMk(){
 }
 async function loadMonth(){
   await autoDone();
+  // 이 달 · 지난 달 · 다음 달 회기를 한꺼번에 읽기 시작한다 (2026-11-25 — 달을 넘길 때 오래 걸리던 것)
+  //   전에는 앞 것을 다 읽은 뒤에 다음 것을 읽었다. 결과는 아래 자리에서 그대로 받는다
+  const _sCur = sessOfMonth(mon), _sPrev = sessOfMonth(prevMon(mon)), _sNext = sessOfMonth(nextMon(mon));
+  _sPrev.catch(() => {}); _sNext.catch(() => {});
+  const _wait = loadWait();   // 자리 대기 명단도 함께 (WAITL 만 채움)
   await applyMonthFilter();
   BAL = new Set();
   OFF = new Set(); OFFTXT = {}; BLOCK = new Set(); BLKTXT = {}; CONS = {}; WORKX = {};
@@ -10904,7 +10909,7 @@ async function loadMonth(){
     }
   });
 
-  const { data, error } = await sessOfMonth(mon);
+  const { data, error } = await _sCur;
   if (error) alert('그 달 회기를 읽지 못했습니다. 새로고침(F5) 해 주세요.\n' + error.message);
   SESS = error ? [] : (data || []);
   // 치료사 화면은 자기 회기만 보여준다.
@@ -10961,7 +10966,7 @@ async function loadMonth(){
 
   // 지난 달 회기도 불러온다 (이월 보강 때문)
   const pm = prevMon(mon);
-  const { data: pv } = await sessOfMonth(pm);
+  const { data: pv } = await _sPrev;
   PREV = pv || [];
   // 치료사 — 자기가 맡은 아동의 다른 수업분 결석도 함께 본다 (보강 조율용)
   if (MY_TH) {
@@ -10984,7 +10989,7 @@ async function loadMonth(){
 
   // 다음 달 몫인데 이번 달에 미리 한 줄(선보강)도 이번 달 시간표에 띄운다
   const nm2 = nextMon(mon);
-  const { data: nx } = await sessOfMonth(nm2);
+  const { data: nx } = await _sNext;
   NEXTM = nx || [];
   if (MY_TH) NEXTM = NEXTM.filter(s => s.therapist_id === MY_TH);
   NEXTM.forEach(s => {
@@ -11082,7 +11087,7 @@ async function loadMonth(){
     SESS.forEach(s => { if (!s._name) s._name = n2[s.child_id] || ''; });
   }
 
-  await loadWait();   // 자리 대기 아동 (2026-10-08)
+  await _wait;   // 자리 대기 아동 (2026-10-08) · 위에서 미리 읽기 시작함
   await loadNeed();
 }
 
