@@ -233,6 +233,8 @@ function kindOf(p) {
   if (m.indexOf('현영') >= 0) return 'done';
   if (m.indexOf('[계좌확인]') >= 0) return 'bank';
   if (m.indexOf('[카드확인]') >= 0) return 'card';
+  // 「계좌」 글자와 승인번호(7자리 이상)가 함께 있으면 직원이 고른다 (2026-11-25 — 올해 5줄)
+  if (m.indexOf('계좌') >= 0 && /[0-9]{7,9}/.test(m)) return 'ask';
   if (m.indexOf('계좌') >= 0) return 'bank';
   if (m.indexOf('카드') >= 0) return 'card';
   if (m.indexOf('결제선생') >= 0) return 'card';
@@ -240,7 +242,9 @@ function kindOf(p) {
   if (/[0-9]{7,9}/.test(m)) return 'card';
   const st = Number(p.support_type_id);
   if (st === 2) return 'bank';     // 발달재활서비스는 계좌
-  if (st === 8) return 'bank';     // 발추도 계좌
+  // 발추 — 8월까지는 계좌로 받았고, 9월부터는 납부 계산 「카드 저장」으로 받는다 (2026-11-25)
+  //   9월부터 표시 없는 발추는 직원이 고른다 (카드인데 계좌로 잡혀 공제가 겹치지 않게)
+  if (st === 8) return String(p.paid_on || '') >= '2026-09-01' ? 'ask' : 'bank';
   if (st === 9) return 'card';     // 평가비는 카드
   return 'ask';
 }
