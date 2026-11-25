@@ -3306,6 +3306,46 @@ async function toggleFix(childId, btn) {
 }
 
 // only — 'card' 면 카드결제만, 'bank' 면 계좌입금(발달재활)만, 없으면 전부
+// 시스템 쓰기 전 달 — 저장된 카드 쪽 줄의 금액은 그대로, 낸 날 · 승인번호 · 메모만 (2026-11-25 은정님 · 83번 7월)
+//   화면 셈(0원 등)으로 덮어쓰거나 지우지 않는다. 승인번호가 있으면 [카드확인], 「계좌」라고 적으면 [계좌확인]
+async function savePreMonth(childId, box, btn, only) {
+  if (only === 'bank') { show($('msg2'), '시스템 쓰기 전 달의 본인부담금은 이 화면에서 고치지 않습니다.', false); return 'empty'; }
+  const sv = SAVED[childId] || {};
+  const tg = Object.keys(sv).map(k => sv[k]).filter(r => Number(r.support_type_id) !== 2 && Number(r.amount) > 0);
+  if (!tg.length) { show($('msg2'), '이 달에 저장된 카드 쪽 납부 줄이 없습니다.', false); return 'empty'; }
+  const day = (box.querySelector('.pday') || {}).value || '';
+  const ap = ((box.querySelector('.kmemo') || {}).value || '').trim();
+  const mm = ((box.querySelector('.pay .p1 .pmemo') || {}).value || '').replace(/[\[\]]/g, '').trim();
+  if (!day && !ap && !mm) { show($('msg2'), '저장할 내용이 없습니다. 납부일자 · 승인번호 · 메모 가운데 하나를 적어 주세요.', false); return 'empty'; }
+  const bankWord = /계좌/.test(ap + ' ' + mm);
+  const names = tg.map(r => (TYPES[r.support_type_id] || ('유형' + r.support_type_id)) + ' ' + Number(r.amount).toLocaleString() + '원').join(' · ');
+  if (!confirm(LOADED_MK + '은 시스템 쓰기 전 달입니다.\n금액은 그대로 두고 ' + names + ' 줄에\n'
+      + (day ? '낸 날 ' + day + ' · ' : '') + (ap ? '승인번호 ' + ap + ' · ' : '') + (mm ? '메모 「' + mm + '」 · ' : '')
+      + (bankWord ? '계좌' : '카드') + '로 표시합니다.\n\n저장할까요?')) return;
+  SAVING = true; btn.disabled = true; btn.textContent = '저장 중...';
+  try {
+    for (const r of tg) {
+      const base = String(r.memo || '').replace(/\s*\[(계좌확인|카드확인)\d*\]/g, '').replace(/\s*\[카드로바꿈\]/g, '').trim();
+      const memo = [base, ap, mm, bankWord ? '[계좌확인]' : '[카드확인]'].filter(Boolean).join(' ');
+      const upd = { memo };
+      if (day) { upd.paid_on = day; upd.is_paid = true; }
+      const { data, error } = await sb.from('nl_payments').update(upd)
+        .eq('child_id', childId).eq('month_key', LOADED_MK).eq('support_type_id', r.support_type_id).select('support_type_id');
+      if (error) throw error;
+      if (!(data && data.length)) throw new Error('서버에서 바뀐 줄이 없습니다. 새로고침(F5) 뒤 다시 해 주세요.');
+      Object.assign(r, upd);
+    }
+    show($('msg2'), '✅ ' + tg.length + '줄 고쳤습니다 (금액 그대로 · ' + (bankWord ? '계좌' : '카드') + ').', true);
+    if (CHANGED[childId]) { delete CHANGED[childId].card; if (!Object.keys(CHANGED[childId]).length) delete CHANGED[childId]; }
+    btn.textContent = '\u2713 저장됨'; btn.classList.add('done');
+  } catch (e) {
+    show($('msg2'), '❌ 저장하지 못했습니다.\n' + e.message, false);
+    btn.textContent = btn.dataset.ttl || '저장 전';
+  } finally {
+    btn.disabled = false; setTimeout(() => { SAVING = false; }, 800);
+  }
+}
+
 async function saveKid(childId, btn, only) {
   const box = document.querySelector('.kid[data-child="' + childId + '"]');
   const parts = JSON.parse(box.dataset.parts || '[]');
@@ -3314,6 +3354,9 @@ async function saveKid(childId, btn, only) {
   let cardDay  = cEl ? cEl.value : '';
   let cardMemo = cMemo ? cMemo.value.trim() : '';
   // 카드 상자 여러 줄 (2026-11-25)
+  // 시스템 쓰기 전 달(2026-07 까지)은 장부에서 옮긴 금액을 지키고 날짜 · 승인번호 · 메모만 고친다 (2026-11-25)
+  const PRE = String(LOADED_MK) < '2026-08';
+  if (PRE) return await savePreMonth(childId, box, btn, only);
   const PL = only === 'bank' ? { multi: false } : planLines(box, parts);
   if (PL.err) { alert(PL.err); return; }
   if (PL.multi) { cardDay = PL.day; cardMemo = PL.memo; }
