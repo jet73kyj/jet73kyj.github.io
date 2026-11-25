@@ -44,6 +44,10 @@ jobs:
         with:
           path: '_site'
 
+      # 2026-11-25 — 올리자마자 배포 단계가 묶음을 못 찾는 일이 잦아 잠깐 기다림
+      - name: Wait for artifact
+        run: sleep 20
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
