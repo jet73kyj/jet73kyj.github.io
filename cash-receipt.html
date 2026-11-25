@@ -240,6 +240,8 @@ function bankAmt(p) { const s = splitOf(p); return s ? s.bank : (p.amount || 0);
 function kindOf(p) {
   const m = String(p.memo || '');
   if (m.indexOf('현영') >= 0) return 'done';
+  // 발달재활 본인부담금은 늘 계좌 (메모에 숫자가 있어도) — 은정님 2026-11-25
+  if (Number(p.support_type_id) === 2) return 'bank';
   if (splitOf(p)) return 'split';
   if (m.indexOf('[계좌확인]') >= 0) return 'bank';
   if (m.indexOf('[카드확인]') >= 0) return 'card';

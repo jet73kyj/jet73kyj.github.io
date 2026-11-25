@@ -2512,7 +2512,11 @@ function memoOf(p, isBank) {
     if (m === '계좌입금') return '';
     if (m.indexOf('계좌입금 ') === 0) return m.slice(5);
   } else {
-    if (m.indexOf('2026-08-11 자동이관') === 0) return '';
+    // 옮겨 온 줄은 글을 비우되 현금영수증 표시([계좌확인] · [카드확인])는 남긴다 — 다시 저장해도 안 사라지게 (2026-11-25)
+    if (m.indexOf('2026-08-11 자동이관') === 0) {
+      const tg = m.match(/\[(계좌확인|카드확인)\d*\]/g);
+      return tg ? tg.join(' ') : '';
+    }
   }
   m = m.replace(/\s*\[회기[0-9,]+\]/g, '')
        .replace(/\s*\[적용단가[0-9,]+\]/g, '')
