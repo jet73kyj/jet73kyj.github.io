@@ -1174,7 +1174,7 @@ async function load() {
     TRMON = {}; XLMON = {};
     try {
       const { data: _tl, error: _te } = await sb.from('nl_trial_lessons')
-        .select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo')
+        .select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo, is_group')
         .gte('lesson_date', mk + '-01').lte('lesson_date', monEndDay(mk))
         .order('lesson_date');
       if (_te) console.warn('체험 못 가져옴', _te);
@@ -2883,7 +2883,7 @@ function extraInfoHtml(rows, fixed) {
     const th = v.therapist_id ? (THNAME[v.therapist_id] || (v.therapist_id + '번')) + ' 선생님' : '담당 미정';
     const done = v.status === '완료';
     return '<div class="evinfo xlinfo">'
-      + '<span>＋ 추가 수업</span>'
+      + '<span>＋ 추가 수업' + (v.is_group ? ' · 그룹' : '') + '</span>'
       + '<span>' + esc(ds) + (ts ? ' ' + ts : '') + '</span>'
       + '<span>' + esc(tn) + ' ' + (Number(v.duration_min) || 40) + '분</span>'
       + '<span>담당 ' + esc(th) + '</span>'
@@ -4429,19 +4429,36 @@ function openExtra(childId) {
     + '<div class="rw"><label>날짜</label><input type="date" id="xlD" value="' + d0 + '" min="' + LOADED_MK + '-01" max="' + monEndDay(LOADED_MK) + '"></div>'
     + '<div class="rw"><label>시각</label><select id="xlH">' + hs + '</select><select id="xlM">' + ms + '</select>'
     + '<select id="xlN"><option value="30">30분</option><option value="40" selected>40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'
+    // 형태 — 개인 · 그룹 (2026-11-26 은정님) · 그룹은 같은 선생님 · 같은 시각 · 같은 분 그룹 추가 수업과 함께 넣을 수 있음
+    + '<div class="rw"><label>형태</label><span class="xlgp" style="display:inline-flex;gap:6px">'
+    + '<button type="button" data-g="0" class="xlg on">개인</button><button type="button" data-g="1" class="xlg">그룹</button></span></div>'
     + '<div class="rw"><label>선생님</label><select id="xlT">' + to + '</select></div>'
     + '<div class="rw"><label>치료</label><select id="xlY">' + yo + '</select></div>'
     + '<div class="rw"><label>금액</label><input id="xlF" data-won type="text" inputmode="numeric" placeholder="0" style="width:110px"> 원'
-    + ' <span style="color:#999;font-size:12px">선생님 · 분 정규 1회 단가</span></div>'
+    + ' <span class="xlfh" style="color:#999;font-size:12px">선생님 · 분 정규 1회 단가</span></div>'
     + '<div class="rw"><label>메모</label><input id="xlO" type="text" maxlength="60" placeholder="예) 추석 대신 한 번 더" style="flex:1"></div>'
     + '<div style="font-size:12px;color:#777;margin-top:6px">이 달만 하는 수업입니다. 매달 되풀이하는 수업은 시간표 「수업 넣기」로 넣어 주세요.</div>'
     + '<div class="bt"><button type="button" id="xlNo">닫기</button><button type="button" class="go" id="xlGo">저장</button></div></div>';
   document.body.appendChild(w);
   const $w = id => w.querySelector('#' + id);
   $w('xlH').value = '16';
-  let feeTouched = false;
+  let feeTouched = false, isGrp = false;
+  const gbs = w.querySelectorAll('.xlg');
+  const gStyle = () => gbs.forEach(b => {
+    const on = (b.dataset.g === '1') === isGrp;
+    b.style.cssText = 'width:auto;margin:0;padding:5px 16px;border-radius:6px;font-size:13px;cursor:pointer;'
+      + (on ? 'background:#B07A4A;color:#fff;border:1px solid #B07A4A' : 'background:#fff;color:#7E5530;border:1px solid #E4E0DA');
+  });
+  gbs.forEach(b => b.onclick = () => {
+    isGrp = b.dataset.g === '1'; gStyle();
+    // 그룹 1회 금액은 기준표가 없어 직접 적는다
+    if (isGrp && !feeTouched) $w('xlF').value = '';
+    if (!isGrp) fillFee();
+    w.querySelector('.xlfh').textContent = isGrp ? '그룹 1회 금액을 적어 주세요' : '선생님 · 분 정규 1회 단가';
+  });
+  gStyle();
   const fillFee = () => {
-    if (feeTouched) return;
+    if (feeTouched || isGrp) return;
     const f = xlFee(Number($w('xlT').value), Number($w('xlN').value));
     $w('xlF').value = f ? f.toLocaleString() : '';
   };
@@ -4456,14 +4473,15 @@ function openExtra(childId) {
     if (!dt || dt.slice(0, 7) !== LOADED_MK) { alert(Number(LOADED_MK.slice(5)) + '월 안의 날짜를 골라 주세요.'); return; }
     if (!tid) { alert('선생님을 골라 주세요.'); return; }
     if (!ty)  { alert('치료를 골라 주세요.'); return; }
+    if (isGrp && feeBlank) { alert('그룹 1회 금액을 적어 주세요. (무료면 0)'); return; }
     const go = $w('xlGo'); go.disabled = true; go.textContent = '저장 중…';
     try {
       const { data, error } = await sb.from('nl_trial_lessons').insert({
         child_id: childId, kind: '추가', status: '예정',
         lesson_date: dt, lesson_time: $w('xlH').value + ':' + $w('xlM').value,
         duration_min: dur, therapist_id: tid, therapy_type_id: ty,
-        fee: feeBlank ? null : fee, memo: $w('xlO').value.trim() || null
-      }).select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo');
+        fee: feeBlank ? null : fee, memo: $w('xlO').value.trim() || null, is_group: isGrp
+      }).select('id, child_id, lesson_date, lesson_time, therapy_type_id, duration_min, therapist_id, fee, status, paid_on, kind, memo, is_group');
       if (error || !data || data.length !== 1) throw (error || new Error('표에 들어가지 않았습니다 (권한)'));
       (XLMON[childId] = XLMON[childId] || []).push(data[0]);
       w.remove();

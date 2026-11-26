@@ -606,6 +606,8 @@ let GFEES = {};   // 그룹반 번호 -> 1인당 학부모 금액 (그룹 5:5 �
 let SHAREMISS = false;
 // 그 회기의 학부모 1회 결제 단가 — 납부 메모 [요일줄단가요일줄:금액] → 없으면 담당 선생님 학부모 수업료
 function payUnitOf(s, sc, dur, noFee){
+  // 추가 수업은 그 수업에 적은 학부모 금액 (2026-11-26)
+  if (s._fee != null && s._fee > 0) return s._fee;
   const mk = String(s.month_key || mon);
   const sid = Number(s.schedule_id || 0);
   for (const p of PAYM) {
@@ -781,6 +783,9 @@ function calc(){
     done.push({ id: (isX ? 'X' : 'T') + t.id, child_id: t.child_id, plan_date: t.lesson_date,
                 status: '완료', therapist_id: t.therapist_id, support_type_id: isX ? 11 : 10,
                 schedule_id: null, memo: '', _trialDur: Number(t.duration_min) || 40, _isX: isX,
+                // 그룹 추가 수업 — 그 영역 그룹 1인당 단가 (2026-11-26)
+                _xGrp: isX && !!t.is_group, _tt: t.therapy_type_id || null,
+                _fee: isX && t.fee != null ? Number(t.fee) : null,
                 // 30분 추가 수업은 0.75회 (2026-11-26)
                 minutes: (Number(t.duration_min) || 40) < 40 ? Number(t.duration_min) : undefined });
   });
@@ -813,7 +818,7 @@ function calc(){
     const grpSlot = !!(sc && sc._grp && s.plan_date && s.start_time && sc.start_time
       && String(s.start_time).slice(0,5) === String(sc.start_time).slice(0,5)
       && (!sc.weekday || '일월화수목금토'[new Date(String(s.plan_date).slice(0,10) + 'T00:00:00').getDay()] === sc.weekday));
-    const isGrp = !!(sc && sc._grp && !s.makeup_for && grpSlot);
+    const isGrp = !!(sc && sc._grp && !s.makeup_for && grpSlot) || !!s._xGrp;
     // 아동 번호를 이름 앞에 (2026-10-03 은정님)
     const nm  = (isGrp ? '[그룹] ' : '') + s.child_id + '번 ' + (KIDS[s.child_id] || '')
               + (stid ? ' · ' + (STYPE[stid] || ('유형'+stid)) : '');
@@ -823,7 +828,7 @@ function calc(){
     // 메모에 '심리'가 있는 것만 특수로 본다
     // 영역별 단가 (2026-10-04) — 그 회기 수업의 치료 종류로 찾음. 없으면 회기 단가
     //   옛 방식(메모에 「심리」 + 특별 단가)은 영역별 단가가 없을 때만 (지난 자료 보호)
-    const tt2 = tt || (s.therapy_id ? TPTT[s.therapy_id] : null) || null;
+    const tt2 = tt || (s.therapy_id ? TPTT[s.therapy_id] : null) || s._tt || null;
     const aFee = isGrp ? 0 : areaFeeOf(r, tt2);
     const shp  = areaShareOf(r, tt2);   // 5:5 (2026-10-28) · 그룹도 (2026-11-02 미술공개수업)
     const myA = TH_AREAS[thId] || [];
@@ -836,7 +841,7 @@ function calc(){
     const gFee = isGrp ? (areaGrpOf(r, tt2) || Number(r.group_fee) || 0) : 0;
     if (shp && isGrp) {
       // 그룹 5:5 — 그 그룹반 1인당 학부모 금액(납부 메모 [요일줄단가] 먼저)의 몇 % (2026-11-02)
-      const pu = payUnitOf(s, sc, dur, true) || GFEES[sc._grp] || 0;
+      const pu = payUnitOf(s, sc, dur, true) || (sc ? GFEES[sc._grp] : 0) || 0;
       if (!pu) SHAREMISS = true;
       k.m40 += part;
       unit = pu * shp / 100; fee = unit * part; ulab = '5:5 그룹 · ' + ttName(tt2);
@@ -1422,7 +1427,7 @@ async function loadEvals(){
   TRIALS = [];
   try {
     const { data: tl } = await sb.from('nl_trial_lessons')
-      .select('id, child_id, lesson_date, therapist_id, duration_min, status, kind')
+      .select('id, child_id, lesson_date, therapist_id, duration_min, status, kind, is_group, therapy_type_id, fee')
       .gte('lesson_date', mon + '-01').lte('lesson_date', monEnd(mon))
       .order('lesson_date');
     TRIALS = (tl || []).filter(t => t.status === '완료');
