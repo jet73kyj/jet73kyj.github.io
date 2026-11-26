@@ -613,6 +613,7 @@ function carryWhy(supportTypeId, seq) {
 let SCHED = {};             // child_id -> 수업 목록
 let GRPS  = {};             // 그룹 번호 -> {name, fee, mk_diff} (2026-10-02)
 let XDIFF = {};             // 'child|st' -> {n, unit} 그룹 1:1 보강 차액
+let TDIFF = {};             // 'child|st' -> [{date, th, amt}] 단가가 더 높은 선생님 보강 차액 (2026-11-26)
 let SESSCNT = {};           // 수업번호 -> { 지원유형: 회기수 }
 // 회기 단추 (2026-09-11) — 켜진 단추 수 = 청구 회수 (예정 교육비 nl_estimate_calc 와 같은 규칙)
 let SROWS   = {};           // '수업번호|지원유형' -> 그 달 원래 수업 줄들 (날짜 차례)
@@ -1144,7 +1145,7 @@ async function load() {
         let all = [];
         for (let f = 0; ; f += 1000) {
           const r = await sb.from('nl_sessions')
-            .select('id, child_id, schedule_id, support_type_id, status, plan_date, start_time, month_key, run_no, makeup_for, no_makeup, no_makeup_why, want_makeup, minutes, dur_min')
+            .select('id, child_id, schedule_id, support_type_id, status, plan_date, start_time, month_key, run_no, makeup_for, no_makeup, no_makeup_why, want_makeup, minutes, dur_min, therapist_id')
             .eq('month_key', mk).order('id').range(f, f + 999);
           if (r.error) return r;
           all = all.concat(r.data || []);
@@ -1478,6 +1479,44 @@ async function load() {
         XDIFF[k].n++;
       });
     } catch (e) { GRPS = {}; XDIFF = {}; }
+
+    // 단가가 더 높은 선생님이 보강하면 차액을 더 받는다 (2026-11-26 은정님 · 167번)
+    //   원래 수업 선생님 수업료와 보강 선생님 수업료(같은 분)를 견줘 높을 때만 · 낮으면 그대로
+    //   쪼개기 조각은 분만큼 나눔 · 결석 · 취소한 보강은 안 셈 · 그룹 · 발달재활 · 발추 · 평가 · 체험 · 추가는 뺌
+    //   몫인 달(원래 수업 달)에 청구 — 보강이 다음 달 날짜여도 원래 달 납부에 붙음
+    TDIFF = {};
+    try {
+      const scInfo = {}, grpSc = {};
+      (th.data || []).forEach(t => (t.nl_therapy_schedules || []).forEach(sc => {
+        scInfo[sc.id] = { th: sc.therapist_id, dur: Number(sc.duration) || 40 };
+        if (t.group_id) grpSc[sc.id] = true;
+      }));
+      const byId = {}; sess.forEach(x => { byId[x.id] = x; });
+      const feeAt = (tid, dur) => {
+        const f = FEES[tid]; if (!f) return null;
+        const v = dur === 60 ? f.fee_60 : dur === 50 ? f.fee_50 : f.fee_40;
+        return (v == null || v === '') ? null : Number(v);
+      };
+      sess.forEach(x => {
+        if (!x.makeup_for || ['결석', '취소'].includes(x.status)) return;
+        const o = byId[x.makeup_for];
+        if (!o || !o.schedule_id || grpSc[o.schedule_id]) return;
+        const st = Number(o.support_type_id || 0);
+        if ([0, 2, 8, 9, 10, 11].includes(st)) return;
+        const info = scInfo[o.schedule_id] || {};
+        const thO = o.therapist_id || info.th, thM = x.therapist_id;
+        if (!thO || !thM || Number(thO) === Number(thM)) return;
+        const dur = Number(o.dur_min) || info.dur || 40;
+        const fO = feeAt(thO, dur), fM = feeAt(thM, dur);
+        if (fO == null || fM == null || fM <= fO) return;
+        const ratio = (x.minutes != null && Number(x.minutes) < dur) ? Number(x.minutes) / dur : 1;
+        const amt = Math.round((fM - fO) * ratio / 10) * 10;
+        if (amt <= 0) return;
+        const k = o.child_id + '|' + st;
+        (TDIFF[k] = TDIFF[k] || []).push({ date: x.plan_date, th: thM, amt: amt,
+          from: fO, to: fM, min: (ratio < 1 ? Number(x.minutes) : null) });
+      });
+    } catch (e) { TDIFF = {}; }
 
     SCHED = {};
     (th.data || []).forEach(t => {
@@ -2425,6 +2464,19 @@ function drawKid(c) {
           + '<span class="up">' + xd.unit.toLocaleString() + '</span>'
           + '<span class="am">' + (xd.n * xd.unit).toLocaleString() + '</span></div>';
       }
+      // 단가가 더 높은 선생님 보강 차액 (2026-11-26) — 그룹 차액과 같은 자리 · 합계에 함께 들어감
+      (TDIFF[c.id + '|' + g.support_type_id] || []).forEach(td => {
+        const dd = String(td.date).slice(5).replace('-', '/');
+        b += '<div class="r xdiffrow tdiff" data-st="' + g.support_type_id + '" data-amt="' + td.amt
+          + '" data-label="' + esc(dd + ' 보강 단가 차액 (' + thrName(td.th) + ')') + '">'
+          + '<span class="nm"></span>'
+          + '<span class="de">' + esc(dd) + ' 보강 단가 차액 · <b class="thr">' + esc(thrName(td.th)) + '</b>'
+          + (td.min ? ' · ' + td.min + '분' : '') + '</span>'
+          + '<span class="ap"></span>'
+          + '<span class="ct"></span>'
+          + '<span class="up">' + td.from.toLocaleString() + '→' + td.to.toLocaleString() + '</span>'
+          + '<span class="am">' + td.amt.toLocaleString() + '</span></div>';
+      });
       if (gIdx === lastCalcIdx && !devDone) { b += devLookHtml(); devDone = true; }
       if (g.deduction > 0) {
         b += '<div class="r sub2"><span class="nm"></span>'
@@ -3165,7 +3217,7 @@ function pvBuild(childId, box, parts){
         lines.push({ t: lab + (thr ? ' (' + thr + ')' : ''), cnt: Number(String(tr.querySelector('.cnt').value).replace(/[^0-9.]/g, '')) || 0, amt: la });
       });
       box.querySelectorAll('.xdiffrow[data-st="' + st + '"]').forEach(tr => {
-        const a = Number(tr.dataset.amt || 0); if (a > 0) lines.push({ t: '1:1 보강 차액', cnt: 0, amt: a });
+        const a = Number(tr.dataset.amt || 0); if (a > 0) lines.push({ t: tr.dataset.label || '1:1 보강 차액', cnt: 0, amt: a });
       });
     }
     const gs = box.querySelector('.gsum[data-st="' + st + '"]');
