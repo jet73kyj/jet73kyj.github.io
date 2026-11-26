@@ -272,7 +272,23 @@
 @media print { .chgsheet .fc-guide { display:none !important; }
   .chgsheet textarea.fc-body, .chgsheet textarea.fc-att { display:none !important; }
   .chgsheet .fc-pr { display:block !important; }
-  .chgsheet .fc-pr.b { min-height:95mm; } .chgsheet .fc-pr.a { min-height:25mm; } }
+  .chgsheet .fc-pr.b { min-height:95mm; } .chgsheet .fc-pr.a { min-height:25mm; }
+  .chgsheet.fcimg .fc-pr.b { min-height:70mm; } .chgsheet.fcimg .fc-pr.a { min-height:12mm; }
+  .chgsheet .fc-drop { border:none !important; background:transparent !important; padding:0 !important; }
+  .chgsheet .fc-drop.n0, .chgsheet .fc-tool { display:none !important; } }
+/* 사실 확인서 캡처 그림 2장 (2026-11-27 은정님) — 칸 높이를 못 박아 A4 를 벗어나지 않게 */
+.chgsheet .fc-drop { border:2px dashed #C9A27E; border-radius:8px; height:62mm; margin:6px 0 0; padding:4px; box-sizing:border-box;
+  display:grid; grid-template-columns:1fr 1fr; gap:4px; background:#FFFBF6; overflow:hidden; }
+.chgsheet .fc-drop.n0 { display:flex; align-items:center; justify-content:center; color:#9a8a76; font-size:12.5px; text-align:center; cursor:pointer; height:22mm; }
+.chgsheet .fc-drop.n1 { grid-template-columns:1fr; }
+.chgsheet .fc-drop.over { background:#F4E9DC; }
+.chgsheet .fc-cell { position:relative; min-width:0; min-height:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.chgsheet .fc-cell img { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+.chgsheet .fc-cell .fc-x { position:absolute; top:2px; right:2px; width:auto !important; margin:0 !important; padding:0 7px !important;
+  font-size:12px !important; background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px; cursor:pointer; }
+.chgsheet .fc-tool { font-size:12px; color:#7a6a55; margin:4px 0 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.chgsheet .fc-tool button { width:auto !important; margin:0 !important; padding:3px 10px !important; font-size:12px !important;
+  background:#fff !important; color:#7E5530 !important; border:1px solid #D9C3A7 !important; border-radius:6px; cursor:pointer; }
 #chgBox button { width:auto !important; margin:0 0 0 6px !important; padding:3px 10px !important; font-size:12px !important;
                  border:1px solid #D9C3A7 !important; background:#fff !important; color:#7E5530 !important; border-radius:6px; cursor:pointer; }
 .chgsheet .chg-lead { font-size:12.5px; margin:0 0 10px; }
@@ -2478,6 +2494,20 @@ function fcDrawSheets() {
     });
     const sel = sh.querySelector('.fc-case');
     if (sel) sel.addEventListener('change', () => fcPickCase(i, sel.value));
+    sh.addEventListener('mousedown', () => { FC_LAST = i; });
+    sh.addEventListener('focusin', () => { FC_LAST = i; });
+    const dz = $('fcDrop_' + i);
+    if (dz) {
+      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+      dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+      dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); fcAddImgs(i, e.dataTransfer.files); });
+      dz.addEventListener('click', e => {
+        const x = e.target.closest('.fc-x');
+        if (x) { FC[i].imgs.splice(Number(x.dataset.k), 1); fcDrawImgs(i); fcDirty(i); return; }
+        if (!FC[i].imgs.length) fcPickImg(i);
+      });
+      fcDrawImgs(i);
+    }
   });
   if (FC.length) chgStamp();
   w.style.display = open && FC.length ? 'block' : 'none';
@@ -2485,7 +2515,8 @@ function fcDrawSheets() {
 function fcSheetHtml(c, i) {
   const v = f => esc(fcVal(c, f) || '');
   const done = !!(c.doc && c.doc.done);
-  return '<div class="sheet chgsheet" id="fc_' + i + '" data-i="' + i + '">'
+  if (!Array.isArray(c.imgs)) { const g = fcVal(c, 'imgs'); c.imgs = Array.isArray(g) ? g.slice(0, 2) : []; }
+  return '<div class="sheet chgsheet' + (c.imgs.length ? ' fcimg' : '') + '" id="fc_' + i + '" data-i="' + i + '">'
     + '<h2 class="title">사 실 확 인 서</h2>'
     + '<table class="chg-tbl">'
     + '<tr><th style="width:16%;">기관명</th><td>' + esc(CHG_ORG) + '</td>'
@@ -2496,7 +2527,12 @@ function fcSheetHtml(c, i) {
     +       esc((x.ex_no ? '예시 ' + x.ex_no + ' · ' : '') + x.name) + '</option>').join('')
     +   '</select> <span style="color:#888;">고르면 「사유 · 조치」가 채워집니다 · 채운 뒤 고칠 수 있습니다</span></div>'
     +   '<div class="fc-guide">육하원칙(언제 · 어디서 · 누가 · 무엇을 · 어떻게 · 왜)으로 적고, 「사유」와 「조치」를 꼭 채워 주세요. 객관적인 근거(결제 내역 · 기록지 등)를 첨부자료로 남깁니다.</div></td></tr>'
-    + '<tr><th>첨부자료 목록</th><td colspan="3"><textarea class="fc-att" data-f="att">' + v('att') + '</textarea><div class="fc-pr a" data-p="att">' + v('att') + '</div></td></tr>'
+    + '<tr><th>첨부자료 목록</th><td colspan="3"><textarea class="fc-att" data-f="att">' + v('att') + '</textarea><div class="fc-pr a" data-p="att">' + v('att') + '</div>'
+    +   '<div class="fc-drop" id="fcDrop_' + i + '" data-i="' + i + '"></div>'
+    +   '<div class="fc-tool no-print">캡처(윈도우 키 + Shift + S) 뒤 이 확인서에서 Ctrl+V · 칸에 끌어다 놓기 · '
+    +     '<button type="button" onclick="fcPickImg(' + i + ')">그림 고르기</button> '
+    +     '<button type="button" onclick="fcPasteClip(' + i + ')">캡처 붙여넣기</button> <span>(2장까지)</span>'
+    +     '<input type="file" id="fcFile_' + i + '" accept="image/*" multiple style="display:none" onchange="fcAddImgs(' + i + ', this.files); this.value=\'\';"></div></td></tr>'
     + '</table>'
     + '<div class="chg-apply">위 내용이 사실임을 확인합니다.</div>'
     + '<div class="chg-date">작성일 <input type="text" data-f="written_on" value="' + v('written_on') + '"></div>'
@@ -2552,8 +2588,63 @@ function fcOpen() {
 function fcRead(i) {
   const out = {};
   document.querySelectorAll('#fc_' + i + ' [data-f]').forEach(el => { out[el.dataset.f] = el.value; });
+  out.imgs = (FC[i] && Array.isArray(FC[i].imgs)) ? FC[i].imgs.slice(0, 2) : [];
   return out;
 }
+// ── 사실 확인서 캡처 그림 2장 (2026-11-27 은정님) ──
+let FC_LAST = -1;
+function fcDrawImgs(i) {
+  const dz = $('fcDrop_' + i), c = FC[i]; if (!dz || !c) return;
+  const n = c.imgs.length;
+  dz.className = 'fc-drop n' + n;
+  const sh = $('fc_' + i); if (sh) sh.classList.toggle('fcimg', n > 0);
+  dz.innerHTML = n ? c.imgs.map((src, k) => '<div class="fc-cell"><img src="' + src + '" alt="">'
+      + '<button type="button" class="fc-x no-print" data-k="' + k + '" title="빼기">✕</button></div>').join('')
+    : '캡처 그림을 여기로 끌어다 놓으세요 (누르면 그림 고르기 · 2장까지)';
+}
+function fcPickImg(i) { FC_LAST = i; const f = $('fcFile_' + i); if (f) f.click(); }
+async function fcAddImgs(i, list) {
+  const c = FC[i]; if (!c) return;
+  const fs = Array.from(list || []).filter(f => /^image\//.test(f.type));
+  if (!fs.length) { alert('그림 파일(JPG · PNG)만 넣을 수 있습니다.'); return; }
+  const room = 2 - c.imgs.length;
+  if (room <= 0) { alert('그림은 2장까지 넣을 수 있습니다. ✕ 로 하나를 뺀 뒤 넣어 주세요.'); return; }
+  if (fs.length > room) alert('2장까지만 넣을 수 있어 앞의 ' + room + '장만 넣습니다.');
+  for (const f of fs.slice(0, room)) {
+    try { c.imgs.push(await erShrink(f)); } catch (e) { alert(e.message || e); }
+  }
+  fcDrawImgs(i); fcDirty(i);
+}
+async function fcPasteClip(i) {
+  FC_LAST = i;
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    alert('이 브라우저는 단추로 붙여넣기가 안 됩니다.\n캡처한 뒤 이 확인서 칸을 한 번 누르고 Ctrl+V 를 눌러 주세요.'); return;
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    const fs = [];
+    for (const it of items) {
+      const t = it.types.find(x => /^image\//.test(x));
+      if (t) { const b = await it.getType(t); fs.push(new File([b], 'capture.png', { type: t })); }
+    }
+    if (!fs.length) { alert('복사된 캡처 그림이 없습니다.\n윈도우 키 + Shift + S 로 캡처한 뒤 다시 눌러 주세요.'); return; }
+    fcAddImgs(i, fs);
+  } catch (e) {
+    alert('붙여넣기를 하지 못했습니다. (' + (e.message || e) + ')\n이 확인서 칸을 한 번 누르고 Ctrl+V 를 눌러 주세요.');
+  }
+}
+document.addEventListener('paste', e => {
+  if (typeof ER_CUR !== 'undefined' && ER_CUR && $('erWrap').style.display === 'block') return;   // 사유서가 먼저
+  const w = $('fcWrap');
+  if (!w || w.style.display !== 'block' || !FC[FC_LAST]) return;
+  const cd = e.clipboardData; if (!cd) return;
+  let fs = Array.from(cd.files || []).filter(f => /^image\//.test(f.type));
+  if (!fs.length) fs = Array.from(cd.items || []).filter(it => it.kind === 'file' && /^image\//.test(it.type))
+                        .map(it => it.getAsFile()).filter(Boolean);
+  if (!fs.length) return;
+  e.preventDefault();
+  fcAddImgs(FC_LAST, fs);
+});
 async function fcSave(i, doneVal) {
   const c = FC[i]; if (!c) return;
   const bt = document.querySelector('#fc_' + i + ' .chg-save');
