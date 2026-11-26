@@ -2307,9 +2307,15 @@ async function erAddFiles(list) {
   const room = 4 - ER_CUR.imgs.length;
   if (room <= 0) { alert('소명자료 그림은 4장까지 넣을 수 있습니다.'); return; }
   if (fs.length > room) alert('4장까지만 넣을 수 있어 앞의 ' + room + '장만 넣습니다.');
+  let same = 0;
   for (const f of fs.slice(0, room)) {
-    try { ER_CUR.imgs.push(await erShrink(f)); } catch (e) { alert(e.message || e); }
+    try {
+      const u = await erShrink(f);
+      if (ER_CUR.imgs.indexOf(u) >= 0) { same++; continue; }   // 같은 그림은 두 번 안 넣음 (2026-11-27)
+      ER_CUR.imgs.push(u);
+    } catch (e) { alert(e.message || e); }
   }
+  if (same) alert('이미 넣은 그림과 같은 그림이라 넣지 않았습니다.\n새 화면을 캡처(윈도우 키 + Shift + S)해 영역을 고른 뒤 다시 붙여 넣어 주세요.');
   erDrawImgs(); erDirty();
 }
 async function erSave() {
@@ -2610,9 +2616,15 @@ async function fcAddImgs(i, list) {
   const room = 2 - c.imgs.length;
   if (room <= 0) { alert('그림은 2장까지 넣을 수 있습니다. ✕ 로 하나를 뺀 뒤 넣어 주세요.'); return; }
   if (fs.length > room) alert('2장까지만 넣을 수 있어 앞의 ' + room + '장만 넣습니다.');
+  let same = 0;
   for (const f of fs.slice(0, room)) {
-    try { c.imgs.push(await erShrink(f)); } catch (e) { alert(e.message || e); }
+    try {
+      const u = await erShrink(f);
+      if (c.imgs.indexOf(u) >= 0) { same++; continue; }
+      c.imgs.push(u);
+    } catch (e) { alert(e.message || e); }
   }
+  if (same) alert('이미 넣은 그림과 같은 그림이라 넣지 않았습니다.\n새 화면을 캡처(윈도우 키 + Shift + S)해 영역을 고른 뒤 다시 붙여 넣어 주세요.');
   fcDrawImgs(i); fcDirty(i);
 }
 async function fcPasteClip(i) {
