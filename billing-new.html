@@ -2014,7 +2014,10 @@ function sideMissing(childId) {
   const ks = Object.keys(sv);
   const cardSaved = ks.some(k => Number(k) !== 2);
   const bankSaved = ks.some(k => Number(k) === 2);
-  return (cal.card > 0 && !cardSaved) || cardUnsaved(childId) || (cal.bank > 0 && !bankSaved);
+  // 낸 뒤 카드 금액이 늘었는가 — 저장한 카드 쪽 금액 합보다 지금 카드 합계가 크면 미납 (2026-11-26 · 167번 보강 차액)
+  const savedCard = ks.filter(k => Number(k) !== 2).reduce((a, k) => a + (Number(sv[k].amount) || 0), 0);
+  const cardMore = cardSaved && cal.card > savedCard;
+  return (cal.card > 0 && !cardSaved) || cardUnsaved(childId) || cardMore || (cal.bank > 0 && !bankSaved);
 }
 
 function isUnpaid(childId) {
