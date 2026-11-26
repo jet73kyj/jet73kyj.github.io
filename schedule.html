@@ -5875,10 +5875,8 @@ $('gbody').addEventListener('click', async e => {
   if (mnd) {
     e.stopPropagation();
     const id = Number(mnd.dataset.mndel);
-    if (!confirm('직접 넣은 이 보강을 지울까요?')) return;
-    const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', id).select('id'));
-    if (error) { alert('지우지 못했습니다.\n' + error.message); return; }
-    SESS = SESS.filter(x => x.id !== id);
+    const r = await delSessRow(id, (m, ok) => { if (!ok) alert(m); }, '직접 넣은 이 보강을 지울까요?');
+    if (r !== 'ok' && r !== 'part') return;
     // 상자 셋 · 찾기 창도 다시 센다 (2026-10-01 전체 점검)
     await reloadAfterMk();
     draw();
@@ -8659,13 +8657,9 @@ $('mnFind').onclick = async () => {
 // 보강 취소 — 이 줄을 지운다 (고치기로 열었을 때만 보인다)
 $('mnDel').onclick = async () => {
   if (!mnEditId) { mnmsg('취소할 보강이 없습니다.', false); return; }
-  if (!confirm('이 보강을 취소할까요?\n\n지운 뒤에는 되돌릴 수 없습니다.')) return;
-  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', mnEditId).select('id'));
-  if (error) { mnmsg('❌ 취소하지 못했습니다.\n' + error.message, false); return; }
-  SESS = SESS.filter(v => v.id !== mnEditId);
-  PREV = PREV.filter(v => v.id !== mnEditId);
+  const r = await delSessRow(mnEditId, mnmsg, '이 보강을 취소할까요?\n\n지운 뒤에는 되돌릴 수 없습니다.');
+  if (r !== 'ok' && r !== 'part') return;
   mnEditId = null;
-  mnmsg('✅ 보강을 취소했습니다.', true);
   $('mnBox').style.display = 'none';
   // 상자 셋도 바로 다시 센다 (2026-10-01)
   await reloadAfterMk();
@@ -9575,15 +9569,10 @@ document.addEventListener('click', ev => {
 async function delMakeup(sid){
   const x = SESS.find(v => v.id === sid) || PREV.find(v => v.id === sid);
   if (!x) return;
-  if (!confirm('이 보강을 지울까요?\n\n'
-    + dayNo(x.plan_date) + '일 ' + String(x.start_time).slice(0,5)
-    + ' · ' + (x._name || '') + '\n\n'
-    + '원래 결석·휴무 줄은 그대로 남습니다.\n'
-    + '지운 뒤에는 되돌릴 수 없습니다.')) return;
-  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', sid).select('id'));
-  if (error) { alert('지우지 못했습니다.\n' + error.message); return; }
-  SESS = SESS.filter(v => v.id !== sid);
-  PREV = PREV.filter(v => v.id !== sid);
+  const r = await delSessRow(sid, (m, ok) => { if (!ok) alert(m); },
+    '이 보강을 지울까요?\n\n' + dayNo(x.plan_date) + '일 ' + String(x.start_time).slice(0,5)
+    + ' · ' + (x._name || '') + '\n\n원래 결석·휴무 줄은 그대로 남습니다.\n지운 뒤에는 되돌릴 수 없습니다.');
+  if (r !== 'ok' && r !== 'part') return;
   await loadMonth();
   draw();
 }
@@ -10694,31 +10683,62 @@ $('mkGiveup').onclick = async () => {
 };
 
 // 보강 취소 — 이 결석을 메우는 보강·쪼개기 조각을 모두 지운다 (2026-11-26 은정님)
-//   쪼개기는 여러 날에 흩어져 있어 화면 목록이 아니라 서버에서 다시 찾는다
+//   쪼개기는 여러 날 · 여러 달에 흩어져 있어 화면 목록이 아니라 서버에서 다시 찾는다
 //   (전에는 첫 줄 하나만 지워 조각이 남았음 — 113번 12/22)
-$('mkDel').onclick = async () => {
-  if (!mkSess) return;
+//   보강을 지우는 길(보강 잡기 창 · 직접 보강 창 · 시간표 ✕ · 줄 지우기)은 모두 여기를 부른다
+//   돌려줌: 'ok' 다 지움 / 'part' 일부만 / 'none' 지울 것 없음 / 'cancel' 안 함 / 'err' 오류
+async function cancelMakeupsFor(origId, say){
   const { data: rows, error: e0 } = await sb.from('nl_sessions')
     .select('id, plan_date, start_time, minutes, status')
-    .eq('makeup_for', mkSess.id).not('status', 'in', '("결석","취소")')
+    .eq('makeup_for', origId).not('status', 'in', '("결석","취소")')
     .order('plan_date').order('start_time');
-  if (e0) { mkmsg('❌ 보강을 찾지 못했습니다.\n' + e0.message, false); return; }
-  if (!rows || !rows.length) { mkmsg('취소할 보강이 없습니다.', false); return; }
+  if (e0) { say('❌ 보강을 찾지 못했습니다.\n' + e0.message, false); return 'err'; }
+  if (!rows || !rows.length) { say('취소할 보강이 없습니다.', false); return 'none'; }
   const list = rows.map(r => '· ' + monNo(String(r.plan_date).slice(0, 7)) + '월 ' + dayNo(r.plan_date) + '일 '
     + String(r.start_time).slice(0, 5) + ' ' + ((r.minutes && r.minutes < 40) ? '+' + r.minutes + '분' : '40분')
     + ' (' + r.status + ')').join('\n');
-  if (!confirm('이 결석을 메우는 보강 ' + rows.length + '개를 모두 취소할까요?\n\n' + list
-    + (rows.some(r => r.status === '완료') ? '\n\n※ 완료한 조각도 함께 지워집니다 (정산에서도 빠짐).' : ''))) return;
+  const many = rows.length > 1;
+  if (!confirm((many ? '이 결석을 메우는 보강 ' + rows.length + '개를 모두 취소할까요?\n(쪼개기는 함께 취소됩니다)'
+                     : '이 보강을 취소할까요?') + '\n\n' + list
+    + (rows.some(r => r.status === '완료') ? '\n\n※ 완료한 조각도 함께 지워집니다 (정산에서도 빠짐).' : '')
+    + '\n\n원래 결석·휴무 줄은 그대로 남습니다.')) return 'cancel';
   const ids = rows.map(r => r.id);
   const { data: gone, error } = await sb.from('nl_sessions').delete().in('id', ids).select('id');
-  if (error) { mkmsg('❌ 취소하지 못했습니다.\n' + error.message, false); return; }
-  if (!gone || gone.length !== ids.length) {
-    mkmsg('⚠ ' + ids.length + '개 중 ' + (gone ? gone.length : 0) + '개만 지웠습니다. 권한이나 확인 잠금을 확인해 주세요.', false);
-  }
+  if (error) { say('❌ 취소하지 못했습니다.\n' + error.message, false); return 'err'; }
   const goneSet = new Set((gone || []).map(r => r.id));
   SESS = SESS.filter(x => !goneSet.has(x.id));
   PREV = PREV.filter(x => !goneSet.has(x.id));
-  if (gone && gone.length === ids.length) mkmsg('✅ 보강 ' + ids.length + '개를 모두 취소했습니다.', true);
+  if (typeof NEXTM !== 'undefined') NEXTM = NEXTM.filter(x => !goneSet.has(x.id));
+  if (goneSet.size !== ids.length) {
+    say('⚠ ' + ids.length + '개 중 ' + goneSet.size + '개만 지웠습니다. 권한이나 확인 잠금을 확인해 주세요.', false);
+    return 'part';
+  }
+  say('✅ 보강 ' + (many ? ids.length + '개를 모두 ' : '을 ') + '취소했습니다.', true);
+  return 'ok';
+}
+// 줄 하나를 지울 때 — 결석을 메우는 보강이면 그 결석의 보강 전부, 아니면(직접 넣은 줄) 그 줄만
+async function delSessRow(sid, say, ask){
+  const x = SESS.find(v => v.id === sid) || PREV.find(v => v.id === sid)
+         || (typeof NEXTM !== 'undefined' ? NEXTM.find(v => v.id === sid) : null);
+  let mf = x ? x.makeup_for : null;
+  if (!x) {
+    const { data } = await sb.from('nl_sessions').select('makeup_for').eq('id', sid).maybeSingle();
+    mf = data ? data.makeup_for : null;
+  }
+  if (mf) return cancelMakeupsFor(mf, say);
+  if (!confirm(ask)) return 'cancel';
+  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', sid).select('id'));
+  if (error) { say('❌ 지우지 못했습니다.\n' + error.message, false); return 'err'; }
+  SESS = SESS.filter(v => v.id !== sid);
+  PREV = PREV.filter(v => v.id !== sid);
+  if (typeof NEXTM !== 'undefined') NEXTM = NEXTM.filter(v => v.id !== sid);
+  say('✅ 지웠습니다.', true);
+  return 'ok';
+}
+$('mkDel').onclick = async () => {
+  if (!mkSess) return;
+  const r = await cancelMakeupsFor(mkSess.id, mkmsg);
+  if (r !== 'ok' && r !== 'part') return;
   $('mkDel').style.display = 'none';
   await reloadAfterMk();
   draw();
