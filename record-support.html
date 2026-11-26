@@ -1367,6 +1367,43 @@ function paintRow(tr) {
   pd.classList.toggle('red', red);
   pd.innerHTML = payLine(p, tv, i);
 }
+// 직접 고친 일자 · 시간 칸 정리 (2026-11-26 은정님 — 「이대로 고치기」 없이도 고쳐 저장)
+//   일자: 「11월 5일」 · 「11/5」 · 「5일」 · 「5」(이 달) · 「2026-11-05」 → 「11월 5일」
+//   시간: 「16:00-16:40」 · 「1600-1640」 · 「4:00」(1~8시는 오후) · 시작만 적으면 끝 = 시작 + 수업 분
+function normDate(v) {
+  const t = String(v || '').trim(); if (!t) return '';
+  let m = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (m) return Number(m[2]) + '월 ' + Number(m[3]) + '일';
+  m = t.match(/^(\d{1,2})\s*(?:월|\/|\.|-)\s*(\d{1,2})\s*일?\.?$/);
+  if (m) return Number(m[1]) + '월 ' + Number(m[2]) + '일';
+  m = t.match(/^(\d{1,2})\s*일?$/);
+  if (m) return month + '월 ' + Number(m[1]) + '일';
+  return t;
+}
+function normHm(v) {
+  let t = String(v || '').trim(); if (!t) return null;
+  const pm = /오후|pm/i.test(t), am = /오전|am/i.test(t);
+  t = t.replace(/오전|오후|am|pm/ig, '').trim();
+  let h, mi;
+  let m = t.match(/^(\d{1,2})\s*[:시.]\s*(\d{1,2})?\s*분?$/);
+  if (m) { h = Number(m[1]); mi = Number(m[2] || 0); }
+  else if ((m = t.match(/^(\d{3,4})$/))) { h = Number(m[1].slice(0, -2)); mi = Number(m[1].slice(-2)); }
+  else if ((m = t.match(/^(\d{1,2})$/))) { h = Number(m[1]); mi = 0; }
+  else return null;
+  if (pm && h < 12) h += 12;
+  else if (!am && h >= 1 && h <= 8) h += 12;
+  if (h > 23 || mi > 59) return null;
+  return _hmOf(h * 60 + mi);
+}
+function normTime(v, p) {
+  const t = String(v || '').trim(); if (!t) return '';
+  const parts = t.split(/\s*[-~]\s*/);
+  const a = normHm(parts[0]);
+  if (!a) return t;
+  let b = parts[1] ? normHm(parts[1]) : null;
+  if (!b) b = _hmOf(_min(a) + payDur(p));
+  return a + '-' + b;
+}
 // 「이대로 고치기」 — 시각 칸에 대안을 넣음 (저장은 「저장」 단추)
 $('seqBody').addEventListener('click', e => {
   const b = e.target.closest('.q_fix'); if (!b) return;
@@ -1388,6 +1425,7 @@ $('seqBody').addEventListener('input', e => {
   paintRow(tr);
   drawTT();
   pcMarkEdited();
+  markDirty();
 });
 // 두 칸을 모두 비우고 나가면 다시 카드 결제 내용으로
 $('seqBody').addEventListener('change', e => {
@@ -1395,7 +1433,14 @@ $('seqBody').addEventListener('change', e => {
   const tr = e.target.closest('tr'); if (!tr) return;
   const i = Number(tr.dataset.i), p = PAY[i] || null;
   const qd = tr.querySelector('.q_date'), qt = tr.querySelector('.q_time');
-  if (qd.value.trim() || qt.value.trim()) return;
+  if (qd.value.trim() || qt.value.trim()) {
+    const nd = normDate(qd.value), nt = normTime(qt.value, p);
+    if (nd !== qd.value) qd.value = nd;
+    if (nt !== qt.value) qt.value = nt;
+    MAN[i] = true; EDITED[i] = true;
+    paintRow(tr); drawTT(); pcMarkEdited(); markDirty();
+    return;
+  }
   MAN[i] = false; EDITED[i] = true;
   if (p) { qd.value = payDateText(p); qt.value = payFixText(p); }
   paintRow(tr);
@@ -1477,6 +1522,10 @@ async function saveRecord() {
     const trs = document.querySelectorAll('#seqBody tr');
     const items = [];
     trs.forEach((tr, i) => {
+      if (MAN[i]) {                                   // 직접 고친 칸은 저장 전에 한 번 더 정리
+        const qd = tr.querySelector('.q_date'), qt = tr.querySelector('.q_time');
+        qd.value = normDate(qd.value); qt.value = normTime(qt.value, PAY[i] || null);
+      }
       const dtxt = tr.querySelector('.q_date').value;
       const dm = dtxt.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
       const iso = dm
