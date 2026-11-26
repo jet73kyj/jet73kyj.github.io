@@ -2314,7 +2314,7 @@ async function openAsk(d) {
        : '<label class="asklb">왜 못 오시는지 짧게 적어주세요</label>'
          + '<input id="askWhy" type="text" placeholder="예) 감기로 병원에 갑니다" maxlength="60">')
     + (partner
-       ? '<label class="pairchk"><input type="checkbox" id="askPair" checked>'
+       ? '<label class="pairchk"><input type="checkbox" id="askPair">'
          + '<span>같은 날 ' + esc(partner.t) + ' ' + esc(partner.nm) + ' 수업'
          + (THRS[partner.thr] ? '(' + esc(THRS[partner.thr]) + ' 선생님)' : '') + '도 못 가요</span></label>'
        : '')

@@ -4031,8 +4031,9 @@ async function markNoMakeup(btn) {
 
   // 예정 줄을 골랐으면 결석으로도 바꾼다 (사유를 다 받은 뒤에)
   if (pick.s === '예정' || pick.s === '완료') {
+    // 결석 · 보강 없음을 한 번에 — 따로 바꾸면 「결석으로 바뀌었습니다」 알림이 잘못 감 (2026-11-26)
     const up = await rowsOk(sb.from('nl_sessions')
-      .update({ status: '결석' }).eq('id', pick.id).select('id'));
+      .update({ status: '결석', no_makeup: true, no_makeup_why: why }).eq('id', pick.id).select('id'));
     if (up.error) { alert('바꾸지 못했습니다.\n' + up.error.message); return; }
   }
 
