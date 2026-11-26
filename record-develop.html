@@ -2176,8 +2176,8 @@ function erOpen(i) {
     + '<div class="er-pr">' + v('why', '') + '</div>'
     + '<div class="er-h">□ 소명자료(첨부자료 목록)</div>'
     + '<div class="er-drop" id="erDrop"></div>'
-    + '<div class="er-tool">그림을 칸 안으로 끌어다 놓거나 · 캡처 후 Ctrl+V · '
-    +   '<button type="button" id="erPick">그림 고르기</button> <span>(4장까지 · 칸 크기에 맞춰 줄어듭니다)</span>'
+    + '<div class="er-tool">그림을 칸 안으로 끌어다 놓거나 · 캡처(윈도우 키 + Shift + S) 뒤 Ctrl+V · '
+    +   '<button type="button" id="erPick">그림 고르기</button> <button type="button" id="erPaste">캡처 붙여넣기</button> <span>(4장까지 · 칸 크기에 맞춰 줄어듭니다)</span>'
     +   '<input type="file" id="erFile" accept="image/*" multiple style="display:none"></div>'
     + '<div class="er-date"><input type="text" data-f="day" maxlength="20" value="' + v('day', erTodayDot()) + '"></div>'
     + '<div class="er-sign">'
@@ -2210,6 +2210,7 @@ function erOpen(i) {
     if (!ER_CUR.imgs.length) $('erFile').click();
   });
   $('erPick').onclick = () => $('erFile').click();
+  $('erPaste').onclick = erPasteClip;
   $('erFile').onchange = e => { erAddFiles(e.target.files); e.target.value = ''; };
   $('erSave').onclick = erSave;
   $('erPrint').onclick = erPrint;
@@ -2223,11 +2224,32 @@ function erOpen(i) {
 // 캡처 붙여넣기 — 사유서가 열려 있을 때만
 document.addEventListener('paste', e => {
   if (!ER_CUR || $('erWrap').style.display !== 'block') return;
-  const fs = Array.from((e.clipboardData && e.clipboardData.files) || []).filter(f => /^image\//.test(f.type));
+  const cd = e.clipboardData; if (!cd) return;
+  let fs = Array.from(cd.files || []).filter(f => /^image\//.test(f.type));
+  if (!fs.length) fs = Array.from(cd.items || []).filter(it => it.kind === 'file' && /^image\//.test(it.type))
+                        .map(it => it.getAsFile()).filter(Boolean);
   if (!fs.length) return;
   e.preventDefault();
   erAddFiles(fs);
 });
+// 「캡처 붙여넣기」 단추 — 윈도우 키 + Shift + S 로 캡처한 뒤 누름
+async function erPasteClip() {
+  if (!navigator.clipboard || !navigator.clipboard.read) {
+    alert('이 브라우저는 단추로 붙여넣기가 안 됩니다.\n캡처한 뒤 사유서 화면에서 Ctrl+V 를 눌러 주세요.'); return;
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    const fs = [];
+    for (const it of items) {
+      const t = it.types.find(x => /^image\//.test(x));
+      if (t) { const b = await it.getType(t); fs.push(new File([b], 'capture.png', { type: t })); }
+    }
+    if (!fs.length) { alert('복사된 캡처 그림이 없습니다.\n윈도우 키 + Shift + S 로 캡처한 뒤 다시 눌러 주세요.'); return; }
+    erAddFiles(fs);
+  } catch (e) {
+    alert('붙여넣기를 하지 못했습니다. (' + (e.message || e) + ')\n사유서 화면에서 Ctrl+V 를 눌러 주세요.');
+  }
+}
 function erDirty() {
   if (!ER_CUR) return;
   ER_CUR.dirty = true;
