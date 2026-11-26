@@ -2165,7 +2165,7 @@ function erCases() {
   document.querySelectorAll('#statusTbl tbody tr').forEach((tr, i) => {
     if (i >= SESSIONS) return;
     const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
-    if (/^예외/.test(no)) out.push({ i, key: mkNow() + ':' + (i + 1), no });
+    if (/^예외/.test(no) && !out.some(x => x.no === no)) out.push({ i, key: mkNow() + ':' + no, no, old: mkNow() + ':' + (i + 1) });
   });
   return out;
 }
@@ -2178,7 +2178,7 @@ function erOpen(i) {
   if (!c) { alert('이 회차는 예외결제가 아닙니다.'); return; }
   if (ER_CUR && ER_CUR.dirty && ER_CUR.key !== c.key
       && !confirm('지금 열린 사유서에 저장하지 않은 글이 있습니다.\n그래도 다른 사유서를 열까요?')) return;
-  const doc = ER_DOCS[c.key], d = (doc && doc.data) || {};
+  const doc = ER_DOCS[c.key] || ER_DOCS[c.old], d = (doc && doc.data) || {};   // 옛 열쇠(회차 번호)로 저장된 것도 읽음
   ER_CUR = { i, key: c.key, no: c.no, imgs: (d.imgs || []).slice(0, 4), dirty: false };
   const th = String(($('s1_therapistName_' + (i + 1)) || {}).value || '').trim();
   const v = (f, def) => esc(d[f] != null ? d[f] : def);
@@ -3256,7 +3256,7 @@ function dlDraw() {
   if (!eps.length) h += lab(DL_HAS['계획서'] ? 'has' : 'none', '계획서', 'data-dl="계획서"');
   eps.forEach((e, i) => { h += lab(dlPlanState(eps, i), '계획서' + (i ? (i + 1) : '') + ' · ' + (PL_SHORT[e.type] || '기타'), 'data-dl="계획서" data-ep="' + i + '"'); });
   erCases().forEach(c => {
-    const d = ER_DOCS[c.key];
+    const d = ER_DOCS[c.key] || ER_DOCS[c.old];
     const st = (d && d.done) ? 'done' : 'need';
     h += lab(st, '사유서 · ' + (c.i + 1) + '회', 'data-dl="사유서" data-ep="' + c.i + '"');
   });
@@ -3920,7 +3920,7 @@ async function saveRecord(opts) {
     //   한 회차의 내용(시간 · 승인 · 이용자 상태 · 결과 · 특이사항 · 소급 · 담당 · 서비스 종류)은 통째로 옮긴다
     //   날짜 빈 회차(포기 등)는 맨 뒤 · 10월 기록지부터 (9월은 서명이 끝나 손대지 않음)
     let reordered = false;
-    if (mk >= AUTO_FROM) {
+    if (true) {                                     // 9월 이전도 날짜 차례로 (2026-11-27 은정님)
       const order = items.map((it, k) => ({ it, k }))
         .sort((a, b) => {
           const da = a.it.service_date || '9999-99-99', db = b.it.service_date || '9999-99-99';
