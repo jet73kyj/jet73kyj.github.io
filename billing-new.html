@@ -2617,8 +2617,15 @@ function drawKid(c) {
            + '<input class="dt bday" type="date" value="' + (ds && ds.paid_on ? ds.paid_on : '') + '">'
            + '<input class="tx bmemo" type="text" placeholder="입금자명" value="'
            + esc(payerOf(c.id)) + '">'
-           + '<button class="ksave2' + (sideSaved(c.id, 'bank') ? ' done' : '') + '" type="button" data-only="bank"'
-           + ' data-ttl="계좌 저장 전">' + (sideSaved(c.id, 'bank') ? '\u2713 저장됨' : '계좌 저장 전') + '</button></div>'
+           // 금액이 있는데 낸 날 없이 저장된 줄은 「미납으로 저장됨」 (2026-11-26 — 저장됨과 헷갈리지 않게)
+           + (() => {
+               const sv2 = (SAVED[c.id] || {})[2];
+               const ok = sideSaved(c.id, 'bank');
+               const unp = ok && sv2 && Number(sv2.amount) > 0 && !sv2.paid_on;
+               return '<button class="ksave2' + (ok ? ' done' : '') + '" type="button" data-only="bank"'
+                 + (unp ? ' style="background:#FFF3E0;color:#B45309;border:1px solid #F0B36B"' : '')
+                 + ' data-ttl="계좌 저장 전">' + (unp ? '미납으로 저장됨' : ok ? '\u2713 저장됨' : '계좌 저장 전') + '</button>';
+             })() + '</div>'
            + '<div class="pay"><input class="tx brf" type="text" style="flex:1 1 auto;"'
            + ' placeholder="환불 메모 — 은행 · 예금주 · 끝 4자리 · 금액 · 날짜 (적으면 이번 달 0원)"'
            + ' value="' + esc(srf) + '"></div>')
