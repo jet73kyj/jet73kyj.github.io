@@ -6264,14 +6264,18 @@ async function refreshRuns(scheduleId){
     // 예정·쉼·휴무를 지운다. 나눠 진행하는 발추 줄([분산5회])은 남긴다
     //   오늘부터만 지운다 — 지난 날짜는 손대지 않는다 (2026-11-02)
     //   (지난 휴무·쉼을 지웠다 다시 깔면 선생님이 확인한 날이 풀렸음)
-    const { data: olds } = await sb.from('nl_sessions')
+    const { data: olds, error: eO } = await sb.from('nl_sessions')
       .select('id, memo')
       .eq('schedule_id', scheduleId).eq('month_key', mon)
       .gte('plan_date', todayKr())
       .in('status', ['예정','쉼','휴무']);
+    if (eO) throw eO;
     const kill = (olds || []).filter(v => !isSplitRun(v)).map(v => v.id);
-    if (kill.length) await sb.from('nl_sessions').delete().in('id', kill);
-    await sb.rpc('nl_make_sessions', { p_month: mon });
+    if (kill.length) {
+      const { error: eK } = await sb.from('nl_sessions').delete().in('id', kill);
+      if (eK) throw eK;
+    }
+    { const { error: eM } = await sb.rpc('nl_make_sessions', { p_month: mon }); if (eM) throw eM; }
     await loadMonth();
     return true;
   } catch (e) {
@@ -6822,7 +6826,8 @@ async function applySplit(schedId, minutes){
     if (i >= 0) SESS[i] = Object.assign({}, SESS[i], up); else SESS.push(up);
     if (auto.length > 1) {
       const extra = auto.slice(1).map(v => v.id);
-      await sb.from('nl_sessions').delete().in('id', extra);
+      const { error: eX } = await sb.from('nl_sessions').delete().in('id', extra);
+      if (eX) return eX.message;
       SESS = SESS.filter(z => extra.indexOf(z.id) < 0);
     }
   } else {
@@ -6882,7 +6887,7 @@ async function undoRest(){
     // 화면이 들고 있는 값도 함께 바꾼다 (안 그러면 「쉬는 중」 표시가 남는다)
     edRow.from_month = null;
     { const rr = ROWS.find(x => x.id === edRow.id); if (rr) rr.from_month = null; }
-    await sb.rpc('nl_make_sessions', { p_month: mon });
+    { const { error: eM } = await sb.rpc('nl_make_sessions', { p_month: mon }); if (eM) throw eM; }
     await loadMonth(); draw();
     edmsg('✅ ' + monNo(mon) + '월 수업을 다시 살렸습니다.', true);
     $('edBox').style.display = 'none';
@@ -7461,8 +7466,9 @@ async function changeTherapistFrom(th, du, applyD){
         .eq('schedule_id', ns.id).is('makeup_for', null).gte('plan_date', from);
       const mids = (moved || []).map(v => v.id);
       for (let i = 0; i < mids.length; i += 200) {
-        await sb.from('nl_sessions').update({ schedule_id: ns.id })
+        const { error: eMv } = await sb.from('nl_sessions').update({ schedule_id: ns.id })
           .in('makeup_for', mids.slice(i, i + 200));
+        if (eMv) throw new Error('옮긴 수업의 보강을 잇지 못했습니다 — ' + eMv.message);
       }
     }
     if (!pastN) {
@@ -7637,15 +7643,18 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     //    옛 줄이 남아 같은 날에 두 줄이 그려진다
     //    변경 시작일이 있으면 그 날부터의 것만 지운다.
     //    그 날 앞의 회기(이미 한 수업)는 옛 시각 그대로 남는다
-    if (_d) {
-      await sb.from('nl_sessions').delete()
-        .eq('schedule_id', edRow.id).gte('plan_date', _cutDel)
-        .in('status', ['예정','쉼','휴무']);
-    } else {
-      await sb.from('nl_sessions').delete()
-        .eq('schedule_id', edRow.id).gte('month_key', mon)
-        .gte('plan_date', _cutDel)
-        .in('status', ['예정','쉼','휴무']);
+    // 지우기가 실패하면 옛 줄이 남아 같은 날 두 줄이 된다 → 멈추고 알림 (2026-11-26)
+    {
+      const _dq = _d
+        ? sb.from('nl_sessions').delete()
+            .eq('schedule_id', edRow.id).gte('plan_date', _cutDel)
+            .in('status', ['예정','쉼','휴무'])
+        : sb.from('nl_sessions').delete()
+            .eq('schedule_id', edRow.id).gte('month_key', mon)
+            .gte('plan_date', _cutDel)
+            .in('status', ['예정','쉼','휴무']);
+      const { error: eOld } = await _dq;
+      if (eOld) throw new Error('옛 회기를 지우지 못했습니다 — ' + eOld.message);
     }
 
     // ④-1 옛 요일에 미리 표시해 둔 「앞날 결석」도 지운다 (2026-10-02)
@@ -7685,14 +7694,20 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
     // ④-2 요일줄과 연결이 끊긴 예정 회기도 함께 지운다
     //     옛날에 요일줄을 지우던 시절의 흔적이 남아 있으면
     //     요일을 옮겨도 옛 자리가 그대로 보인다
-    await sb.from('nl_sessions').delete()
-      .eq('therapy_id', edRow.therapy_id)
-      .is('schedule_id', null)
-      .gte('month_key', mon).gte('plan_date', _cutDel)
-      .in('status', ['예정','쉼','휴무']);
+    {
+      const { error: eLoose } = await sb.from('nl_sessions').delete()
+        .eq('therapy_id', edRow.therapy_id)
+        .is('schedule_id', null)
+        .gte('month_key', mon).gte('plan_date', _cutDel)
+        .in('status', ['예정','쉼','휴무']);
+      if (eLoose) throw new Error('끊긴 회기를 지우지 못했습니다 — ' + eLoose.message);
+    }
 
     // ⑤ 새 요일로 이번 달 회기를 깐다
-    await sb.rpc('nl_make_sessions', { p_month: mon });
+    {
+      const { error: eMk } = await sb.rpc('nl_make_sessions', { p_month: mon });
+      if (eMk) throw new Error('새 요일로 회기를 깔지 못했습니다 — ' + eMk.message);
+    }
 
     // ⑥ 뒷정리 (2026-09-10)
     //    · 회기가 하나도 안 남은 옛 요일줄을 지운다
@@ -12477,9 +12492,11 @@ $('grpList').addEventListener('click', async e => {
 
       // 그날부터 아직 안 한 회기 지우기 (완료 · 결석 · 보강은 그대로)
 
-      await sb.from('nl_sessions').delete().eq('therapy_id', tid).gte('plan_date', d)
+      const { error: eGd } = await sb.from('nl_sessions').delete().eq('therapy_id', tid).gte('plan_date', d)
 
         .in('status', ['예정', '쉼', '휴무']).is('makeup_for', null);
+
+      if (eGd) { grpmsg('⚠ 그룹에서는 뺐지만 남은 회기를 지우지 못했습니다 — ' + eGd.message, false); return; }
 
       grpmsg('✅ ' + t.child_id + '번을 뺐습니다.', true);
 
