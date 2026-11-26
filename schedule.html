@@ -2611,7 +2611,9 @@ function waitOkFor(v, wd, thId){
 function grpJoin(list, render){
   const out = [], host = {};
   list.forEach(x => {
-    const g = (!isMk(x) && x.schedule_id && GTH[x.therapy_id]) ? String(GTH[x.therapy_id]) : '';
+    // 그룹 추가 수업 — 같은 선생님 · 같은 날 · 같은 시각이면 한 카드에 (2026-11-26)
+    const g = (!isMk(x) && x.schedule_id && GTH[x.therapy_id]) ? String(GTH[x.therapy_id])
+            : x._xGrp ? 'XG|' + x.therapist_id + '|' + x.plan_date + '|' + String(x.start_time).slice(0, 5) : '';
     if (g && host[g] !== undefined) {
       const i = host[g], h = out[i], at = h.lastIndexOf('</div>');
       out[i] = h.slice(0, at) + gsubHtml(x) + h.slice(at);
@@ -11130,7 +11132,7 @@ async function loadMonth(){
   //   평가 칸 모양을 그대로 빌려 쓰고(_isEval), 색·글만 체험으로 바꾼다
   try {
     const { data: tl } = await sb.from('nl_trial_lessons')
-      .select('id, child_id, lesson_date, lesson_time, therapist_id, status, duration_min, kind')
+      .select('id, child_id, lesson_date, lesson_time, therapist_id, status, duration_min, kind, is_group')
       .gte('lesson_date', mon + '-01').lte('lesson_date', monEnd(mon));
     (tl || []).forEach(function(t){
       if (!t.lesson_date || !t.lesson_time) return;
@@ -11156,7 +11158,8 @@ async function loadMonth(){
         memo: isX ? '추가' : '체험',
         _isEval: true,
         _isTrial: true,
-        _isExtra: isX
+        _isExtra: isX,
+        _xGrp: isX && !!t.is_group
       });
     });
   } catch (e) { /* 체험을 못 읽어도 시간표는 그린다 */ }
