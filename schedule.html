@@ -10713,10 +10713,14 @@ async function cancelMakeupsFor(origId, say){
     + String(r.start_time).slice(0, 5) + ' ' + ((r.minutes && r.minutes < 40) ? '+' + r.minutes + '분' : '40분')
     + ' (' + r.status + ')').join('\n');
   const many = rows.length > 1;
+  // 조각이 다 차서 원래 줄이 「완료」가 된 경우 — 조각을 지워도 원래 줄은 완료로 남는다 (2026-11-26)
+  const { data: org } = await sb.from('nl_sessions').select('status').eq('id', origId).maybeSingle();
+  const orgDone = !!(org && org.status === '완료' && rows.some(r => r.minutes && r.minutes < 40));
   if (!confirm((many ? '이 결석을 메우는 보강 ' + rows.length + '개를 모두 취소할까요?\n(쪼개기는 함께 취소됩니다)'
                      : '이 보강을 취소할까요?') + '\n\n' + list
     + (rows.some(r => r.status === '완료') ? '\n\n※ 완료한 조각도 함께 지워집니다 (정산에서도 빠짐).' : '')
-    + '\n\n원래 결석·휴무 줄은 그대로 남습니다.')) return 'cancel';
+    + (orgDone ? '\n\n⚠ 조각으로 채워 원래 수업이 「완료」로 되어 있습니다.\n지운 뒤 찾기 창에서 원래 수업을 결석으로 바꿔 주세요.'
+               : '\n\n원래 결석·휴무 줄은 그대로 남습니다.'))) return 'cancel';
   const ids = rows.map(r => r.id);
   const { data: gone, error } = await sb.from('nl_sessions').delete().in('id', ids).select('id');
   if (error) { say('❌ 취소하지 못했습니다.\n' + error.message, false); return 'err'; }
@@ -10728,19 +10732,28 @@ async function cancelMakeupsFor(origId, say){
     say('⚠ ' + ids.length + '개 중 ' + goneSet.size + '개만 지웠습니다. 권한이나 확인 잠금을 확인해 주세요.', false);
     return 'part';
   }
-  say('✅ 보강 ' + (many ? ids.length + '개를 모두 ' : '을 ') + '취소했습니다.', true);
+  say('✅ 보강 ' + (many ? ids.length + '개를 모두 ' : '을 ') + '취소했습니다.'
+    + (orgDone ? '\n⚠ 원래 수업이 「완료」로 남아 있습니다. 결석으로 바꿔 주세요.' : ''), !orgDone);
+  if (orgDone) alert('⚠ 조각을 지웠지만 원래 수업은 「완료」로 남아 있습니다.\n찾기 창에서 원래 수업을 결석으로 바꿔 주세요.');
   return 'ok';
 }
 // 줄 하나를 지울 때 — 결석을 메우는 보강이면 그 결석의 보강 전부, 아니면(직접 넣은 줄) 그 줄만
 async function delSessRow(sid, say, ask){
+  // 체험 · 추가 · 평가 줄은 회기가 아니다 (번호 앞 T · X) — 그 화면에서 지운다
+  if (!Number.isFinite(Number(sid))) {
+    say('체험 · 추가 수업 · 평가는 여기서 지우지 않습니다.\n신규 상담 · 아동 목록 · 납부 계산에서 「취소」해 주세요.', false);
+    return 'none';
+  }
+  sid = Number(sid);
   const x = SESS.find(v => v.id === sid) || PREV.find(v => v.id === sid)
          || (typeof NEXTM !== 'undefined' ? NEXTM.find(v => v.id === sid) : null);
-  let mf = x ? x.makeup_for : null;
+  let mf = x ? x.makeup_for : null, st = x ? x.status : null;
   if (!x) {
-    const { data } = await sb.from('nl_sessions').select('makeup_for').eq('id', sid).maybeSingle();
-    mf = data ? data.makeup_for : null;
+    const { data } = await sb.from('nl_sessions').select('makeup_for, status').eq('id', sid).maybeSingle();
+    mf = data ? data.makeup_for : null; st = data ? data.status : null;
   }
-  if (mf) return cancelMakeupsFor(mf, say);
+  // 살아 있는 보강이면 그 결석의 보강 · 조각을 모두 — 이미 결석(안 함) · 취소된 보강 줄은 그 줄만 지운다
+  if (mf && st !== '결석' && st !== '취소') return cancelMakeupsFor(mf, say);
   if (!confirm(ask)) return 'cancel';
   const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', sid).select('id'));
   if (error) { say('❌ 지우지 못했습니다.\n' + error.message, false); return 'err'; }
