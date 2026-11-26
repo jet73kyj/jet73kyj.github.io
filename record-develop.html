@@ -2171,8 +2171,8 @@ function erOpen(i) {
     + '<div class="er-title">사실 확인서</div>'
     + '<div class="er-row">아동명 : <input type="text" data-f="kid" maxlength="30" value="' + v('kid', child ? child.name : '') + '"></div>'
     + '<div class="er-row">사업명 : 발달재활서비스</div>'
-    + '<div class="er-h">□ 사유</div>'
-    + '<textarea class="er-why" data-f="why" maxlength="600" placeholder="사유를 적어 주세요 (600자까지)">' + v('why', '') + '</textarea>'
+    + '<div class="er-h">□ 확인 내용</div>'
+    + '<textarea class="er-why" data-f="why" maxlength="600" placeholder="확인 내용을 적어 주세요 (600자까지)">' + v('why', '') + '</textarea>'
     + '<div class="er-pr">' + v('why', '') + '</div>'
     + '<div class="er-h">□ 소명자료(첨부자료 목록)</div>'
     + '<div class="er-drop" id="erDrop"></div>'
@@ -2304,7 +2304,7 @@ async function erSave() {
   d.imgs = ER_CUR.imgs.slice(0, 4);
   d.seq = ER_CUR.i + 1; d.appr_no = ER_CUR.no;
   const done = !!String(d.why || '').trim();
-  if (!done && !confirm('사유가 비어 있습니다. 그래도 저장할까요?\n(사유를 적어야 라벨이 「작성 끝」으로 바뀝니다)')) return;
+  if (!done && !confirm('확인 내용이 비어 있습니다. 그래도 저장할까요?\n(확인 내용을 적어야 라벨이 「작성 끝」으로 바뀝니다)')) return;
   if (b) { b.disabled = true; b.textContent = '저장 중…'; }
   const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const row = { child_id: Number(childId), doc_type: '예외사유', doc_key: ER_CUR.key, data: d,
