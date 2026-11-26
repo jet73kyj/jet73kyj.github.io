@@ -1343,7 +1343,7 @@ function payEarly(p, timeText) {
   if (!p || !p.paid_time) return false;
   const st = _min(timeText) != null ? _min(timeText) : _min(p.cls_start);
   const pt = _min(p.paid_time);
-  return st != null && pt != null && pt < st + 40;
+  return st != null && pt != null && pt < st + 39;   // 1분 이른 결제는 봐줌 (2026-11-26 은정님)
 }
 function payAlt(p) {
   const pt = _min(p.paid_time); if (pt == null) return '';
