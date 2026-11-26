@@ -221,6 +221,43 @@
   .rpsheet .rp-tbl input { border:none !important; background:transparent !important; }
   .rpsheet .rp-pr.m { min-height:22mm; } .rpsheet .rp-pr.b { min-height:34mm; }
 }
+
+/* 예외지급 사유서 (2026-11-26 은정님) — A4 한 장 안에 꼭 들어가게 칸마다 높이를 못 박음 */
+.ersheet { font-size:13px; }
+.ersheet .er-title { text-align:center; font-size:20px; font-weight:700; letter-spacing:4px; margin:0 0 18px; }
+.ersheet .er-row { display:flex; align-items:center; gap:6px; margin:0 0 10px; font-weight:600; }
+.ersheet .er-row input { width:220px; display:inline-block; font-weight:400; }
+.ersheet .er-h { font-weight:700; margin:16px 0 6px; }
+.ersheet textarea.er-why { width:100%; height:52mm; resize:none; line-height:1.7; font-size:13px; }
+.ersheet .er-pr { display:none; white-space:pre-wrap; line-height:1.7; height:52mm; overflow:hidden; }
+.ersheet .er-drop { border:2px dashed #C9A27E; border-radius:8px; height:105mm; padding:4px; box-sizing:border-box;
+  display:grid; gap:4px; background:#FFFBF6; position:relative; overflow:hidden; }
+.ersheet .er-drop.n0 { display:flex; align-items:center; justify-content:center; color:#9a8a76; font-size:12.5px; text-align:center; cursor:pointer; }
+.ersheet .er-drop.n1 { grid-template-columns:1fr; grid-template-rows:1fr; }
+.ersheet .er-drop.n2 { grid-template-columns:1fr 1fr; grid-template-rows:1fr; }
+.ersheet .er-drop.n3, .ersheet .er-drop.n4 { grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+.ersheet .er-drop.over { background:#F4E9DC; }
+.ersheet .er-cell { position:relative; min-width:0; min-height:0; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+.ersheet .er-cell img { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+.ersheet .er-cell .er-x { position:absolute; top:2px; right:2px; width:auto !important; margin:0 !important; padding:0 7px !important;
+  font-size:12px !important; background:#fff !important; color:#c0392b !important; border:1px solid #c0392b !important; border-radius:4px; cursor:pointer; }
+.ersheet .er-tool { font-size:12px; color:#7a6a55; margin:6px 0 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.ersheet .er-tool button { width:auto !important; margin:0 !important; padding:3px 10px !important; font-size:12px !important;
+  background:#fff !important; color:#7E5530 !important; border:1px solid #D9C3A7 !important; border-radius:6px; cursor:pointer; }
+.ersheet .er-date { text-align:center; margin:16px 0 14px; font-weight:600; }
+.ersheet .er-date input { width:150px; text-align:center; display:inline-block; }
+.ersheet .er-sign { margin-left:52%; line-height:2.1; font-weight:600; }
+.ersheet .er-sign input { width:120px; display:inline-block; font-weight:400; }
+@media print {
+  .ersheet { font-size:12px !important; height:262mm; overflow:hidden; }
+  .ersheet .er-title { font-size:18px; margin:0 0 7mm; }
+  .ersheet textarea.er-why { display:none !important; }
+  .ersheet .er-pr { display:block !important; }
+  .ersheet .er-drop { border:none; background:transparent; padding:0; }
+  .ersheet .er-drop.n0 { color:transparent; }
+  .ersheet .er-tool { display:none !important; }
+  .ersheet input { border:none !important; background:transparent !important; }
+}
 #fcBox { margin:0 0 12px; padding:10px 14px; border-radius:8px; font-size:12.5px; line-height:1.7; }
 #fcBox.need { background:#FDECEA; border-left:3px solid #D8684A; color:#7A2E1E; }
 #fcBox.ok   { background:#EAF4EC; border-left:3px solid #5E9A6E; color:#2E6B3E; }
@@ -521,6 +558,8 @@
 <div class="container docwrap" id="chgWrap" style="display:none;"></div>
 <!-- 사실 확인서 [서식 27호] (2026-10-09) -->
 <div class="container docwrap" id="fcWrap" style="display:none;"></div>
+<!-- 예외지급 사유서 (2026-11-26) -->
+<div class="container docwrap" id="erWrap" style="display:none;"></div>
 <!-- 중간 · 종결 보고서 [서식 11-1호] (2026-10-09) -->
 <div class="container docwrap" id="rpWrap" style="display:none;"></div>
 <!-- 제공(이용) 계획서 [서식 8호] (2026-10-09) -->
@@ -1208,6 +1247,7 @@ async function loadOne() {
     kbView('sheet');
     loadChg(cid, mk);
     fcLoadDocs(cid, mk);
+    erLoad(cid, mk);
     rpLoad(cid, mk);
     plLoad(cid, mk);
     dlLoad(cid);
@@ -1545,6 +1585,7 @@ document.addEventListener('click', e => {
   an.value = b.dataset.v;
   an.dispatchEvent(new Event('input', { bubbles: true }));
   _apprWarn();
+  dlDraw();                                       // 예외결제면 「사유서」 라벨이 생김 (2026-11-26)
   if (typeof SAVING !== 'undefined' && SAVING) return;
   saveRecord();                                   // [예외결제] · [포기]도 바로 저장 (2026-10-23)
 });
@@ -1873,6 +1914,7 @@ function chgReset() {
   const b = $('chgBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('chgWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
   fcReset();
+  erReset();
   rpReset();
   plReset();
   dlReset();
@@ -2075,6 +2117,203 @@ window.addEventListener('beforeunload', e => {
 
 
 // ═════════════════════════════════════════════
+
+// ═════════════════════════════════════════════
+// 예외지급 사유서 (2026-11-26 은정님)
+//   기록지 회차에 [예외결제]를 누르면 오른쪽에 「사유서 · ○회」 라벨이 생김 — 회차마다 한 장
+//   아동명 · 사유 · 담당치료사는 직접 적음 · 소명자료는 그림을 끌어다 넣음 (4장까지)
+//   A4 한 장 — 사유 칸 52mm · 소명자료 칸 105mm 로 못 박아 글 · 그림이 넘쳐도 용지를 벗어나지 않음
+//   저장 = nl_dev_docs (doc_type 예외사유 · 열쇠 「YYYY-MM:회차」) · 그림은 줄여서 글 안에 담음
+// ═════════════════════════════════════════════
+let ER_DOCS = {}, ER_MK = '', ER_REQ = 0, ER_CUR = null;   // ER_CUR = {i, key, imgs, dirty}
+function erReset() {
+  ER_DOCS = {}; ER_MK = ''; ER_REQ++; ER_CUR = null;
+  const w = $('erWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
+}
+async function erLoad(cid, mk) {
+  const req = ++ER_REQ;
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .select('id, doc_key, data, done, done_on, updated_at')
+      .eq('child_id', Number(cid)).eq('doc_type', '예외사유').like('doc_key', mk + ':%');
+    if (error) throw error;
+    if (req !== ER_REQ) return;
+    ER_DOCS = {}; (data || []).forEach(d => { ER_DOCS[d.doc_key] = d; });
+    ER_MK = mk;
+  } catch (e) { console.warn('사유서를 불러오지 못했습니다', e); }
+  dlDraw();
+}
+function erCases() {
+  const out = [];
+  if (!LOADED || !child) return out;
+  document.querySelectorAll('#statusTbl tbody tr').forEach((tr, i) => {
+    if (i >= SESSIONS) return;
+    const no = String((tr.querySelector('.st_apprNo') || {}).value || '').trim();
+    if (/^예외/.test(no)) out.push({ i, key: mkNow() + ':' + (i + 1), no });
+  });
+  return out;
+}
+function erTodayDot() {
+  const d = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10).split('-');
+  return d[0] + '. ' + Number(d[1]) + '. ' + Number(d[2]) + '.';
+}
+function erOpen(i) {
+  const c = erCases().find(x => x.i === i);
+  if (!c) { alert('이 회차는 예외결제가 아닙니다.'); return; }
+  if (ER_CUR && ER_CUR.dirty && ER_CUR.key !== c.key
+      && !confirm('지금 열린 사유서에 저장하지 않은 글이 있습니다.\n그래도 다른 사유서를 열까요?')) return;
+  const doc = ER_DOCS[c.key], d = (doc && doc.data) || {};
+  ER_CUR = { i, key: c.key, no: c.no, imgs: (d.imgs || []).slice(0, 4), dirty: false };
+  const th = String(($('s1_therapistName_' + (i + 1)) || {}).value || '').trim();
+  const v = (f, def) => esc(d[f] != null ? d[f] : def);
+  const w = $('erWrap');
+  w.innerHTML = '<div class="sheet chgsheet ersheet on" id="er_sheet">'
+    + '<div class="er-title">사실 확인서</div>'
+    + '<div class="er-row">아동명 : <input type="text" data-f="kid" maxlength="30" value="' + v('kid', child ? child.name : '') + '"></div>'
+    + '<div class="er-row">사업명 : 발달재활서비스</div>'
+    + '<div class="er-h">□ 사유</div>'
+    + '<textarea class="er-why" data-f="why" maxlength="600" placeholder="사유를 적어 주세요 (600자까지)">' + v('why', '') + '</textarea>'
+    + '<div class="er-pr">' + v('why', '') + '</div>'
+    + '<div class="er-h">□ 소명자료(첨부자료 목록)</div>'
+    + '<div class="er-drop" id="erDrop"></div>'
+    + '<div class="er-tool">그림을 칸 안으로 끌어다 놓거나 · 캡처 후 Ctrl+V · '
+    +   '<button type="button" id="erPick">그림 고르기</button> <span>(4장까지 · 칸 크기에 맞춰 줄어듭니다)</span>'
+    +   '<input type="file" id="erFile" accept="image/*" multiple style="display:none"></div>'
+    + '<div class="er-date"><input type="text" data-f="day" maxlength="20" value="' + v('day', erTodayDot()) + '"></div>'
+    + '<div class="er-sign">'
+    +   '<div>제공기관명 : 자라는 나무</div>'
+    +   '<div>사업자등록번호 : 314-82-75463</div>'
+    +   '<div>기 관 장 : 김 은 정 <span class="chg-ins" style="width:56px;height:20px;vertical-align:middle;">(인)<img class="chg-stamp" alt=""'
+    +     (CHG_STAMP ? ' src="' + CHG_STAMP + '" style="display:inline"' : '') + '></span></div>'
+    +   '<div>담당치료사 : <input type="text" data-f="th" maxlength="20" value="' + v('th', th) + '"></div>'
+    + '</div>'
+    + '<div class="chg-act no-print">'
+    +   '<span style="font-weight:600;">' + (i + 1) + '회째 · ' + esc(c.no) + '</span>'
+    +   '<button type="button" class="chg-save' + (doc ? ' done' : '') + '" id="erSave">' + (doc ? '✓ 저장됨' : '저장 전') + '</button>'
+    +   '<button type="button" id="erPrint">인쇄</button>'
+    +   '<button type="button" id="erClose">닫기</button>'
+    + '</div></div>';
+  erDrawImgs();
+  chgStamp();
+  const sh = $('er_sheet');
+  sh.addEventListener('input', e => {
+    if (e.target && e.target.dataset && e.target.dataset.f === 'why') sh.querySelector('.er-pr').textContent = e.target.value;
+    erDirty();
+  });
+  const dz = $('erDrop');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); erAddFiles(e.dataTransfer.files); });
+  dz.addEventListener('click', e => {
+    const x = e.target.closest('.er-x');
+    if (x) { ER_CUR.imgs.splice(Number(x.dataset.k), 1); erDrawImgs(); erDirty(); return; }
+    if (!ER_CUR.imgs.length) $('erFile').click();
+  });
+  $('erPick').onclick = () => $('erFile').click();
+  $('erFile').onchange = e => { erAddFiles(e.target.files); e.target.value = ''; };
+  $('erSave').onclick = erSave;
+  $('erPrint').onclick = erPrint;
+  $('erClose').onclick = () => {
+    if (ER_CUR && ER_CUR.dirty && !confirm('저장하지 않은 글이 있습니다. 그래도 닫을까요?')) return;
+    w.style.display = 'none'; ER_CUR = null;
+  };
+  w.style.display = 'block';
+  w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+// 캡처 붙여넣기 — 사유서가 열려 있을 때만
+document.addEventListener('paste', e => {
+  if (!ER_CUR || $('erWrap').style.display !== 'block') return;
+  const fs = Array.from((e.clipboardData && e.clipboardData.files) || []).filter(f => /^image\//.test(f.type));
+  if (!fs.length) return;
+  e.preventDefault();
+  erAddFiles(fs);
+});
+function erDirty() {
+  if (!ER_CUR) return;
+  ER_CUR.dirty = true;
+  const b = $('erSave'); if (b) { b.classList.remove('done'); b.textContent = '저장 전'; b.disabled = false; }
+}
+function erDrawImgs() {
+  const dz = $('erDrop'); if (!dz || !ER_CUR) return;
+  const n = ER_CUR.imgs.length;
+  dz.className = 'er-drop n' + n;
+  dz.innerHTML = n ? ER_CUR.imgs.map((src, k) => '<div class="er-cell"><img src="' + src + '" alt="">'
+      + '<button type="button" class="er-x no-print" data-k="' + k + '" title="빼기">✕</button></div>').join('')
+    : '여기로 그림을 끌어다 놓으세요<br>(누르면 그림 고르기)';
+}
+// 그림은 긴 쪽 1,400픽셀 JPEG 로 줄여 글 안에 담는다
+function erShrink(file) {
+  return new Promise((ok, no) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const m = 1400, r = Math.min(1, m / Math.max(im.width, im.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(im.width * r); cv.height = Math.round(im.height * r);
+        const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(im, 0, 0, cv.width, cv.height);
+        ok(cv.toDataURL('image/jpeg', 0.75));
+      };
+      im.onerror = () => no(new Error('그림을 읽지 못했습니다'));
+      im.src = fr.result;
+    };
+    fr.onerror = () => no(new Error('파일을 읽지 못했습니다'));
+    fr.readAsDataURL(file);
+  });
+}
+async function erAddFiles(list) {
+  if (!ER_CUR) return;
+  const fs = Array.from(list || []).filter(f => /^image\//.test(f.type));
+  if (!fs.length) { alert('그림 파일(JPG · PNG)만 넣을 수 있습니다.\nPDF 는 캡처해서 넣어 주세요.'); return; }
+  const room = 4 - ER_CUR.imgs.length;
+  if (room <= 0) { alert('소명자료 그림은 4장까지 넣을 수 있습니다.'); return; }
+  if (fs.length > room) alert('4장까지만 넣을 수 있어 앞의 ' + room + '장만 넣습니다.');
+  for (const f of fs.slice(0, room)) {
+    try { ER_CUR.imgs.push(await erShrink(f)); } catch (e) { alert(e.message || e); }
+  }
+  erDrawImgs(); erDirty();
+}
+async function erSave() {
+  if (!ER_CUR) return;
+  const sh = $('er_sheet'), b = $('erSave');
+  const d = {};
+  sh.querySelectorAll('[data-f]').forEach(el => { d[el.dataset.f] = el.value; });
+  d.imgs = ER_CUR.imgs.slice(0, 4);
+  d.seq = ER_CUR.i + 1; d.appr_no = ER_CUR.no;
+  const done = !!String(d.why || '').trim();
+  if (!done && !confirm('사유가 비어 있습니다. 그래도 저장할까요?\n(사유를 적어야 라벨이 「작성 끝」으로 바뀝니다)')) return;
+  if (b) { b.disabled = true; b.textContent = '저장 중…'; }
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const row = { child_id: Number(childId), doc_type: '예외사유', doc_key: ER_CUR.key, data: d,
+                done: done, done_on: done ? today : null,
+                updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs')
+      .upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('저장된 줄을 돌려받지 못했습니다 (권한 확인)');
+    ER_DOCS[ER_CUR.key] = data[0];
+    ER_CUR.dirty = false;
+    if (b) { b.disabled = false; b.classList.add('done'); b.textContent = '✓ 저장됨'; }
+    dlDraw();
+  } catch (e) {
+    alert('사유서를 저장하지 못했습니다.\n' + (e.message || e));
+    if (b) { b.disabled = false; b.textContent = '저장 전'; b.classList.remove('done'); }
+  }
+}
+function erPrint() {
+  if (ER_CUR && ER_CUR.dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
+  document.querySelectorAll('.docwrap .chgsheet').forEach(sh => sh.classList.toggle('on', sh.id === 'er_sheet'));
+  document.body.classList.add('print-chg');
+  const off = () => { document.body.classList.remove('print-chg'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
+  setTimeout(off, 1500);
+}
+window.addEventListener('beforeunload', e => { if (ER_CUR && ER_CUR.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
 // 사실 확인서 [서식 27호] (2026-10-09 은정님)
 //   ① 수업일과 결제일이 다름  ② 제공인력을 잘못 골라 결제  ③ 결제 금액 오류
 //   이런 회차가 있으면 기록지 위에 알리고 확인서를 자동으로 써 둔다 · 결제(승인번호)마다 한 장
@@ -2891,6 +3130,11 @@ function dlDraw() {
   let h = '';
   if (!eps.length) h += lab(DL_HAS['계획서'] ? 'has' : 'none', '계획서', 'data-dl="계획서"');
   eps.forEach((e, i) => { h += lab(dlPlanState(eps, i), '계획서' + (i ? (i + 1) : '') + ' · ' + (PL_SHORT[e.type] || '기타'), 'data-dl="계획서" data-ep="' + i + '"'); });
+  erCases().forEach(c => {
+    const d = ER_DOCS[c.key];
+    const st = (d && d.done) ? 'done' : 'need';
+    h += lab(st, '사유서 · ' + (c.i + 1) + '회', 'data-dl="사유서" data-ep="' + c.i + '"');
+  });
   h += lab(dlState('중간보고'), '중간 보고서', 'data-dl="중간보고"');
   h += lab(dlState('종결보고'), '종결 보고서', 'data-dl="종결보고"');
   box.innerHTML = h;
@@ -2909,6 +3153,7 @@ function dlPlace() {
 }
 window.addEventListener('resize', dlPlace);
 async function dlOpen(t, epS) {
+  if (t === '사유서') { erOpen(Number(epS)); return; }
   if (t === '계획서') {
     const ei = epS != null && epS !== '' ? Number(epS) : null;
     if (PL && (ei == null || (PL.ep && PL.ep.i === ei))) { plOpen(); return; }
