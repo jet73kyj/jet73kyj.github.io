@@ -1879,7 +1879,7 @@ function cardDueOf(box, parts) {
 function readLines(box) {
   return Array.from(box.querySelectorAll('.pay .pl')).map((el, i) => {
     const mt = el.querySelector('.pmeth');
-    const dt = el.querySelector('.pday, .pdt');
+    const dt = el.querySelector('input[type=date].pday, input[type=date].pdt');
     const rf = el.querySelector('.kmemo, .pref');
     const am = el.querySelector('.pamt');
     const mm = el.querySelector('.pmemo');
@@ -3351,7 +3351,7 @@ async function savePreMonth(childId, box, btn, only) {
   const sv = SAVED[childId] || {};
   const tg = Object.keys(sv).map(k => sv[k]).filter(r => Number(r.support_type_id) !== 2 && Number(r.amount) > 0);
   if (!tg.length) { show($('msg2'), '이 달에 저장된 카드 쪽 납부 줄이 없습니다.', false); return 'empty'; }
-  const day = (box.querySelector('.pday') || {}).value || '';
+  const day = (box.querySelector('input[type=date].pday') || {}).value || '';
   const ap = ((box.querySelector('.kmemo') || {}).value || '').trim();
   const mm = ((box.querySelector('.pay .p1 .pmemo') || {}).value || '').replace(/[\[\]]/g, '').trim();
   if (!day && !ap && !mm) { show($('msg2'), '저장할 내용이 없습니다. 납부일자 · 승인번호 · 메모 가운데 하나를 적어 주세요.', false); return 'empty'; }
@@ -3387,12 +3387,27 @@ async function savePreMonth(childId, box, btn, only) {
 async function saveKid(childId, btn, only) {
   const box = document.querySelector('.kid[data-child="' + childId + '"]');
   const parts = JSON.parse(box.dataset.parts || '[]');
-  const cEl = box.querySelector('.pday'),  cMemo = box.querySelector('.kmemo');
-  const bEl = box.querySelector('.bday'),  bMemo = box.querySelector('.bmemo');
+  const cEl = box.querySelector('input[type=date].pday'),  cMemo = box.querySelector('.kmemo');
+  const bEl = box.querySelector('input[type=date].bday'),  bMemo = box.querySelector('.bmemo');
   let cardDay  = cEl ? cEl.value : '';
   let cardMemo = cMemo ? cMemo.value.trim() : '';
   // 카드 상자 여러 줄 (2026-11-25)
   // 시스템 쓰기 전 달(2026-07 까지)은 장부에서 옮긴 금액을 지키고 날짜 · 승인번호 · 메모만 고친다 (2026-11-25)
+  // 덜 적은 날짜(여덟 자리가 안 됨)가 있으면 저장하지 않는다 (2026-11-26)
+  //   전에는 칸에 「2026-11」처럼 보여도 날짜는 빈칸으로 저장되거나 오류가 났다
+  {
+    const half = Array.from(box.querySelectorAll('.nlDt')).filter(t => {
+      const real = t.parentNode ? t.parentNode.querySelector('input[type=date]') : null;
+      if (!real || !String(t.value).trim() || real.value) return false;
+      const isB = real.classList.contains('bday');
+      return !only || (only === 'bank' ? isB : !isB);
+    });
+    if (half.length) {
+      alert('날짜를 다 적지 않은 칸이 있습니다.\n숫자 여덟 자리로 적어 주세요 (예: 20261104).');
+      half[0].focus();
+      return;
+    }
+  }
   const PRE = String(LOADED_MK) < '2026-08';
   if (PRE) return await savePreMonth(childId, box, btn, only);
   const PL = only === 'bank' ? { multi: false } : planLines(box, parts);
@@ -3420,8 +3435,8 @@ async function saveKid(childId, btn, only) {
     const isBank = (p.st === 2);
     let lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
     // 평가비 칸을 비워 두었고 전에 따로 저장한 적이 없으면 상자 날짜와 함께 받는다 (2026-11-12)
-    if (lr && p.st === 9 && !lr.querySelector('.lday').value && !isLater((SAVED[childId] || {})[9])) lr = null;
-    const day  = isBank ? bankDay : lr ? lr.querySelector('.lday').value : cardDay;
+    if (lr && p.st === 9 && !lr.querySelector('input[type=date].lday').value && !isLater((SAVED[childId] || {})[9])) lr = null;
+    const day  = isBank ? bankDay : lr ? lr.querySelector('input[type=date].lday').value : cardDay;
     const lm = lr ? lr.querySelector('.lmemo').value.trim() : '';
     const memo = isBank ? (bankMemo ? '계좌입금 ' + bankMemo : '계좌입금')
                         : lr ? (lm || '카드결제') : (cardMemo || '카드결제');
@@ -3620,8 +3635,16 @@ async function saveKid(childId, btn, only) {
                  : sidePaid(childId, side);
     // 미납이어도 저장되면 「✓ 저장됨」 (2026-11-14)
     void paidOk;
+    btn.removeAttribute('style');   // 「미납으로 저장됨」 주황을 지운다
     btn.textContent = '\u2713 저장됨';
     btn.classList.add('done');
+    {
+      const sv2 = (SAVED[childId] || {})[2];
+      if (only === 'bank' && sv2 && Number(sv2.amount) > 0 && !sv2.paid_on) {
+        btn.textContent = '미납으로 저장됨';
+        btn.style.cssText = 'background:#FFF3E0;color:#B45309;border:1px solid #F0B36B';
+      }
+    }
     btn.disabled = false;
     setTimeout(() => { SAVING = false; }, 800);
   } catch (e) {
@@ -4202,7 +4225,7 @@ $('kids').addEventListener('click', e => {
     // 계좌 저장 — 낼 돈이 있는데 납부일자가 비면 저장하지 않는다 (2026-11-26 은정님)
     //   낼 돈이 없으면(0원) 날짜 없이 저장 · 「확정」으로 미납을 남기는 길은 그대로
     if (e.target.dataset.only === 'bank') {
-      const _bd = e.target.closest('.kid').querySelector('.bday');
+      const _bd = e.target.closest('.kid').querySelector('input[type=date].bday');
       const _amt = Number((CALC[_cid] || {}).bank) || 0;
       if (_amt > 0 && !(_bd && _bd.value)) {
         alert('계좌 납부일자를 넣어 주세요.\n(숫자 여덟 자리 · 예: 20261126)\n\n받지 않은 돈이면 「확정」을 누르면 미납으로 남습니다.\n이번 달 낼 돈이 없으면 「이번 달 금액」에 0 을 넣고 저장하세요.');
@@ -4210,7 +4233,27 @@ $('kids').addEventListener('click', e => {
         return;
       }
     }
-    saveKid(_cid, e.target, e.target.dataset.only);
+    const _only = e.target.dataset.only, _other = _only === 'bank' ? 'card' : 'bank';
+    const _ch = CHANGED[_cid] || {};
+    if (_ch[_other]) {
+      const _ob = e.target.closest('.kid').querySelector('.ksave2[data-only="' + _other + '"]');
+      if (_ob && confirm((_other === 'bank' ? '계좌' : '카드') + ' 칸에도 저장하지 않은 값이 있습니다.\n함께 저장할까요?\n\n(취소하면 ' + (_only === 'bank' ? '계좌' : '카드') + '만 저장합니다)')) {
+        (async () => {
+          await saveKid(_cid, e.target, _only);
+          if (!e.target.classList.contains('done')) return;
+          if (_other === 'bank') {
+            const _bd2 = e.target.closest('.kid').querySelector('input[type=date].bday');
+            if ((Number((CALC[_cid] || {}).bank) || 0) > 0 && !(_bd2 && _bd2.value)) {
+              alert('카드는 저장했습니다.\n계좌 납부일자가 비어 있어 계좌는 저장하지 않았습니다.');
+              return;
+            }
+          }
+          await saveKid(_cid, _ob, _other);
+        })();
+        return;
+      }
+    }
+    saveKid(_cid, e.target, _only);
     return;
   }
 
@@ -4567,8 +4610,11 @@ function unDone(el){
             || (stEl && stEl.dataset.st === '2');
   const ch = CHANGED[kid.dataset.child] = CHANGED[kid.dataset.child] || {};
   ch[bank ? 'bank' : 'card'] = true;
-  kid.querySelectorAll('.ksave, .ksave2, .lsave').forEach(b => {
-    if (!b.classList.contains('done')) return;
+  // 바꾼 쪽 단추만 「저장 전」 (2026-11-26) — 전에는 계좌 날짜를 쳐도 카드 단추까지 바뀌어
+  //   「카드 저장」을 누르면 계좌 날짜가 빠진 채 저장됐다
+  kid.querySelectorAll(bank ? '.ksave, .ksave2[data-only="bank"]' : '.ksave, .ksave2[data-only="card"], .lsave').forEach(b => {
+    if (!b.classList.contains('done') && !/미납으로/.test(b.textContent)) return;
+    b.removeAttribute('style');
     b.classList.remove('done');
     b.textContent = b.dataset.ttl || '저장 전';
   });
