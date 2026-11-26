@@ -420,7 +420,7 @@ function openLink(r){
   let u = f + '?c=' + encodeURIComponent(r.child_id) + '&m=' + encodeURIComponent($('mon').value);
   if (r.kind === '치료지원' && r.support_type_id) u += '&s=' + encodeURIComponent(r.support_type_id);
   if (r.kind === '센터' && r.therapist_id) u += '&t=' + encodeURIComponent(r.therapist_id);
-  return '<a class="rcopen" href="' + u + '" target="_blank" rel="noopener">기록지 열기 ↗</a>';
+  return '<a class="rcopen" href="' + u + '" target="_blank" rel="opener">기록지 열기 ↗</a>';
 }
 function rcCell(r, i){
   const x = RES[rkey(r)] || {};

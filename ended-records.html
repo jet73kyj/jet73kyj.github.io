@@ -153,7 +153,7 @@ function drawList() {
     const why = [t.end_cat, t.end_reason].filter(Boolean).join(' · ');
     const mons = r.lg.length
       ? '<span class="lb">기록지</span>' + r.lg.map(l => '<a href="' + esc(KINDS[r.k].page + '?c=' + t.child_id + '&m=' + l.month_key + KINDS[r.k].extra(l) + '&view=1')
-          + '" target="_blank" rel="noopener">' + esc(monTxt(l.month_key)) + '</a>').join('')
+          + '" target="_blank" rel="opener">' + esc(monTxt(l.month_key)) + '</a>').join('')
       : '<span class="none">저장된 기록지 없음</span>';
     return '<div class="row"><div class="t1"><span class="nm">' + esc(r.kid.id + '번 ' + (r.kid.name || '')) + '</span>'
       + '<span class="meta">' + esc([r.stn, r.ttn].filter(Boolean).join(' · ') + (r.th ? ' · 담당 ' + r.th : '') + ' · ' + per) + '</span>'
