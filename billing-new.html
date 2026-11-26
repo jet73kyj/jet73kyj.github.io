@@ -3886,15 +3886,20 @@ async function markMakeup(btn) {
   //   되돌리지 않으면 시간표에서 그 날 줄이 계속 안 보인다
   let undone = 0;
   try {
-    const { data: back } = await sb.from('nl_sessions')
+    const { data: back, error: eB } = await sb.from('nl_sessions')
       .update({ no_makeup: false, no_makeup_why: null })
       .eq('child_id', Number(box.dataset.child))
       .eq('month_key', LOADED_MK || $('mk').value)
       .eq('support_type_id', st)
       .eq('no_makeup', true)
       .select('id');
+    if (eB) throw eB;
     undone = (back || []).length;
-  } catch (e) {}
+  } catch (e) {
+    // 풀지 못한 채 넘어가면 회기 수와 시간표가 어긋난다 → 멈춤 (2026-11-26)
+    alert('❌ 「보강 없음」 날을 되돌리지 못했습니다.\n' + (e.message || e) + '\n\n새로고침(F5) 뒤 다시 해 주세요.');
+    return;
+  }
 
   // 지금 적힌 회수 합계
   let now = 0;
@@ -3968,9 +3973,12 @@ async function clearSavedCnt(cid, st) {
       .eq('support_type_id', st).maybeSingle();
     if (prow && prow.memo && /\[회기[0-9,]+\]/.test(prow.memo)) {
       const m2 = String(prow.memo).replace(/\s*\[회기[0-9,]+\]/g, '').trim();
-      await sb.from('nl_payments').update({ memo: m2 }).eq('id', prow.id);
+      const { error: eC } = await sb.from('nl_payments').update({ memo: m2 }).eq('id', prow.id);
+      if (eC) throw eC;
     }
-  } catch (e) {}
+  } catch (e) {
+    alert('⚠ 저장된 회기 표시를 지우지 못했습니다.\n' + (e.message || e) + '\n\n회기 칸이 옛 숫자로 보일 수 있습니다. 새로고침(F5) 뒤 확인해 주세요.');
+  }
 }
 
 async function markNoMakeup(btn) {

@@ -6259,6 +6259,15 @@ async function devPrestartFill(sc, mk){
 // 예정·쉼·휴무를 지우고 다시 깐다. 완료·결석·보강은 그대로 둔다
 //   휴무·쉼을 안 지우면 시각이나 지원유형을 고쳤을 때 옛 줄이 남아 두 벌이 된다
 //   (휴무·쉼은 다시 깔면 그대로 다시 만들어지므로 지워도 잃는 것이 없다)
+// 회차 다시 매기기 — 실패하면 알린다 (말없이 넘어가면 회차가 어긋남 · 2026-11-26)
+async function renumOk(mk, tid){
+  try {
+    const { error } = await sb.rpc('nl_renum_month', { p_month: mk, p_therapy: tid });
+    if (error) throw error;
+  } catch (e) {
+    alert('⚠ 회차 번호를 다시 매기지 못했습니다.\n' + (e.message || e) + '\n\n저장은 되었습니다. 새로고침(F5) 뒤 찾기 창에서 회차를 확인해 주세요.');
+  }
+}
 async function refreshRuns(scheduleId){
   try {
     // 예정·쉼·휴무를 지운다. 나눠 진행하는 발추 줄([분산5회])은 남긴다
@@ -7296,9 +7305,7 @@ $('edSave').onclick = async () => {
     const scId = edRow.id;
     const rr = await refreshRuns(scId);
     // 회차를 치료 단위로 다시 매긴다 (요일줄이 둘 이상이어도 이어지게)
-    try {
-      await sb.rpc('nl_renum_month', { p_month: mon, p_therapy: edRow.therapy_id });
-    } catch (e) {}
+    await renumOk(mon, edRow.therapy_id);
 
     // 회기를 다시 깐 뒤에 표시를 붙인다 (새로 생긴 줄도 챙기려고)
     const sp = await applySplit(scId, wantSp);
@@ -7488,7 +7495,7 @@ async function changeTherapistFrom(th, du, applyD){
       therapy_type_id: ntt, support_type_id: nst, count_mode: nmode,
       monthly_count: wkCnt + ((nmode !== '4회만') ? 1 : 0), duration_min: du
     }).eq('id', old.therapy_id).select('id')); if (_r.error) throw _r.error; }
-    try { await sb.rpc('nl_renum_month', { p_month: mon, p_therapy: old.therapy_id }); } catch (e) {}
+    await renumOk(mon, old.therapy_id);
     // 화면이 들고 있는 요일줄 목록도 맞춘다 (loadMonth 는 요일줄을 다시 읽지 않는다)
     const extra = { _tt: ntt, support_type_id: nst, _mode: nmode,
       _cnt: wkCnt + ((nmode !== '4회만') ? 1 : 0), _wks: wkCnt,
@@ -7725,8 +7732,8 @@ async function changeFromThisMonth(nw, slot, th, du, hm, applyD){
           if (!count) await sb.from('nl_therapy_schedules').delete().eq('id', q.id);
         }
       }
-      await sb.rpc('nl_renum_month', { p_month: mon, p_therapy: edRow.therapy_id });
     } catch (e) {}
+    await renumOk(mon, edRow.therapy_id);
 
     edmsg((_d
       ? '✅ ' + _d + ' 부터 ' + nw + '요일 ' + h12(hm || slotHm(slot, th, nw))

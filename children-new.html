@@ -1291,7 +1291,13 @@ $('saveNew').onclick = async () => {
         week1: true, week2: true, week3: true, week4: true,
         from_date: L.from, to_date: L.to
       }).select('id').single();
-      if (se) { extra += '\n⚠️ 수업요일을 넣지 못했습니다. ' + se.message; continue; }
+      if (se) {
+        // 요일줄 없이 수업만 남으면 「빈 수업」이 된다 → 방금 만든 수업도 지운다 (2026-11-26)
+        const { error: eDt } = await sb.from('nl_therapies').delete().eq('id', th.id);
+        extra += '\n⚠️ 수업요일을 넣지 못했습니다. ' + se.message
+          + (eDt ? '\n⚠️ 방금 만든 수업(번호 ' + th.id + ')도 지우지 못했습니다. 시간표에서 확인해 주세요.' : '');
+        continue;
+      }
 
       TAKEN[L.wd + '|' + L.hm + '|' + L.th] = true;
       ok++;
@@ -1322,7 +1328,12 @@ $('saveNew').onclick = async () => {
         }
       }
       for (const mk of Object.keys(months)) {
-        if (mk > curMk) { try { await sb.rpc('nl_make_sessions', { p_month: mk }); } catch (me) {} }
+        if (mk > curMk) {
+          try {
+            const { error: fe } = await sb.rpc('nl_make_sessions', { p_month: mk });
+            if (fe) layBad.push(mk + ' ' + (fe.message || '오류'));
+          } catch (me) { layBad.push(mk + ' 서버에 닿지 못함'); }
+        }
       }
       extra += layBad.length ? ('\n⚠️ 회기를 일부 깔지 못했습니다 — ' + layBad.join(' / ')) : '\n회기도 깔았습니다.';
     } else if (ok) {
