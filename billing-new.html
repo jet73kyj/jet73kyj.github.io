@@ -4387,6 +4387,8 @@ function redrawKid(childId) {
 function xlFee(tid, dur) {
   const f = FEES[tid];
   if (!f) return 0;
+  // 30분 — 40분 금액의 3/4 (백 원 단위 반올림) (2026-11-26 은정님)
+  if (dur === 30) return Math.round((Number(f.fee_40) || 0) * 0.75 / 100) * 100;
   return Number(dur === 60 ? f.fee_60 : dur === 50 ? f.fee_50 : f.fee_40) || 0;
 }
 // 확정한 달이면 — 묻고 예정으로 돌린 뒤 창을 연다 (확정 = 금액 확정이므로)
@@ -4426,7 +4428,7 @@ function openExtra(childId) {
   w.innerHTML = '<div class="bx"><h3>1회 수업 추가 · ' + childId + '번 ' + esc(c ? c.name : '') + (c && ymd(c.birth) ? ' ' + ymd(c.birth) : '') + '</h3>'
     + '<div class="rw"><label>날짜</label><input type="date" id="xlD" value="' + d0 + '" min="' + LOADED_MK + '-01" max="' + monEndDay(LOADED_MK) + '"></div>'
     + '<div class="rw"><label>시각</label><select id="xlH">' + hs + '</select><select id="xlM">' + ms + '</select>'
-    + '<select id="xlN"><option value="40">40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'
+    + '<select id="xlN"><option value="30">30분</option><option value="40" selected>40분</option><option value="50">50분</option><option value="60">60분</option></select></div>'
     + '<div class="rw"><label>선생님</label><select id="xlT">' + to + '</select></div>'
     + '<div class="rw"><label>치료</label><select id="xlY">' + yo + '</select></div>'
     + '<div class="rw"><label>금액</label><input id="xlF" data-won type="text" inputmode="numeric" placeholder="0" style="width:110px"> 원'

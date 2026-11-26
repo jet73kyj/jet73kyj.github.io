@@ -780,7 +780,9 @@ function calc(){
     const isX = t.kind === '추가';
     done.push({ id: (isX ? 'X' : 'T') + t.id, child_id: t.child_id, plan_date: t.lesson_date,
                 status: '완료', therapist_id: t.therapist_id, support_type_id: isX ? 11 : 10,
-                schedule_id: null, memo: '', _trialDur: Number(t.duration_min) || 40, _isX: isX });
+                schedule_id: null, memo: '', _trialDur: Number(t.duration_min) || 40, _isX: isX,
+                // 30분 추가 수업은 0.75회 (2026-11-26)
+                minutes: (Number(t.duration_min) || 40) < 40 ? Number(t.duration_min) : undefined });
   });
 
   if (!SESS.length) {
