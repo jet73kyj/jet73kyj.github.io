@@ -10693,17 +10693,32 @@ $('mkGiveup').onclick = async () => {
   draw();
 };
 
+// 보강 취소 — 이 결석을 메우는 보강·쪼개기 조각을 모두 지운다 (2026-11-26 은정님)
+//   쪼개기는 여러 날에 흩어져 있어 화면 목록이 아니라 서버에서 다시 찾는다
+//   (전에는 첫 줄 하나만 지워 조각이 남았음 — 113번 12/22)
 $('mkDel').onclick = async () => {
   if (!mkSess) return;
-  const old = SESS.find(x => isMk(x) && x.makeup_for === mkSess.id && pCount(x))
-           || PREV.find(x => isMk(x) && x.makeup_for === mkSess.id && pCount(x));
-  if (!old) { mkmsg('취소할 보강이 없습니다.', false); return; }
-  if (!confirm('이 보강을 취소할까요?')) return;
-  const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', old.id).select('id'));
+  const { data: rows, error: e0 } = await sb.from('nl_sessions')
+    .select('id, plan_date, start_time, minutes, status')
+    .eq('makeup_for', mkSess.id).not('status', 'in', '("결석","취소")')
+    .order('plan_date').order('start_time');
+  if (e0) { mkmsg('❌ 보강을 찾지 못했습니다.\n' + e0.message, false); return; }
+  if (!rows || !rows.length) { mkmsg('취소할 보강이 없습니다.', false); return; }
+  const list = rows.map(r => '· ' + monNo(String(r.plan_date).slice(0, 7)) + '월 ' + dayNo(r.plan_date) + '일 '
+    + String(r.start_time).slice(0, 5) + ' ' + ((r.minutes && r.minutes < 40) ? '+' + r.minutes + '분' : '40분')
+    + ' (' + r.status + ')').join('\n');
+  if (!confirm('이 결석을 메우는 보강 ' + rows.length + '개를 모두 취소할까요?\n\n' + list
+    + (rows.some(r => r.status === '완료') ? '\n\n※ 완료한 조각도 함께 지워집니다 (정산에서도 빠짐).' : ''))) return;
+  const ids = rows.map(r => r.id);
+  const { data: gone, error } = await sb.from('nl_sessions').delete().in('id', ids).select('id');
   if (error) { mkmsg('❌ 취소하지 못했습니다.\n' + error.message, false); return; }
-  SESS = SESS.filter(x => x.id !== old.id);
-  PREV = PREV.filter(x => x.id !== old.id);
-  mkmsg('✅ 보강을 취소했습니다.', true);
+  if (!gone || gone.length !== ids.length) {
+    mkmsg('⚠ ' + ids.length + '개 중 ' + (gone ? gone.length : 0) + '개만 지웠습니다. 권한이나 확인 잠금을 확인해 주세요.', false);
+  }
+  const goneSet = new Set((gone || []).map(r => r.id));
+  SESS = SESS.filter(x => !goneSet.has(x.id));
+  PREV = PREV.filter(x => !goneSet.has(x.id));
+  if (gone && gone.length === ids.length) mkmsg('✅ 보강 ' + ids.length + '개를 모두 취소했습니다.', true);
   $('mkDel').style.display = 'none';
   await reloadAfterMk();
   draw();
