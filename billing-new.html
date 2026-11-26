@@ -469,7 +469,7 @@
   .cardbody .pay { margin-top:10px; }
   /* 상자 안 왼쪽 시작점 하나 — 수업 줄의 빈 이름 칸을 없앤다 */
   .cardbody .r.line .nm, .cardbody .r.sum .nm, .cardbody .r.sub2 .nm,
-  .cardbody .r.xdiffrow .nm, .cardbody .r.tot .nm { display:none; }
+  .cardbody .r.xdiffrow .nm, .cardbody .r.tdiffrow .nm, .cardbody .r.tot .nm { display:none; }
   .cardbody .sbrow { padding-left:0; }
   @media (min-width:641px) { .cardbody .r.look, .cardbody .r.look + .sbrow { margin-left:0; } }
   /* 두 상자 사이 — 선 대신 틈 */
@@ -755,6 +755,12 @@ function noticeText(childId) {
   if (x11) {
     const a11 = nNum(x11.querySelector('.xlamt'));
     if (a11 > 0) rows.push({ nm: '추가수업', day: '', thr: '', cnt: 0, amt: a11 });
+  }
+  // 보강 차액 (2026-11-26)
+  const x12 = box.querySelector('.gsum[data-st="12"]');
+  if (x12) {
+    const a12 = nNum(x12.querySelector('.tdamt'));
+    if (a12 > 0) rows.push({ nm: '보강 차액', day: '', thr: '', cnt: 0, amt: a12 });
   }
 
   const cardTot = nNum(box.querySelector('.cardtotal'));
@@ -1502,7 +1508,7 @@ async function load() {
         const o = byId[x.makeup_for];
         if (!o || !o.schedule_id || grpSc[o.schedule_id]) return;
         const st = Number(o.support_type_id || 0);
-        if ([0, 2, 8, 9, 10, 11].includes(st)) return;
+        if ([0, 2, 8, 9, 10, 11, 12].includes(st)) return;
         const info = scInfo[o.schedule_id] || {};
         const thO = o.therapist_id || info.th, thM = x.therapist_id;
         if (!thO || !thM || Number(thO) === Number(thM)) return;
@@ -2467,7 +2473,8 @@ function drawKid(c) {
       // 단가가 더 높은 선생님 보강 차액 (2026-11-26) — 그룹 차액과 같은 자리 · 합계에 함께 들어감
       (TDIFF[c.id + '|' + g.support_type_id] || []).forEach(td => {
         const dd = String(td.date).slice(5).replace('-', '/');
-        b += '<div class="r xdiffrow tdiff" data-st="' + g.support_type_id + '" data-amt="' + td.amt
+        // 합계에 안 섞는다 — 아래 「보강 차액」 항목(12번)으로 따로 받는다 (이미 낸 수업료와 갈라 미납으로 보이게)
+        b += '<div class="r tdiffrow" data-st="' + g.support_type_id + '" data-amt="' + td.amt
           + '" data-label="' + esc(dd + ' 보강 단가 차액 (' + thrName(td.th) + ')') + '">'
           + '<span class="nm"></span>'
           + '<span class="de">' + esc(dd) + ' 보강 단가 차액 · <b class="thr">' + esc(thrName(td.th)) + '</b>'
@@ -2475,7 +2482,7 @@ function drawKid(c) {
           + '<span class="ap"></span>'
           + '<span class="ct"></span>'
           + '<span class="up">' + td.from.toLocaleString() + '→' + td.to.toLocaleString() + '</span>'
-          + '<span class="am">' + td.amt.toLocaleString() + '</span></div>';
+          + '<span class="am" style="color:#a39c95">→ 보강 차액</span></div>';
       });
       if (gIdx === lastCalcIdx && !devDone) { b += devLookHtml(); devDone = true; }
       if (g.deduction > 0) {
@@ -2597,6 +2604,24 @@ function drawKid(c) {
       + extraInfoHtml(xlRows, fixed)
       + (xlStale ? staleHtml('추가 수업', Number(xv.amount)) : '');
     if (xlStale) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
+  }
+  // 보강 차액 (12번) — 단가가 더 높은 선생님이 보강한 차액 합계 (2026-11-26)
+  //   늘 지금 셈한 금액으로 채운다. 저장한 금액과 다르면 「저장 전」
+  //   수업료를 이미 냈으면 「납부완료 뒤 신청」 줄로 따로 받는다 (비우고 저장하면 미납)
+  {
+    let tdSum = 0;
+    Object.keys(TDIFF).forEach(k => { if (k.split('|')[0] === String(c.id)) TDIFF[k].forEach(t => { tdSum += t.amt; }); });
+    const dv = sv[12];
+    if (tdSum > 0 || (dv && Number(dv.amount) > 0)) {
+      b += '<div class="r gsum narrownm" data-st="12" data-manual="1">'
+        + '<span class="nm">보강 차액</span>'
+        + '<span class="de">단가가 더 높은 선생님 보강</span>'
+        + '<span class="ap"></span><span class="ct"></span><span class="up"></span>'
+        + '<span class="am"><input class="mn evamt tdamt" data-won type="text" inputmode="numeric" value="'
+        + (tdSum ? tdSum.toLocaleString() : '') + '" placeholder="0"></span></div>';
+      // 저장한 뒤 차액이 바뀌었으면 「저장 전」 (저장 줄이 없으면 「납부완료 뒤 신청」 줄이 알아서 잡음)
+      if (dv && Number(dv.amount) !== tdSum) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
+    }
   }
   // 확정한 아동에게도 단추를 둔다 — 누르면 예정으로 돌린 뒤 넣는다 (2026-10-29 은정님 · 62번)
   b += '<button type="button" class="xladd" data-xladd="' + c.id + '">＋ 1회 수업 추가</button>';
@@ -3198,6 +3223,10 @@ function pvBuild(childId, box, parts){
     const lines = [];
     if (st === 2) {
       // 발달재활 본인부담금 — 줄 글은 학부모 화면이 시간표로 그림
+    } else if (st === 12) {
+      box.querySelectorAll('.tdiffrow').forEach(tr => {
+        const a = Number(tr.dataset.amt || 0); if (a > 0) lines.push({ t: tr.dataset.label || '보강 단가 차액', cnt: 0, amt: a });
+      });
     } else if (st === 8) {
       const x8 = box.querySelector('.gsum[data-st="8"]'), sel = x8 && x8.querySelector('.xthr');
       const thr = sel ? ((sel.options[sel.selectedIndex] || {}).text || '') : '';

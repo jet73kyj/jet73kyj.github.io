@@ -2821,6 +2821,8 @@ async function loadPay() {
                   + (wd ? ' ' + wd : '') ];
         } else if (Number(r.support_type_id) === 10 || Number(r.support_type_id) === 11) {
           det = extraDet(k.id, r.support_type_id);
+        } else if (Number(r.support_type_id) === 12) {
+          det = ['보강 단가 차액 (단가가 더 높은 선생님 보강)'];
         } else {
           det = detailOf(k.id, r.support_type_id);
         }
