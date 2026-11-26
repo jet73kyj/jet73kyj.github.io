@@ -10710,24 +10710,20 @@ $('mkGiveup').onclick = async () => {
 //   보강을 지우는 길(보강 잡기 창 · 직접 보강 창 · 시간표 ✕ · 줄 지우기)은 모두 여기를 부른다
 //   돌려줌: 'ok' 다 지움 / 'part' 일부만 / 'none' 지울 것 없음 / 'cancel' 안 함 / 'err' 오류
 async function cancelMakeupsFor(origId, say){
+  // 2026-11-26 밤 은정님 — 아직 안 한 보강 · 조각만 지우고, 완료한 것은 남긴다 (자라는나무 링크와 같음)
   const { data: rows, error: e0 } = await sb.from('nl_sessions')
     .select('id, plan_date, start_time, minutes, status')
-    .eq('makeup_for', origId).not('status', 'in', '("결석","취소")')
+    .eq('makeup_for', origId).not('status', 'in', '("결석","취소","완료")')
     .order('plan_date').order('start_time');
   if (e0) { say('❌ 보강을 찾지 못했습니다.\n' + e0.message, false); return 'err'; }
-  if (!rows || !rows.length) { say('취소할 보강이 없습니다.', false); return 'none'; }
+  if (!rows || !rows.length) { say('지울 보강이 없습니다 (완료한 보강은 남깁니다).', false); return 'none'; }
   const list = rows.map(r => '· ' + monNo(String(r.plan_date).slice(0, 7)) + '월 ' + dayNo(r.plan_date) + '일 '
     + String(r.start_time).slice(0, 5) + ' ' + ((r.minutes && r.minutes < 40) ? '+' + r.minutes + '분' : '40분')
     + ' (' + r.status + ')').join('\n');
   const many = rows.length > 1;
-  // 조각이 다 차서 원래 줄이 「완료」가 된 경우 — 조각을 지워도 원래 줄은 완료로 남는다 (2026-11-26)
-  const { data: org } = await sb.from('nl_sessions').select('status').eq('id', origId).maybeSingle();
-  const orgDone = !!(org && org.status === '완료' && rows.some(r => r.minutes && r.minutes < 40));
-  if (!confirm((many ? '이 결석을 메우는 보강 ' + rows.length + '개를 모두 취소할까요?\n(쪼개기는 함께 취소됩니다)'
+  if (!confirm((many ? '아직 하지 않은 보강 ' + rows.length + '개를 모두 취소할까요?\n(쪼개기는 함께 취소됩니다)'
                      : '이 보강을 취소할까요?') + '\n\n' + list
-    + (rows.some(r => r.status === '완료') ? '\n\n※ 완료한 조각도 함께 지워집니다 (정산에서도 빠짐).' : '')
-    + (orgDone ? '\n\n⚠ 조각으로 채워 원래 수업이 「완료」로 되어 있습니다.\n지운 뒤 찾기 창에서 원래 수업을 결석으로 바꿔 주세요.'
-               : '\n\n원래 결석·휴무 줄은 그대로 남습니다.'))) return 'cancel';
+    + '\n\n완료한 보강은 남깁니다. 원래 결석·휴무 줄은 그대로 남습니다.')) return 'cancel';
   const ids = rows.map(r => r.id);
   const { data: gone, error } = await sb.from('nl_sessions').delete().in('id', ids).select('id');
   if (error) { say('❌ 취소하지 못했습니다.\n' + error.message, false); return 'err'; }
@@ -10739,9 +10735,7 @@ async function cancelMakeupsFor(origId, say){
     say('⚠ ' + ids.length + '개 중 ' + goneSet.size + '개만 지웠습니다. 권한이나 확인 잠금을 확인해 주세요.', false);
     return 'part';
   }
-  say('✅ 보강 ' + (many ? ids.length + '개를 모두 ' : '을 ') + '취소했습니다.'
-    + (orgDone ? '\n⚠ 원래 수업이 「완료」로 남아 있습니다. 결석으로 바꿔 주세요.' : ''), !orgDone);
-  if (orgDone) alert('⚠ 조각을 지웠지만 원래 수업은 「완료」로 남아 있습니다.\n찾기 창에서 원래 수업을 결석으로 바꿔 주세요.');
+  say('✅ 보강 ' + (many ? ids.length + '개를 모두 ' : '을 ') + '취소했습니다.', true);
   return 'ok';
 }
 // 줄 하나를 지울 때 — 결석을 메우는 보강이면 그 결석의 보강 전부, 아니면(직접 넣은 줄) 그 줄만
@@ -10759,7 +10753,9 @@ async function delSessRow(sid, say, ask){
     const { data } = await sb.from('nl_sessions').select('makeup_for, status').eq('id', sid).maybeSingle();
     mf = data ? data.makeup_for : null; st = data ? data.status : null;
   }
-  // 살아 있는 보강이면 그 결석의 보강 · 조각을 모두 — 이미 결석(안 함) · 취소된 보강 줄은 그 줄만 지운다
+  // 아직 안 한 보강이면 그 결석의 안 한 보강 · 조각을 모두 — 결석(안 함) · 취소된 보강 줄은 그 줄만
+  // 완료한 보강은 지우지 않는다 (2026-11-26 밤)
+  if (mf && st === '완료') { say('완료한 보강은 지우지 않습니다.', false); return 'none'; }
   if (mf && st !== '결석' && st !== '취소') return cancelMakeupsFor(mf, say);
   if (!confirm(ask)) return 'cancel';
   const { error } = await rowsOk(sb.from('nl_sessions').delete().eq('id', sid).select('id'));
