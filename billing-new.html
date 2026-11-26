@@ -4191,8 +4191,19 @@ $('kids').addEventListener('click', e => {
   }
   // 카드 저장 · 계좌 저장 — 그 쪽만 저장한다
   if (e.target.classList.contains('ksave2')) {
-    saveKid(Number(e.target.closest('.kid').dataset.child),
-            e.target, e.target.dataset.only);
+    const _cid = Number(e.target.closest('.kid').dataset.child);
+    // 계좌 저장 — 낼 돈이 있는데 납부일자가 비면 저장하지 않는다 (2026-11-26 은정님)
+    //   낼 돈이 없으면(0원) 날짜 없이 저장 · 「확정」으로 미납을 남기는 길은 그대로
+    if (e.target.dataset.only === 'bank') {
+      const _bd = e.target.closest('.kid').querySelector('.bday');
+      const _amt = Number((CALC[_cid] || {}).bank) || 0;
+      if (_amt > 0 && !(_bd && _bd.value)) {
+        alert('계좌 납부일자를 넣어 주세요.\n(숫자 여덟 자리 · 예: 20261126)\n\n받지 않은 돈이면 「확정」을 누르면 미납으로 남습니다.\n이번 달 낼 돈이 없으면 「이번 달 금액」에 0 을 넣고 저장하세요.');
+        if (_bd) _bd.focus();
+        return;
+      }
+    }
+    saveKid(_cid, e.target, e.target.dataset.only);
     return;
   }
 
