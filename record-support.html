@@ -900,9 +900,23 @@ async function loadOne() {
       PAYTOTAL = PAY.length ? Number(PAY[0].total || PAY.length) : 0;
     } catch (e2) { PAY = []; PAYERR = (e2 && e2.message) || String(e2); }
     // 면허 (위탁수수료 정산에 적은 것) · 결제 변경 관리 줄 — 못 받아도 기록지는 연다
-    LICS = []; PCROWS = []; PCERR = '';
+    LICS = []; PCROWS = []; PCERR = ''; MKTHS = [];
+    // 담당이 아닌 선생님이 한 보강 (2026-11-27 은정님) — 치료사 정보에 그 선생님 이름 · 면허도 함께
     try {
-      const tids = [...new Set(SCHED.map(s => s.therapist_id).filter(v => v != null))];
+      const m0 = mk + '-01', m1 = new Date(year, month, 0);
+      const m1s = m1.getFullYear() + '-' + String(m1.getMonth() + 1).padStart(2, '0') + '-' + String(m1.getDate()).padStart(2, '0');
+      const mq = await sb.from('nl_sessions').select('therapist_id, minutes, status, plan_date')
+        .eq('therapy_id', cur.therapy_id).not('makeup_for', 'is', null)
+        .gte('plan_date', m0).lte('plan_date', m1s).in('status', ['보강', '완료']);
+      if (!mq.error) {
+        const own = new Set(SCHED.map(s => String(s.therapist_id)));
+        MKTHS = [...new Set((mq.data || []).filter(r => r.therapist_id != null
+          && !own.has(String(r.therapist_id)) && !(r.minutes && Number(r.minutes) < 40))
+          .map(r => r.therapist_id))];
+      }
+    } catch (e4) {}
+    try {
+      const tids = [...new Set(SCHED.map(s => s.therapist_id).concat(MKTHS).filter(v => v != null))];
       if (tids.length) {
         const lr = await sb.from('nl_th_licenses').select('therapist_id, lic_name, lic_no').in('therapist_id', tids).order('id');
         if (!lr.error) LICS = lr.data || [];
@@ -1060,6 +1074,13 @@ function curTh() {   // 이 달 담당 — 그 달 마지막 요일줄 선생님
 }
 // 면허는 이 수업의 치료 영역에 맞는 것만 (2026-10-09 · 언어 → 「언어」 든 면허 / 작업 → 「작업」 든 면허)
 //   맞는 것이 없으면 빈칸 (종이에 직접)
+let MKTHS = [];   // 이 달 다른 선생님 보강
+function thInfo(tid, f) {   // 담당 + 보강 선생님 (보강) — f(선생님 번호) 값을 「 / 」로 잇기
+  const out = [];
+  if (tid) out.push(f(tid) || '');
+  MKTHS.forEach(t => { const v = f(t); out.push((v || '') + ' (보강)'); });
+  return out.filter(v => v !== '').join(' / ');
+}
 function licText(tid) {
   const kw = cur ? (TTYPE[cur.therapy_type_id] || '') : '';
   return LICS.filter(l => String(l.therapist_id) === String(tid)
@@ -1101,8 +1122,8 @@ function drawTT() {
     + '<table class="tt-cal"><tr>' + WDK.map(x => '<th>' + x + '</th>').join('') + '</tr>' + cells + '</table>'
     + '<div class="tt-th">□ 치료사 정보</div>'
     + '<table class="rec-tbl" style="margin-top:6px;"><colgroup><col style="width:15%"><col style="width:35%"><col style="width:15%"><col style="width:35%"></colgroup>'
-    + '<tr><td class="lbl">이름</td><td>' + esc(tid ? (THERAPISTS[tid] || '') : '') + '</td><td class="lbl">성별</td><td>' + esc(tid ? (THGENDER[tid] || '') : '') + '</td></tr>'
-    + '<tr><td class="lbl">치료기관</td><td>자라는 나무</td><td class="lbl">면허 번호</td><td>' + esc(tid ? licText(tid) : '') + '</td></tr></table>'
+    + '<tr><td class="lbl">이름</td><td>' + esc(thInfo(tid, t => THERAPISTS[t] || '')) + '</td><td class="lbl">성별</td><td>' + esc(thInfo(tid, t => THGENDER[t] || '')) + '</td></tr>'
+    + '<tr><td class="lbl">치료기관</td><td>자라는 나무</td><td class="lbl">면허 번호</td><td>' + esc(thInfo(tid, licText)) + '</td></tr></table>'
     + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
   box.style.display = 'block';
 }
