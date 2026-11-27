@@ -1352,7 +1352,11 @@ function payAlt(p) {
 }
 function payRed(p, timeText) { return payEarly(p, timeText); }
 function payLine(p, timeText, i) {
-  if (!payEarly(p, timeText)) return '';
+  if (!payEarly(p, timeText)) {                 // 결제 시각은 늘 보이게 (2026-11-27 은정님 · 인쇄에는 안 나옴)
+    if (!p || !p.paid_time) return '';
+    const pd = String(p.paid_on || '').match(/\d{4}-(\d{2})-(\d{2})/);
+    return '결제 ' + (pd ? Number(pd[1]) + '/' + Number(pd[2]) + ' ' : '') + esc(_hm5(p.paid_time));
+  }
   return '⚠ 결제 ' + esc(_hm5(p.paid_time)) + ' — 수업 시작 40분 전 결제'
     + '<br>대안: 수업 ' + esc(payAlt(p))
     + '<br><button type="button" class="q_fix" data-i="' + i + '">이대로 고치기</button>';
