@@ -847,6 +847,14 @@ async function buildChildList() {
   try {
     const { data, error } = await sb.rpc('nl_live_rows', { p_month: mv, p_grace: 2 });
     if (error) throw error;
+    // 화면을 연 뒤에 새로 등록한 아동은 KIDS 에 없다 — 모자란 아동만 서버에서 더 받는다 (2026-11-27 · 159번)
+    const miss = [...new Set((data || []).filter(r => Number(r.support_type_id) === 2 && !KIDS[r.child_id]).map(r => r.child_id))];
+    if (miss.length) {
+      try {
+        const { data: ks } = await sb.from('nl_children').select('id, name, birth, manager_no, status').in('id', miss);
+        (ks || []).forEach(k => { KIDS[k.id] = k; });
+      } catch (e) {}
+    }
     (data || []).forEach(r => {
       if (Number(r.support_type_id) !== 2) return;
       if (!allView && String(r.therapist_id) !== String(ME.id)) return;
