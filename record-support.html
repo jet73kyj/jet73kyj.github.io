@@ -1038,14 +1038,13 @@ function drawAll(saved) {
     }
   }
   WRITTEN = wd || null;
-  $('signDate').innerHTML = wd
-    ? `${wd.slice(0,4)}년 ${parseInt(wd.slice(5,7),10)}월 ${parseInt(wd.slice(8,10),10)}일`
-    : '20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;일';
+  drawSignDate();
 
   if (carried) {
     $('pInfo').textContent += ' · 지난 기록(' + PREV.month_key + ')에서 목표를 이어받았습니다';
   }
   buildSeq();
+  signFromRows();                 // 확인 일자 = 기록지 회차 중 마지막 수업 날 (2026-11-27 은정님)
   drawTT();
   drawPc();
 }
@@ -1518,6 +1517,34 @@ function buildSeq() {
     tb.appendChild(tr);
   }
 }
+
+// 확인 일자 (2026-11-27 은정님) — 기록지 회차 중 마지막 수업 날 · 회차 일자를 고치면 따라감
+//   회차에 날짜가 하나도 없으면 전처럼 (저장된 날 → 그 달 마지막 시간표 수업일)
+function drawSignDate() {
+  const wd = WRITTEN || '';
+  $('signDate').innerHTML = wd
+    ? `${wd.slice(0,4)}년 ${parseInt(wd.slice(5,7),10)}월 ${parseInt(wd.slice(8,10),10)}일`
+    : '20&nbsp;&nbsp;&nbsp;년&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;월&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;일';
+}
+function signFromRows() {
+  let last = '';
+  document.querySelectorAll('#seqBody .q_date').forEach(el => {
+    const t = String(el.value || '');
+    let iso = '';
+    const m = t.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) iso = year + '-' + String(m[1]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+    else { const m2 = t.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); if (m2) iso = m2[1] + '-' + m2[2].padStart(2, '0') + '-' + m2[3].padStart(2, '0'); }
+    if (iso && iso > last) last = iso;
+  });
+  if (!last) return;
+  if (last !== WRITTEN) {
+    const had = WRITTEN;
+    WRITTEN = last;
+    drawSignDate();
+    if (had) { if (LOADED) { DIRTY = true; setSaveBtn('before'); } else AUTOCHG = true; }   // 저장된 날과 다르면 「저장 전」
+  }
+}
+document.addEventListener('change', e => { if (e.target && e.target.classList && e.target.classList.contains('q_date')) signFromRows(); });
 
 // ── 저장 ──
 async function saveRecord() {
