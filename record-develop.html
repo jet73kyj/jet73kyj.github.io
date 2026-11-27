@@ -2467,7 +2467,8 @@ function fcCases() {
     const att = ['1. 발달재활서비스 제공기록지 사본 1부', '2. 바우처 결제 내역 1부'];
     if (why.includes('th') || why.includes('amt')) att.push('3. 결제 취소 · 재결제 내역 1부');
     out.push({ key: FC_MK + ':' + no, i, why, day, appr, no, tname, ctx,
-      auto: { body, att: att.join('\n'), writer: tname, case_id: caseId ? String(caseId) : '',
+      // 확인 내용은 비워 둔다 — 선생님이 직접 적음 (2026-11-27 은정님 · 예시 고르기는 그대로 쓸 수 있음)
+      auto: { body: '', att: att.join('\n'), writer: tname, case_id: '',
               written_on: new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10) } });
   }
   return out;
@@ -2684,9 +2685,8 @@ async function fcSave(i, doneVal) {
   const d = fcRead(i);
   const done = doneVal !== undefined ? !!doneVal : !!(c.doc && c.doc.done);
   if (done) {
-    const why = (String(d.body || '').match(/사유[ \t]*:[ \t]*(.*)/) || [])[1] || '';
-    if (!why.trim()) {
-      alert('「사유:」 뒤에 왜 그렇게 되었는지 적어 주세요.\n사유가 비어 있으면 「작성 끝」을 할 수 없습니다.');
+    if (!String(d.body || '').trim()) {
+      alert('확인 내용을 적어 주세요.\n확인 내용이 비어 있으면 「작성 끝」을 할 수 없습니다.');
       if (cb) cb.checked = false;
       return;
     }
