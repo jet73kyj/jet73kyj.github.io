@@ -1464,11 +1464,11 @@ $('seqBody').addEventListener('change', e => {
 function buildSeq() {
   const tb = $('seqBody');
   tb.innerHTML = '';
+  // 1) 회차마다 적힌 값 (결제 칸 PAY[i] 는 결제 순서 그대로)
+  const R = [];
   for (let i = 0; i < SESSIONS; i++) {
     const it = ITEMS[i] || {};
-    // 회기 일자 = 카드 결제 일자 (1순위 · 2026-10-09)
-    // 둘째 칸 = 그날 이 수업 회기 시간 · 아래에 결제 시각
-    // 결제가 없는 회는 저장된 값 그대로 (선생님이 적음)
+    // 회기 일자 = 카드 결제 일자 (1순위 · 2026-10-09) · 결제가 없는 회는 저장된 값 그대로
     const d  = it.service_date ? parseInt(String(it.service_date).slice(8,10),10) : '';
     const st = it.start_time ? String(it.start_time).slice(0,5) : '';
     const en = it.end_time   ? String(it.end_time).slice(0,5)   : '';
@@ -1477,12 +1477,32 @@ function buildSeq() {
     const savedD = d ? month + '월 ' + d + '일' : '';
     const p = PAY[i] || null;
     const man = !!(it.state_json && it.state_json.man);
-    MAN[i] = man;
     let dVal = savedD, tVal = timeVal;
     if (!man && p) {
       dVal = payDateText(p); tVal = payClsText(p);
       if (dVal !== savedD || tVal !== timeVal || String(it.voucher_no || '') !== String(p.appr_no || '')) AUTOCHG = true;
     }
+    R.push({ dVal, tVal, man, content: it.content || '', react: it.reaction || '' });
+  }
+  // 2) 같은 날 두 번 이상 수업한 회는 시각이 이른 수업이 먼저 (2026-11-27 은정님)
+  //    결제 칸은 결제 순서 그대로 두고, 수업 시각 · 활동 내용 · 아동 반응을 시각 차례로 다시 놓는다
+  //    (같은 날 결제는 앞 결제가 앞 수업 몫 — 서버 짝 규칙과 같음)
+  const startOf = r => { const m = String(r.tVal || '').match(/(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const groups = {};
+  R.forEach((r, i) => { if (r.dVal) (groups[r.dVal] = groups[r.dVal] || []).push(i); });
+  Object.keys(groups).forEach(k => {
+    const ix = groups[k];
+    if (ix.length < 2 || ix.some(i => startOf(R[i]) == null)) return;
+    const parts = ix.map(i => R[i]).slice().sort((a, b) => startOf(a) - startOf(b));
+    if (parts.every((r, j) => r === R[ix[j]])) return;
+    ix.forEach((i, j) => { R[i] = Object.assign({}, parts[j], { dVal: R[i].dVal, man: true }); });   // 옮긴 회는 고친 값으로 남김 (다시 열어도 그대로)
+    AUTOCHG = true;                                 // 차례가 바뀌었으니 「저장 전」
+  });
+  // 3) 그리기
+  for (let i = 0; i < SESSIONS; i++) {
+    const r = R[i], p = PAY[i] || null;
+    MAN[i] = r.man;
+    const dVal = r.dVal, tVal = r.tVal;
     const red = payRed(p, tVal);
     const tr = document.createElement('tr');
     tr.dataset.i = String(i);
@@ -1493,8 +1513,8 @@ function buildSeq() {
       + '<input type="text" class="q_time' + (red ? ' red' : '') + '" value="' + esc(tVal) + '" style="text-align:center;margin-top:3px;">'
       + '<div class="q_pay' + (red ? ' red' : '') + '">' + payLine(p, tVal, i) + '</div>'
       + '</td>'
-      + '<td><textarea class="q_content" style="min-height:64px;">' + esc(it.content || '') + '</textarea></td>'
-      + '<td><textarea class="q_react" style="min-height:64px;">' + esc(it.reaction || '') + '</textarea></td>';
+      + '<td><textarea class="q_content" style="min-height:64px;">' + esc(r.content) + '</textarea></td>'
+      + '<td><textarea class="q_react" style="min-height:64px;">' + esc(r.react) + '</textarea></td>';
     tb.appendChild(tr);
   }
 }
