@@ -175,6 +175,8 @@
     #docLabs button.dl .dot { top:50%; left:9px; transform:translateY(-50%); }
     #docLabs button.dl.none { border-style:dashed !important; } }
   @media print { #docLabs { display:none !important; } }
+  /* 화면에서 칠한 노란 · 빨간 칸은 인쇄에 안 나오게 (2026-11-27 은정님) */
+  @media print { input, textarea, select { background:transparent !important; background-color:transparent !important; } }
 </style>
 <style>
 /* ===== 변경 계약서 [서식 10호] (2026-10-09) ===== */
