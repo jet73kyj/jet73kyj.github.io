@@ -1321,6 +1321,11 @@ window.addEventListener('afterprint', () => document.body.classList.remove('prin
 
 // ── 카드 결제 칸 (2026-10-09) ──
 function _hm5(v) { return v ? String(v).slice(0, 5) : ''; }
+// 결제 시각 초까지 (2026-11-27 은정님) — 서버 값에 초가 없으면 시:분만
+function _hms(v) {
+  const m = String(v || '').match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return m ? m[1].padStart(2, '0') + ':' + m[2] + (m[3] ? ':' + m[3] : '') : '';
+}
 function payDateText(p) {
   const s = String(p.paid_on || '');
   return s.length >= 10 ? parseInt(s.slice(5, 7), 10) + '월 ' + parseInt(s.slice(8, 10), 10) + '일' : '';
@@ -1351,13 +1356,17 @@ function payAlt(p) {
   return _hmOf(st) + '-' + _hmOf(st + payDur(p));
 }
 function payRed(p, timeText) { return payEarly(p, timeText); }
+// 결제 날짜 「9/10 」 — 날짜가 없으면 빈 글 (수업일과 다르면 그 날짜가 보여야 하므로 늘 붙임)
+function payDay(p) {
+  const pd = String((p && p.paid_on) || '').match(/\d{4}-(\d{2})-(\d{2})/);
+  return pd ? Number(pd[1]) + '/' + Number(pd[2]) + ' ' : '';
+}
 function payLine(p, timeText, i) {
   if (!payEarly(p, timeText)) {                 // 결제 시각은 늘 보이게 (2026-11-27 은정님 · 인쇄에는 안 나옴)
     if (!p || !p.paid_time) return '';
-    const pd = String(p.paid_on || '').match(/\d{4}-(\d{2})-(\d{2})/);
-    return '결제 ' + (pd ? Number(pd[1]) + '/' + Number(pd[2]) + ' ' : '') + esc(_hm5(p.paid_time));
+    return '결제 ' + esc(payDay(p)) + esc(_hms(p.paid_time));
   }
-  return '⚠ 결제 ' + esc(_hm5(p.paid_time)) + ' — 수업 시작 40분 전 결제'
+  return '⚠ 결제 ' + esc(payDay(p)) + esc(_hms(p.paid_time)) + ' — 수업 시작 40분 전 결제'
     + '<br>대안: 수업 ' + esc(payAlt(p))
     + '<br><button type="button" class="q_fix" data-i="' + i + '">이대로 고치기</button>';
 }
