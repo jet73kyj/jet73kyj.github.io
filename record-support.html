@@ -1093,7 +1093,7 @@ function drawTT() {
     cells += '</tr>';
   }
   const school = schoolLine();
-  const area = (SUPNAME[cur.support_type_id] || '');
+  const area = (SUPNAME[cur.support_type_id] || '').replace(/방과후\s*/g, '').trim();   // 지원영역에서 「방과후」 뺌 (2026-11-27 은정님)
   box.innerHTML =
       '<h2 class="title">특수교육대상자 치료지원 시간표 ( ' + month + ' 월)</h2>'
     + '<table class="rec-tbl"><colgroup><col style="width:15%"><col style="width:35%"><col style="width:15%"><col style="width:35%"></colgroup>'
