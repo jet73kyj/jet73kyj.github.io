@@ -860,6 +860,7 @@ async function buildChildList() {
     ALIVE_ON = !!window.NLRec;
     // 그 달 발달재활 회기(보강 포함)를 맡은 선생님에게도 보이게 (2026-10-22 · 66번 9/29 — 담당이 바뀌기 전 달 보강)
     if (!allView) await addMySessKids(mv, seen);
+    if (!allView) await dropMovedKids(mv);
     CHILDREN.sort((a,b) => (a.name||'').localeCompare(b.name||''));
     return;
   } catch (e) { /* 서버를 못 부르면 아래 옛 셈으로 */ }
@@ -877,7 +878,18 @@ async function buildChildList() {
     CHILDREN.push(c);
   });
   if (!allView) await addMySessKids(mv, seen);
+  if (!allView) await dropMovedKids(mv);
   CHILDREN.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+// 담당 변경 계약서를 쓴 아동 — 변경일이 든 달부터 옛 선생님 목록에서 뺀다 (2026-11-27 은정님)
+//   셈은 서버 nl_dev_moved_kids 한 곳 (기록지 장 잠금도 같은 셈) · 그 뒤에 내가 그 아동 회기를 맡았으면 보임
+async function dropMovedKids(mv) {
+  try {
+    const { data, error } = await sb.rpc('nl_dev_moved_kids', { p_month: mv });
+    if (error || !data || !data.length) return;
+    const gone = new Set(data.map(r => String(typeof r === 'object' ? (r.nl_dev_moved_kids ?? r.child_id) : r)));
+    CHILDREN = CHILDREN.filter(c => !gone.has(String(c.id)));
+  } catch (e) {}
 }
 // 그 달 몫 발달재활 회기를 내가 맡은 아동 (요일줄 담당이 아니어도 — 보강을 맡은 선생님)
 async function addMySessKids(mv, seen) {
