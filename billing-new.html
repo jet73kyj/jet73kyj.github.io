@@ -1869,7 +1869,8 @@ function laterSts(childId, parts) {
   // 평가비는 그 달 평가가 있으면 늘 「따로 받음」 칸을 둔다 (평가 날 받고 수업료는 나중에 · 2026-11-12 은정님)
   const evNow = (EVMON[childId] || []).length > 0;
   return parts.filter(p => Number(p.st) !== 2 && Number(p.amt) > 0)
-    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]) || (Number(p.st) === 9 && evNow))
+    .filter(p => Number(p.st) !== 9 || !evNow)   // 평가비는 카드결제 줄로 받음 (2026-11-27)
+    .filter(p => isLater(sv[p.st]) || (mainPaid && !sv[p.st]))
     .map(p => ({ st: Number(p.st), amt: Number(p.amt) }));
 }
 function fillLater(box, childId, parts) {
@@ -2591,7 +2592,7 @@ function drawKid(c) {
   // 평가비 — 그 달 평가가 있거나 저장한 평가비가 있으면 수업료 받는 칸 아래 따로 묶는다 (2026-11-12 은정님)
   //   평가 날 받고 수업료는 나중에 받으므로 「평가비 받은 날 · 승인번호」를 따로 둔다
   //   평가가 없는 아동은 전처럼 리뷰 차감 위에 한 줄 (손으로 넣을 수 있게)
-  const evSep = !!(evRows.length || (ev && Number(ev.amount) > 0));
+  const evSep = false;   // 평가비도 카드결제 안에서 함께 셈 (2026-11-27 은정님 · 11/12 「따로 묶기」를 바꿈)
   const evHtml = '<div class="r gsum narrownm" data-st="9" data-manual="1">'
     + '<span class="nm">평가비</span>'
     + '<span class="de">평가 <select class="evsel" style="border:1px solid #888;border-radius:4px;padding:2px 4px;background:#fff;color:#000">' + evalOptions(evT) + '</select></span>'
