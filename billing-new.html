@@ -267,6 +267,8 @@
   .later-r .lsave { width:auto !important; margin:0 !important; padding:6px 12px; border:1px solid #E4E0DA;
                     border-radius:8px; background:#fff; color:#4A433F; cursor:pointer; font-size:13px; }
   .later-r .lsave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .later-r.evpays .evp { flex-basis:100%; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .later-r.evpays .evpn { flex:1 1 220px; color:#5b4a8a; }
   .pay .ksave2:disabled { background:#bbb; color:#fff; border-color:#bbb; }
   .kidfoot .ksave { background:#e8f3ea; color:#2e7d32; border:1px solid #a9d6b3; }
   .kidfoot .ksave.done { background:#2e7d32; color:#fff; border-color:#2e7d32; }
@@ -1179,7 +1181,7 @@ async function load() {
     EVMON = {};
     try {
       const { data: _ev, error: _ee } = await sb.from('nl_evaluations')
-        .select('id, child_id, eval_type_id, eval_date, eval_time, therapist_id, fee, item_cnt, status')
+        .select('id, child_id, eval_type_id, eval_date, eval_time, therapist_id, fee, item_cnt, status, paid_on, card_no')
         .gte('eval_date', mk + '-01').lte('eval_date', monEndDay(mk))
         .order('eval_date');
       if (_ee) console.warn('평가 못 가져옴', _ee);
@@ -1876,9 +1878,28 @@ function fillLater(box, childId, parts) {
   const sv = SAVED[childId] || {};
   const want = laterSts(childId, parts);
   box.querySelectorAll('.later-r').forEach(r => { if (!want.some(w => String(w.st) === r.dataset.lst)) r.remove(); });
+  const evRows = EVMON[childId] || [];
   want.forEach(w => {
     const host = w.st === 9 ? el9 : el;
     let r = box.querySelector('.later-r[data-lst="' + w.st + '"]');
+    // 평가가 있는 달 — 평가마다 받은 날 · 승인번호 (다른 날 받으면 따로 · 2026-11-27 은정님)
+    if (!r && w.st === 9 && evRows.length) {
+      r = document.createElement('div'); r.className = 'later-r evpays'; r.dataset.lst = 9;
+      const allPaid = evRows.every(v => v.paid_on);
+      r.innerHTML = '<span class="lnm">평가비 · 평가마다 받은 날 (비우면 미납)</span>'
+        + evRows.map(v => {
+            const d = v.eval_date ? Number(v.eval_date.slice(5, 7)) + '/' + Number(v.eval_date.slice(8, 10)) : '날짜 없음';
+            return '<div class="evp" data-evid="' + v.id + '">'
+              + '<span class="evpn">' + esc(d + ' ' + evItemName(v, ETYPES[v.eval_type_id] || '평가') + ' · ' + (Number(v.fee) || 0).toLocaleString() + '원') + '</span>'
+              + '<span class="llb">받은 날</span><input class="dt eday" type="date" value="' + esc(v.paid_on || '') + '">'
+              + '<input class="tx eno" type="text" placeholder="승인번호" value="' + esc(v.card_no || '') + '">'
+              + '</div>';
+          }).join('')
+        + '<button type="button" class="lsave' + (allPaid ? ' done' : '') + '" data-ttl="저장 전">' + (allPaid ? '\u2713 저장됨' : '저장 전') + '</button>';
+      host.appendChild(r);
+      return;
+    }
+    if (r && r.classList.contains('evpays')) return;
     if (!r) {
       const o = sv[w.st];
       r = document.createElement('div'); r.className = 'later-r'; r.dataset.lst = w.st;
@@ -2564,7 +2585,9 @@ function drawKid(c) {
   const evRows = EVMON[c.id] || [];
   const evPre  = ev ? null : evalPreset(c.id);
   const evT    = ev ? evalTypeOf(ev) : (evPre ? evPre.type : null);
-  const evAmt  = ev ? Number(ev.amount) : (evPre ? evPre.amt : 0);
+  // 그 달 평가가 있으면 평가 금액 합계가 기준 (평가를 더 잡으면 저절로 늘어남 · 2026-11-27)
+  const evAmt  = evRows.length ? evalSumOf(c.id) : (ev ? Number(ev.amount) : (evPre ? evPre.amt : 0));
+  if (ev && evRows.length && Number(ev.amount) !== evAmt) CHANGED[c.id] = Object.assign(CHANGED[c.id] || {}, { card: true });
   // 평가비 — 그 달 평가가 있거나 저장한 평가비가 있으면 수업료 받는 칸 아래 따로 묶는다 (2026-11-12 은정님)
   //   평가 날 받고 수업료는 나중에 받으므로 「평가비 받은 날 · 승인번호」를 따로 둔다
   //   평가가 없는 아동은 전처럼 리뷰 차감 위에 한 줄 (손으로 넣을 수 있게)
@@ -3532,6 +3555,25 @@ async function saveKid(childId, btn, only) {
   ).map(p => {
     const isBank = (p.st === 2);
     let lr = isBank ? null : box.querySelector('.later-r[data-lst="' + p.st + '"]');
+    if (lr && lr.classList.contains('evpays')) {
+      // 평가마다 받은 날 — 모두 받았으면 가장 늦은 날, 하나라도 비면 미납
+      const eps = Array.from(lr.querySelectorAll('.evp')).map(e => ({
+        day: e.querySelector('input[type=date].eday').value, no: e.querySelector('.eno').value.trim() }));
+      const allD = eps.length && eps.every(x => x.day);
+      let memo2 = eps.filter(x => x.no).map(x => x.no).join(', ') || '카드결제';
+      const old = (SAVED[childId] || {})[9];
+      const tg = old && old.memo ? String(old.memo).match(/\[(계좌확인\d*|카드확인|카드로바꿈)\]/g) : null;
+      if (tg) memo2 += ' ' + tg.join(' ');
+      memo2 += ' [따로]';
+      const es = box.querySelector('.evsel');
+      if (es && es.value) memo2 += ' [평가유형' + es.value + ']';
+      const rv0 = box.querySelector('.rv'), rvn = rv0 ? numOf(rv0.value) : 0;
+      if (rvn > 0) memo2 += ' [리뷰' + rvn + ']';
+      const coE = box.querySelector('.corow[data-st="9"] .co');
+      const pd = allD ? eps.map(x => x.day).sort().slice(-1)[0] : null;
+      return { child_id: childId, support_type_id: 9, month_key: LOADED_MK, amount: p.amt,
+               carry_over: coE ? numOf(coE.value) : 0, is_paid: !!pd, paid_on: pd, memo: memo2 };
+    }
     // 평가비 칸을 비워 두었고 전에 따로 저장한 적이 없으면 상자 날짜와 함께 받는다 (2026-11-12)
     if (lr && p.st === 9 && !lr.querySelector('input[type=date].lday').value && !isLater((SAVED[childId] || {})[9])) lr = null;
     const day  = isBank ? bankDay : lr ? lr.querySelector('input[type=date].lday').value : cardDay;
@@ -3796,6 +3838,29 @@ async function releaseNoMakeup(childId, box, only) {
 // 평가비를 받았으면 평가 관리 쪽 상태도 「완료」로 바꾼다
 // (금액이 0원이면 안 바꾼다)
 async function markEvalPaid(childId, rows){
+  // 평가마다 받은 날 칸이 있으면 그 값을 평가 줄에 그대로 (2026-11-27)
+  const kidBox = document.querySelector('.kid[data-child="' + childId + '"]');
+  const lr = kidBox ? kidBox.querySelector('.later-r.evpays') : null;
+  if (lr && rows.some(r => Number(r.support_type_id) === 9)) {
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    let n = 0;
+    for (const e of Array.from(lr.querySelectorAll('.evp'))) {
+      const id = Number(e.dataset.evid);
+      const day = e.querySelector('input[type=date].eday').value || null;
+      const no = e.querySelector('.eno').value.trim() || null;
+      const v = (EVMON[childId] || []).find(x => Number(x.id) === id);
+      const upd = { paid_on: day, card_no: no };
+      if (day && v && v.status !== '완료' && v.eval_date && v.eval_date <= today) upd.status = '완료';
+      const { data, error } = await sb.from('nl_evaluations').update(upd).eq('id', id).select('id, paid_on, card_no, status');
+      if (error || !data || !data.length) return '\n⚠️ 평가 받은 날을 저장하지 못했습니다. ' + (error ? error.message : '');
+      if (v) Object.assign(v, data[0]);
+      n++;
+    }
+    const allPaid = (EVMON[childId] || []).every(v => v.paid_on);
+    const bt = lr.querySelector('.lsave');
+    if (bt) { bt.textContent = allPaid ? '\u2713 저장됨' : '미납 있음 · 저장됨'; bt.classList.toggle('done', allPaid); }
+    return '\n평가 ' + n + '건 받은 날을 저장했습니다.';
+  }
   const ev = rows.find(r => Number(r.support_type_id) === 9);
   if (!ev) return '\n(평가비 줄이 없어 평가 상태는 그대로)';
   if (!ev.amount || Number(ev.amount) <= 0)

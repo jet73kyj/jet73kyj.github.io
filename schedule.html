@@ -3870,9 +3870,9 @@ function drawFind(){
             const th = THS_ALL.find(t => t.id === x.therapist_id);
             return '<span class="run r-eval' + (x.status === '완료' ? ' r-done' : '') + '" data-sid="' + x.id + '"'
               + ' style="display:inline-flex;cursor:pointer;">'
-              + '<span class="spdif">' + (x._isExtra ? '추가' : x._isTrial ? '체험' : '평가') + '</span>'
               + '<span class="dt">' + dtWithMon(x.plan_date) + ' ' + h12(String(x.start_time || '').slice(0, 5)) + '</span>'
               + (th ? '<span class="st">' + th.id + '번</span>' : '')
+              + '<span class="spdif">' + (x._isExtra ? '추가' : x._isTrial ? '체험' : (x._evType || '평가')) + '</span>'
               + '<span class="st">' + esc(stWord(x)) + '</span></span>';
           }).join('') + '</div>'
         + '</div>';
@@ -6103,17 +6103,23 @@ $('adSave').onclick = async () => {
   try {
     const hm0 = adHm + ':00';
     const { data: dup } = await sb.from('nl_therapy_schedules')
-      .select('id, weekday, start_time, therapist_id, to_month,'
-            + ' nl_therapies!inner(id, child_id, ended_on)')
+      .select('id, weekday, start_time, therapist_id, to_month, to_date, from_date,'
+            + ' nl_therapies!inner(id, child_id, ended_on, therapy_type_id)')
       .eq('weekday', wd)
       .eq('start_time', hm0)
       .eq('therapist_id', thId)
       .eq('nl_therapies.child_id', cid)
       .is('nl_therapies.ended_on', null);
-    const live = (dup || []).filter(x => !x.to_month || x.to_month >= mon);
+    // 끝난 요일줄(끝난날이 새 시작일보다 앞)은 빼고 본다 (2026-11-27)
+    const st0 = $('ad_start').value || (mon + '-01');
+    const live = (dup || []).filter(x => (!x.to_month || x.to_month >= mon) && (!x.to_date || x.to_date >= st0));
     if (live.length) {
       $('adSave').disabled = false; $('adSave').textContent = '저장';
+      const x0 = live[0];
       admsg('⚠️ 이 아동은 같은 요일·같은 시간에 이 치료사 수업이 이미 있습니다.\n'
+          + '(수업 ' + x0.nl_therapies.id + ' · 요일줄 ' + x0.id + ' · '
+          + (TTYPE[x0.nl_therapies.therapy_type_id] || '') + ' · ' + (x0.from_date || '') + '부터'
+          + (x0.to_date ? ' ' + x0.to_date + '까지' : '') + ')\n'
           + '두 번 넣지 않도록 그대로 두었습니다.', false);
       return;
     }
@@ -11189,6 +11195,7 @@ async function loadMonth(){
         makeup_for: null,
         support_type_id: 9,           // 9 = 평가
         memo: '평가',
+        _evType: ({1:'심리평가', 2:'발달평가', 3:'언어평가'})[e.eval_type_id] || '평가',
         _isEval: true
       });
     });
