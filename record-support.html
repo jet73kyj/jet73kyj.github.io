@@ -70,6 +70,9 @@
   .tt-cal .dn { display:inline-block; min-width:18px; border:1px solid #555; padding:0 3px; font-size:10.5px; }
   .tt-cal .tm { margin-top:6px; text-align:center; font-size:12px; font-weight:bold; line-height:1.5; }
   .tt-th { margin-top:22px; font-weight:bold; font-size:13px; }
+  .ttin { width:100% !important; box-sizing:border-box; border:1px dashed #ccc; background:#fff; font:inherit; padding:2px 4px; margin:0 !important; }
+  .ttin.ttman { background:#fff8d6; }
+  @media print { .ttin, .ttin.ttman { border:none !important; background:transparent !important; padding:0; } }
   .pc-sub { text-align:right; font-weight:bold; font-size:14px; margin:-6px 0 8px; }
   .pc-tbl td { vertical-align:middle; }
   .pc-cat { font-size:10.5px; line-height:1.45; text-align:center; color:#555; }
@@ -1021,6 +1024,8 @@ function drawAll(saved) {
     + (schedThNames(id => THERAPISTS[id] || '') ? ' · 담당 ' + schedThNames(id => THERAPISTS[id] || '') + ' 선생님' : '');
   $('sheetTitle').textContent = `${areaName}치료 [ ${month} ]월 치료지원 누가기록서`;
 
+  TTMAN = { name: (saved && saved.th_name_text) || null, gender: (saved && saved.th_gender_text) || null,
+            lic: (saved && saved.th_lic_text) || null };
   $('f_name').value   = c.name || '';
   $('f_birth').value  = fmtBirth(c.birth);
   // 이번 달 저장분 → 없으면 지난 기록 → 없으면 아동 표
@@ -1075,6 +1080,27 @@ function curTh() {   // 이 달 담당 — 그 달 마지막 요일줄 선생님
 // 면허는 이 수업의 치료 영역에 맞는 것만 (2026-10-09 · 언어 → 「언어」 든 면허 / 작업 → 「작업」 든 면허)
 //   맞는 것이 없으면 빈칸 (종이에 직접)
 let MKTHS = [];   // 이 달 다른 선생님 보강
+// 치료사 정보 직접 고치기 (2026-11-27 은정님) — 비우면 저절로 만든 글 · 이 달 기록지에만 저장
+let TTMAN = { name: null, gender: null, lic: null };
+function ttAuto(k, tid) {
+  if (k === 'name') return thInfo(tid, t => THERAPISTS[t] || '');
+  if (k === 'gender') return thInfo(tid, t => THGENDER[t] || '');
+  return thInfo(tid, licText);
+}
+function ttCell(k, tid) {
+  const auto = ttAuto(k, tid), man = TTMAN[k];
+  const v = (man != null && man !== '') ? man : auto;
+  return '<input class="ttin' + ((man != null && man !== '' && man !== auto) ? ' ttman' : '') + '" data-tk="' + k
+    + '" data-auto="' + esc(auto).replace(/"/g, '&quot;') + '" value="' + esc(v).replace(/"/g, '&quot;') + '">';
+}
+document.addEventListener('input', e => {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('ttin')) return;
+  const v = el.value.trim();
+  TTMAN[el.dataset.tk] = (v === '' || v === el.dataset.auto) ? null : v;
+  el.classList.toggle('ttman', TTMAN[el.dataset.tk] != null);
+  markDirty();
+});
 function thInfo(tid, f) {   // 담당 + 보강 선생님 (보강) — f(선생님 번호) 값을 「 / 」로 잇기
   const out = [];
   if (tid) out.push(f(tid) || '');
@@ -1122,8 +1148,8 @@ function drawTT() {
     + '<table class="tt-cal"><tr>' + WDK.map(x => '<th>' + x + '</th>').join('') + '</tr>' + cells + '</table>'
     + '<div class="tt-th">□ 치료사 정보</div>'
     + '<table class="rec-tbl" style="margin-top:6px;"><colgroup><col style="width:15%"><col style="width:35%"><col style="width:15%"><col style="width:35%"></colgroup>'
-    + '<tr><td class="lbl">이름</td><td>' + esc(thInfo(tid, t => THERAPISTS[t] || '')) + '</td><td class="lbl">성별</td><td>' + esc(thInfo(tid, t => THGENDER[t] || '')) + '</td></tr>'
-    + '<tr><td class="lbl">치료기관</td><td>자라는 나무</td><td class="lbl">면허 번호</td><td>' + esc(thInfo(tid, licText)) + '</td></tr></table>'
+    + '<tr><td class="lbl">이름</td><td>' + ttCell('name', tid) + '</td><td class="lbl">성별</td><td>' + ttCell('gender', tid) + '</td></tr>'
+    + '<tr><td class="lbl">치료기관</td><td>자라는 나무</td><td class="lbl">면허 번호</td><td>' + ttCell('lic', tid) + '</td></tr></table>'
     + '<div class="sheetlogo"><img src="img/nl-logo.png" alt="자라는나무"></div>';
   box.style.display = 'block';
 }
@@ -1590,6 +1616,7 @@ async function saveRecord() {
       continue_yn: CONT || null,
       month_summary: $('f_opinion').value || null,
       written_on: WRITTEN || null,
+      th_name_text: TTMAN.name, th_gender_text: TTMAN.gender, th_lic_text: TTMAN.lic,
       updated_at: new Date().toISOString()
     };
     // 잠금 uq_session_log_th — 아동·지원유형·달·수업 (2026-09-11)
