@@ -2390,7 +2390,7 @@ let FC_MK = '';
 let FC_SIG = '';
 let FC_CASES = [];         // 사례 목록 예시 글 (nl_rc_cases.tmpl · 은정님이 표에서 고침)
 function fcReset() {
-  FC = []; FC_DOCS = {}; FC_MK = ''; FC_SIG = '';
+  FC = []; FC_OFF = []; FC_DOCS = {}; FC_MK = ''; FC_SIG = '';
   const b = $('fcBox'); if (b) { b.style.display = 'none'; b.innerHTML = ''; }
   const w = $('fcWrap'); if (w) { w.style.display = 'none'; w.innerHTML = ''; }
 }
@@ -2481,13 +2481,33 @@ function fcRefresh() {
   // 적던 글은 살린다
   const keep = {};
   FC.forEach((c, i) => { if (c.dirty) keep[c.key] = fcRead(i); });
-  FC = cs.map(c => Object.assign(c, { doc: FC_DOCS[c.key] || null, dirty: !!keep[c.key], kept: keep[c.key] || null }));
+  const all = cs.map(c => Object.assign(c, { doc: FC_DOCS[c.key] || null, dirty: !!keep[c.key], kept: keep[c.key] || null }));
+  // 「필요 없음」으로 지운 확인서는 목록에서 뺀다 (2026-11-27 은정님) — 위 안내 줄에서 되살림
+  const off = c => !!(c.doc && c.doc.data && c.doc.data.dismissed);
+  FC = all.filter(c => !off(c));
+  FC_OFF = all.filter(off);
   fcBanner();
-  if (sig !== FC_SIG) { FC_SIG = sig; fcDrawSheets(); }
+  const sig2 = sig + '|off:' + FC_OFF.map(c => c.key).join(',');
+  if (sig2 !== FC_SIG) { FC_SIG = sig2; fcDrawSheets(); }
+}
+let FC_OFF = [];
+function fcOffHtml() {
+  if (!FC_OFF.length) return '';
+  const md = iso => iso ? Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10)) : '';
+  return '<div style="margin-top:6px;color:#7a6a55;">지운 사실 확인서 ' + FC_OFF.length + '건 — '
+    + FC_OFF.map(c => esc((c.i + 1) + '회째 ' + md(c.day)) + ' <button type="button" onclick="fcRestore(\'' + esc(c.key) + '\')">되살리기</button>').join(' · ')
+    + '</div>';
 }
 function fcBanner() {
   const b = $('fcBox');
-  if (!FC.length) { b.style.display = 'none'; $('fcWrap').style.display = 'none'; return; }
+  if (!FC.length && !FC_OFF.length) { b.style.display = 'none'; $('fcWrap').style.display = 'none'; return; }
+  if (!FC.length) {
+    b.className = 'no-print ok';
+    b.innerHTML = '사실 확인서 — 남은 것 없음' + fcOffHtml();
+    b.style.display = 'block';
+    $('fcWrap').style.display = 'none';
+    return;
+  }
   const left = FC.filter(c => !(c.doc && c.doc.done));
   const md = iso => iso ? Number(iso.slice(5, 7)) + '/' + Number(iso.slice(8, 10)) : '';
   const line = c => (c.i + 1) + '회째 ' + md(c.day) + ' — ' + c.why.map(w => FC_WHY[w]).join(' · ');
@@ -2500,6 +2520,7 @@ function fcBanner() {
     b.className = 'no-print ok';
     b.innerHTML = '사실 확인서 — ' + FC.length + '건 모두 작성 끝 <button type="button" onclick="fcOpen()">보기</button>';
   }
+  b.innerHTML += fcOffHtml();
   b.style.display = 'block';
 }
 function fcVal(c, f) {
@@ -2576,6 +2597,7 @@ function fcSheetHtml(c, i) {
     +   '<label><input type="checkbox" class="chg-done"' + (done ? ' checked' : '') + ' onchange="fcSave(' + i + ', this.checked)"> 작성 끝</label>'
     +   (done && c.doc.done_on ? '<span class="chg-signed">' + esc(String(c.doc.done_on).slice(0, 10)) + ' 작성 끝</span>' : '')
     +   '<button type="button" onclick="fcPrint(' + i + ')">이 확인서 인쇄</button>'
+    +   '<button type="button" onclick="fcDismiss(' + i + ')" style="color:#c0392b !important;border-color:#e0b4ad !important;">필요 없음 (지우기)</button>'
     + '</div>'
     + '</div>';
 }
@@ -2714,6 +2736,40 @@ async function fcSave(i, doneVal) {
     if (bt) { bt.disabled = false; bt.textContent = '저장 전'; bt.classList.remove('done'); }
     if (cb && doneVal !== undefined) cb.checked = !doneVal;
   }
+}
+// 불필요하거나 잘못 잡힌 사실 확인서 지우기 (2026-11-27 은정님)
+//   서버에 「지움」 표시로 남겨 다시 생기지 않게 함 · 점검에서는 끝난 것으로 봄 · 위 안내 줄에서 되살림
+async function fcDismiss(i) {
+  const c = FC[i]; if (!c) return;
+  if (!confirm((c.i + 1) + '회째 사실 확인서를 지울까요?\n\n불필요하거나 잘못 잡힌 확인서는 목록과 점검에서 빠집니다.\n(위 안내 줄의 「되살리기」로 다시 꺼낼 수 있습니다)')) return;
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const d = Object.assign(fcRead(i), { dismissed: true, why: c.why, seq: c.i + 1, appr_no: c.no, day: c.day, appr: c.appr });
+  const row = { child_id: Number(childId), doc_type: '사실확인', doc_key: c.key, data: d,
+                done: true, done_on: today, updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs').upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('지운 표시를 저장하지 못했습니다 (권한 확인)');
+    FC_DOCS[c.key] = data[0];
+    c.dirty = false; c.kept = null;
+    FC_SIG = ''; fcRefresh();
+  } catch (e) { alert('사실 확인서를 지우지 못했습니다.\n' + (e.message || e)); }
+}
+async function fcRestore(key) {
+  const doc = FC_DOCS[key]; if (!doc) return;
+  if (!confirm('이 사실 확인서를 되살릴까요?')) return;
+  const d = Object.assign({}, doc.data || {}); delete d.dismissed;
+  const row = { child_id: Number(childId), doc_type: '사실확인', doc_key: key, data: d,
+                done: false, done_on: null, updated_by: ME ? ME.id : null, updated_at: new Date().toISOString() };
+  try {
+    const { data, error } = await sb.from('nl_dev_docs').upsert(row, { onConflict: 'child_id,doc_type,doc_key' })
+      .select('id, doc_key, data, done, done_on, updated_at');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('되살리지 못했습니다 (권한 확인)');
+    FC_DOCS[key] = data[0];
+    FC_SIG = ''; fcRefresh();
+  } catch (e) { alert('사실 확인서를 되살리지 못했습니다.\n' + (e.message || e)); }
 }
 function fcPrint(i) {
   if (FC[i] && FC[i].dirty && !confirm('저장하지 않은 글이 있습니다. 화면 그대로 인쇄할까요?')) return;
