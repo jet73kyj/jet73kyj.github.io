@@ -198,6 +198,12 @@
   <nav class="paytabs"><a href="voucher-upload.html" data-k="dev">발달재활 바우처</a><a href="card-upload.html?st=3" data-k="tr" class="on">치료지원</a><a href="card-upload.html?st=5" data-k="af">방과후</a></nav>
   <div class="wide">
 
+  <div class="card" id="repCard" style="display:none;">
+    <h2>지난 결제 대조 보고서</h2>
+    <div class="note" style="margin:0 0 8px;">④ 「PDF로 저장」을 누를 때 그 달 · 그 갈래 결과가 여기에 저장됩니다 (마지막 것). 눌러서 다시 보고 인쇄합니다.</div>
+    <div id="repList" style="font-size:13px;color:#777;">불러오는 중…</div>
+  </div>
+
   <!-- 1. 파일 올리기 -->
   <div class="card">
     <h2>① 엑셀 고르기</h2>
@@ -933,7 +939,63 @@ $('ckGo').onclick = async () => {
 };
 
 // 점검 결과를 PDF로 — 인쇄 창에서 「PDF로 저장」을 고르시면 됩니다
-$('ckPdf').onclick = () => { window.print(); };
+$('ckPdf').onclick = async () => { await saveReport(); window.print(); };
+
+// ── 결제 대조 보고서 목차 (2026-11-27 은정님) — 표 nl_audit_reports (갈래 치료지원/방과후 · 달마다 마지막 것) ──
+async function saveReport() {
+  const mk = $('ckMk').value, kind = $('ckKind').value === '5' ? '방과후' : '치료지원';
+  const body = $('ckBody');
+  if (!/^\d{4}-\d{2}$/.test(mk || '') || !body || !body.innerHTML.trim()) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = body.innerHTML;
+  wrap.querySelectorAll('button, select').forEach(el => el.remove());
+  wrap.querySelectorAll('input, textarea').forEach(el => { const sp = document.createElement('span'); sp.textContent = el.value || ''; el.replaceWith(sp); });
+  try {
+    const { data, error } = await sb.from('nl_audit_reports')
+      .upsert({ kind: kind, month_key: mk, html: wrap.innerHTML, saved_at: new Date().toISOString() },
+              { onConflict: 'kind,month_key' }).select('id');
+    if (error || !data || !data.length) throw (error || new Error('저장된 줄을 돌려받지 못했습니다'));
+    loadReports();
+  } catch (e) { alert('보고서를 목차에 남기지 못했습니다 (PDF는 그대로 만들 수 있습니다).\n' + (e.message || e)); }
+}
+async function loadReports() {
+  const card = $('repCard'), box = $('repList'); if (!box) return;
+  card.style.display = '';
+  try {
+    const { data, error } = await sb.from('nl_audit_reports').select('id, kind, month_key, saved_at')
+      .in('kind', ['치료지원', '방과후']).order('month_key', { ascending: false }).range(0, 199);
+    if (error) throw error;
+    const reps = data || [];
+    if (!reps.length) { box.textContent = '아직 저장된 보고서가 없습니다.'; return; }
+    const by = {};
+    reps.forEach(r => { (by[r.month_key] = by[r.month_key] || []).push(r); });
+    box.innerHTML = Object.keys(by).sort().reverse().map(mk =>
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid #EEE;">'
+      + '<b style="min-width:90px;color:#333;">' + esc(mk.slice(0, 4) + '년 ' + Number(mk.slice(5, 7)) + '월') + '</b>'
+      + by[mk].sort((a, b) => a.kind > b.kind ? -1 : 1).map(r =>
+          '<button type="button" class="ghost" data-rep="' + r.id + '" style="padding:4px 10px;width:auto;margin:0;">' + esc(r.kind) + ' 열기</button>'
+          + '<span style="font-size:11.5px;color:#999;">' + esc(String(r.saved_at || '').slice(5, 16).replace('T', ' ')) + '</span>').join(' ')
+      + '</div>').join('');
+    box.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => openReport(Number(b.dataset.rep)));
+  } catch (e) { box.textContent = '보고서 목록을 불러오지 못했습니다. (' + (e.message || e) + ')'; }
+}
+async function openReport(id) {
+  const w = window.open('', '_blank');
+  if (!w) { alert('새 창이 막혀 있습니다. 주소창 오른쪽에서 팝업을 허용해 주세요.'); return; }
+  w.document.write('<p style="font-family:sans-serif">불러오는 중…</p>');
+  const { data, error } = await sb.from('nl_audit_reports').select('kind, month_key, html, saved_at').eq('id', id).maybeSingle();
+  if (error || !data) { w.document.body.textContent = '불러오지 못했습니다. ' + (error ? error.message : ''); return; }
+  const css = Array.from(document.querySelectorAll('style')).map(st => st.outerHTML).join('');
+  const ttl = data.month_key.slice(0, 4) + '년 ' + Number(data.month_key.slice(5, 7)) + '월 ' + data.kind + ' 결제 대조';
+  w.document.open();
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + esc(ttl) + '</title>' + css
+    + '</head><body style="background:#fff;padding:20px;"><div class="wide">'
+    + '<div class="pdfbtn" style="margin-bottom:12px;"><button onclick="window.print()" style="width:auto;">인쇄 · PDF로 저장</button></div>'
+    + '<h3 style="margin:0 0 4px;">' + esc(ttl) + '</h3>'
+    + '<div style="font-size:12px;color:#777;margin-bottom:12px;">저장 ' + esc(String(data.saved_at || '').slice(0, 16).replace('T', ' ')) + '</div>'
+    + data.html + '</div></body></html>');
+  w.document.close();
+}
 $('ckCopy').onclick = () => { if (CK_COPY) upCopyText($('ckCopyBox'), CK_COPY); };
 
 // ── 로그인 ────────────────────────────────────────
@@ -953,6 +1015,7 @@ async function afterLogin(user) {
     return;
   }
 
+  loadReports();
   const [c, m, tn, tp] = await Promise.all([
     sb.from('nl_children').select('id, name, birth, status').order('id'),
     sb.from('nl_card_map').select('person_name, support_type_id, child_id'),
