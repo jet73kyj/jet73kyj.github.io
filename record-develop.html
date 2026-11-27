@@ -471,7 +471,7 @@
         <td class="lbl">전화</td><td><input type="tel" id="s1_svcTel" data-tel inputmode="numeric" maxlength="13" autocomplete="off" value="042-488-6011"></td>
       </tr>
       <tr>
-        <td class="lbl">담당</td><td><input type="text" id="s1_svcCharge"></td>
+        <td class="lbl">담당</td><td><input type="text" id="s1_svcCharge" list="thNameList" title="담당 — 바뀌었으면 직접 고쳐 적으세요 (비우면 시간표 담당)" oninput="this.style.background = this.value.trim() && this.value.trim() !== (this.dataset.auto || '') ? '#fff8d6' : ''"></td>
         <td class="lbl">서비스 종류</td><td><input type="text" id="s1_svcType" value="감각발달재활" oninput="syncCalSvc()"></td>
       </tr>
       <tr>
@@ -1394,6 +1394,8 @@ function drawAll(saved) {
   $('s1_svcType').value    = area;
   $('s1_costType').value   = area;
   $('s1_svcCharge').value  = tname;
+  $('s1_svcCharge').dataset.auto = tname;
+  $('s1_svcCharge').style.background = '';
   for (let i = 1; i <= SESSIONS; i++) {
     // 회차마다 그 회기를 맡은 선생님 (시간표 회기 · 2026-10-02)
     const _sl = SLOTS[i - 1];
@@ -1428,6 +1430,8 @@ function drawAll(saved) {
     if (saved.sig_admin)    $('s1_adminSig').value    = saved.sig_admin;
     if (saved.sig_guardian) $('s1_guardianSig').value = saved.sig_guardian;
     if (saved.cycle_text)   $('s1_svcCycle').value    = saved.cycle_text;
+    // 서비스제공현황 담당 — 직접 고친 이름 (2026-11-27 은정님)
+    if (saved.charge_text) { $('s1_svcCharge').value = saved.charge_text; $('s1_svcCharge').style.background = '#fff8d6'; }
     if (saved.area_text)  { $('s1_area').value = saved.area_text;
                             $('s1_svcType').value = saved.area_text;
                             $('s1_costType').value = saved.area_text; }
@@ -3992,6 +3996,9 @@ async function saveRecord(opts) {
       sig_admin:    $('s1_adminSig').value || null,
       sig_guardian: $('s1_guardianSig').value || null,
       cycle_text:   $('s1_svcCycle').value || null,
+      // 담당 — 시간표 담당과 다를 때만 남김 · 비우면 시간표 담당
+      charge_text:  (() => { const e = $('s1_svcCharge'), v = String(e.value || '').trim();
+                             return v && v !== String(e.dataset.auto || '').trim() ? v : null; })(),
       days_text:    $('s1_svcDays').value || null,
       area_text:    $('s1_svcType').value || null,
       written_on:   /^\d{4}-\d{2}-\d{2}$/.test(wd) ? wd : null,
@@ -4138,7 +4145,7 @@ function setSaveBtn(st) {
 (function lockSheet1(){
   const ids = ['s1_org','s1_childName',   // 제공영역은 직접 고침 (2026-10-06)
                's1_childBirth','s1_mgmtNo','s1_childName2',
-               's1_provider','s1_svcProviderName','s1_svcTel','s1_svcCharge',
+               's1_provider','s1_svcProviderName','s1_svcTel',   // 담당(s1_svcCharge)은 직접 고침 (2026-11-27)
                's1_costType','s1_costUnit','s1_costCount','s1_costTotal','s1_costSelf','s1_svcDays'];
   // 담당재활사는 회차마다 직접 고칠 수 있다 (2026-10-30 은정님 — 143번 수업 중 선생님 바뀜)
   for (let i = 1; i <= 4; i++) ids.push('s1_totalTime_' + i, 's1_totalCost_' + i);
