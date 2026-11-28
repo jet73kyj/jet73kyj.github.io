@@ -2083,18 +2083,29 @@ function isPaid(childId) {
 // (「미납만」 단추를 누르면 적어둔 낸날이 사라지던 문제)
 let TYPED = {};
 
+// 칸마다 이름표 — 칸 이름 전체 + 지원유형 + 같은 이름 칸의 몇 번째 (2026-11-28 · 173번)
+//   전에는 첫 이름(tx · dt)과 상자 안 전체 차례로 짝지었다.
+//   날짜 칸 옆 글자 칸(nlDt)이 그린 뒤에 생겨 차례가 한 칸씩 밀리면
+//   승인번호가 금액 · 메모 칸으로 들어가 보였다 (서버 값은 그대로)
+function typedEach(box, fn) {
+  const seen = {};
+  box.querySelectorAll('input, select').forEach(el => {
+    if (el.classList.contains('nlDt')) return;     // 날짜 칸 옆 글자 칸은 진짜 날짜 칸이 맡는다
+    const nm = (el.className || '').trim() || el.tagName;
+    const st = el.closest('[data-st]');
+    const base = nm + '|' + (st ? st.dataset.st : '');
+    seen[base] = (seen[base] || 0) + 1;
+    fn(el, base + '|' + seen[base]);
+  });
+}
+
 function keepTyped() {
   TYPED = {};
   document.querySelectorAll('#kids .kid').forEach(box => {
     const kid = box.dataset.child;
     if (!kid) return;
     const one = {};
-    box.querySelectorAll('input, select').forEach((el, i) => {
-      const nm = (el.className || '').split(' ')[0] || el.tagName;
-      const st = el.closest('[data-st]');
-      const key = nm + '|' + (st ? st.dataset.st : '') + '|' + i;
-      one[key] = el.value;
-    });
+    typedEach(box, (el, key) => { one[key] = el.value; });
     TYPED[kid] = one;
   });
 }
@@ -2103,12 +2114,7 @@ function putTyped() {
   document.querySelectorAll('#kids .kid').forEach(box => {
     const one = TYPED[box.dataset.child];
     if (!one) return;
-    box.querySelectorAll('input, select').forEach((el, i) => {
-      const nm = (el.className || '').split(' ')[0] || el.tagName;
-      const st = el.closest('[data-st]');
-      const key = nm + '|' + (st ? st.dataset.st : '') + '|' + i;
-      if (one[key] != null && one[key] !== '') el.value = one[key];
-    });
+    typedEach(box, (el, key) => { if (one[key] != null && one[key] !== '') el.value = one[key]; });
   });
 }
 
